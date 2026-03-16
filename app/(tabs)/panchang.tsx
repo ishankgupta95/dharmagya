@@ -218,7 +218,7 @@ function MiniCell({ label, value, colors }: { label: string; value: string; colo
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function PanchangScreen() {
-  const { isDarkMode } = useStore();
+  const { isDarkMode, userLocation } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -234,7 +234,7 @@ export default function PanchangScreen() {
   const loadPanchang = useCallback(async (date: Date) => {
     setLoading(true);
     setError(false);
-    const result = await fetchPanchang(date);
+    const result = await fetchPanchang(date, userLocation);
     if (result) {
       setPanchang(result);
     } else {
@@ -250,7 +250,7 @@ export default function PanchangScreen() {
   async function handlePickDate(date: Date) {
     setPickerDate(date);
     setPickerLoading(true);
-    const result = await fetchPanchang(date);
+    const result = await fetchPanchang(date, userLocation);
     setPickerPanchang(result);
     setPickerLoading(false);
   }
@@ -281,7 +281,11 @@ export default function PanchangScreen() {
         <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>Panchang</Text>
         <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
           <Ionicons name="location" size={10} color={colors.accent} />
-          <Text style={[styles.locationText, { color: colors.textMuted }]}> Pune, MH (GPS)</Text>
+          <Text style={[styles.locationText, { color: colors.textMuted }]}>
+            {userLocation
+              ? ` ${userLocation.lat.toFixed(2)}°N, ${userLocation.lon.toFixed(2)}°E`
+              : ' Pune, MH (default)'}
+          </Text>
         </View>
       </View>
 

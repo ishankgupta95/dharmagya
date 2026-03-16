@@ -116,14 +116,6 @@ export function PanchangSkeleton({ colors }: { colors: ColorPalette }) {
   return (
     <View style={{ gap: 16, paddingTop: 8 }}>
 
-      {/* Date display area */}
-      <View style={{ alignItems: 'center', gap: 10 }}>
-        <SkeletonBlock width={160} height={14} colors={colors} />
-        <SkeletonBlock width={60} height={42} colors={colors} />
-        <SkeletonBlock width={200} height={14} colors={colors} />
-        <SkeletonBlock width={120} height={12} colors={colors} />
-      </View>
-
       {/* Pancha Anga card — 5 limb rows */}
       <View style={full.card}>
         {[0, 1, 2, 3, 4].map((i) => (

@@ -38,9 +38,12 @@ async function getCoords(): Promise<{ lat: number; lon: number }> {
   return FALLBACK;
 }
 
-export async function fetchPanchang(date: Date): Promise<IPanchangDay | null> {
+export async function fetchPanchang(
+  date: Date,
+  savedCoords?: { lat: number; lon: number } | null,
+): Promise<IPanchangDay | null> {
   try {
-    const coords = await getCoords();
+    const coords = savedCoords ?? (await getCoords());
     const observer = new Observer(coords.lat, coords.lon, ELEVATION);
     const result = getPanchangam(date, observer, { timezoneOffset: TIMEZONE_OFFSET });
 
@@ -66,6 +69,8 @@ export async function fetchPanchang(date: Date): Promise<IPanchangDay | null> {
   }
 }
 
-export async function fetchPanchangForToday(): Promise<IPanchangDay | null> {
-  return fetchPanchang(new Date());
+export async function fetchPanchangForToday(
+  savedCoords?: { lat: number; lon: number } | null,
+): Promise<IPanchangDay | null> {
+  return fetchPanchang(new Date(), savedCoords);
 }

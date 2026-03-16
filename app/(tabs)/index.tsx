@@ -51,7 +51,7 @@ function rowToAarti(row: AartiRow): IAarti {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { isDarkMode, favoriteIds } = useStore();
+  const { isDarkMode, favoriteIds, userLocation } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 
@@ -61,7 +61,7 @@ export default function HomeScreen() {
 
   // ── Panchang ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchPanchangForToday()
+    fetchPanchangForToday(userLocation)
       .then(setPanchang)
       .finally(() => setPanchangLoading(false));
   }, []);
@@ -72,8 +72,9 @@ export default function HomeScreen() {
     let row: AartiRow | null = null;
 
     if (favAartiIds.length > 0) {
-      const randomId = favAartiIds[Math.floor(Math.random() * favAartiIds.length)];
-      row = db.getFirstSync<AartiRow>('SELECT * FROM aartis WHERE id = ?', [randomId]);
+      const randomPrefixed = favAartiIds[Math.floor(Math.random() * favAartiIds.length)];
+      const rawId = randomPrefixed.slice('aarti-'.length);
+      row = db.getFirstSync<AartiRow>('SELECT * FROM aartis WHERE id = ?', [rawId]);
     }
 
     if (!row) {
@@ -129,7 +130,7 @@ export default function HomeScreen() {
             <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
               <Ionicons name="location-outline" size={10} color={colors.textMuted} />
               <Text style={[styles.locationText, { color: colors.textMuted }]}>
-                {'  Pune, MH'}
+                {'  '}{userLocation ? 'GPS' : 'Pune, MH'}
               </Text>
             </View>
           </View>
