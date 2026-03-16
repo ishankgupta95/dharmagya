@@ -140,6 +140,12 @@ export default function LibraryScreen() {
           <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>भजन संग्रह</Text>
           <Text style={[styles.screenTitleEn, { color: colors.textMuted }]}>Library</Text>
         </View>
+        <TouchableOpacity
+          onPress={() => router.push('/search')}
+          style={[styles.searchBtn, { backgroundColor: colors.surfaceRecessed }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Segment Control ───────────────────────────────────────────── */}
@@ -331,13 +337,14 @@ const styles = StyleSheet.create({
   // Header
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
     paddingBottom: 12,
   },
   screenTitle: { fontSize: 22, fontFamily: 'Mukta_700Bold', lineHeight: 28 },
   screenTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginTop: 1 },
+  searchBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
   // Segment
   segmentWrap: { marginBottom: 14 },
