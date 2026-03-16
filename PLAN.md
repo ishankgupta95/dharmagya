@@ -832,7 +832,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Tapping an aarti navigates to `app/aarti/[id].tsx`. Tapping a chalisa navigates to `app/chalisa/[id].tsx`.
   - Favorites toggle (heart icon) updates Zustand `favoriteIds` — works for both aartis and chalisas.
 
-### Step 10: Aarti Detail Screen
+### Step 10a: Aarti Detail Screen
 
 - In `app/aarti/[id].tsx`, build per Section 6.5.
 - Read the aarti ID using `const { id } = useLocalSearchParams<{ id: string }>()` (see Section 3.6).
