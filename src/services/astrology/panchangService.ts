@@ -23,9 +23,11 @@ function formatTime(date: Date | null | undefined): string | undefined {
   });
 }
 
+// Only checks existing permission — never shows a dialog.
+// Permission is requested explicitly from the location-permission screen.
 async function getCoords(): Promise<{ lat: number; lon: number }> {
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.getForegroundPermissionsAsync();
     if (status === 'granted') {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,

@@ -241,7 +241,7 @@ export default function PanchangScreen() {
       setError(true);
     }
     setLoading(false);
-  }, []);
+  }, [userLocation]);
 
   useEffect(() => {
     loadPanchang(selectedDate);

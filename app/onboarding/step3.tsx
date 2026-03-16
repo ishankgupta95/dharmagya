@@ -19,7 +19,14 @@ export default function OnboardingStep3() {
 
   function handleFinish() {
     setHasOnboarded();
-    router.replace('/(tabs)');
+    if (locationChoice === 'gps') {
+      // Replace history with tabs first so router.back() from location-permission
+      // lands on the main app, not the onboarding flow.
+      router.replace('/(tabs)');
+      router.push('/location-permission');
+    } else {
+      router.replace('/(tabs)');
+    }
   }
 
   function handleThemeSelect(dark: boolean) {
