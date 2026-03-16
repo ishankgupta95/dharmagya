@@ -67,7 +67,10 @@ export default function SettingsScreen() {
 
         {/* ── Location ──────────────────────────────────────────────── */}
         <SectionHeader label="LOCATION" colors={colors} />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/location-permission')}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
             icon="location-outline"
@@ -75,11 +78,14 @@ export default function SettingsScreen() {
             sublabel={locationText}
             colors={colors}
             right={
-              <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
+              <View style={styles.locationRight}>
+                <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              </View>
             }
           />
 
-        </View>
+        </TouchableOpacity>
 
         {/* ── Notifications ─────────────────────────────────────────── */}
         <SectionHeader label="NOTIFICATIONS" colors={colors} />
@@ -249,6 +255,7 @@ const styles = StyleSheet.create({
 
   // Status dot
   statusDot: { width: 8, height: 8, borderRadius: 4 },
+  locationRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // Version text
   versionText: { fontSize: 13, fontFamily: 'Mukta_400Regular' },

@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +16,7 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import type { IPanchangDay, IAarti } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -136,10 +136,7 @@ export default function HomeScreen() {
 
           {/* 2×2 grid */}
           {panchangLoading ? (
-            <ActivityIndicator
-              color={colors.accent}
-              style={{ marginVertical: 20 }}
-            />
+            <HomePanchangSkeleton colors={colors} />
           ) : panchang ? (
             <>
               <View style={styles.panchangGrid}>

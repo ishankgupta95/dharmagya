@@ -9,17 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { fetchPanchang } from '@/services/astrology/panchangService';
+import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
 import type { IPanchangDay } from '@/types';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
@@ -43,39 +38,6 @@ function isSameDay(a: Date, b: Date) {
   return a.getDate() === b.getDate() &&
     a.getMonth() === b.getMonth() &&
     a.getFullYear() === b.getFullYear();
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
-function SkeletonBlock({ width, height, colors }: { width: number | string; height: number; colors: ColorPalette }) {
-  const opacity = useSharedValue(0.3);
-  useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.7, { duration: 900 }), -1, true);
-  }, [opacity]);
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return (
-    <Animated.View
-      style={[{ width: width as number, height, borderRadius: 8, backgroundColor: colors.surfaceRecessed }, style]}
-    />
-  );
-}
-
-function PanchangSkeleton({ colors }: { colors: ColorPalette }) {
-  return (
-    <View style={{ gap: 16, paddingTop: 8 }}>
-      <View style={{ alignItems: 'center', gap: 10 }}>
-        <SkeletonBlock width={160} height={14} colors={colors} />
-        <SkeletonBlock width={60} height={42} colors={colors} />
-        <SkeletonBlock width={200} height={14} colors={colors} />
-        <SkeletonBlock width={120} height={12} colors={colors} />
-      </View>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, gap: 16 }]}>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <SkeletonBlock key={i} width="100%" height={52} colors={colors} />
-        ))}
-      </View>
-    </View>
-  );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
