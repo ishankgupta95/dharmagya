@@ -28,6 +28,266 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 6. No babel.config.js changes needed: `react-native-reanimated` v4 does NOT require a babel plugin. Do not add `react-native-reanimated/plugin` anywhere.
 7. Source structure: Migrate existing root-level `components/`, `hooks/`, and `constants/` into `src/` during scaffolding for a clean structure.
 
+### 3.1 `@ishubhamx/panchangam-js` API Contract
+
+**Package:** `@ishubhamx/panchangam-js` (v2.1.x) — pure TypeScript, no native modules, works in React Native out of the box.
+
+**Import:**
+```typescript
+import { getPanchangam, Observer } from '@ishubhamx/panchangam-js';
+```
+
+**Observer constructor:**
+```typescript
+// Observer(latitude: number, longitude: number, elevationInMeters: number)
+const observer = new Observer(18.6298, 73.7997, 560); // Pune
+```
+
+**getPanchangam call:**
+```typescript
+// getPanchangam(date: Date, observer: Observer, options?: { timezoneOffset?: number }): Panchangam
+const panchangam = getPanchangam(new Date(), observer, { timezoneOffset: 330 }); // IST = +330 minutes
+```
+
+**Return type — `Panchangam` interface (relevant fields for MVP):**
+```typescript
+interface Panchangam {
+  // Core — these are NUMERIC INDICES, not display strings
+  tithi: number;          // 0-29 (lunar day index)
+  nakshatra: number;      // 0-26 (lunar mansion index)
+  yoga: number;           // 0-26 (sun-moon combination index)
+  karana: string;         // string name (e.g., "Bava", "Balava", "Kaulava")
+  vara: number;           // 0=Sunday, 1=Monday, ... 6=Saturday
+
+  // Times — Date objects or null
+  sunrise: Date | null;
+  sunset: Date | null;
+  moonrise: Date | null;
+  moonset: Date | null;
+  tithiEndTime: Date | null;
+  nakshatraEndTime: Date | null;
+  yogaEndTime: Date | null;
+
+  // Inauspicious periods
+  rahuKalamStart: Date | null;
+  rahuKalamEnd: Date | null;
+
+  // Muhurats
+  abhijitMuhurta: { start: Date; end: Date } | null;
+  brahmaMuhurta: { start: Date; end: Date } | null;
+
+  // Planetary positions
+  planetaryPositions: {
+    sun: { rashi: number; rashiName: string; degree: number; longitude: number };
+    moon: { rashi: number; rashiName: string; degree: number; longitude: number };
+    // ... mars, mercury, jupiter, venus, saturn (same shape)
+  };
+
+  // Festivals
+  festivals: string[];
+}
+```
+
+**CRITICAL: Converting indices to display strings.** `tithi`, `nakshatra`, and `yoga` are numbers. Use the exported name arrays:
+```typescript
+import { tithiNames, nakshatraNames, yogaNames } from '@ishubhamx/panchangam-js';
+
+const tithiLabel = tithiNames[panchangam.tithi];         // e.g., "Krishna Chaturdashi"
+const nakshatraLabel = nakshatraNames[panchangam.nakshatra]; // e.g., "Purva Bhadrapada"
+const yogaLabel = yogaNames[panchangam.yoga];             // e.g., "Siddha"
+```
+
+**Timezone handling:** Always pass `timezoneOffset: 330` (IST, +5:30) in options for Indian users. Without it, the library approximates from longitude, which can be inaccurate.
+
+**Performance:** ~5ms per calculation. Safe to call synchronously on the JS thread.
+
+### 3.2 `expo-sqlite` API (SDK 54+)
+
+Use the modern synchronous API. Do NOT use the legacy `expo-sqlite/legacy` or `SQLite.openDatabase()`.
+
+```typescript
+import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
+
+// Open/create database (synchronous, call at module level or in layout)
+const db: SQLiteDatabase = openDatabaseSync('dharmsetu.db');
+
+// Execute statements
+db.execSync(`
+  CREATE TABLE IF NOT EXISTS aartis (
+    id TEXT PRIMARY KEY NOT NULL,
+    titleEnglish TEXT NOT NULL,
+    titleNative TEXT NOT NULL,
+    content TEXT NOT NULL,
+    deity TEXT NOT NULL
+  );
+`);
+
+// Query with parameters (returns array of row objects)
+const rows = db.getAllSync<IAarti>('SELECT * FROM aartis WHERE deity = ?', ['Ganesh']);
+
+// Insert
+db.runSync(
+  'INSERT OR REPLACE INTO aartis (id, titleEnglish, titleNative, content, deity) VALUES (?, ?, ?, ?, ?)',
+  [aarti.id, aarti.titleEnglish, aarti.titleNative, JSON.stringify(aarti.content), aarti.deity]
+);
+
+// For React components, use the hook:
+import { useSQLiteContext } from 'expo-sqlite';
+// Requires <SQLiteProvider> wrapper in _layout.tsx
+```
+
+**Provider pattern in `_layout.tsx`:**
+```typescript
+import { SQLiteProvider } from 'expo-sqlite';
+
+// In the layout component:
+<SQLiteProvider databaseName="dharmsetu.db" useSuspense>
+  {/* app content */}
+</SQLiteProvider>
+```
+
+### 3.3 Path Aliases
+
+Configure `@/` alias to point to `src/`. Add to `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
+```
+
+All imports from `src/` should use the alias:
+```typescript
+import { useStore } from '@/store/useStore';
+import { IAarti } from '@/types';
+import { darkTheme, lightTheme } from '@/config/theme';
+```
+
+### 3.4 Zustand Persistence
+
+Use `zustand/middleware` persist with `expo-sqlite/kv-store` as the storage backend (already available since we install `expo-sqlite`):
+
+```typescript
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from 'expo-sqlite/kv-store';
+
+interface AppStore {
+  // Persisted
+  isDarkMode: boolean;
+  favoriteIds: string[];       // Stores both aarti and chalisa IDs (prefixed: "aarti-*", "chalisa-*")
+  hasOnboarded: boolean;
+  selectedDeities: string[];
+  userLocation: { lat: number; lon: number } | null;
+
+  // Actions (not persisted)
+  toggleTheme: () => void;
+  toggleFavorite: (id: string) => void;
+  setUserLocation: (loc: { lat: number; lon: number }) => void;
+  setHasOnboarded: () => void;
+  setSelectedDeities: (deities: string[]) => void;
+}
+
+export const useStore = create<AppStore>()(
+  persist(
+    (set, get) => ({
+      isDarkMode: true,
+      favoriteIds: [],
+      hasOnboarded: false,
+      selectedDeities: [],
+      userLocation: null,
+
+      toggleTheme: () => set((s) => ({ isDarkMode: !s.isDarkMode })),
+      toggleFavorite: (id) =>
+        set((s) => ({
+          favoriteIds: s.favoriteIds.includes(id)
+            ? s.favoriteIds.filter((fId) => fId !== id)
+            : [...s.favoriteIds, id],
+        })),
+      setUserLocation: (loc) => set({ userLocation: loc }),
+      setHasOnboarded: () => set({ hasOnboarded: true }),
+      setSelectedDeities: (deities) => set({ selectedDeities: deities }),
+    }),
+    {
+      name: 'dharmsetu-store',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);
+```
+
+### 3.5 Font Loading
+
+Load these Mukta variants via `@expo-google-fonts/mukta`:
+
+```typescript
+import {
+  useFonts,
+  Mukta_400Regular,
+  Mukta_500Medium,
+  Mukta_700Bold,
+} from '@expo-google-fonts/mukta';
+
+// In _layout.tsx:
+const [fontsLoaded] = useFonts({
+  Mukta_400Regular,
+  Mukta_500Medium,
+  Mukta_700Bold,
+});
+```
+
+**Usage in styles:**
+```typescript
+fontFamily: 'Mukta_400Regular'  // body text
+fontFamily: 'Mukta_500Medium'   // headings, labels
+fontFamily: 'Mukta_700Bold'     // emphasis
+```
+
+### 3.6 Expo Router Dynamic Routes
+
+**Aarti detail route:** `app/aarti/[id].tsx`
+
+```typescript
+import { useLocalSearchParams } from 'expo-router';
+
+export default function AartiDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  // Query SQLite for aarti with this id
+}
+```
+
+**Navigation to detail:**
+```typescript
+import { router } from 'expo-router';
+
+// From Library or Home screen:
+router.push(`/aarti/${aarti.id}`);
+```
+
+**Other routes:** Settings, Search, Favorites, and Onboarding are standard stack screens — no dynamic params needed.
+
+### 3.7 MVP Scope Clarifications
+
+- **Notification toggles (Settings screen):** UI-only stubs in MVP. Store the boolean in Zustand but do NOT wire up `expo-notifications`. The toggles flip state but don't schedule actual notifications. Phase 2 adds real scheduling.
+- **Read Along Mode (Aarti Detail):** Button is present but disabled / shows a "Coming Soon" toast in MVP. No auto-scroll implementation yet.
+- **Font Size setting (Settings):** UI stub only in MVP. Chevron + "Medium" label but tapping does nothing. Phase 2 adds a font scale slider.
+- **Panchang Date Picker:** INCLUDE in MVP. Tapping the date area should open the calendar grid and recalculate Panchang for any selected date using `getPanchangam(selectedDate, observer)`.
+
+### 3.8 Project File Context
+
+**IMPORTANT:** Before starting Step 1, inspect these files for current state:
+- `app.json` or `app.config.ts` — check existing plugins, splash config, scheme.
+- `tsconfig.json` — check if path aliases already exist.
+- `package.json` — check already-installed deps to avoid duplicates.
+- Run `ls -la` at project root to see existing folder structure.
+- Run `ls app/` and `ls app/(tabs)/` to see existing route files.
+
+Do NOT overwrite files blindly. Read first, then modify.
+
 ---
 
 ## 4. Design System
@@ -74,6 +334,7 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 | Shiva    | Blue      | `#7AA8C8` |
 | Lakshmi  | Gold      | `#D4A853` |
 | Vishnu   | Teal      | `#5DCAA5` |
+| Hanuman  | Vermilion | `#E85D3A` |
 
 #### Semantic Colors
 
@@ -146,16 +407,17 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 | 4  | Panchang         | `app/(tabs)/panchang.tsx`    | Designed |
 | 5  | Library          | `app/(tabs)/library.tsx`     | Designed |
 | 6  | Aarti Detail     | `app/aarti/[id].tsx`         | Designed |
+| 7  | Chalisa Detail   | `app/chalisa/[id].tsx`       | New      |
 
 ### 5.2 Supporting Screens
 
 | #  | Screen                 | Route / Context                | Status   |
 | -- | ---------------------- | ------------------------------ | -------- |
-| 7  | Settings               | `app/settings.tsx`             | Designed |
-| 8  | Favorites (populated)  | `app/favorites.tsx`            | Designed |
-| 9  | Favorites (empty)      | `app/favorites.tsx`            | Designed |
-| 10 | Search                 | `app/search.tsx`               | Designed |
-| 11 | Panchang Date Picker   | (overlay on Panchang screen)   | Designed |
+| 8  | Settings               | `app/settings.tsx`             | Designed |
+| 9  | Favorites (populated)  | `app/favorites.tsx`            | Designed |
+| 10 | Favorites (empty)      | `app/favorites.tsx`            | Designed |
+| 11 | Search                 | `app/search.tsx`               | Designed |
+| 12 | Panchang Date Picker   | (overlay on Panchang screen)   | Designed |
 
 ### 5.3 Flows & States
 
@@ -410,48 +672,131 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
     id: string;
     titleEnglish: string;
     titleNative: string;
-    content: string[];
-    deity: string;
+    content: string[];   // Array of verse strings
+    deity: string;       // "Ganesh" | "Shiva" | "Lakshmi" | "Vishnu" | "Hanuman"
   }
 
+  export interface IChalisaSection {
+    type: 'doha' | 'chaupai';  // Doha = couplet, Chaupai = quatrain
+    label: string;              // "दोहा" or "चौपाई"
+    verses: string[];           // Array of verse strings
+  }
+
+  export interface IChalisa {
+    id: string;
+    titleEnglish: string;
+    titleNative: string;
+    deity: string;              // "Hanuman" | "Shiva" | "Ganesh" etc.
+    sections: IChalisaSection[]; // Ordered: opening doha → chaupais → closing doha
+  }
+
+  // Mapped from raw Panchangam response (numeric indices → display strings)
   export interface IPanchangDay {
     date: Date;
-    tithi: string;
-    nakshatra: string;
-    yoga: string;
-    karana: string;
-    sunrise: string;
-    sunset: string;
+    tithi: string;              // Resolved from tithiNames[panchangam.tithi]
+    nakshatra: string;          // Resolved from nakshatraNames[panchangam.nakshatra]
+    yoga: string;               // Resolved from yogaNames[panchangam.yoga]
+    karana: string;             // Already a string from library
+    sunrise: string;            // Formatted from panchangam.sunrise Date
+    sunset: string;             // Formatted from panchangam.sunset Date
+    tithiEndTime?: string;      // Formatted end time
+    nakshatraEndTime?: string;  // Formatted end time
+    yogaEndTime?: string;       // Formatted end time
+    rahuKalamStart?: string;    // Formatted
+    rahuKalamEnd?: string;      // Formatted
   }
   ```
 
-- In `src/store/useStore.ts`, set up Zustand for: `isDarkMode`, `toggleTheme`, `userLocation`, `setUserLocation`, `favoriteAartiIds`, `toggleFavorite`.
-
+- In `src/store/useStore.ts`, implement the full Zustand store with persistence **exactly as specified in Section 3.4**. Update `favoriteAartiIds` to `favoriteIds` — this stores both aarti and chalisa IDs (they have distinct prefixes: `aarti-*` and `chalisa-*`).
 ### Step 3: Theme & Typography Configuration
 
 - In `src/config/theme.ts`, extend the `MD3DarkTheme` and `MD3LightTheme` using the color palette from Section 4.1.
 - Map dark theme colors: primary = `#E8893C`, background = `#1A1A1F`, surface = `#222228`, onSurface = `#F0E6D3`.
 - Map light theme colors: primary = `#C06A20`, background = `#FAF6F0`, surface = `#FFFFFF`, onSurface = `#2A2218`.
-- Ensure the font config maps to the loaded Mukta fonts to prevent Devanagari clipping.
+- Load Mukta fonts as specified in Section 3.5 (`Mukta_400Regular`, `Mukta_500Medium`, `Mukta_700Bold`).
+- Configure RN Paper's `fontConfig` to use `Mukta_400Regular` as the default body font and `Mukta_500Medium` for headings.
 
 ### Step 4: App Shell, Routing & Splash Screen
 
+- **FIRST:** Read `app.json` (or `app.config.ts`) and `tsconfig.json` to understand current config before modifying.
+- Set up `tsconfig.json` path alias as specified in Section 3.3 (if not already present).
 - Delete `app/(tabs)/explore.tsx` (default Expo template file, not needed).
-- In `app/_layout.tsx`, use `expo-splash-screen` to prevent the UI from mounting until Mukta fonts are loaded and the SQLite database is ready.
-- Wrap the root layout in the `PaperProvider` (dynamically passing the theme from Zustand).
+- In `app/_layout.tsx`:
+  - Load Mukta fonts using `useFonts` (Section 3.5). Keep splash screen visible until fonts load.
+  - Wrap app in `<SQLiteProvider databaseName="dharmsetu.db" useSuspense>` (Section 3.2).
+  - Wrap in `<PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>`.
+  - Use `expo-splash-screen` `preventAutoHideAsync()` / `hideAsync()` pattern.
+  - Check `useStore().hasOnboarded` — if false, redirect to onboarding flow.
 - Update `app/(tabs)/_layout.tsx` to define exactly three tabs: `index.tsx` (Home), `panchang.tsx` (Calendar), `library.tsx` (Aartis).
 - Tab bar styling: `#1A1A1F` background (dark), `#FAF6F0` (light), 0.5px top border. Active = filled icon + accent label. Inactive = outline icon + textMuted label.
 - Create empty screen files: `app/(tabs)/panchang.tsx` and `app/(tabs)/library.tsx`.
 
 ### Step 5: The Panchang Engine Service
 
-- In `src/services/astrology/panchangService.ts`, create a service that checks for Expo Location permissions, reads coordinates (or uses fallback), calls `getPanchangam` from `@ishubhamx/panchangam-js`, and returns a typed `IPanchangDay` object.
+- In `src/services/astrology/panchangService.ts`, create a service that:
+  1. Checks for Expo Location permissions via `expo-location`.
+  2. Reads coordinates (or uses fallback: `{ lat: 18.6298, lon: 73.7997 }`).
+  3. Creates an Observer: `new Observer(lat, lon, 560)` (560m default elevation for Pune).
+  4. Calls `getPanchangam(date, observer, { timezoneOffset: 330 })`.
+  5. Maps the raw response to `IPanchangDay`:
+     - `tithiNames[result.tithi]` → tithi string
+     - `nakshatraNames[result.nakshatra]` → nakshatra string
+     - `yogaNames[result.yoga]` → yoga string
+     - `result.karana` → karana string (already a string)
+     - `result.sunrise?.toLocaleTimeString('en-IN')` → sunrise string
+     - Same for sunset, end times, Rahukaal.
+  6. Returns the typed `IPanchangDay` object.
+  7. Wraps in try/catch — returns null on failure so screens can show error state.
+- See Section 3.1 for the complete `Panchangam` return type and import paths.
 
 ### Step 6: Initialization & Data Seeding (Crucial)
 
-- In `src/utils/database.ts`, write an initialization function that creates an `aartis` table in `expo-sqlite` if it doesn't exist.
-- Create `src/data/static/aartis.json` containing at least 5 sample prayers matching the `IAarti` interface (include a mix of deities: Ganesh, Shiva, Lakshmi, Vishnu).
-- On the very first app launch (detected by checking if the `aartis` table has 0 rows), parse the JSON and insert the records into `expo-sqlite`. No AsyncStorage needed.
+- In `src/utils/database.ts`, write an initialization function using the synchronous API (Section 3.2):
+  ```typescript
+  import { openDatabaseSync } from 'expo-sqlite';
+
+  export function initDatabase() {
+    const db = openDatabaseSync('dharmsetu.db');
+
+    // Aartis table
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS aartis (
+        id TEXT PRIMARY KEY NOT NULL,
+        titleEnglish TEXT NOT NULL,
+        titleNative TEXT NOT NULL,
+        content TEXT NOT NULL,
+        deity TEXT NOT NULL
+      );
+    `);
+
+    // Chalisas table
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS chalisas (
+        id TEXT PRIMARY KEY NOT NULL,
+        titleEnglish TEXT NOT NULL,
+        titleNative TEXT NOT NULL,
+        deity TEXT NOT NULL,
+        sections TEXT NOT NULL
+      );
+    `);
+
+    // Seed if empty
+    const aartiCount = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM aartis');
+    if (aartiCount && aartiCount.count === 0) {
+      seedAartis(db);
+    }
+    const chalisaCount = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM chalisas');
+    if (chalisaCount && chalisaCount.count === 0) {
+      seedChalisas(db);
+    }
+  }
+  ```
+- **Seed data files (location: `src/data/static/`):**
+  - `src/data/static/aartis.json` — provided in repo, contains Hanuman Aarti. Add more aartis later by appending to this file.
+  - `src/data/static/chalisas.json` — provided in repo, contains Hanuman Chalisa (full 40 chaupais + opening/closing dohas). Add more chalisas later.
+- **Aarti content field:** `content` is an array of verse strings in JSON. Store as `JSON.stringify(content)` in SQLite. Parse back with `JSON.parse()` on read.
+- **Chalisa sections field:** `sections` is an array of `IChalisaSection` objects. Store as `JSON.stringify(sections)` in SQLite. Parse back on read. Each section has `type` ("doha" or "chaupai"), `label`, and `verses[]`.
+- Seeding runs only when the respective table has 0 rows (first launch). No AsyncStorage needed.
 
 ### Step 7: Home Screen UI
 
@@ -472,52 +817,82 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Handle loading state (skeleton shimmer) while service calculates.
   - Handle error state with retry button and fallback note.
 
-### Step 9: Library (Aarti) Screen UI
+### Step 9: Library Screen UI (Aartis + Chalisas)
 
-- In `app/(tabs)/library.tsx`, build per Section 6.4:
-  - Horizontal deity filter chips with active/inactive states.
-  - `FlatList` of aarti cards with deity avatars, bilingual titles, deity badges.
-  - Favorites toggle (heart icon) that updates both Zustand store and SQLite.
-  - Tapping an aarti navigates to detail screen.
+- In `app/(tabs)/library.tsx`, build an expanded library with two content types:
+  - **Top-level segment control:** Two pill-shaped tabs — "Aartis" and "Chalisas" — to switch between the two categories. Use a simple Zustand or local state toggle (not a nested tab navigator). Active segment: accent bg, base text. Inactive: surfaceRecessed bg, textSecondary.
+  - **Deity filter chips (below segment):** Horizontal scroll row filtering within the active segment. Include "Hanuman" alongside Ganesh, Shiva, Lakshmi, Vishnu.
+  - **Aarti list (when "Aartis" selected):** `FlatList` of aarti cards per Section 6.4.
+  - **Chalisa list (when "Chalisas" selected):** Same card layout as aartis but queried from the `chalisas` table. Each card shows:
+    - Deity avatar (deity-colored gradient bg with Devanagari initial).
+    - Title in Devanagari (16px bold) + transliteration (12px, textTertiary).
+    - Deity badge pill.
+    - Verse count badge (e.g., "40 chaupai" in textMuted).
+    - Heart icon for favorites.
+  - Tapping an aarti navigates to `app/aarti/[id].tsx`. Tapping a chalisa navigates to `app/chalisa/[id].tsx`.
+  - Favorites toggle (heart icon) updates Zustand `favoriteIds` — works for both aartis and chalisas.
 
 ### Step 10: Aarti Detail Screen
 
-- In `app/aarti/[id].tsx`, build per Section 6.5:
-  - Gradient header with back button, deity label, favorite heart, title.
-  - Scrollable lyrics with verse labels, center-aligned Devanagari text, dividers.
-  - Bottom "Read Along Mode" CTA with gradient fade.
+- In `app/aarti/[id].tsx`, build per Section 6.5.
+- Read the aarti ID using `const { id } = useLocalSearchParams<{ id: string }>()` (see Section 3.6).
+- Query SQLite for the aarti: `db.getFirstSync<IAarti>('SELECT * FROM aartis WHERE id = ?', [id])`.
+- Parse `content` from JSON string back to `string[]` for rendering verses.
+- Navigation from Library/Home: `router.push(\`/aarti/${aarti.id}\`)`.
+- Gradient header with back button, deity label, favorite heart, title.
+- Scrollable lyrics with verse labels, center-aligned Devanagari text, dividers.
+- Bottom "Read Along Mode" CTA — **shows "Coming Soon" toast on press in MVP** (see Section 3.7).
+
+### Step 10b: Chalisa Detail Screen
+
+- In `app/chalisa/[id].tsx`, build a Chalisa-specific detail view.
+- Read ID using `const { id } = useLocalSearchParams<{ id: string }>()`.
+- Query SQLite: `db.getFirstSync('SELECT * FROM chalisas WHERE id = ?', [id])`.
+- Parse `sections` from JSON string back to `IChalisaSection[]`.
+- **Layout differs from Aarti detail — Chalisa has structured sections:**
+  - Gradient header: same pattern as Aarti detail (back button, deity label, heart, title).
+  - **Opening Doha section:** labeled "दोहा" in accent caps. Doha verses rendered in slightly larger text (18px) with extra spacing — dohas are couplets that frame the prayer.
+  - **Chaupai section:** labeled "चौपाई" in accent caps. Chaupais rendered as numbered pairs (1-40), each chaupai is a two-line verse. Use 17px serif text, center-aligned, with subtle numbering (small accent-colored number to the left or above each pair).
+  - **Closing Doha section:** same styling as opening doha.
+  - Dividers between sections (not between every chaupai — keep the flow continuous within the chaupai block, with subtle spacing between pairs).
+- Bottom CTA: "Read Along Mode" — shows "Coming Soon" toast in MVP.
 
 ### Step 11: Settings Screen
 
 - In `app/settings.tsx`, build per Section 6.6:
   - Grouped settings sections: Appearance, Location, Notifications, About.
   - Dark mode toggle wired to Zustand `toggleTheme`.
+  - Font size row: **UI stub only** — shows "Medium" with chevron, tapping does nothing (Section 3.7).
   - Location display showing GPS status or fallback coordinates.
-  - Notification toggles (UI only for MVP — notification scheduling is Phase 2).
+  - Notification toggles: **UI stubs only** — toggle state saved in Zustand but NO `expo-notifications` wiring (Section 3.7). Phase 2 adds real scheduling.
+  - About section: version "1.0.0 (MVP)", engine "panchangam-js".
 
 ### Step 12: Search Screen
 
 - In `app/search.tsx`, build per Section 6.7:
   - Search bar with accent border on focus.
-  - Bilingual search: query against `titleEnglish`, `titleNative`, and `deity` in SQLite.
+  - Bilingual search: query against `titleEnglish`, `titleNative`, and `deity` in **both** `aartis` and `chalisas` tables.
+  - Results grouped: show "Aartis" results first, then "Chalisas" results, with section headers if both have results.
   - Highlighted match text in accent color.
   - Result count and bilingual support note.
+  - Tapping an aarti result navigates to `app/aarti/[id].tsx`. Tapping a chalisa result navigates to `app/chalisa/[id].tsx`.
 
 ### Step 13: Favorites Screen
 
 - In `app/favorites.tsx`, build per Section 6.8:
-  - Filtered list of favorited aartis (queried via Zustand `favoriteAartiIds`).
+  - Filtered list of favorited items — query both `aartis` and `chalisas` tables using IDs from Zustand `favoriteIds`.
+  - Mix aartis and chalisas in one list, each card showing a small type badge ("Aarti" or "Chalisa") in textMuted.
   - Empty state with dashed heart, explanation text, "Browse library" CTA.
 
 ### Step 14: Onboarding Flow
 
 - In `app/onboarding/` directory:
-  - `step1.tsx` — Deity preference (2×2 grid, multi-select).
-  - `step2.tsx` — Location (GPS vs default radio).
-  - `step3.tsx` — Theme (dark/light preview cards).
+  - `step1.tsx` — Deity preference (2×2 grid, multi-select). Saves to `useStore().setSelectedDeities()`.
+  - `step2.tsx` — Location (GPS vs default radio). Triggers location permission or sets fallback.
+  - `step3.tsx` — Theme (dark/light preview cards). Saves to `useStore().isDarkMode`.
 - Progress bar component showing 3-step completion.
-- On completion: save preferences to Zustand, navigate to Home, set `hasOnboarded` flag.
-- Show onboarding only on first launch (check Zustand persisted state or SQLite flag).
+- On completion: call `useStore().setHasOnboarded()`, navigate to Home via `router.replace('/(tabs)')`.
+- Onboarding gate: In `app/_layout.tsx`, check `useStore().hasOnboarded`. If false, redirect to `app/onboarding/step1.tsx`. This works because `hasOnboarded` is persisted via Zustand middleware (Section 3.4).
 
 ### Step 15: Location Permission Flow
 
