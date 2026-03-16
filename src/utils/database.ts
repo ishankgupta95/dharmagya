@@ -1,4 +1,4 @@
-import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
+import { type SQLiteDatabase } from 'expo-sqlite';
 
 import type { IAarti, IChalisa } from '@/types';
 import aartiSeedData from '@/data/static/aartis.json';
@@ -24,9 +24,9 @@ function seedChalisas(db: SQLiteDatabase): void {
   }
 }
 
-export function initDatabase(): void {
-  const db = openDatabaseSync('dharmsetu.db');
-
+// Called via SQLiteProvider's onInit — receives the same connection
+// that will be provided to all children, so no second connection is opened.
+export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // Aartis table
   db.execSync(`
     CREATE TABLE IF NOT EXISTS aartis (

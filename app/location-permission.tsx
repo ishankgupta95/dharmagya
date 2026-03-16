@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -119,13 +120,22 @@ export default function LocationPermissionScreen() {
           ))}
         </View>
 
-        {/* Denied message */}
+        {/* Denied message + open-settings CTA */}
         {denied && (
-          <View style={[styles.deniedBanner, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-            <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-            <Text style={[styles.deniedText, { color: colors.textSecondary }]}>
-              Permission denied. You can enable it later in your device Settings, or use the Pune default.
-            </Text>
+          <View style={[styles.deniedCard, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+            <View style={styles.deniedRow}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+              <Text style={[styles.deniedText, { color: colors.textSecondary }]}>
+                Location access was denied. Enable it in your device Settings to get accurate Panchang times.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => Linking.openSettings()}
+              activeOpacity={0.8}
+              style={[styles.openSettingsBtn, { borderColor: colors.accent }]}>
+              <Ionicons name="settings-outline" size={14} color={colors.accent} />
+              <Text style={[styles.openSettingsText, { color: colors.accent }]}>Open Settings</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -251,17 +261,26 @@ const styles = StyleSheet.create({
   trustTitle: { fontSize: 15, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
   trustBody: { fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 20 },
 
-  // Denied banner
-  deniedBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+  // Denied card
+  deniedCard: {
     marginTop: 20,
     padding: 12,
     borderRadius: borderRadius.cardInner,
     borderWidth: 1,
+    gap: 10,
   },
+  deniedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   deniedText: { flex: 1, fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 18 },
+  openSettingsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: borderRadius.button,
+    borderWidth: 1,
+  },
+  openSettingsText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
   // CTAs
   ctaWrap: {

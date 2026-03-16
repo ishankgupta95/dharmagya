@@ -17,10 +17,6 @@ import { initDatabase } from '@/utils/database';
 
 SplashScreen.preventAutoHideAsync();
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
 export default function RootLayout() {
   const { isDarkMode, hasOnboarded } = useStore();
   const [storeHydrated, setStoreHydrated] = useState(
@@ -43,7 +39,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (appReady) {
-      initDatabase();
       SplashScreen.hideAsync();
     }
   }, [appReady]);
@@ -58,11 +53,10 @@ export default function RootLayout() {
 
   return (
     <Suspense fallback={null}>
-      <SQLiteProvider databaseName="dharmsetu.db" useSuspense>
+      <SQLiteProvider databaseName="dharmsetu.db" useSuspense onInit={initDatabase}>
         <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="onboarding" />
           </Stack>
           <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         </PaperProvider>
