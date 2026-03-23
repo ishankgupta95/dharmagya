@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from 'expo-sqlite/kv-store';
 
+export type FontSize = 'small' | 'normal' | 'large' | 'xl';
+
 interface AppStore {
   // Persisted
   isDarkMode: boolean;
@@ -9,6 +11,9 @@ interface AppStore {
   hasOnboarded: boolean;
   selectedDeities: string[];
   userLocation: { lat: number; lon: number } | null;
+  fontSize: FontSize;
+  dailyReminderEnabled: boolean;
+  sunriseAlertEnabled: boolean;
 
   // Actions (not persisted)
   toggleTheme: () => void;
@@ -16,6 +21,9 @@ interface AppStore {
   setUserLocation: (loc: { lat: number; lon: number }) => void;
   setHasOnboarded: () => void;
   setSelectedDeities: (deities: string[]) => void;
+  setFontSize: (size: FontSize) => void;
+  setDailyReminderEnabled: (val: boolean) => void;
+  setSunriseAlertEnabled: (val: boolean) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -26,6 +34,9 @@ export const useStore = create<AppStore>()(
       hasOnboarded: false,
       selectedDeities: [],
       userLocation: null,
+      fontSize: 'normal',
+      dailyReminderEnabled: false,
+      sunriseAlertEnabled: false,
 
       toggleTheme: () => set((s) => ({ isDarkMode: !s.isDarkMode })),
       toggleFavorite: (id) =>
@@ -37,6 +48,9 @@ export const useStore = create<AppStore>()(
       setUserLocation: (loc) => set({ userLocation: loc }),
       setHasOnboarded: () => set({ hasOnboarded: true }),
       setSelectedDeities: (deities) => set({ selectedDeities: deities }),
+      setFontSize: (size) => set({ fontSize: size }),
+      setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
+      setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
     }),
     {
       name: 'dharmsetu-store',

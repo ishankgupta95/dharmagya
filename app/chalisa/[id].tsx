@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -17,7 +17,6 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import type { IChalisaSection } from '@/types';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ChalisaRow {

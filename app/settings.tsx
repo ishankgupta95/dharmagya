@@ -1,20 +1,102 @@
-import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { useStore } from '@/store/useStore';
+import { useStore, type FontSize } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import {
+  scheduleDailyReminder,
+  cancelDailyReminder,
+  scheduleSunriseAlert,
+  cancelSunriseAlert,
+} from '@/services/notifications';
+import { fetchPanchangForToday } from '@/services/astrology/panchangService';
+
+// ─── Font size config ─────────────────────────────────────────────────────────
+
+const FONT_SIZE_OPTIONS: { key: FontSize; label: string }[] = [
+  { key: 'small', label: 'A' },
+  { key: 'normal', label: 'A' },
+  { key: 'large', label: 'A' },
+  { key: 'xl', label: 'A' },
+];
+
+const FONT_SIZE_LABELS: Record<FontSize, string> = {
+  small: 'Small',
+  normal: 'Normal',
+  large: 'Large',
+  xl: 'Extra Large',
+};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
-  const { isDarkMode, toggleTheme, userLocation } = useStore();
+  const {
+    isDarkMode,
+    toggleTheme,
+    userLocation,
+    fontSize,
+    setFontSize,
+    dailyReminderEnabled,
+    setDailyReminderEnabled,
+    sunriseAlertEnabled,
+    setSunriseAlertEnabled,
+  } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
+
+  const [sunriseTime, setSunriseTime] = useState<string | null>(null);
+
+  // Fetch today's sunrise once (needed to schedule the sunrise alert)
+  useEffect(() => {
+    fetchPanchangForToday(userLocation).then((p) => {
+      if (p?.sunrise && p.sunrise !== '—') setSunriseTime(p.sunrise);
+    });
+  }, [userLocation]);
 
   const locationText = userLocation
     ? `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`
     : 'Using default (Pune)';
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  async function handleDailyReminderToggle(val: boolean) {
+    if (val) {
+      const ok = await scheduleDailyReminder();
+      if (!ok) {
+        Alert.alert(
+          'Permission Required',
+          'Please allow notifications in Settings to enable this.',
+        );
+        return;
+      }
+    } else {
+      await cancelDailyReminder();
+    }
+    setDailyReminderEnabled(val);
+  }
+
+  async function handleSunriseAlertToggle(val: boolean) {
+    if (val) {
+      if (!sunriseTime) {
+        Alert.alert('Sunrise Unavailable', 'Could not determine sunrise time for today.');
+        return;
+      }
+      const ok = await scheduleSunriseAlert(sunriseTime);
+      if (!ok) {
+        Alert.alert(
+          'Permission Required',
+          'Please allow notifications in Settings to enable this.',
+        );
+        return;
+      }
+    } else {
+      await cancelSunriseAlert();
+    }
+    setSunriseAlertEnabled(val);
+  }
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -55,12 +137,15 @@ export default function SettingsScreen() {
 
           <Divider colors={colors} />
 
+          {/* Font Size — inline segmented picker */}
           <SettingRow
             icon="text-outline"
             label="Font Size"
-            sublabel="Normal"
+            sublabel={FONT_SIZE_LABELS[fontSize]}
             colors={colors}
-            right={<StubBadge label="Coming Soon" colors={colors} />}
+            right={
+              <FontSizePicker value={fontSize} onChange={setFontSize} colors={colors} />
+            }
           />
 
         </View>
@@ -94,9 +179,16 @@ export default function SettingsScreen() {
           <SettingRow
             icon="notifications-outline"
             label="Daily Reminder"
-            sublabel="Morning aarti nudge"
+            sublabel="Morning aarti nudge at 7:00 AM"
             colors={colors}
-            right={<StubBadge label="Coming Soon" colors={colors} />}
+            right={
+              <Switch
+                value={dailyReminderEnabled}
+                onValueChange={handleDailyReminderToggle}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={dailyReminderEnabled ? colors.accent : colors.textDisabled}
+              />
+            }
           />
 
           <Divider colors={colors} />
@@ -104,9 +196,16 @@ export default function SettingsScreen() {
           <SettingRow
             icon="sunny-outline"
             label="Sunrise Alert"
-            sublabel="Notification at sunrise"
+            sublabel={sunriseTime ? `Notification at ${sunriseTime}` : 'Notification at sunrise'}
             colors={colors}
-            right={<StubBadge label="Coming Soon" colors={colors} />}
+            right={
+              <Switch
+                value={sunriseAlertEnabled}
+                onValueChange={handleSunriseAlertToggle}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={sunriseAlertEnabled ? colors.accent : colors.textDisabled}
+              />
+            }
           />
 
         </View>
@@ -139,6 +238,45 @@ export default function SettingsScreen() {
       </ScrollView>
 
     </SafeAreaView>
+  );
+}
+
+// ─── Font Size Picker ─────────────────────────────────────────────────────────
+
+interface FontSizePickerProps {
+  value: FontSize;
+  onChange: (size: FontSize) => void;
+  colors: ColorPalette;
+}
+
+function FontSizePicker({ value, onChange, colors }: FontSizePickerProps) {
+  const sizes: { fontSize: number; key: FontSize }[] = [
+    { key: 'small', fontSize: 12 },
+    { key: 'normal', fontSize: 15 },
+    { key: 'large', fontSize: 19 },
+    { key: 'xl', fontSize: 24 },
+  ];
+  return (
+    <View style={[styles.fontPicker, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+      {sizes.map(({ key, fontSize }, i) => {
+        const active = value === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => onChange(key)}
+            style={[
+              styles.fontPickerBtn,
+              i < sizes.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
+              active && { backgroundColor: colors.accent },
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            <RNText style={[styles.fontPickerLabel, { fontSize, color: active ? '#FFFFFF' : colors.textSecondary }]}>
+              A
+            </RNText>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 
@@ -184,14 +322,6 @@ function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
 
 function Divider({ colors }: { colors: ColorPalette }) {
   return <View style={[styles.divider, { backgroundColor: colors.divider }]} />;
-}
-
-function StubBadge({ label, colors }: { label: string; colors: ColorPalette }) {
-  return (
-    <View style={[styles.stubBadge, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-      <Text style={[styles.stubBadgeText, { color: colors.textMuted }]}>{label}</Text>
-    </View>
-  );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -260,12 +390,22 @@ const styles = StyleSheet.create({
   // Version text
   versionText: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
 
-  // Stub badge
-  stubBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  // Font size picker
+  fontPicker: {
+    flexDirection: 'row',
     borderRadius: 8,
     borderWidth: 1,
+    overflow: 'hidden',
   },
-  stubBadgeText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  fontPickerBtn: {
+    width: 34,
+    height: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fontPickerLabel: {
+    fontFamily: 'Mukta_500Medium',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
 });

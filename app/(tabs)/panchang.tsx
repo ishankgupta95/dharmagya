@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
   Modal,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
