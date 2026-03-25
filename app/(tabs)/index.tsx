@@ -19,6 +19,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
+import { AdBanner } from '@/components/common/AdBanner';
 import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -280,6 +281,9 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
+
+      <AdBanner colors={colors} />
+
     </SafeAreaView>
   );
 }

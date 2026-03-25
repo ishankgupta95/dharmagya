@@ -16,6 +16,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { fetchPanchang } from '@/services/astrology/panchangService';
 import { usePanchang } from '@/hooks/usePanchang';
 import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
+import { AdBanner } from '@/components/common/AdBanner';
 import type { IPanchangDay, IPanchangElement } from '@/types';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
@@ -350,6 +351,8 @@ export default function PanchangScreen() {
         ) : null}
 
       </ScrollView>
+
+      <AdBanner colors={colors} />
 
       <DatePickerOverlay
         visible={showPicker}

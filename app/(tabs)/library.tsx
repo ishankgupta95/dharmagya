@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { AdBanner } from '@/components/common/AdBanner';
 import type { IAarti, IChalisaSection } from '@/types';
 
 // ─── Row / Item Types ─────────────────────────────────────────────────────────
@@ -232,6 +233,8 @@ export default function LibraryScreen() {
           }
         />
       )}
+
+      <AdBanner colors={colors} />
 
     </SafeAreaView>
   );
