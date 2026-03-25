@@ -1,26 +1,44 @@
 import * as Location from 'expo-location';
-import {
-  getPanchangam,
-  Observer,
-  tithiNames,
-  nakshatraNames,
-  yogaNames,
-  dayNames,
-} from '@ishubhamx/panchangam-js';
+import { getDailyPanchang, type DailyPanchangResult } from 'panchang-ts';
 
-import { IPanchangDay } from '@/types';
+import type { IPanchangDay, IPanchangElement } from '@/types';
 
-const FALLBACK = { lat: 18.6298, lon: 73.7997 };
-const ELEVATION = 560; // metres (Pune default)
-const TIMEZONE_OFFSET = 330; // IST = +5:30
+export const FALLBACK_COORDS = { lat: 18.6298, lon: 73.7997 }; // Pune
 
+// Dates from panchang-ts are offset-adjusted local display dates — read via getUTC*.
 function formatTime(date: Date | null | undefined): string | undefined {
   if (!date) return undefined;
-  return date.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const h = date.getUTCHours();
+  const m = date.getUTCMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+function toElements(items: { name: string; endTime: Date | null }[]): IPanchangElement[] {
+  return items.map(item => ({
+    name: item.name,
+    endTime: formatTime(item.endTime),
+    endTimeMs: item.endTime?.getTime(),
+  }));
+}
+
+export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
+  return {
+    date: result.date,
+    tithis: toElements(result.tithis),
+    nakshatras: toElements(result.nakshatras),
+    yogas: toElements(result.yogas),
+    karanas: toElements(result.karanas),
+    sunrise: formatTime(result.sunrise) ?? '—',
+    sunset: formatTime(result.sunset) ?? '—',
+    rahuKalamStart: formatTime(result.rahuKalam.start),
+    rahuKalamEnd: formatTime(result.rahuKalam.end),
+    vara: result.vara.englishName,
+    hinduMonth: result.masa.name,
+    // vikramSamvat not yet available in panchang-ts v0.1.0
+    vikramSamvat: undefined,
+  };
 }
 
 // Only checks existing permission — never shows a dialog.
@@ -37,35 +55,23 @@ async function getCoords(): Promise<{ lat: number; lon: number }> {
   } catch {
     // fall through to fallback
   }
-  return FALLBACK;
+  return FALLBACK_COORDS;
 }
 
 export async function fetchPanchang(
   date: Date,
   savedCoords?: { lat: number; lon: number } | null,
+  computeEndTimes = true,
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
-    const observer = new Observer(coords.lat, coords.lon, ELEVATION);
-    const result = getPanchangam(date, observer, { timezoneOffset: TIMEZONE_OFFSET });
-
-    return {
+    const timezone = -new Date().getTimezoneOffset();
+    const result = getDailyPanchang(
       date,
-      tithi: tithiNames[result.tithi] ?? String(result.tithi),
-      nakshatra: nakshatraNames[result.nakshatra] ?? String(result.nakshatra),
-      yoga: yogaNames[result.yoga] ?? String(result.yoga),
-      karana: result.karana,
-      sunrise: formatTime(result.sunrise) ?? '—',
-      sunset: formatTime(result.sunset) ?? '—',
-      tithiEndTime: formatTime(result.tithiEndTime),
-      nakshatraEndTime: formatTime(result.nakshatraEndTime),
-      yogaEndTime: formatTime(result.yogaEndTime),
-      rahuKalamStart: formatTime(result.rahuKalamStart),
-      rahuKalamEnd: formatTime(result.rahuKalamEnd),
-      vara: dayNames[result.vara] ?? undefined,
-      hinduMonth: (result.masa as { name: string } | undefined)?.name,
-      vikramSamvat: (result.samvat as { vikram: number } | undefined)?.vikram,
-    };
+      { latitude: coords.lat, longitude: coords.lon },
+      { timezone, computeEndTimes },
+    );
+    return mapToPanchangDay(result);
   } catch {
     return null;
   }

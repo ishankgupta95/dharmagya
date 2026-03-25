@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
+  type AppStateStatus,
   View,
   ScrollView,
   TouchableOpacity,
@@ -8,7 +10,7 @@ import {
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -17,7 +19,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
-import type { IPanchangDay, IAarti } from '@/types';
+import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,21 @@ function rowToAarti(row: AartiRow): IAarti {
   return { ...row, content: JSON.parse(row.content) as string[] };
 }
 
+/**
+ * From an element array (tithi/nakshatra/etc.), returns the one that is
+ * currently active based on wall-clock time. Falls back to the last element
+ * if all end-times have passed (shouldn't happen in practice).
+ */
+function getActiveElement(elements: IPanchangElement[]): IPanchangElement | undefined {
+  if (!elements.length) return undefined;
+  const nowMs = Date.now();
+  for (const el of elements) {
+    // endTimeMs is in the same reference frame as Date.now() (see panchangService)
+    if (!el.endTimeMs || el.endTimeMs > nowMs) return el;
+  }
+  return elements[elements.length - 1];
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -59,12 +76,33 @@ export default function HomeScreen() {
   const [panchangLoading, setPanchangLoading] = useState(true);
   const [featuredAarti, setFeaturedAarti] = useState<IAarti | null>(null);
 
-  // ── Panchang ──────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
+  const lastFetchRef = useRef(0);
+
+  const refreshPanchang = useCallback((showSpinner = false) => {
+    const now = Date.now();
+    // Throttle: don't re-fetch more than once per minute
+    if (!showSpinner && now - lastFetchRef.current < 60_000) return;
+    lastFetchRef.current = now;
+    if (showSpinner) setPanchangLoading(true);
     fetchPanchangForToday(userLocation)
-      .then(setPanchang)
+      .then(p => { if (p) setPanchang(p); })
       .finally(() => setPanchangLoading(false));
-  }, []);
+  }, [userLocation]);
+
+  // Initial load
+  useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
+
+  // Refresh when this tab gains focus (user switches back from another tab)
+  useFocusEffect(useCallback(() => { refreshPanchang(); }, [refreshPanchang]));
+
+  // Refresh when app comes back to foreground (mid-day element transitions)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') refreshPanchang();
+    });
+    return () => sub.remove();
+  }, [refreshPanchang]);
 
   // ── Featured Aarti ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -116,64 +154,69 @@ export default function HomeScreen() {
         </Text>
 
         {/* ── Panchang Card ─────────────────────────────────────────────── */}
-        <LinearGradient
-          colors={panchangGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.panchangCard, { borderColor: colors.borderAccent }]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/(tabs)/panchang')}>
+          <LinearGradient
+            colors={panchangGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.panchangCard, { borderColor: colors.borderAccent }]}>
 
-          {/* Card header row */}
-          <View style={styles.panchangCardHeader}>
-            <Text style={[styles.sectionLabel, { color: colors.accent }]}>
-              TODAY'S PANCHANG
-            </Text>
-            <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
-              <Ionicons name="location-outline" size={10} color={colors.textMuted} />
-              <Text style={[styles.locationText, { color: colors.textMuted }]}>
-                {'  '}{userLocation ? 'GPS' : 'Pune, MH'}
+            {/* Card header row */}
+            <View style={styles.panchangCardHeader}>
+              <Text style={[styles.sectionLabel, { color: colors.accent }]}>
+                TODAY'S PANCHANG
               </Text>
+              <View style={styles.panchangCardHeaderRight}>
+                <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
+                  <Ionicons name="location-outline" size={10} color={colors.textMuted} />
+                  <Text style={[styles.locationText, { color: colors.textMuted }]}>
+                    {'  '}{userLocation ? 'GPS' : 'Pune, MH'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />
+              </View>
             </View>
-          </View>
 
-          {/* 2×2 grid */}
-          {panchangLoading ? (
-            <HomePanchangSkeleton colors={colors} />
-          ) : panchang ? (
-            <>
-              <View style={styles.panchangGrid}>
-                <PanchangCell label="TITHI" value={panchang.tithi} colors={colors} />
-                <PanchangCell label="NAKSHATRA" value={panchang.nakshatra} colors={colors} />
-                <PanchangCell label="YOGA" value={panchang.yoga} colors={colors} />
-                <PanchangCell label="KARANA" value={panchang.karana} colors={colors} />
-              </View>
+            {panchangLoading ? (
+              <HomePanchangSkeleton colors={colors} />
+            ) : panchang ? (
+              <>
+                {/* Single-column element rows showing currently-active element */}
+                <PanchangRow label="TITHI"     el={getActiveElement(panchang.tithis)}     colors={colors} />
+                <PanchangRow label="NAKSHATRA" el={getActiveElement(panchang.nakshatras)} colors={colors} />
+                <PanchangRow label="YOGA"      el={getActiveElement(panchang.yogas)}      colors={colors} />
+                <PanchangRow label="KARANA"    el={getActiveElement(panchang.karanas)}    colors={colors} />
 
-              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+                <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
-              {/* Sunrise / Sunset */}
-              <View style={styles.sunRow}>
-                <View style={styles.sunItem}>
-                  <Ionicons name="sunny-outline" size={14} color={colors.accent} />
-                  <Text style={[styles.sunLabel, { color: colors.textMuted }]}> SUNRISE</Text>
-                  <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
-                    {panchang.sunrise}
-                  </Text>
+                {/* Sunrise / Sunset */}
+                <View style={styles.sunRow}>
+                  <View style={styles.sunItem}>
+                    <Ionicons name="sunny-outline" size={14} color={colors.accent} />
+                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> SUNRISE</Text>
+                    <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
+                      {panchang.sunrise}
+                    </Text>
+                  </View>
+                  <View style={[styles.sunSep, { backgroundColor: colors.divider }]} />
+                  <View style={styles.sunItem}>
+                    <Ionicons name="moon-outline" size={14} color={colors.textMuted} />
+                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> SUNSET</Text>
+                    <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
+                      {panchang.sunset}
+                    </Text>
+                  </View>
                 </View>
-                <View style={[styles.sunSep, { backgroundColor: colors.divider }]} />
-                <View style={styles.sunItem}>
-                  <Ionicons name="moon-outline" size={14} color={colors.textMuted} />
-                  <Text style={[styles.sunLabel, { color: colors.textMuted }]}> SUNSET</Text>
-                  <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
-                    {panchang.sunset}
-                  </Text>
-                </View>
-              </View>
-            </>
-          ) : (
-            <Text style={[styles.errorText, { color: colors.textMuted }]}>
-              Could not load Panchang
-            </Text>
-          )}
-        </LinearGradient>
+              </>
+            ) : (
+              <Text style={[styles.errorText, { color: colors.textMuted }]}>
+                Could not load Panchang
+              </Text>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* ── Featured Aarti Card ───────────────────────────────────────── */}
         {featuredAarti && (
@@ -243,17 +286,23 @@ export default function HomeScreen() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-interface PanchangCellProps {
+interface PanchangRowProps {
   label: string;
-  value: string;
+  el: IPanchangElement | undefined;
   colors: ColorPalette;
 }
 
-function PanchangCell({ label, value, colors }: PanchangCellProps) {
+function PanchangRow({ label, el, colors }: PanchangRowProps) {
+  if (!el) return null;
   return (
-    <View style={styles.panchangCell}>
+    <View style={styles.panchangRow}>
       <Text style={[styles.panchangLabel, { color: colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.panchangValue, { color: colors.textPrimary }]}>{value}</Text>
+      <View style={styles.panchangRowRight}>
+        <Text style={[styles.panchangValue, { color: colors.textPrimary }]}>{el.name}</Text>
+        {el.endTime && (
+          <Text style={[styles.panchangEndTime, { color: colors.textMuted }]}>until {el.endTime}</Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -303,14 +352,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   panchangCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  panchangCardHeaderRight: { flexDirection: 'row', alignItems: 'center' },
   sectionLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1 },
   locationBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: borderRadius.chip },
   locationText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
 
-  panchangGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14 },
-  panchangCell: { width: '50%', paddingVertical: 6 },
-  panchangLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginBottom: 2 },
+  panchangRow: { flexDirection: 'row', alignItems: 'baseline', paddingVertical: 5 },
+  panchangLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, width: 86 },
+  panchangRowRight: { flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 },
   panchangValue: { fontSize: 15, fontFamily: 'Mukta_500Medium' },
+  panchangEndTime: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
 
   divider: { height: 0.5, marginVertical: 12 },
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -14,8 +14,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { fetchPanchang } from '@/services/astrology/panchangService';
+import { usePanchang } from '@/hooks/usePanchang';
 import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
-import type { IPanchangDay } from '@/types';
+import type { IPanchangDay, IPanchangElement } from '@/types';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
@@ -44,21 +45,24 @@ function isSameDay(a: Date, b: Date) {
 
 interface LimbRowProps {
   label: string;
-  value: string;
-  endTime?: string;
+  elements: IPanchangElement[];
   colors: ColorPalette;
   isLast?: boolean;
 }
 
-function LimbRow({ label, value, endTime, colors, isLast }: LimbRowProps) {
+function LimbRow({ label, elements, colors, isLast }: LimbRowProps) {
   return (
     <>
       <View style={styles.limbRow}>
         <Text style={[styles.limbLabel, { color: colors.accent }]}>{label}</Text>
-        <Text style={[styles.limbValue, { color: colors.textPrimary }]}>{value}</Text>
-        {endTime && (
-          <Text style={[styles.limbEndTime, { color: colors.textMuted }]}>Until {endTime}</Text>
-        )}
+        {elements.map((el, i) => (
+          <View key={i} style={i > 0 ? styles.limbSecondary : undefined}>
+            <Text style={[styles.limbValue, { color: colors.textPrimary }]}>{el.name}</Text>
+            {el.endTime && (
+              <Text style={[styles.limbEndTime, { color: colors.textMuted }]}>Until {el.endTime}</Text>
+            )}
+          </View>
+        ))}
       </View>
       {!isLast && <View style={[styles.limbDivider, { backgroundColor: colors.divider }]} />}
     </>
@@ -187,10 +191,10 @@ function DatePickerOverlay({
             <ActivityIndicator color={colors.accent} style={{ marginVertical: 12 }} />
           ) : pickerPanchang ? (
             <View style={[styles.miniGrid, { borderColor: colors.border }]}>
-              <MiniCell label="TITHI" value={pickerPanchang.tithi} colors={colors} />
-              <MiniCell label="NAKSHATRA" value={pickerPanchang.nakshatra} colors={colors} />
-              <MiniCell label="YOGA" value={pickerPanchang.yoga} colors={colors} />
-              <MiniCell label="KARANA" value={pickerPanchang.karana} colors={colors} />
+              <MiniCell label="TITHI" value={pickerPanchang.tithis[0]?.name ?? ''} colors={colors} />
+              <MiniCell label="NAKSHATRA" value={pickerPanchang.nakshatras[0]?.name ?? ''} colors={colors} />
+              <MiniCell label="YOGA" value={pickerPanchang.yogas[0]?.name ?? ''} colors={colors} />
+              <MiniCell label="KARANA" value={pickerPanchang.karanas[0]?.name ?? ''} colors={colors} />
             </View>
           ) : null}
 
@@ -222,30 +226,12 @@ export default function PanchangScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation);
 
   const [showPicker, setShowPicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
   const [pickerPanchang, setPickerPanchang] = useState<IPanchangDay | null>(null);
   const [pickerLoading, setPickerLoading] = useState(false);
-
-  const loadPanchang = useCallback(async (date: Date) => {
-    setLoading(true);
-    setError(false);
-    const result = await fetchPanchang(date, userLocation);
-    if (result) {
-      setPanchang(result);
-    } else {
-      setError(true);
-    }
-    setLoading(false);
-  }, [userLocation]);
-
-  useEffect(() => {
-    loadPanchang(selectedDate);
-  }, [selectedDate, loadPanchang]);
 
   async function handlePickDate(date: Date) {
     setPickerDate(date);
@@ -300,7 +286,7 @@ export default function PanchangScreen() {
           style={styles.dateDisplay}>
           <Text style={[styles.dateTopLabel, { color: colors.textMuted }]}>
             {panchang
-              ? `${panchang.hinduMonth ?? ''} · ${panchang.tithi}`.toUpperCase()
+              ? `${panchang.hinduMonth ?? ''} · ${panchang.tithis[0]?.name ?? ''}`.toUpperCase()
               : ' '}
           </Text>
           <Text style={[styles.dateBigNumber, { color: colors.accent }]}>{dateDay}</Text>
@@ -325,7 +311,7 @@ export default function PanchangScreen() {
               Unable to compute Panchang for this date. This may be due to an invalid date or location.
             </Text>
             <TouchableOpacity
-              onPress={() => loadPanchang(selectedDate)}
+              onPress={retry}
               style={[styles.retryBtn, { backgroundColor: colors.accent }]}>
               <Text style={[styles.retryText, { color: colors.base }]}>Retry</Text>
             </TouchableOpacity>
@@ -337,11 +323,11 @@ export default function PanchangScreen() {
           <>
             {/* Pancha Anga card */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <LimbRow label="TITHI (LUNAR DAY)" value={panchang.tithi} endTime={panchang.tithiEndTime} colors={colors} />
-              <LimbRow label="NAKSHATRA (LUNAR MANSION)" value={panchang.nakshatra} endTime={panchang.nakshatraEndTime} colors={colors} />
-              <LimbRow label="YOGA (SUN-MOON COMBINATION)" value={panchang.yoga} endTime={panchang.yogaEndTime} colors={colors} />
-              <LimbRow label="KARANA" value={panchang.karana} colors={colors} />
-              <LimbRow label="VARA (DAY OF WEEK)" value={panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' })} colors={colors} isLast />
+              <LimbRow label="TITHI (LUNAR DAY)" elements={panchang.tithis} colors={colors} />
+              <LimbRow label="NAKSHATRA (LUNAR MANSION)" elements={panchang.nakshatras} colors={colors} />
+              <LimbRow label="YOGA (SUN-MOON COMBINATION)" elements={panchang.yogas} colors={colors} />
+              <LimbRow label="KARANA" elements={panchang.karanas} colors={colors} />
+              <LimbRow label="VARA (DAY OF WEEK)" elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} isLast />
             </View>
 
             {/* Sunrise / Sunset */}
@@ -401,6 +387,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: borderRadius.card, borderWidth: 1, padding: 16, marginBottom: 16 },
   limbRow: { paddingVertical: 12 },
   limbLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, marginBottom: 4 },
+  limbSecondary: { marginTop: 8 },
   limbValue: { fontSize: 17, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
   limbEndTime: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
   limbDivider: { height: 0.5 },
