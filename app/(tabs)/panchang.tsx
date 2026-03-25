@@ -17,7 +17,7 @@ import { fetchPanchang } from '@/services/astrology/panchangService';
 import { usePanchang } from '@/hooks/usePanchang';
 import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
-import type { IPanchangDay, IPanchangElement } from '@/types';
+import type { IPanchangDay, IPanchangElement, IChoghadiyaSlot } from '@/types';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
@@ -220,6 +220,48 @@ function MiniCell({ label, value, colors }: { label: string; value: string; colo
   );
 }
 
+const QUALITY_COLOR: Record<IChoghadiyaSlot['quality'], string> = {
+  auspicious:   '#4CAF50',
+  inauspicious: '#F44336',
+  neutral:      '#9E9E9E',
+};
+
+interface ChoghadiyaCardProps {
+  slots: { day: IChoghadiyaSlot[]; night: IChoghadiyaSlot[] };
+  colors: ColorPalette;
+}
+
+function ChoghadiyaCard({ slots, colors }: ChoghadiyaCardProps) {
+  const [tab, setTab] = useState<'day' | 'night'>('day');
+  const active = tab === 'day' ? slots.day : slots.night;
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.choghadiyaHeader}>
+        <Text style={[styles.limbLabel, { color: colors.accent }]}>CHOGHADIYA</Text>
+        <View style={[styles.choghadiyaTabs, { backgroundColor: colors.surfaceRecessed }]}>
+          {(['day', 'night'] as const).map(t => (
+            <TouchableOpacity
+              key={t}
+              onPress={() => setTab(t)}
+              style={[styles.choghadiyaTab, tab === t && { backgroundColor: colors.accent }]}>
+              <Text style={[styles.choghadiyaTabText, { color: tab === t ? colors.base : colors.textMuted }]}>
+                {t === 'day' ? 'Day' : 'Night'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+      {active.map((slot, i) => (
+        <View key={i} style={[styles.choghadiyaRow, i < active.length - 1 && { borderBottomWidth: 0.5, borderBottomColor: colors.divider }]}>
+          <View style={[styles.choghadiyaDot, { backgroundColor: QUALITY_COLOR[slot.quality] }]} />
+          <Text style={[styles.choghadiyaName, { color: colors.textPrimary }]}>{slot.name}</Text>
+          <Text style={[styles.choghadiyaTime, { color: colors.textMuted }]}>{slot.start} – {slot.end}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function PanchangScreen() {
@@ -322,20 +364,47 @@ export default function PanchangScreen() {
           </View>
         ) : panchang ? (
           <>
+            {/* Panchaka warning */}
+            {panchang.panchaka && (
+              <View style={[styles.panchakaBar, { backgroundColor: '#FFF3E0', borderColor: '#FF9800' }]}>
+                <Ionicons name="alert-circle-outline" size={15} color="#FF9800" />
+                <Text style={[styles.panchakaText, { color: '#E65100' }]}>PANCHAKA — Moon in last 5 nakshatras</Text>
+              </View>
+            )}
+
             {/* Pancha Anga card */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <LimbRow label="TITHI (LUNAR DAY)" elements={panchang.tithis} colors={colors} />
               <LimbRow label="NAKSHATRA (LUNAR MANSION)" elements={panchang.nakshatras} colors={colors} />
               <LimbRow label="YOGA (SUN-MOON COMBINATION)" elements={panchang.yogas} colors={colors} />
               <LimbRow label="KARANA" elements={panchang.karanas} colors={colors} />
-              <LimbRow label="VARA (DAY OF WEEK)" elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} isLast />
+              <LimbRow label="VARA (DAY OF WEEK)" elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} />
+              {panchang.chandraRashi && (
+                <LimbRow label="CHANDRA RASHI (MOON SIGN)" elements={[{ name: panchang.chandraRashi }]} colors={colors} />
+              )}
+              {panchang.suryaNakshatra && (
+                <LimbRow label="SURYA NAKSHATRA (SUN'S ASTERISM)" elements={[{ name: panchang.suryaNakshatra }]} colors={colors} isLast />
+              )}
             </View>
 
-            {/* Sunrise / Sunset */}
-            <View style={styles.sunRow}>
-              <SunCard icon="sunny-outline" label="SUNRISE" time={panchang.sunrise} colors={colors} iconColor={colors.accent} />
-              <SunCard icon="moon-outline" label="SUNSET" time={panchang.sunset} colors={colors} iconColor={colors.textMuted} />
+            {/* Sunrise / Sunset / Moonrise / Moonset */}
+            <View style={styles.sunGrid}>
+              <SunCard icon="sunny-outline" label="SUNRISE"  time={panchang.sunrise}         colors={colors} iconColor={colors.accent} />
+              <SunCard icon="moon-outline"  label="SUNSET"   time={panchang.sunset}          colors={colors} iconColor={colors.textMuted} />
+              <SunCard icon="moon-outline"  label="MOONRISE" time={panchang.moonrise ?? '—'} colors={colors} iconColor={colors.accent} />
+              <SunCard icon="moon-outline"  label="MOONSET"  time={panchang.moonset  ?? '—'} colors={colors} iconColor={colors.textMuted} />
             </View>
+
+            {/* Brahma Muhurta */}
+            {panchang.brahmaMuhurtaStart && panchang.brahmaMuhurtaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="sparkles-outline" size={16} color={colors.accent} />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>BRAHMA MUHURTA</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.brahmaMuhurtaStart} – {panchang.brahmaMuhurtaEnd}
+                </Text>
+              </View>
+            )}
 
             {/* Rahukaal bar */}
             {panchang.rahuKalamStart && panchang.rahuKalamEnd && (
@@ -347,6 +416,9 @@ export default function PanchangScreen() {
                 </Text>
               </View>
             )}
+
+            {/* Choghadiya */}
+            <ChoghadiyaCard slots={panchang.choghadiya} colors={colors} />
           </>
         ) : null}
 
@@ -395,16 +467,31 @@ const styles = StyleSheet.create({
   limbEndTime: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
   limbDivider: { height: 0.5 },
 
-  // Sun cards
+  // Sun / Moon grid (2×2)
+  sunGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   sunRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  sunCard: { flex: 1, borderRadius: borderRadius.cardInner, borderWidth: 1, padding: 16, alignItems: 'center', gap: 6 },
+  sunCard: { width: '47%', borderRadius: borderRadius.cardInner, borderWidth: 1, padding: 16, alignItems: 'center', gap: 6 },
   sunCardLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
   sunCardTime: { fontSize: 16, fontFamily: 'Mukta_500Medium' },
 
-  // Rahukaal
-  rahuBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 16 },
+  // Panchaka
+  panchakaBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
+  panchakaText: { fontSize: 12, fontFamily: 'Mukta_500Medium', flex: 1 },
+
+  // Rahukaal / Brahma Muhurta
+  rahuBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   rahuLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, flex: 1 },
   rahuTime: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+
+  // Choghadiya
+  choghadiyaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  choghadiyaTabs: { flexDirection: 'row', borderRadius: borderRadius.chip, padding: 2, gap: 2 },
+  choghadiyaTab: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: borderRadius.chip },
+  choghadiyaTabText: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
+  choghadiyaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10 },
+  choghadiyaDot: { width: 8, height: 8, borderRadius: 4 },
+  choghadiyaName: { fontSize: 15, fontFamily: 'Mukta_500Medium', flex: 1 },
+  choghadiyaTime: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
 
   // Error
   errorContainer: { alignItems: 'center', paddingVertical: 32, gap: 12 },

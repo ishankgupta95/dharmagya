@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 
 type LocationChoice = 'gps' | 'default';
 
@@ -14,7 +14,7 @@ type LocationChoice = 'gps' | 'default';
 
 export default function OnboardingStep3() {
   const { isDarkMode, toggleTheme, setHasOnboarded } = useStore();
-  const C = isDarkMode ? darkColors : lightColors;
+  const colors = isDarkMode ? darkColors : lightColors;
 
   const [locationChoice, setLocationChoice] = useState<LocationChoice>('default');
 
@@ -35,14 +35,14 @@ export default function OnboardingStep3() {
   }
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: C.base }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: C.divider }]}>
+      <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={C.textSecondary} />
+          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerStep, { color: C.textMuted }]}>Step 3 of 3</Text>
+        <Text style={[styles.headerStep, { color: colors.textMuted }]}>Step 3 of 3</Text>
         <View style={{ width: 20 }} />
       </View>
 
@@ -51,11 +51,11 @@ export default function OnboardingStep3() {
         showsVerticalScrollIndicator={false}>
 
         {/* ── Title ─────────────────────────────────────────────────── */}
-        <Text style={[styles.titleHindi, { color: C.textPrimary }]}>प्राथमिकताएँ</Text>
-        <Text style={[styles.title, { color: C.textSecondary }]}>Set Your Preferences</Text>
+        <Text style={[styles.titleHindi, { color: colors.textPrimary }]}>प्राथमिकताएँ</Text>
+        <Text style={[styles.title, { color: colors.textSecondary }]}>Set Your Preferences</Text>
 
         {/* ── Theme Section ─────────────────────────────────────────── */}
-        <SectionLabel label="APPEARANCE" colors={C} />
+        <SectionLabel label="APPEARANCE" colors={colors} />
         <View style={styles.themeRow}>
           <ThemeCard
             dark
@@ -70,8 +70,8 @@ export default function OnboardingStep3() {
         </View>
 
         {/* ── Location Section ──────────────────────────────────────── */}
-        <SectionLabel label="LOCATION" colors={C} />
-        <View style={[styles.radioGroup, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <SectionLabel label="LOCATION" colors={colors} />
+        <View style={[styles.radioGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <RadioRow
             label="Use GPS Location"
@@ -79,10 +79,10 @@ export default function OnboardingStep3() {
             icon="location-outline"
             selected={locationChoice === 'gps'}
             onPress={() => setLocationChoice('gps')}
-            colors={C}
+            colors={colors}
           />
 
-          <View style={[styles.radioDivider, { backgroundColor: C.divider }]} />
+          <View style={[styles.radioDivider, { backgroundColor: colors.divider }]} />
 
           <RadioRow
             label="Use Pune (default)"
@@ -90,7 +90,7 @@ export default function OnboardingStep3() {
             icon="map-outline"
             selected={locationChoice === 'default'}
             onPress={() => setLocationChoice('default')}
-            colors={C}
+            colors={colors}
           />
 
         </View>
@@ -99,12 +99,12 @@ export default function OnboardingStep3() {
       </ScrollView>
 
       {/* ── Bottom ────────────────────────────────────────────────────── */}
-      <View style={[styles.bottom, { paddingHorizontal: spacing.screenH, borderTopColor: C.divider }]}>
-        <ProgressDots current={3} total={3} accent={C.accent} />
+      <View style={[styles.bottom, { paddingHorizontal: spacing.screenH, borderTopColor: colors.divider }]}>
+        <ProgressDots current={3} total={3} accent={colors.accent} />
         <TouchableOpacity
           onPress={handleFinish}
           activeOpacity={0.85}
-          style={[styles.cta, { backgroundColor: C.accent }]}>
+          style={[styles.cta, { backgroundColor: colors.accent }]}>
           <Text style={styles.ctaText}>Start Exploring  🙏</Text>
         </TouchableOpacity>
       </View>
@@ -166,21 +166,21 @@ interface RadioRowProps {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   selected: boolean;
   onPress: () => void;
-  colors: typeof darkColors;
+  colors: ColorPalette;
 }
 
-function RadioRow({ label, sublabel, icon, selected, onPress, colors: C }: RadioRowProps) {
+function RadioRow({ label, sublabel, icon, selected, onPress, colors }: RadioRowProps) {
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.radioRow}>
-      <View style={[styles.radioIconWrap, { backgroundColor: C.surfaceRecessed }]}>
-        <Ionicons name={icon} size={17} color={C.accent} />
+      <View style={[styles.radioIconWrap, { backgroundColor: colors.surfaceRecessed }]}>
+        <Ionicons name={icon} size={17} color={colors.accent} />
       </View>
       <View style={styles.radioText}>
-        <Text style={[styles.radioLabel, { color: C.textPrimary }]}>{label}</Text>
-        <Text style={[styles.radioSublabel, { color: C.textSecondary }]}>{sublabel}</Text>
+        <Text style={[styles.radioLabel, { color: colors.textPrimary }]}>{label}</Text>
+        <Text style={[styles.radioSublabel, { color: colors.textSecondary }]}>{sublabel}</Text>
       </View>
-      <View style={[styles.radioCircle, { borderColor: selected ? C.accent : C.border }]}>
-        {selected && <View style={[styles.radioFill, { backgroundColor: C.accent }]} />}
+      <View style={[styles.radioCircle, { borderColor: selected ? colors.accent : colors.border }]}>
+        {selected && <View style={[styles.radioFill, { backgroundColor: colors.accent }]} />}
       </View>
     </TouchableOpacity>
   );
@@ -188,9 +188,9 @@ function RadioRow({ label, sublabel, icon, selected, onPress, colors: C }: Radio
 
 // ─── Section Label ────────────────────────────────────────────────────────────
 
-function SectionLabel({ label, colors: C }: { label: string; colors: typeof darkColors }) {
+function SectionLabel({ label, colors }: { label: string; colors: ColorPalette }) {
   return (
-    <Text style={[styles.sectionLabel, { color: C.textMuted }]}>{label}</Text>
+    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
   );
 }
 
@@ -199,14 +199,14 @@ function SectionLabel({ label, colors: C }: { label: string; colors: typeof dark
 function ProgressDots({ current, total, accent }: { current: number; total: number; accent: string }) {
   return (
     <View style={dotsStyles.row}>
-      {Array.from({ length: total }, (_, i) => (
+      {Array.from({ length: total }, (_item, index) => (
         <View
-          key={i}
+          key={index}
           style={[
             dotsStyles.dot,
-            i + 1 === current
+            index + 1 === current
               ? { backgroundColor: accent, width: 20 }
-              : i + 1 < current
+              : index + 1 < current
               ? { backgroundColor: accent + '60' }
               : { backgroundColor: 'rgba(128,128,128,0.2)' },
           ]}

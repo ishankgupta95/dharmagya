@@ -9,7 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, deityColors, borderRadius, spacing } from '@/config/theme';
 
-const C = darkColors;
+const colors = darkColors;
 
 // ─── Deity data ───────────────────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ export default function OnboardingStep2() {
 
   function toggleDeity(name: string) {
     setLocalSelected((prev) =>
-      prev.includes(name) ? prev.filter((d) => d !== name) : [...prev, name]
+      prev.includes(name) ? prev.filter((deity) => deity !== name) : [...prev, name]
     );
   }
 
@@ -58,7 +58,7 @@ export default function OnboardingStep2() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={C.textSecondary} />
+          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text style={styles.headerStep}>Step 2 of 3</Text>
         <View style={{ width: 20 }} />
@@ -135,7 +135,7 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
       onPress={onPress}
       style={[
         styles.card,
-        { borderColor: isSelected ? deity.color : C.border },
+        { borderColor: isSelected ? deity.color : colors.border },
         isSelected && { backgroundColor: deity.color + '12' },
       ]}>
 
@@ -146,8 +146,8 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
         <Text style={[styles.cardInitial, { color: deity.color }]}>{deity.initial}</Text>
       </LinearGradient>
 
-      <Text style={[styles.cardNameHindi, { color: C.textPrimary }]}>{deity.nameHindi}</Text>
-      <Text style={[styles.cardName, { color: C.textSecondary }]}>{deity.name}</Text>
+      <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]}>{deity.nameHindi}</Text>
+      <Text style={[styles.cardName, { color: colors.textSecondary }]}>{deity.name}</Text>
 
       {/* Selection checkmark */}
       {isSelected && (
@@ -164,15 +164,15 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
     <View style={dotsStyles.row}>
-      {Array.from({ length: total }, (_, i) => (
+      {Array.from({ length: total }, (_item, index) => (
         <View
-          key={i}
+          key={index}
           style={[
             dotsStyles.dot,
-            i + 1 === current
-              ? { backgroundColor: C.accent, width: 20 }
-              : i + 1 < current
-              ? { backgroundColor: C.accent + '60' }
+            index + 1 === current
+              ? { backgroundColor: colors.accent, width: 20 }
+              : index + 1 < current
+              ? { backgroundColor: colors.accent + '60' }
               : { backgroundColor: 'rgba(255,255,255,0.15)' },
           ]}
         />
@@ -191,7 +191,7 @@ const dotsStyles = StyleSheet.create({
 const CARD_GAP = 12;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.base },
+  root: { flex: 1, backgroundColor: colors.base },
 
   header: {
     flexDirection: 'row',
@@ -200,16 +200,16 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
-  headerStep: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: C.textMuted },
+  headerStep: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: colors.textMuted },
 
   scroll: { paddingBottom: 16 },
 
-  titleHindi: { fontSize: 26, fontFamily: 'Mukta_700Bold', color: C.textPrimary, marginBottom: 4 },
-  title: { fontSize: 15, fontFamily: 'Mukta_400Regular', color: C.textSecondary, marginBottom: 8 },
+  titleHindi: { fontSize: 26, fontFamily: 'Mukta_700Bold', color: colors.textPrimary, marginBottom: 4 },
+  title: { fontSize: 15, fontFamily: 'Mukta_400Regular', color: colors.textSecondary, marginBottom: 8 },
   subtitle: {
     fontSize: 13,
     fontFamily: 'Mukta_400Regular',
-    color: C.textMuted,
+    color: colors.textMuted,
     lineHeight: 20,
     marginBottom: 28,
   },
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     width: '48%',
     borderRadius: borderRadius.card,
     borderWidth: 1.5,
-    backgroundColor: C.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     paddingVertical: 20,
     paddingHorizontal: 12,
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   selectionCount: {
     fontSize: 12,
     fontFamily: 'Mukta_400Regular',
-    color: C.accent,
+    color: colors.accent,
     textAlign: 'center',
     marginTop: 16,
   },
@@ -262,11 +262,11 @@ const styles = StyleSheet.create({
   bottom: { gap: 14, paddingBottom: 8, alignItems: 'center' },
   cta: {
     width: '100%',
-    backgroundColor: C.accent,
+    backgroundColor: colors.accent,
     paddingVertical: 15,
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
   ctaText: { fontSize: 16, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
-  skipText: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: C.textMuted, marginBottom: 8 },
+  skipText: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: colors.textMuted, marginBottom: 8 },
 });

@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { darkColors, borderRadius, spacing } from '@/config/theme';
 
-const C = darkColors;
+const colors = darkColors;
 
 export default function OnboardingStep1() {
   return (
@@ -13,7 +13,7 @@ export default function OnboardingStep1() {
 
       {/* ── Decorative gradient backdrop ────────────────────────────── */}
       <LinearGradient
-        colors={['#2E2418', C.base]}
+        colors={['#2E2418', colors.base]}
         style={styles.backdrop}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -25,7 +25,7 @@ export default function OnboardingStep1() {
 
         {/* Om symbol circle */}
         <LinearGradient
-          colors={[C.accent + '40', C.accent + '10']}
+          colors={[colors.accent + '40', colors.accent + '10']}
           style={styles.omCircle}>
           <Text style={styles.omSymbol}>ॐ</Text>
         </LinearGradient>
@@ -57,15 +57,15 @@ export default function OnboardingStep1() {
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
     <View style={dots.row}>
-      {Array.from({ length: total }, (_, i) => (
+      {Array.from({ length: total }, (_item, index) => (
         <View
-          key={i}
+          key={index}
           style={[
             dots.dot,
-            i + 1 === current
-              ? { backgroundColor: C.accent, width: 20 }
-              : i + 1 < current
-              ? { backgroundColor: C.accent + '60' }
+            index + 1 === current
+              ? { backgroundColor: colors.accent, width: 20 }
+              : index + 1 < current
+              ? { backgroundColor: colors.accent + '60' }
               : { backgroundColor: 'rgba(255,255,255,0.15)' },
           ]}
         />
@@ -82,7 +82,7 @@ const dots = StyleSheet.create({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.base },
+  root: { flex: 1, backgroundColor: colors.base },
   backdrop: { ...StyleSheet.absoluteFillObject },
 
   content: {
@@ -103,26 +103,26 @@ const styles = StyleSheet.create({
   },
   omSymbol: {
     fontSize: 56,
-    color: C.accent,
+    color: colors.accent,
     fontFamily: 'Mukta_700Bold',
   },
 
   appName: {
     fontSize: 36,
     fontFamily: 'Mukta_700Bold',
-    color: C.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: 0.5,
   },
   appNameHindi: {
     fontSize: 18,
     fontFamily: 'Mukta_400Regular',
-    color: C.textSecondary,
+    color: colors.textSecondary,
     marginTop: -6,
   },
   tagline: {
     fontSize: 14,
     fontFamily: 'Mukta_400Regular',
-    color: C.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 22,
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   cta: {
     width: '100%',
-    backgroundColor: C.accent,
+    backgroundColor: colors.accent,
     paddingVertical: 15,
     borderRadius: borderRadius.button,
     alignItems: 'center',
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   skipHint: {
     fontSize: 12,
     fontFamily: 'Mukta_400Regular',
-    color: C.textMuted,
+    color: colors.textMuted,
     marginBottom: 8,
   },
 });

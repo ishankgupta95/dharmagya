@@ -20,6 +20,14 @@ export interface IChalisa {
   sections: IChalisaSection[]; // Ordered: opening doha → chaupais → closing doha
 }
 
+/** One Choghadiya slot (15 min block) with its quality and time range. */
+export interface IChoghadiyaSlot {
+  name: string;
+  quality: 'auspicious' | 'inauspicious' | 'neutral';
+  start: string;
+  end: string;
+}
+
 /** One panchang element (tithi/nakshatra/yoga/karana) active during the day. */
 export interface IPanchangElement {
   name: string;
@@ -47,5 +55,14 @@ export interface IPanchangDay {
   rahuKalamEnd?: string;
   vara?: string;
   hinduMonth?: string;
-  vikramSamvat?: number;
+  vikramSamvat: number;
+  shakaSamvat: number;
+  chandraRashi?: string;
+  suryaNakshatra?: string;
+  moonrise?: string;
+  moonset?: string;
+  brahmaMuhurtaStart?: string;
+  brahmaMuhurtaEnd?: string;
+  panchaka: boolean;
+  choghadiya: { day: IChoghadiyaSlot[]; night: IChoghadiyaSlot[] };
 }

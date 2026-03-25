@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { getDailyPanchang, type DailyPanchangResult } from 'panchang-ts';
 
-import type { IPanchangDay, IPanchangElement } from '@/types';
+import type { IPanchangDay, IPanchangElement, IChoghadiyaSlot } from '@/types';
 
 export const FALLBACK_COORDS = { lat: 18.6298, lon: 73.7997 }; // Pune
 
@@ -23,6 +23,17 @@ function toElements(items: { name: string; endTime: Date | null }[]): IPanchangE
   }));
 }
 
+function toChoghadiyaSlots(
+  slots: DailyPanchangResult['choghadiya']['day'],
+): IChoghadiyaSlot[] {
+  return slots.map(s => ({
+    name: s.name,
+    quality: s.quality,
+    start: formatTime(s.start) ?? '',
+    end: formatTime(s.end) ?? '',
+  }));
+}
+
 export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
   return {
     date: result.date,
@@ -35,9 +46,20 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
     rahuKalamStart: formatTime(result.rahuKalam.start),
     rahuKalamEnd: formatTime(result.rahuKalam.end),
     vara: result.vara.englishName,
-    hinduMonth: result.masa.name,
-    // vikramSamvat not yet available in panchang-ts v0.1.0
-    vikramSamvat: undefined,
+    hinduMonth: result.chandramasa.name,
+    vikramSamvat: result.samvat.vikramSamvat,
+    shakaSamvat: result.samvat.shakaSamvat,
+    chandraRashi: result.chandraRashi.name,
+    suryaNakshatra: result.suryaNakshatra.name,
+    moonrise: formatTime(result.moonrise),
+    moonset: formatTime(result.moonset),
+    brahmaMuhurtaStart: formatTime(result.brahmaMuhurta.start),
+    brahmaMuhurtaEnd: formatTime(result.brahmaMuhurta.end),
+    panchaka: result.panchaka,
+    choghadiya: {
+      day:   toChoghadiyaSlots(result.choghadiya.day),
+      night: toChoghadiyaSlots(result.choghadiya.night),
+    },
   };
 }
 
