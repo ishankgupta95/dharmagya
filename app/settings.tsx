@@ -217,7 +217,7 @@ export default function SettingsScreen() {
           <SettingRow
             icon="apps-outline"
             label="App Version"
-            sublabel="dharmSetu"
+            sublabel="dharmagya"
             colors={colors}
             right={<Text style={[styles.versionText, { color: colors.textMuted }]}>v1.0.0</Text>}
           />

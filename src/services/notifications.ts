@@ -1,15 +1,26 @@
-import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// Configure how notifications appear when the app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// expo-notifications Android push support was removed from Expo Go in SDK 53.
+// Skip the require entirely in Expo Go to prevent the native error overlay.
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let Notifications: typeof import('expo-notifications') | null = null;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications!.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {
+    // Native module unavailable. All notification calls become no-ops.
+  }
+}
 
 const DAILY_REMINDER_ID = 'dharmsetu-daily-reminder';
 const SUNRISE_ALERT_ID = 'dharmsetu-sunrise-alert';
@@ -17,6 +28,7 @@ const SUNRISE_ALERT_ID = 'dharmsetu-sunrise-alert';
 // ─── Permissions ──────────────────────────────────────────────────────────────
 
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (!Notifications) return false;
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
@@ -26,6 +38,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 // ─── Daily Reminder (7:00 AM) ─────────────────────────────────────────────────
 
 export async function scheduleDailyReminder(): Promise<boolean> {
+  if (!Notifications) return false;
   const granted = await requestNotificationPermission();
   if (!granted) return false;
 
@@ -47,6 +60,7 @@ export async function scheduleDailyReminder(): Promise<boolean> {
 }
 
 export async function cancelDailyReminder(): Promise<void> {
+  if (!Notifications) return;
   await Notifications.cancelScheduledNotificationAsync(DAILY_REMINDER_ID).catch(() => {});
 }
 
@@ -57,6 +71,7 @@ export async function cancelDailyReminder(): Promise<void> {
  * sunriseTime is a formatted string like "06:12 AM".
  */
 export async function scheduleSunriseAlert(sunriseTime: string): Promise<boolean> {
+  if (!Notifications) return false;
   const granted = await requestNotificationPermission();
   if (!granted) return false;
 
@@ -81,6 +96,7 @@ export async function scheduleSunriseAlert(sunriseTime: string): Promise<boolean
 }
 
 export async function cancelSunriseAlert(): Promise<void> {
+  if (!Notifications) return;
   await Notifications.cancelScheduledNotificationAsync(SUNRISE_ALERT_ID).catch(() => {});
 }
 

@@ -111,7 +111,7 @@ export default function LocationPermissionScreen() {
       <View style={[styles.body, { backgroundColor: colors.base, paddingHorizontal: spacing.screenH }]}>
 
         <Text style={[styles.bodyIntro, { color: colors.textSecondary }]}>
-          dharmSetu uses your location only for on-device calculations — nothing is ever uploaded.
+          dharmagya uses your location only for on-device calculations — nothing is ever uploaded.
         </Text>
 
         <View style={styles.signalList}>

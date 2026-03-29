@@ -30,8 +30,8 @@ export default function OnboardingStep1() {
           <Text style={styles.omSymbol}>ॐ</Text>
         </LinearGradient>
 
-        <Text style={styles.appName}>dharmSetu</Text>
-        <Text style={styles.appNameHindi}>धर्म सेतु</Text>
+        <Text style={styles.appName}>dharmagya</Text>
+        <Text style={styles.appNameHindi}>धर्मज्ञ</Text>
         <Text style={styles.tagline}>Your daily bridge to the divine</Text>
 
       </View>
