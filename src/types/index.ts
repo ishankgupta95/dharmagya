@@ -20,12 +20,43 @@ export interface IChalisa {
   sections: IChalisaSection[]; // Ordered: opening doha → chaupais → closing doha
 }
 
-/** One Choghadiya slot (15 min block) with its quality and time range. */
-export interface IChoghadiyaSlot {
+/** Timed slot with quality rating (used by Choghadiya and Gowri Panchangam). */
+export interface IQualitySlot {
   name: string;
   quality: 'auspicious' | 'inauspicious' | 'neutral';
   start: string;
   end: string;
+}
+
+/** @deprecated Use IQualitySlot instead. Kept as alias for backwards compat. */
+export type IChoghadiyaSlot = IQualitySlot;
+
+/** Planetary hour slot. */
+export interface IHoraSlot {
+  planet: string;
+  start: string;
+  end: string;
+}
+
+/** A special yoga active on the day (e.g. Amrit Siddhi, Sarvartha Siddhi). */
+export interface ISpecialYoga {
+  name: string;
+  type: string;
+}
+
+/** A festival or observance for the day. */
+export interface IFestival {
+  name: string;
+}
+
+/** Sidereal position of a graha. */
+export interface IGrahaPosition {
+  planet: string;
+  rashi: string;
+  degreeInRashi: number;
+  nakshatra: string;
+  nakshatraPada: number;
+  isRetrograde: boolean;
 }
 
 /** One panchang element (tithi/nakshatra/yoga/karana) active during the day. */
@@ -53,8 +84,16 @@ export interface IPanchangDay {
   sunset: string;
   rahuKalamStart?: string;
   rahuKalamEnd?: string;
+  yamagandaStart?: string;
+  yamagandaEnd?: string;
+  gulikaKalamStart?: string;
+  gulikaKalamEnd?: string;
+  abhijitMuhurtaStart?: string;
+  abhijitMuhurtaEnd?: string;
+  durMuhurta: Array<{ start: string; end: string }>;
   vara?: string;
   hinduMonth?: string;
+  masa?: string;
   vikramSamvat: number;
   shakaSamvat: number;
   chandraRashi?: string;
@@ -64,5 +103,12 @@ export interface IPanchangDay {
   brahmaMuhurtaStart?: string;
   brahmaMuhurtaEnd?: string;
   panchaka: boolean;
-  choghadiya: { day: IChoghadiyaSlot[]; night: IChoghadiyaSlot[] };
+  dayDurationMinutes: number;
+  nightDurationMinutes: number;
+  choghadiya: { day: IQualitySlot[]; night: IQualitySlot[] };
+  gowriPanchangam: { day: IQualitySlot[]; night: IQualitySlot[] };
+  hora: { day: IHoraSlot[]; night: IHoraSlot[] };
+  specialYogas: ISpecialYoga[];
+  festivals: IFestival[];
+  planetaryPositions?: IGrahaPosition[];
 }

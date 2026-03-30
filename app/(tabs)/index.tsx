@@ -278,6 +278,12 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/panchang')}
             colors={colors}
           />
+          <QuickCard
+            emoji="🪔"
+            label="Festivals"
+            onPress={() => router.push('/festivals')}
+            colors={colors}
+          />
         </View>
 
       </ScrollView>

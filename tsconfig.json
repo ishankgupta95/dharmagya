@@ -6,9 +6,6 @@
     "paths": {
       "@/*": [
         "src/*"
-      ],
-      "panchang-ts": [
-        "../panchang-ts/src/index.ts"
       ]
     }
   },

@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
 import { getDailyPanchang } from 'panchang-ts';
 
-import { FALLBACK_COORDS, mapToPanchangDay } from '@/services/astrology/panchangService';
+import {
+  FALLBACK_COORDS,
+  mapToPanchangDay,
+  fetchGrahaPositions,
+} from '@/services/astrology/panchangService';
 import type { IPanchangDay } from '@/types';
 
 interface UsePanchangResult {
@@ -53,13 +57,20 @@ export function usePanchang(
       return;
     }
 
-    // ── Pass 2: Full — end-times after interactions settle ───────────────────
+    // ── Pass 2: Full — end-times + planetary positions after interactions ────
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
       try {
         const full = getDailyPanchang(date, loc, { timezone, computeEndTimes: true });
         if (!cancelled) {
-          setPanchang(mapToPanchangDay(full));
+          const mapped = mapToPanchangDay(full);
+          // Planetary positions are computed separately (CPU-heavy)
+          try {
+            mapped.planetaryPositions = fetchGrahaPositions(date);
+          } catch {
+            // Non-critical — positions just won't appear
+          }
+          setPanchang(mapped);
           setIsFullyLoaded(true);
         }
       } catch {

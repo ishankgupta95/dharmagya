@@ -17,7 +17,10 @@ import { fetchPanchang } from '@/services/astrology/panchangService';
 import { usePanchang } from '@/hooks/usePanchang';
 import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
-import type { IPanchangDay, IPanchangElement, IChoghadiyaSlot } from '@/types';
+import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
+import { HoraCard } from '@/components/panchang/HoraCard';
+import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
+import type { IPanchangDay, IPanchangElement, IQualitySlot } from '@/types';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
@@ -220,46 +223,16 @@ function MiniCell({ label, value, colors }: { label: string; value: string; colo
   );
 }
 
-const QUALITY_COLOR: Record<IChoghadiyaSlot['quality'], string> = {
-  auspicious:   '#4CAF50',
-  inauspicious: '#F44336',
-  neutral:      '#9E9E9E',
-};
-
-interface ChoghadiyaCardProps {
-  slots: { day: IChoghadiyaSlot[]; night: IChoghadiyaSlot[] };
-  colors: ColorPalette;
+function SectionHeader({ title, colors }: { title: string; colors: ColorPalette }) {
+  return (
+    <Text style={[styles.sectionHeader, { color: colors.accent }]}>{title}</Text>
+  );
 }
 
-function ChoghadiyaCard({ slots, colors }: ChoghadiyaCardProps) {
-  const [tab, setTab] = useState<'day' | 'night'>('day');
-  const active = tab === 'day' ? slots.day : slots.night;
-  return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.choghadiyaHeader}>
-        <Text style={[styles.limbLabel, { color: colors.accent }]}>CHOGHADIYA</Text>
-        <View style={[styles.choghadiyaTabs, { backgroundColor: colors.surfaceRecessed }]}>
-          {(['day', 'night'] as const).map(t => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.choghadiyaTab, tab === t && { backgroundColor: colors.accent }]}>
-              <Text style={[styles.choghadiyaTabText, { color: tab === t ? colors.base : colors.textMuted }]}>
-                {t === 'day' ? 'Day' : 'Night'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-      {active.map((slot, i) => (
-        <View key={i} style={[styles.choghadiyaRow, i < active.length - 1 && { borderBottomWidth: 0.5, borderBottomColor: colors.divider }]}>
-          <View style={[styles.choghadiyaDot, { backgroundColor: QUALITY_COLOR[slot.quality] }]} />
-          <Text style={[styles.choghadiyaName, { color: colors.textPrimary }]}>{slot.name}</Text>
-          <Text style={[styles.choghadiyaTime, { color: colors.textMuted }]}>{slot.start} – {slot.end}</Text>
-        </View>
-      ))}
-    </View>
-  );
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${m}m`;
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -364,7 +337,19 @@ export default function PanchangScreen() {
           </View>
         ) : panchang ? (
           <>
-            {/* Panchaka warning */}
+            {/* ── Banners (festivals, special yogas, panchaka) ── */}
+            {panchang.festivals.length > 0 && panchang.festivals.map((f, i) => (
+              <View key={i} style={[styles.panchakaBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
+                <Ionicons name="star" size={14} color="#F9A825" />
+                <Text style={[styles.panchakaText, { color: '#F57F17' }]}>{f.name}</Text>
+              </View>
+            ))}
+            {panchang.specialYogas.length > 0 && panchang.specialYogas.map((y, i) => (
+              <View key={i} style={[styles.panchakaBar, { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }]}>
+                <Ionicons name="sparkles" size={14} color="#4CAF50" />
+                <Text style={[styles.panchakaText, { color: '#2E7D32' }]}>{y.name}</Text>
+              </View>
+            ))}
             {panchang.panchaka && (
               <View style={[styles.panchakaBar, { backgroundColor: '#FFF3E0', borderColor: '#FF9800' }]}>
                 <Ionicons name="alert-circle-outline" size={15} color="#FF9800" />
@@ -372,7 +357,7 @@ export default function PanchangScreen() {
               </View>
             )}
 
-            {/* Pancha Anga card */}
+            {/* ── Pancha Anga card ── */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <LimbRow label="TITHI (LUNAR DAY)" elements={panchang.tithis} colors={colors} />
               <LimbRow label="NAKSHATRA (LUNAR MANSION)" elements={panchang.nakshatras} colors={colors} />
@@ -383,11 +368,14 @@ export default function PanchangScreen() {
                 <LimbRow label="CHANDRA RASHI (MOON SIGN)" elements={[{ name: panchang.chandraRashi }]} colors={colors} />
               )}
               {panchang.suryaNakshatra && (
-                <LimbRow label="SURYA NAKSHATRA (SUN'S ASTERISM)" elements={[{ name: panchang.suryaNakshatra }]} colors={colors} isLast />
+                <LimbRow label="SURYA NAKSHATRA (SUN'S ASTERISM)" elements={[{ name: panchang.suryaNakshatra }]} colors={colors} />
+              )}
+              {panchang.masa && (
+                <LimbRow label="MASA (SOLAR MONTH)" elements={[{ name: panchang.masa }]} colors={colors} isLast />
               )}
             </View>
 
-            {/* Sunrise / Sunset / Moonrise / Moonset */}
+            {/* ── Sun / Moon times ── */}
             <View style={styles.sunGrid}>
               <SunCard icon="sunny-outline" label="SUNRISE"  time={panchang.sunrise}         colors={colors} iconColor={colors.accent} />
               <SunCard icon="moon-outline"  label="SUNSET"   time={panchang.sunset}          colors={colors} iconColor={colors.textMuted} />
@@ -395,30 +383,97 @@ export default function PanchangScreen() {
               <SunCard icon="moon-outline"  label="MOONSET"  time={panchang.moonset  ?? '—'} colors={colors} iconColor={colors.textMuted} />
             </View>
 
-            {/* Brahma Muhurta */}
+            {/* Day / Night duration */}
+            <View style={[styles.durationRow, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+              <View style={styles.durationCell}>
+                <Ionicons name="sunny-outline" size={13} color={colors.accent} />
+                <Text style={[styles.durationText, { color: colors.textMuted }]}>Day </Text>
+                <Text style={[styles.durationValue, { color: colors.textPrimary }]}>{formatDuration(panchang.dayDurationMinutes)}</Text>
+              </View>
+              <View style={[styles.durationDivider, { backgroundColor: colors.divider }]} />
+              <View style={styles.durationCell}>
+                <Ionicons name="moon-outline" size={13} color={colors.textMuted} />
+                <Text style={[styles.durationText, { color: colors.textMuted }]}>Night </Text>
+                <Text style={[styles.durationValue, { color: colors.textPrimary }]}>{formatDuration(panchang.nightDurationMinutes)}</Text>
+              </View>
+            </View>
+
+            {/* ── Auspicious Times ── */}
+            <SectionHeader title="AUSPICIOUS TIMES" colors={colors} />
+
             {panchang.brahmaMuhurtaStart && panchang.brahmaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color={colors.accent} />
+                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>BRAHMA MUHURTA</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.brahmaMuhurtaStart} – {panchang.brahmaMuhurtaEnd}
                 </Text>
               </View>
             )}
+            {panchang.abhijitMuhurtaStart && panchang.abhijitMuhurtaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>ABHIJIT MUHURTA</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.abhijitMuhurtaStart} – {panchang.abhijitMuhurtaEnd}
+                </Text>
+              </View>
+            )}
 
-            {/* Rahukaal bar */}
+            {/* ── Inauspicious Times ── */}
+            <SectionHeader title="INAUSPICIOUS TIMES" colors={colors} />
+
             {panchang.rahuKalamStart && panchang.rahuKalamEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="warning-outline" size={16} color={colors.textMuted} />
-                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>RAHUKAAL</Text>
+                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>RAHU KALAM</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.rahuKalamStart} – {panchang.rahuKalamEnd}
                 </Text>
               </View>
             )}
+            {panchang.yamagandaStart && panchang.yamagandaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>YAMAGANDA</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.yamagandaStart} – {panchang.yamagandaEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.gulikaKalamStart && panchang.gulikaKalamEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>GULIKA KALAM</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.gulikaKalamStart} – {panchang.gulikaKalamEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.durMuhurta.map((dm, i) => (
+              <View key={i} style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>DUR MUHURTA</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {dm.start} – {dm.end}
+                </Text>
+              </View>
+            ))}
 
-            {/* Choghadiya */}
-            <ChoghadiyaCard slots={panchang.choghadiya} colors={colors} />
+            {/* ── Time Slots ── */}
+            <SectionHeader title="TIME QUALITY" colors={colors} />
+
+            <QualitySlotsCard label="CHOGHADIYA" slots={panchang.choghadiya} colors={colors} />
+            <QualitySlotsCard label="GOWRI PANCHANGAM" slots={panchang.gowriPanchangam} colors={colors} />
+            <HoraCard slots={panchang.hora} colors={colors} />
+
+            {/* ── Planetary Positions ── */}
+            {panchang.planetaryPositions && panchang.planetaryPositions.length > 0 && (
+              <>
+                <SectionHeader title="PLANETARY POSITIONS" colors={colors} />
+                <PlanetaryPositionsCard positions={panchang.planetaryPositions} colors={colors} />
+              </>
+            )}
           </>
         ) : null}
 
@@ -483,15 +538,15 @@ const styles = StyleSheet.create({
   rahuLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, flex: 1 },
   rahuTime: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
-  // Choghadiya
-  choghadiyaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  choghadiyaTabs: { flexDirection: 'row', borderRadius: borderRadius.chip, padding: 2, gap: 2 },
-  choghadiyaTab: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: borderRadius.chip },
-  choghadiyaTabText: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
-  choghadiyaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10 },
-  choghadiyaDot: { width: 8, height: 8, borderRadius: 4 },
-  choghadiyaName: { fontSize: 15, fontFamily: 'Mukta_500Medium', flex: 1 },
-  choghadiyaTime: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  // Section header
+  sectionHeader: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1.2, marginTop: 16, marginBottom: 8 },
+
+  // Day/night duration row
+  durationRow: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.cardInner, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12 },
+  durationCell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  durationDivider: { width: 0.5, height: 16 },
+  durationText: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  durationValue: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
   // Error
   errorContainer: { alignItems: 'center', paddingVertical: 32, gap: 12 },
