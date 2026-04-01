@@ -38,6 +38,7 @@ export default function SettingsScreen() {
     isDarkMode,
     toggleTheme,
     userLocation,
+    locationName,
     fontSize,
     setFontSize,
     dailyReminderEnabled,
@@ -56,9 +57,11 @@ export default function SettingsScreen() {
     });
   }, [userLocation]);
 
-  const locationText = userLocation
-    ? `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`
-    : 'Using default (Pune)';
+  const locationText = locationName
+    ? locationName
+    : userLocation
+      ? `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`
+      : 'Using default (Pune)';
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ interface AppStore {
   hasOnboarded: boolean;
   selectedDeities: string[];
   userLocation: { lat: number; lon: number } | null;
+  locationName: string | null; // e.g. "Mumbai, MH" or "GPS"
   fontSize: FontSize;
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
@@ -18,7 +19,7 @@ interface AppStore {
   // Actions (not persisted)
   toggleTheme: () => void;
   toggleFavorite: (id: string) => void;
-  setUserLocation: (loc: { lat: number; lon: number }) => void;
+  setUserLocation: (loc: { lat: number; lon: number }, name?: string) => void;
   setHasOnboarded: () => void;
   setSelectedDeities: (deities: string[]) => void;
   setFontSize: (size: FontSize) => void;
@@ -34,6 +35,7 @@ export const useStore = create<AppStore>()(
       hasOnboarded: false,
       selectedDeities: [],
       userLocation: null,
+      locationName: null,
       fontSize: 'normal',
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
@@ -45,7 +47,7 @@ export const useStore = create<AppStore>()(
             ? s.favoriteIds.filter((fId) => fId !== id)
             : [...s.favoriteIds, id],
         })),
-      setUserLocation: (loc) => set({ userLocation: loc }),
+      setUserLocation: (loc, name) => set({ userLocation: loc, locationName: name ?? null }),
       setHasOnboarded: () => set({ hasOnboarded: true }),
       setSelectedDeities: (deities) => set({ selectedDeities: deities }),
       setFontSize: (size) => set({ fontSize: size }),

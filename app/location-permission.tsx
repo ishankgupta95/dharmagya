@@ -1,192 +1,195 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Linking,
+  FlatList,
+  TextInput,
+  Keyboard,
+  ListRenderItemInfo,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { INDIAN_CITIES, type City } from '@/config/cities';
 
-// ─── Trust signals data ───────────────────────────────────────────────────────
-
-interface TrustSignal {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  title: string;
-  body: string;
+/** Find the nearest city within ~30 km of given coordinates. */
+function findNearestCity(lat: number, lon: number): City | null {
+  const MAX_DEG = 0.3; // ~30 km rough threshold
+  let best: City | null = null;
+  let bestDist = Infinity;
+  for (const city of INDIAN_CITIES) {
+    const dLat = city.lat - lat;
+    const dLon = city.lon - lon;
+    const dist = dLat * dLat + dLon * dLon;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = city;
+    }
+  }
+  return best && bestDist < MAX_DEG * MAX_DEG ? best : null;
 }
-
-const TRUST_SIGNALS: TrustSignal[] = [
-  {
-    icon: 'sunny-outline',
-    title: 'Precise Sunrise & Sunset',
-    body: 'Accurate timings calculated for your exact city.',
-  },
-  {
-    icon: 'calendar-outline',
-    title: 'Accurate Panchang',
-    body: 'Tithi, Nakshatra, and Rahukaal tailored to your location.',
-  },
-  {
-    icon: 'shield-checkmark-outline',
-    title: 'Stays on Your Device',
-    body: 'Your coordinates are never sent to any server.',
-  },
-];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function LocationPermissionScreen() {
-  const { isDarkMode, setUserLocation } = useStore();
+export default function LocationPickerScreen() {
+  const { isDarkMode, setUserLocation, userLocation, locationName } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
-  const [requesting, setRequesting] = useState(false);
-  const [denied, setDenied] = useState(false);
+  const [query, setQuery] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
 
-  async function handleAllow() {
-    setRequesting(true);
-    setDenied(false);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return INDIAN_CITIES;
+    return INDIAN_CITIES.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.state.toLowerCase().includes(q),
+    );
+  }, [query]);
+
+  async function handleUseGPS() {
+    setGpsLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        setUserLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
+        const { latitude, longitude } = loc.coords;
+        const match = findNearestCity(latitude, longitude);
+        const name = match ? `${match.name}, ${match.state}` : 'GPS';
+        setUserLocation({ lat: latitude, lon: longitude }, name);
         router.back();
-      } else {
-        setDenied(true);
       }
-    } catch {
-      setDenied(true);
     } finally {
-      setRequesting(false);
+      setGpsLoading(false);
     }
   }
 
-  function handleSkip() {
+  function handleSelectCity(city: City) {
+    Keyboard.dismiss();
+    setUserLocation({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
     router.back();
   }
 
-  const headerGradient: readonly [string, string] = ['#1A2E2E', colors.base];
+  function renderCity({ item }: ListRenderItemInfo<City>) {
+    const isActive =
+      locationName === `${item.name}, ${item.state}` ||
+      (userLocation &&
+        Math.abs(userLocation.lat - item.lat) < 0.01 &&
+        Math.abs(userLocation.lon - item.lon) < 0.01);
+
+    return (
+      <TouchableOpacity
+        onPress={() => handleSelectCity(item)}
+        activeOpacity={0.7}
+        style={[
+          styles.cityRow,
+          { borderBottomColor: colors.divider },
+          isActive && { backgroundColor: colors.accent + '10' },
+        ]}>
+        <View style={styles.cityInfo}>
+          <Text style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
+          <Text style={[styles.cityState, { color: colors.textMuted }]}>{item.state}</Text>
+        </View>
+        {isActive && <Ionicons name="checkmark-circle" size={18} color={colors.accent} />}
+      </TouchableOpacity>
+    );
+  }
+
+  const currentLabel = locationName ?? (userLocation ? 'GPS' : 'Pune (default)');
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: '#1A2E2E' }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
-      {/* ── Gradient Header ─────────────────────────────────────────── */}
-      <LinearGradient colors={headerGradient} style={styles.header}>
-        <View style={[styles.navRow, { paddingHorizontal: spacing.screenH }]}>
-          <TouchableOpacity
-            onPress={handleSkip}
-            style={styles.backBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color="#F0E6D3" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSkip}>
-            <Text style={styles.skipLink}>Skip</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Location pin illustration */}
-        <View style={styles.heroWrap}>
-          <LinearGradient
-            colors={[colors.accent + '40', colors.accent + '10']}
-            style={styles.pinCircle}>
-            <Ionicons name="location" size={44} color={colors.accent} />
-          </LinearGradient>
-          <Text style={styles.heroTitle}>स्थान सक्षम करें</Text>
-          <Text style={styles.heroSubtitle}>Enable Location Access</Text>
-        </View>
-      </LinearGradient>
-
-      {/* ── Trust Signals ───────────────────────────────────────────── */}
-      <View style={[styles.body, { backgroundColor: colors.base, paddingHorizontal: spacing.screenH }]}>
-
-        <Text style={[styles.bodyIntro, { color: colors.textSecondary }]}>
-          dharmagya uses your location only for on-device calculations — nothing is ever uploaded.
-        </Text>
-
-        <View style={styles.signalList}>
-          {TRUST_SIGNALS.map((signal, i) => (
-            <TrustRow key={i} signal={signal} colors={colors} />
-          ))}
-        </View>
-
-        {/* Denied message + open-settings CTA */}
-        {denied && (
-          <View style={[styles.deniedCard, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-            <View style={styles.deniedRow}>
-              <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-              <Text style={[styles.deniedText, { color: colors.textSecondary }]}>
-                Location access was denied. Enable it in your device Settings to get accurate Panchang times.
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => Linking.openSettings()}
-              activeOpacity={0.8}
-              style={[styles.openSettingsBtn, { borderColor: colors.accent }]}>
-              <Ionicons name="settings-outline" size={14} color={colors.accent} />
-              <Text style={[styles.openSettingsText, { color: colors.accent }]}>Open Settings</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Set Location</Text>
+        <View style={styles.backBtn} />
       </View>
 
-      {/* ── CTAs ────────────────────────────────────────────────────── */}
-      <View style={[styles.ctaWrap, { paddingHorizontal: spacing.screenH, backgroundColor: colors.base, borderTopColor: colors.border }]}>
+      {/* ── Current Location ──────────────────────────────────────────── */}
+      <View style={[styles.currentRow, { paddingHorizontal: spacing.screenH, backgroundColor: colors.surfaceRecessed }]}>
+        <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
+        <Text style={[styles.currentLabel, { color: colors.textSecondary }]}>
+          Current: <Text style={{ color: colors.textPrimary }}>{currentLabel}</Text>
+        </Text>
+      </View>
+
+      {/* ── GPS Button ────────────────────────────────────────────────── */}
+      <View style={{ paddingHorizontal: spacing.screenH, paddingTop: 16, paddingBottom: 8 }}>
         <TouchableOpacity
-          onPress={handleAllow}
+          onPress={handleUseGPS}
           activeOpacity={0.85}
-          disabled={requesting}
-          style={[styles.allowBtn, { backgroundColor: colors.accent, opacity: requesting ? 0.7 : 1 }]}>
-          {requesting ? (
+          disabled={gpsLoading}
+          style={[styles.gpsBtn, { backgroundColor: colors.accent, opacity: gpsLoading ? 0.7 : 1 }]}>
+          {gpsLoading ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <>
-              <Ionicons name="location-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.allowBtnText}>Allow Location Access</Text>
+              <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.gpsBtnText}>Use GPS Location</Text>
             </>
           )}
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleSkip} activeOpacity={0.7}>
-          <Text style={[styles.useDefaultText, { color: colors.textMuted }]}>
-            Use Pune default instead
-          </Text>
-        </TouchableOpacity>
       </View>
+
+      {/* ── Divider ───────────────────────────────────────────────────── */}
+      <View style={[styles.orRow, { paddingHorizontal: spacing.screenH }]}>
+        <View style={[styles.orLine, { backgroundColor: colors.divider }]} />
+        <Text style={[styles.orText, { color: colors.textMuted }]}>or search a city</Text>
+        <View style={[styles.orLine, { backgroundColor: colors.divider }]} />
+      </View>
+
+      {/* ── Search ────────────────────────────────────────────────────── */}
+      <View style={{ paddingHorizontal: spacing.screenH, paddingBottom: 8 }}>
+        <View style={[styles.searchBox, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+          <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            placeholder="Search city..."
+            placeholderTextColor={colors.textDisabled}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="words"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* ── City List ─────────────────────────────────────────────────── */}
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.name}
+        renderItem={renderCity}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 32 }}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+            No cities found for "{query}"
+          </Text>
+        }
+      />
 
     </SafeAreaView>
-  );
-}
-
-// ─── Trust Row ────────────────────────────────────────────────────────────────
-
-interface TrustRowProps {
-  signal: TrustSignal;
-  colors: ColorPalette;
-}
-
-function TrustRow({ signal, colors }: TrustRowProps) {
-  return (
-    <View style={styles.trustRow}>
-      <View style={[styles.trustIcon, { backgroundColor: colors.surfaceRecessed }]}>
-        <Ionicons name={signal.icon} size={20} color={colors.accent} />
-      </View>
-      <View style={styles.trustText}>
-        <Text style={[styles.trustTitle, { color: colors.textPrimary }]}>{signal.title}</Text>
-        <Text style={[styles.trustBody, { color: colors.textSecondary }]}>{signal.body}</Text>
-      </View>
-    </View>
   );
 }
 
@@ -196,109 +199,72 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
 
   // Header
-  header: { paddingBottom: 28 },
-  navRow: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipLink: {
-    fontSize: 14,
-    fontFamily: 'Mukta_400Regular',
-    color: 'rgba(240,230,211,0.6)',
-  },
-  heroWrap: { alignItems: 'center', paddingTop: 8, gap: 10 },
-  pinCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontFamily: 'Mukta_700Bold',
-    color: '#F0E6D3',
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: 13,
-    fontFamily: 'Mukta_400Regular',
-    color: '#C8B89A',
-    textAlign: 'center',
-  },
+  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
 
-  // Body
-  body: { flex: 1, paddingTop: 24 },
-  bodyIntro: {
-    fontSize: 14,
-    fontFamily: 'Mukta_400Regular',
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  signalList: { gap: 16 },
-  trustRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
-  trustIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.iconContainer,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  trustText: { flex: 1 },
-  trustTitle: { fontSize: 15, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
-  trustBody: { fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 20 },
-
-  // Denied card
-  deniedCard: {
-    marginTop: 20,
-    padding: 12,
-    borderRadius: borderRadius.cardInner,
-    borderWidth: 1,
-    gap: 10,
-  },
-  deniedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  deniedText: { flex: 1, fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 18 },
-  openSettingsBtn: {
+  // Current location
+  currentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: borderRadius.button,
-    borderWidth: 1,
+    gap: 8,
+    paddingVertical: 12,
   },
-  openSettingsText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  currentLabel: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
 
-  // CTAs
-  ctaWrap: {
-    paddingTop: 14,
-    paddingBottom: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 12,
-    alignItems: 'center',
-  },
-  allowBtn: {
-    width: '100%',
+  // GPS button
+  gpsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: borderRadius.button,
   },
-  allowBtnText: { fontSize: 16, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
-  useDefaultText: { fontSize: 13, fontFamily: 'Mukta_400Regular', marginBottom: 8 },
+  gpsBtnText: { fontSize: 15, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
+
+  // Or divider
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  orText: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+
+  // Search
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'Mukta_400Regular',
+    padding: 0,
+  },
+
+  // City rows
+  cityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cityInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  cityName: { fontSize: 15, fontFamily: 'Mukta_500Medium' },
+  cityState: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+
+  // Empty
+  emptyText: { fontSize: 14, fontFamily: 'Mukta_400Regular', textAlign: 'center', paddingTop: 32 },
 });

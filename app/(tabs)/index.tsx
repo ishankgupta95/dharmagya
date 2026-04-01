@@ -69,7 +69,7 @@ function getActiveElement(elements: IPanchangElement[]): IPanchangElement | unde
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { isDarkMode, favoriteIds, userLocation } = useStore();
+  const { isDarkMode, favoriteIds, userLocation, locationName } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 
@@ -174,7 +174,7 @@ export default function HomeScreen() {
                 <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
                   <Ionicons name="location-outline" size={10} color={colors.textMuted} />
                   <Text style={[styles.locationText, { color: colors.textMuted }]}>
-                    {'  '}{userLocation ? 'GPS' : 'Pune, MH'}
+                    {'  '}{locationName ?? (userLocation ? 'GPS' : 'Pune, MH')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />

@@ -359,7 +359,7 @@ function formatDuration(minutes: number): string {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function PanchangScreen() {
-  const { isDarkMode, userLocation } = useStore();
+  const { isDarkMode, userLocation, locationName } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -405,9 +405,9 @@ export default function PanchangScreen() {
         <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
           <Ionicons name="location" size={10} color={colors.accent} />
           <Text style={[styles.locationText, { color: colors.textMuted }]}>
-            {userLocation
-              ? ` ${userLocation.lat.toFixed(2)}°N, ${userLocation.lon.toFixed(2)}°E`
-              : ' Pune, MH (default)'}
+            {' '}{locationName ?? (userLocation
+              ? `${userLocation.lat.toFixed(2)}°N, ${userLocation.lon.toFixed(2)}°E`
+              : 'Pune, MH (default)')}
           </Text>
         </View>
       </View>
