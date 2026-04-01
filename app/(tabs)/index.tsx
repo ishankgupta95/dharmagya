@@ -267,8 +267,8 @@ export default function HomeScreen() {
             colors={colors}
           />
           <QuickCard
-            emoji="📿"
-            label="All Aartis"
+            emoji="🙏🏽"
+            label="Gods"
             onPress={() => router.push('/(tabs)/library')}
             colors={colors}
           />

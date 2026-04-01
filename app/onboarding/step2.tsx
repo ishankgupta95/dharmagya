@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, FlatList, StyleSheet, Dimensions, ListRenderItemInfo } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,33 +7,15 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, deityColors, borderRadius, spacing } from '@/config/theme';
+import { darkColors, borderRadius, spacing } from '@/config/theme';
+import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 
 const colors = darkColors;
 
-// ─── Deity data ───────────────────────────────────────────────────────────────
-
-interface DeityInfo {
-  name: string;
-  nameHindi: string;
-  initial: string;
-  color: string;
-}
-
-const DEITIES: DeityInfo[] = [
-  { name: 'Ganesh',  nameHindi: 'गणेश',   initial: 'ग',  color: deityColors.Ganesh },
-  { name: 'Shiva',   nameHindi: 'शिव',     initial: 'श',  color: deityColors.Shiva },
-  { name: 'Lakshmi', nameHindi: 'लक्ष्मी', initial: 'ल',  color: deityColors.Lakshmi },
-  { name: 'Vishnu',  nameHindi: 'विष्णु',  initial: 'वि', color: deityColors.Vishnu },
-  { name: 'Hanuman', nameHindi: 'हनुमान',  initial: 'ह',  color: deityColors.Hanuman },
-];
-
-// Layout: rows of 2, last row centered
-const ROWS: DeityInfo[][] = [
-  [DEITIES[0], DEITIES[1]],
-  [DEITIES[2], DEITIES[3]],
-  [DEITIES[4]],
-];
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const NUM_COLUMNS = 3;
+const CARD_GAP = 10;
+const CARD_WIDTH = (SCREEN_WIDTH - spacing.screenH * 2 - CARD_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +34,17 @@ export default function OnboardingStep2() {
     router.push('/onboarding/step3');
   }
 
+  const renderDeity = ({ item }: ListRenderItemInfo<DeityMeta>) => {
+    const isSelected = localSelected.includes(item.name);
+    return (
+      <DeityCard
+        deity={item}
+        isSelected={isSelected}
+        onPress={() => toggleDeity(item.name)}
+      />
+    );
+  };
+
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
 
@@ -64,43 +57,31 @@ export default function OnboardingStep2() {
         <View style={{ width: 20 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-        showsVerticalScrollIndicator={false}>
-
-        {/* ── Title ─────────────────────────────────────────────────── */}
+      {/* ── Title ─────────────────────────────────────────────────── */}
+      <View style={{ paddingHorizontal: spacing.screenH }}>
         <Text style={styles.titleHindi}>अपने देवता चुनें</Text>
         <Text style={styles.title}>Choose Your Deities</Text>
         <Text style={styles.subtitle}>
           We'll highlight aartis and chalisas for the deities you love. You can change this anytime.
         </Text>
+      </View>
 
-        {/* ── Deity Grid ────────────────────────────────────────────── */}
-        <View style={styles.grid}>
-          {ROWS.map((row, rowIndex) => (
-            <View key={rowIndex} style={styles.gridRow}>
-              {row.map((deity) => {
-                const isSelected = localSelected.includes(deity.name);
-                return (
-                  <DeityCard
-                    key={deity.name}
-                    deity={deity}
-                    isSelected={isSelected}
-                    onPress={() => toggleDeity(deity.name)}
-                  />
-                );
-              })}
-            </View>
-          ))}
-        </View>
+      {/* ── Deity Grid ────────────────────────────────────────────── */}
+      <FlatList
+        data={ALL_DEITIES}
+        keyExtractor={(item) => item.id}
+        renderItem={renderDeity}
+        numColumns={NUM_COLUMNS}
+        contentContainerStyle={[styles.gridContent, { paddingHorizontal: spacing.screenH }]}
+        columnWrapperStyle={styles.gridRow}
+        showsVerticalScrollIndicator={false}
+      />
 
-        {localSelected.length > 0 && (
-          <Text style={styles.selectionCount}>
-            {localSelected.length} selected
-          </Text>
-        )}
-
-      </ScrollView>
+      {localSelected.length > 0 && (
+        <Text style={styles.selectionCount}>
+          {localSelected.length} selected
+        </Text>
+      )}
 
       {/* ── Bottom ────────────────────────────────────────────────────── */}
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH }]}>
@@ -123,7 +104,7 @@ export default function OnboardingStep2() {
 // ─── Deity Card ───────────────────────────────────────────────────────────────
 
 interface DeityCardProps {
-  deity: DeityInfo;
+  deity: DeityMeta;
   isSelected: boolean;
   onPress: () => void;
 }
@@ -135,7 +116,7 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
       onPress={onPress}
       style={[
         styles.card,
-        { borderColor: isSelected ? deity.color : colors.border },
+        { borderColor: isSelected ? deity.color : colors.border, width: CARD_WIDTH },
         isSelected && { backgroundColor: deity.color + '12' },
       ]}>
 
@@ -146,13 +127,14 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
         <Text style={[styles.cardInitial, { color: deity.color }]}>{deity.initial}</Text>
       </LinearGradient>
 
-      <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]}>{deity.nameHindi}</Text>
-      <Text style={[styles.cardName, { color: colors.textSecondary }]}>{deity.name}</Text>
+      <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
+        {deity.nameHindi}
+      </Text>
 
       {/* Selection checkmark */}
       {isSelected && (
         <View style={[styles.checkCircle, { backgroundColor: deity.color }]}>
-          <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
         </View>
       )}
     </TouchableOpacity>
@@ -188,8 +170,6 @@ const dotsStyles = StyleSheet.create({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_GAP = 12;
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.base },
 
@@ -202,8 +182,6 @@ const styles = StyleSheet.create({
   },
   headerStep: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: colors.textMuted },
 
-  scroll: { paddingBottom: 16 },
-
   titleHindi: { fontSize: 26, fontFamily: 'Mukta_700Bold', color: colors.textPrimary, marginBottom: 4 },
   title: { fontSize: 15, fontFamily: 'Mukta_400Regular', color: colors.textSecondary, marginBottom: 8 },
   subtitle: {
@@ -211,42 +189,39 @@ const styles = StyleSheet.create({
     fontFamily: 'Mukta_400Regular',
     color: colors.textMuted,
     lineHeight: 20,
-    marginBottom: 28,
+    marginBottom: 16,
   },
 
-  grid: { gap: CARD_GAP },
-  gridRow: { flexDirection: 'row', gap: CARD_GAP, justifyContent: 'center' },
+  gridContent: { paddingBottom: 8 },
+  gridRow: { gap: CARD_GAP, marginBottom: CARD_GAP },
 
-  // Each card takes ~48% width (2 per row with gap)
   card: {
-    width: '48%',
     borderRadius: borderRadius.card,
     borderWidth: 1.5,
     backgroundColor: colors.surface,
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    gap: 4,
     position: 'relative',
   },
   cardAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardInitial: { fontSize: 26, fontFamily: 'Mukta_700Bold' },
-  cardNameHindi: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
-  cardName: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  cardInitial: { fontSize: 20, fontFamily: 'Mukta_700Bold' },
+  cardNameHindi: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
   checkCircle: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -256,7 +231,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Mukta_400Regular',
     color: colors.accent,
     textAlign: 'center',
-    marginTop: 16,
+    marginBottom: 8,
   },
 
   bottom: { gap: 14, paddingBottom: 8, alignItems: 'center' },

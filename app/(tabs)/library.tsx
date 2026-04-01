@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   FlatList,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
+  Dimensions,
   ListRenderItemInfo,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
@@ -17,120 +17,62 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { AdBanner } from '@/components/common/AdBanner';
-import type { IAarti, IChalisaSection } from '@/types';
+import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 
-// ─── Row / Item Types ─────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-interface AartiRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  content: string;
+interface DeityCount {
   deity: string;
+  count: number;
 }
 
-interface ChalisaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  sections: string;
+interface DeityCardData extends DeityMeta {
+  aartiCount: number;
+  chalisaCount: number;
 }
 
-interface ChalisaItem {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  sections: IChalisaSection[];
-}
+// ─── Constants ───────────────────────────────────────────────────────────────
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const NUM_COLUMNS = 3;
+const CARD_GAP = 12;
+const CARD_WIDTH = (SCREEN_WIDTH - spacing.screenH * 2 - CARD_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
-const DEITIES = ['All', 'Ganesh', 'Shiva', 'Lakshmi', 'Vishnu', 'Hanuman'] as const;
-type DeityFilter = (typeof DEITIES)[number];
-type ActiveTab = 'aartis' | 'chalisas';
+// ─── Screen ──────────────────────────────────────────────────────────────────
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function rowToAarti(row: AartiRow): IAarti {
-  return { ...row, content: JSON.parse(row.content) as string[] };
-}
-
-function rowToChalisa(row: ChalisaRow): ChalisaItem {
-  return { ...row, sections: JSON.parse(row.sections) as IChalisaSection[] };
-}
-
-function countChaupais(sections: IChalisaSection[]): number {
-  return sections.filter((s) => s.type === 'chaupai').length;
-}
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-export default function LibraryScreen() {
-  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
+export default function GodsScreen() {
+  const { isDarkMode } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('aartis');
-  const [activeDeity, setActiveDeity] = useState<DeityFilter>('All');
-  const [aartis, setAartis] = useState<IAarti[]>([]);
-  const [chalisas, setChalisas] = useState<ChalisaItem[]>([]);
+  const [deities, setDeities] = useState<DeityCardData[]>([]);
 
-  // ── Load data whenever tab or deity filter changes ─────────────────────────
   useEffect(() => {
-    if (activeTab === 'aartis') {
-      const rows =
-        activeDeity === 'All'
-          ? db.getAllSync<AartiRow>('SELECT * FROM aartis ORDER BY deity, titleEnglish')
-          : db.getAllSync<AartiRow>(
-              'SELECT * FROM aartis WHERE deity = ? ORDER BY titleEnglish',
-              [activeDeity]
-            );
-      setAartis(rows.map(rowToAarti));
-    } else {
-      const rows =
-        activeDeity === 'All'
-          ? db.getAllSync<ChalisaRow>('SELECT * FROM chalisas ORDER BY deity, titleEnglish')
-          : db.getAllSync<ChalisaRow>(
-              'SELECT * FROM chalisas WHERE deity = ? ORDER BY titleEnglish',
-              [activeDeity]
-            );
-      setChalisas(rows.map(rowToChalisa));
-    }
-  }, [db, activeTab, activeDeity]);
+    const aartiCounts = db.getAllSync<DeityCount>(
+      'SELECT deity, COUNT(*) as count FROM aartis GROUP BY deity'
+    );
+    const chalisaCounts = db.getAllSync<DeityCount>(
+      'SELECT deity, COUNT(*) as count FROM chalisas GROUP BY deity'
+    );
 
-  // ── Render callbacks ────────────────────────────────────────────────────────
-  const renderAarti = useCallback(
-    ({ item }: ListRenderItemInfo<IAarti>) => (
-      <AartiCard
-        item={item}
-        colors={colors}
-        isFavorite={favoriteIds.includes(`aarti-${item.id}`)}
-        onToggleFavorite={() => toggleFavorite(`aarti-${item.id}`)}
-        onPress={() => router.push(`/aarti/${item.id}`)}
-      />
+    const aartiMap = Object.fromEntries(aartiCounts.map(r => [r.deity, r.count]));
+    const chalisaMap = Object.fromEntries(chalisaCounts.map(r => [r.deity, r.count]));
+
+    const data: DeityCardData[] = ALL_DEITIES.map(d => ({
+      ...d,
+      aartiCount: aartiMap[d.name] ?? 0,
+      chalisaCount: chalisaMap[d.name] ?? 0,
+    }));
+
+    setDeities(data);
+  }, [db]);
+
+  const renderDeity = useCallback(
+    ({ item }: ListRenderItemInfo<DeityCardData>) => (
+      <DeityCard deity={item} colors={colors} />
     ),
-    [colors, favoriteIds, toggleFavorite]
+    [colors]
   );
-
-  const renderChalisa = useCallback(
-    ({ item }: ListRenderItemInfo<ChalisaItem>) => (
-      <ChalisaCard
-        item={item}
-        colors={colors}
-        isFavorite={favoriteIds.includes(`chalisa-${item.id}`)}
-        onToggleFavorite={() => toggleFavorite(`chalisa-${item.id}`)}
-        onPress={() => router.push(`/chalisa/${item.id}`)}
-      />
-    ),
-    [colors, favoriteIds, toggleFavorite]
-  );
-
-  const isAartiTab = activeTab === 'aartis';
-
-  const listContentStyle = [styles.listContent, { paddingHorizontal: spacing.screenH }];
-  const emptyText = isAartiTab ? 'No aartis found' : 'No chalisas found';
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -138,8 +80,8 @@ export default function LibraryScreen() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
         <View>
-          <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>भजन संग्रह</Text>
-          <Text style={[styles.screenTitleEn, { color: colors.textMuted }]}>Library</Text>
+          <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>देवी देवता</Text>
+          <Text style={[styles.screenTitleEn, { color: colors.textMuted }]}>Gods</Text>
         </View>
         <TouchableOpacity
           onPress={() => router.push('/search')}
@@ -149,90 +91,16 @@ export default function LibraryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Segment Control ───────────────────────────────────────────── */}
-      <View style={[styles.segmentWrap, { paddingHorizontal: spacing.screenH }]}>
-        <View style={[styles.segmentContainer, { backgroundColor: colors.surfaceRecessed }]}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveTab('aartis')}
-            style={[styles.segmentBtn, isAartiTab && { backgroundColor: colors.accent }]}>
-            <Text
-              style={[
-                styles.segmentText,
-                { color: isAartiTab ? '#FFFFFF' : colors.textSecondary },
-              ]}>
-              Aartis
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveTab('chalisas')}
-            style={[styles.segmentBtn, !isAartiTab && { backgroundColor: colors.accent }]}>
-            <Text
-              style={[
-                styles.segmentText,
-                { color: !isAartiTab ? '#FFFFFF' : colors.textSecondary },
-              ]}>
-              Chalisas
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── Deity Filter Chips ────────────────────────────────────────── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipsRow}
-        contentContainerStyle={[styles.chipsScroll, { paddingHorizontal: spacing.screenH }]}>
-        {DEITIES.map((deity) => {
-          const isActive = activeDeity === deity;
-          return (
-            <TouchableOpacity
-              key={deity}
-              activeOpacity={0.8}
-              onPress={() => setActiveDeity(deity)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: isActive ? colors.accent : colors.surfaceRecessed,
-                  borderColor: isActive ? colors.accent : colors.border,
-                },
-              ]}>
-              <Text style={[styles.chipText, { color: isActive ? '#FFFFFF' : colors.textSecondary }]}>
-                {deity}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* ── List ──────────────────────────────────────────────────────── */}
-      {isAartiTab ? (
-        <FlatList
-          data={aartis}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAarti}
-          contentContainerStyle={listContentStyle}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{emptyText}</Text>
-          }
-        />
-      ) : (
-        <FlatList
-          data={chalisas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderChalisa}
-          contentContainerStyle={listContentStyle}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{emptyText}</Text>
-          }
-        />
-      )}
+      {/* ── God Grid ──────────────────────────────────────────────────── */}
+      <FlatList
+        data={deities}
+        keyExtractor={(item) => item.id}
+        renderItem={renderDeity}
+        numColumns={NUM_COLUMNS}
+        contentContainerStyle={[styles.gridContent, { paddingHorizontal: spacing.screenH }]}
+        columnWrapperStyle={styles.gridRow}
+        showsVerticalScrollIndicator={false}
+      />
 
       <AdBanner colors={colors} />
 
@@ -240,99 +108,47 @@ export default function LibraryScreen() {
   );
 }
 
-// ─── Aarti Card ───────────────────────────────────────────────────────────────
+// ─── Deity Card ──────────────────────────────────────────────────────────────
 
-interface AartiCardProps {
-  item: IAarti;
+interface DeityCardProps {
+  deity: DeityCardData;
   colors: ColorPalette;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-  onPress: () => void;
 }
 
-function AartiCard({ item, colors, isFavorite, onToggleFavorite, onPress }: AartiCardProps) {
+function DeityCard({ deity, colors }: DeityCardProps) {
+  const totalCount = deity.aartiCount + deity.chalisaCount;
+
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <DeityAvatar deity={item.deity} size={46} />
-      <View style={styles.cardText}>
-        <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleNative}
-        </Text>
-        <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
-          {item.titleEnglish}
-        </Text>
-        <View style={[styles.badge, { backgroundColor: colors.surfaceRecessed }]}>
-          <Text style={[styles.badgeText, { color: colors.accent }]}>{item.deity}</Text>
+      activeOpacity={0.8}
+      onPress={() => router.push(`/god/${deity.id}`)}
+      style={[
+        styles.card,
+        {
+          width: CARD_WIDTH,
+          backgroundColor: colors.surface,
+          borderColor: deity.color + '30',
+        },
+      ]}>
+      <DeityAvatar deity={deity.name} size={56} />
+      <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
+        {deity.nameHindi}
+      </Text>
+      <Text style={[styles.cardName, { color: colors.textSecondary }]} numberOfLines={1}>
+        {deity.name}
+      </Text>
+      {totalCount > 0 && (
+        <View style={[styles.countBadge, { backgroundColor: deity.color + '18' }]}>
+          <Text style={[styles.countText, { color: deity.color }]}>
+            {totalCount} {totalCount === 1 ? 'भजन' : 'भजन'}
+          </Text>
         </View>
-      </View>
-      <TouchableOpacity
-        onPress={onToggleFavorite}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons
-          name={isFavorite ? 'heart' : 'heart-outline'}
-          size={22}
-          color={isFavorite ? colors.accent : colors.textMuted}
-        />
-      </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 }
 
-// ─── Chalisa Card ─────────────────────────────────────────────────────────────
-
-interface ChalisaCardProps {
-  item: ChalisaItem;
-  colors: ColorPalette;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-  onPress: () => void;
-}
-
-function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: ChalisaCardProps) {
-  const chaupaiCount = countChaupais(item.sections);
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <DeityAvatar deity={item.deity} size={46} />
-      <View style={styles.cardText}>
-        <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleNative}
-        </Text>
-        <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
-          {item.titleEnglish}
-        </Text>
-        <View style={styles.badgeRow}>
-          <View style={[styles.badge, { backgroundColor: colors.surfaceRecessed }]}>
-            <Text style={[styles.badgeText, { color: colors.accent }]}>{item.deity}</Text>
-          </View>
-          {chaupaiCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-              <Text style={[styles.badgeText, { color: colors.accent }]}>
-                {chaupaiCount} चौपाई
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-      <TouchableOpacity
-        onPress={onToggleFavorite}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons
-          name={isFavorite ? 'heart' : 'heart-outline'}
-          size={22}
-          color={isFavorite ? colors.accent : colors.textMuted}
-        />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -349,56 +165,26 @@ const styles = StyleSheet.create({
   screenTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginTop: 1 },
   searchBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
-  // Segment
-  segmentWrap: { marginBottom: 14 },
-  segmentContainer: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.button,
-    padding: 3,
-  },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: borderRadius.button - 2,
-    alignItems: 'center',
-  },
-  segmentText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-
-  // Chips
-  chipsRow: { maxHeight: 44, marginBottom: 14 },
-  chipsScroll: { gap: 8, alignItems: 'center', paddingRight: spacing.screenH },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: borderRadius.chip,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
-
-  // List
-  listContent: { paddingTop: 2, paddingBottom: 32 },
-  emptyText: {
-    textAlign: 'center',
-    fontFamily: 'Mukta_400Regular',
-    fontSize: 15,
-    marginTop: 48,
-  },
+  // Grid
+  gridContent: { paddingTop: 4, paddingBottom: 32 },
+  gridRow: { gap: CARD_GAP, marginBottom: CARD_GAP },
 
   // Card
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     borderRadius: borderRadius.card,
     borderWidth: 1,
-    padding: spacing.cardPad,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    gap: 4,
   },
-  cardText: { flex: 1 },
-  cardTitleNative: { fontSize: 16, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
-  cardTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginBottom: 6 },
-
-  // Badges
-  badgeRow: { flexDirection: 'row', gap: 6 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.chip },
-  badgeText: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.3 },
+  cardNameHindi: { fontSize: 15, fontFamily: 'Mukta_500Medium', marginTop: 4 },
+  cardName: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: borderRadius.chip,
+    marginTop: 4,
+  },
+  countText: { fontSize: 10, fontFamily: 'Mukta_400Regular' },
 });

@@ -4,6 +4,9 @@ import type { IAarti, IChalisa } from '@/types';
 import aartiSeedData from '@/data/static/aartis.json';
 import chalisaSeedData from '@/data/static/chalisas.json';
 
+// Bump this whenever seed data changes to trigger a re-seed on existing installs.
+const SEED_VERSION = 2;
+
 function seedAartis(db: SQLiteDatabase): void {
   const aartis = aartiSeedData as IAarti[];
   for (const aarti of aartis) {
@@ -49,14 +52,21 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
-  // Seed if empty
-  const aartiCount = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM aartis');
-  if (aartiCount && aartiCount.count === 0) {
-    seedAartis(db);
-  }
+  // Meta table for tracking seed version
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    );
+  `);
 
-  const chalisaCount = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM chalisas');
-  if (chalisaCount && chalisaCount.count === 0) {
+  // Check current seed version
+  const row = db.getFirstSync<{ value: string }>('SELECT value FROM meta WHERE key = ?', ['seedVersion']);
+  const currentVersion = row ? parseInt(row.value, 10) : 0;
+
+  if (currentVersion < SEED_VERSION) {
+    seedAartis(db);
     seedChalisas(db);
+    db.runSync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', ['seedVersion', String(SEED_VERSION)]);
   }
 }

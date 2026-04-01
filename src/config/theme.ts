@@ -51,13 +51,26 @@ export const lightColors = {
   divider: 'rgba(0,0,0,0.05)',
 } as const;
 
-export const deityColors = {
+export const deityColors: Record<string, string> = {
   Ganesh: '#E8893C',
   Shiva: '#7AA8C8',
   Lakshmi: '#D4A853',
   Vishnu: '#5DCAA5',
   Hanuman: '#E85D3A',
-} as const;
+  Krishna: '#4A7ABF',
+  Rama: '#5EA06A',
+  Durga: '#D45454',
+  Saraswati: '#B0A0D8',
+  Parvati: '#E07878',
+  Kali: '#8B5CF6',
+  Surya: '#F0A030',
+  Kartikeya: '#E06040',
+  Brahma: '#D4A060',
+  'Sai Baba': '#A0886A',
+  Jagannath: '#3A8FD4',
+  'Santoshi Mata': '#E8A060',
+  Radha: '#E888A0',
+};
 
 export const semanticColors = {
   success: '#5DCAA5',
