@@ -7,7 +7,6 @@ import {
   Image,
   ListRenderItemInfo,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -96,14 +95,6 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
         )}
       </View>
 
-      {/* ── Gradient overlay on image edge ── */}
-      <LinearGradient
-        colors={['transparent', colors.surface]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.imageGradient}
-      />
-
       {/* ── Info ── */}
       <View style={styles.cardInfo}>
         <Text style={[styles.cardName, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -156,13 +147,6 @@ const styles = StyleSheet.create({
   image: {
     width: 88,
     height: 88,
-  },
-  imageGradient: {
-    position: 'absolute',
-    left: 72,
-    top: 0,
-    bottom: 0,
-    width: 24,
   },
   cardInfo: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, gap: 2 },
   cardName: { fontSize: 16, fontFamily: 'Mukta_600SemiBold', lineHeight: 22 },
