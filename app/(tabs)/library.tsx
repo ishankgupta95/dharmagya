@@ -1,4 +1,4 @@
-import { useCallback, memo } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 import {
   View,
   FlatList,
@@ -10,6 +10,7 @@ import {
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
@@ -21,14 +22,37 @@ import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+type Segment = 'gods' | 'kathas';
+
 type DeityCardData = DeityMeta;
+
+interface KathaListItem {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
+}
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-export default function GodsScreen() {
-  const { isDarkMode } = useStore();
+export default function LibraryScreen() {
+  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
+  const db = useSQLiteContext();
+  const [segment, setSegment] = useState<Segment>('gods');
+  const [kathas, setKathas] = useState<KathaListItem[]>([]);
+
   const deities: DeityCardData[] = ALL_DEITIES;
+
+  useEffect(() => {
+    if (segment === 'kathas') {
+      const rows = db.getAllSync<KathaListItem>(
+        'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas ORDER BY titleEnglish'
+      );
+      setKathas(rows);
+    }
+  }, [db, segment]);
 
   const renderDeity = useCallback(
     ({ item }: ListRenderItemInfo<DeityCardData>) => (
@@ -37,14 +61,30 @@ export default function GodsScreen() {
     [colors]
   );
 
+  const renderKatha = useCallback(
+    ({ item }: ListRenderItemInfo<KathaListItem>) => (
+      <KathaCard
+        item={item}
+        colors={colors}
+        isFavorite={favoriteIds.includes(`katha-${item.id}`)}
+        onToggleFavorite={() => toggleFavorite(`katha-${item.id}`)}
+      />
+    ),
+    [colors, favoriteIds, toggleFavorite]
+  );
+
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
         <View>
-          <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>देवी देवता</Text>
-          <Text style={[styles.screenTitleEn, { color: colors.textMuted }]}>Gods</Text>
+          <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>
+            {segment === 'gods' ? 'देवी देवता' : 'कथाएँ'}
+          </Text>
+          <Text style={[styles.screenTitleEn, { color: colors.textMuted }]}>
+            {segment === 'gods' ? 'Gods' : 'Kathas'}
+          </Text>
         </View>
         <TouchableOpacity
           onPress={() => router.push('/search')}
@@ -54,21 +94,83 @@ export default function GodsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── God List ─────────────────────────────────────────────────── */}
-      <FlatList
-        data={deities}
-        keyExtractor={(item) => item.id}
-        renderItem={renderDeity}
-        getItemLayout={(_, index) => ({ length: 98, offset: 98 * index, index })}
-        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* ── Segment Control ──────────────────────────────────────────── */}
+      <View style={[styles.segmentRow, { paddingHorizontal: spacing.screenH }]}>
+        <SegmentButton
+          label="देवी देवता"
+          active={segment === 'gods'}
+          onPress={() => setSegment('gods')}
+          colors={colors}
+        />
+        <SegmentButton
+          label="कथाएँ"
+          active={segment === 'kathas'}
+          onPress={() => setSegment('kathas')}
+          colors={colors}
+        />
+      </View>
+
+      {/* ── Content ──────────────────────────────────────────────────── */}
+      {segment === 'gods' ? (
+        <FlatList
+          data={deities}
+          keyExtractor={(item) => item.id}
+          renderItem={renderDeity}
+          getItemLayout={(_, index) => ({ length: 98, offset: 98 * index, index })}
+          contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={kathas}
+          keyExtractor={(item) => item.id}
+          renderItem={renderKatha}
+          contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={ItemSeparator}
+        />
+      )}
 
       <AdBanner colors={colors} />
 
     </SafeAreaView>
   );
 }
+
+// ─── Segment Button ──────────────────────────────────────────────────────────
+
+interface SegmentButtonProps {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: ColorPalette;
+}
+
+function SegmentButton({ label, active, onPress, colors }: SegmentButtonProps) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.segmentBtn,
+        {
+          backgroundColor: active ? colors.accent + '20' : 'transparent',
+          borderColor: active ? colors.accent : colors.border,
+        },
+      ]}>
+      <Text
+        style={[
+          styles.segmentText,
+          { color: active ? colors.accent : colors.textSecondary },
+        ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Item Separator ──────────────────────────────────────────────────────────
+
+const ItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
 
 // ─── Deity Card ──────────────────────────────────────────────────────────────
 
@@ -110,6 +212,59 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
   );
 });
 
+// ─── Katha Card ──────────────────────────────────────────────────────────────
+
+interface KathaCardProps {
+  item: KathaListItem;
+  colors: ColorPalette;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+}
+
+const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFavorite }: KathaCardProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => router.push(`/katha/${item.id}`)}
+      style={[styles.kathaCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+      <View style={styles.kathaCardTop}>
+        <DeityAvatar deity={item.deity} size={44} />
+        <View style={styles.kathaCardText}>
+          <Text style={[styles.kathaTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
+            {item.titleNative}
+          </Text>
+          <Text style={[styles.kathaTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
+            {item.titleEnglish}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onToggleFavorite}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons
+            name={isFavorite ? 'heart' : 'heart-outline'}
+            size={22}
+            color={isFavorite ? colors.accent : colors.textMuted}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={[styles.kathaSummary, { color: colors.textMuted }]} numberOfLines={2}>
+        {item.summary}
+      </Text>
+
+      <View style={styles.kathaBadgeRow}>
+        <View style={[styles.kathaBadge, { backgroundColor: colors.borderAccent }]}>
+          <Text style={[styles.kathaBadgeText, { color: colors.accent }]}>कथा</Text>
+        </View>
+        <View style={[styles.kathaBadge, { backgroundColor: colors.surfaceRecessed }]}>
+          <Text style={[styles.kathaBadgeText, { color: colors.textSecondary }]}>{item.deity}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -121,16 +276,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   screenTitle: { fontSize: 22, fontFamily: 'Mukta_700Bold', lineHeight: 28 },
   screenTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginTop: 1 },
   searchBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
+  // Segment control
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 12,
+  },
+  segmentBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontFamily: 'Mukta_500Medium',
+  },
+
   // List
   listContent: { paddingTop: 4, paddingBottom: 32, gap: 10 },
 
-  // Card
+  // Deity Card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -151,4 +323,24 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, gap: 2 },
   cardName: { fontSize: 16, fontFamily: 'Mukta_600SemiBold', lineHeight: 22 },
   cardDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', lineHeight: 16 },
+
+  // Katha Card
+  kathaCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: spacing.cardPad,
+    gap: 8,
+  },
+  kathaCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  kathaCardText: { flex: 1 },
+  kathaTitleNative: { fontSize: 16, fontFamily: 'Mukta_700Bold', marginBottom: 1 },
+  kathaTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  kathaSummary: { fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 20, marginLeft: 56 },
+  kathaBadgeRow: { flexDirection: 'row', gap: 6, marginLeft: 56 },
+  kathaBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.chip },
+  kathaBadgeText: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.3 },
 });

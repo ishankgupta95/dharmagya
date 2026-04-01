@@ -19,7 +19,7 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SearchResult {
-  type: 'aarti' | 'chalisa';
+  type: 'aarti' | 'chalisa' | 'katha';
   id: string;
   titleEnglish: string;
   titleNative: string;
@@ -37,6 +37,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [aartiResults, setAartiResults] = useState<SearchResult[]>([]);
   const [chalisaResults, setChalisaResults] = useState<SearchResult[]>([]);
+  const [kathaResults, setKathaResults] = useState<SearchResult[]>([]);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -50,6 +51,7 @@ export default function SearchScreen() {
     if (!q) {
       setAartiResults([]);
       setChalisaResults([]);
+      setKathaResults([]);
       return;
     }
 
@@ -67,13 +69,19 @@ export default function SearchScreen() {
         [like, like, like]
       );
       setChalisaResults(chalisaRows.map((r) => ({ ...r, type: 'chalisa' as const })));
+
+      const kathaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
+        'SELECT id, titleEnglish, titleNative, deity FROM kathas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
+        [like, like, like]
+      );
+      setKathaResults(kathaRows.map((r) => ({ ...r, type: 'katha' as const })));
     }, 300);
 
     return () => clearTimeout(timer);
   }, [db, query]);
 
   const hasQuery = query.trim().length > 0;
-  const hasResults = aartiResults.length > 0 || chalisaResults.length > 0;
+  const hasResults = aartiResults.length > 0 || chalisaResults.length > 0 || kathaResults.length > 0;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -92,7 +100,7 @@ export default function SearchScreen() {
             ref={inputRef}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search aartis, chalisas, deities…"
+            placeholder="Search aartis, chalisas, kathas…"
             placeholderTextColor={colors.textMuted}
             style={[styles.input, { color: colors.textPrimary }]}
             returnKeyType="search"
@@ -145,6 +153,22 @@ export default function SearchScreen() {
                   query={query}
                   colors={colors}
                   onPress={() => router.push(`/chalisa/${item.id}`)}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* Kathas group */}
+          {kathaResults.length > 0 && (
+            <View style={(aartiResults.length > 0 || chalisaResults.length > 0) ? { marginTop: 8 } : undefined}>
+              <GroupHeader label={`KATHAS  ·  ${kathaResults.length}`} colors={colors} />
+              {kathaResults.map((item) => (
+                <ResultCard
+                  key={item.id}
+                  item={item}
+                  query={query}
+                  colors={colors}
+                  onPress={() => router.push(`/katha/${item.id}`)}
                 />
               ))}
             </View>

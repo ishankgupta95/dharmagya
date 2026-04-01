@@ -1,11 +1,12 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 
-import type { IAarti, IChalisa } from '@/types';
+import type { IAarti, IChalisa, IKatha } from '@/types';
 import aartiSeedData from '@/data/static/aartis.json';
 import chalisaSeedData from '@/data/static/chalisas.json';
+import kathaSeedData from '@/data/static/kathas.json';
 
 // Bump this whenever seed data changes to trigger a re-seed on existing installs.
-const SEED_VERSION = 3;
+const SEED_VERSION = 5;
 
 function seedAartis(db: SQLiteDatabase): void {
   const aartis = aartiSeedData as IAarti[];
@@ -23,6 +24,16 @@ function seedChalisas(db: SQLiteDatabase): void {
     db.runSync(
       'INSERT OR REPLACE INTO chalisas (id, titleEnglish, titleNative, deity, sections) VALUES (?, ?, ?, ?, ?)',
       [chalisa.id, chalisa.titleEnglish, chalisa.titleNative, chalisa.deity, JSON.stringify(chalisa.sections)]
+    );
+  }
+}
+
+function seedKathas(db: SQLiteDatabase): void {
+  const kathas = kathaSeedData as IKatha[];
+  for (const katha of kathas) {
+    db.runSync(
+      'INSERT OR REPLACE INTO kathas (id, titleEnglish, titleNative, deity, summary, content) VALUES (?, ?, ?, ?, ?, ?)',
+      [katha.id, katha.titleEnglish, katha.titleNative, katha.deity, katha.summary, JSON.stringify(katha.paragraphs)]
     );
   }
 }
@@ -52,6 +63,18 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // Kathas table
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS kathas (
+      id TEXT PRIMARY KEY NOT NULL,
+      titleEnglish TEXT NOT NULL,
+      titleNative TEXT NOT NULL,
+      deity TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      content TEXT NOT NULL
+    );
+  `);
+
   // Meta table for tracking seed version
   db.execSync(`
     CREATE TABLE IF NOT EXISTS meta (
@@ -67,6 +90,7 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   if (currentVersion < SEED_VERSION) {
     seedAartis(db);
     seedChalisas(db);
+    seedKathas(db);
     db.runSync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', ['seedVersion', String(SEED_VERSION)]);
   }
 }

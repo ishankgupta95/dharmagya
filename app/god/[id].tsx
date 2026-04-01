@@ -22,7 +22,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { getDeityImage } from '@/config/deityImages';
 import { DEITY_BY_ID } from '@/config/deities';
-import type { IAarti, IChalisaSection } from '@/types';
+import type { IAarti, IChalisaSection, IKatha } from '@/types';
 
 // ─── Row / Item Types ────────────────────────────────────────────────────────
 
@@ -50,9 +50,26 @@ interface ChalisaItem {
   sections: IChalisaSection[];
 }
 
+interface KathaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
+}
+
+interface KathaItem {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
+}
+
 type ListItem =
   | { type: 'aarti'; data: IAarti }
-  | { type: 'chalisa'; data: ChalisaItem };
+  | { type: 'chalisa'; data: ChalisaItem }
+  | { type: 'katha'; data: KathaItem };
 
 interface ListSection {
   title: string;
@@ -93,6 +110,7 @@ export default function GodDetailScreen() {
 
   const [aartis, setAartis] = useState<IAarti[]>([]);
   const [chalisas, setChalisas] = useState<ChalisaItem[]>([]);
+  const [kathas, setKathas] = useState<KathaItem[]>([]);
 
   useEffect(() => {
     if (!deity) return;
@@ -107,6 +125,12 @@ export default function GodDetailScreen() {
       [deity.name]
     );
     setChalisas(chalisaRows.map(rowToChalisa));
+
+    const kathaRows = db.getAllSync<KathaRow>(
+      'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity = ? ORDER BY titleEnglish',
+      [deity.name]
+    );
+    setKathas(kathaRows);
   }, [db, deity]);
 
   const sections: ListSection[] = [];
@@ -120,6 +144,12 @@ export default function GodDetailScreen() {
     sections.push({
       title: `Chalisas (${chalisas.length})`,
       data: chalisas.map((c) => ({ type: 'chalisa' as const, data: c })),
+    });
+  }
+  if (kathas.length > 0) {
+    sections.push({
+      title: `Kathas (${kathas.length})`,
+      data: kathas.map((k) => ({ type: 'katha' as const, data: k })),
     });
   }
 
@@ -137,14 +167,26 @@ export default function GodDetailScreen() {
           />
         );
       }
-      const c = item.data;
+      if (item.type === 'chalisa') {
+        const c = item.data;
+        return (
+          <ChalisaCard
+            item={c}
+            colors={colors}
+            isFavorite={favoriteIds.includes(`chalisa-${c.id}`)}
+            onToggleFavorite={() => toggleFavorite(`chalisa-${c.id}`)}
+            onPress={() => router.push(`/chalisa/${c.id}`)}
+          />
+        );
+      }
+      const k = item.data;
       return (
-        <ChalisaCard
-          item={c}
+        <KathaCard
+          item={k}
           colors={colors}
-          isFavorite={favoriteIds.includes(`chalisa-${c.id}`)}
-          onToggleFavorite={() => toggleFavorite(`chalisa-${c.id}`)}
-          onPress={() => router.push(`/chalisa/${c.id}`)}
+          isFavorite={favoriteIds.includes(`katha-${k.id}`)}
+          onToggleFavorite={() => toggleFavorite(`katha-${k.id}`)}
+          onPress={() => router.push(`/katha/${k.id}`)}
         />
       );
     },
@@ -307,7 +349,7 @@ export default function GodDetailScreen() {
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No aartis or chalisas available yet
+            No content available yet
           </Text>
         }
       />
@@ -396,6 +438,46 @@ const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onTogg
               </Text>
             </View>
           )}
+        </View>
+      </View>
+      <TouchableOpacity
+        onPress={onToggleFavorite}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons
+          name={isFavorite ? 'heart' : 'heart-outline'}
+          size={22}
+          color={isFavorite ? colors.accent : colors.textMuted}
+        />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
+
+// ─── Katha Card ─────────────────────────────────────────────────────────────
+
+interface KathaCardProps {
+  item: KathaItem;
+  colors: ColorPalette;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onPress: () => void;
+}
+
+const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: KathaCardProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.cardText}>
+        <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
+          {item.titleNative}
+        </Text>
+        <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
+          {item.titleEnglish}
+        </Text>
+        <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
+          <Text style={[styles.badgeText, { color: colors.accent }]}>कथा</Text>
         </View>
       </View>
       <TouchableOpacity

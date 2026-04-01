@@ -20,6 +20,15 @@ export interface IChalisa {
   sections: IChalisaSection[]; // Ordered: opening doha → chaupais → closing doha
 }
 
+export interface IKatha {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string; // Short summary in Hindi
+  paragraphs: string[]; // Narrative paragraphs in Hindi
+}
+
 /** Timed slot with quality rating (used by Choghadiya and Gowri Panchangam). */
 export interface IQualitySlot {
   name: string;

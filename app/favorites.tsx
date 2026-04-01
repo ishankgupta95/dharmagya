@@ -19,7 +19,7 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FavoriteItem {
-  type: 'aarti' | 'chalisa';
+  type: 'aarti' | 'chalisa' | 'katha';
   id: string;
   titleEnglish: string;
   titleNative: string;
@@ -34,6 +34,13 @@ interface AartiRow {
 }
 
 interface ChalisaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+}
+
+interface KathaRow {
   id: string;
   titleEnglish: string;
   titleNative: string;
@@ -58,6 +65,10 @@ export default function FavoritesScreen() {
       .filter((id) => id.startsWith('chalisa-'))
       .map((id) => id.slice('chalisa-'.length));
 
+    const kathaIds = favoriteIds
+      .filter((id) => id.startsWith('katha-'))
+      .map((id) => id.slice('katha-'.length));
+
     const results: FavoriteItem[] = [];
 
     if (aartiIds.length > 0) {
@@ -78,6 +89,15 @@ export default function FavoritesScreen() {
       rows.forEach((r) => results.push({ ...r, type: 'chalisa' }));
     }
 
+    if (kathaIds.length > 0) {
+      const placeholders = kathaIds.map(() => '?').join(',');
+      const rows = db.getAllSync<KathaRow>(
+        `SELECT id, titleEnglish, titleNative, deity FROM kathas WHERE id IN (${placeholders})`,
+        kathaIds
+      );
+      rows.forEach((r) => results.push({ ...r, type: 'katha' }));
+    }
+
     // Preserve the order from favoriteIds
     results.sort((a, b) => {
       const aKey = `${a.type}-${a.id}`;
@@ -88,18 +108,21 @@ export default function FavoritesScreen() {
     setItems(results);
   }, [db, favoriteIds]);
 
-  const renderItem = useCallback(({ item }: ListRenderItemInfo<FavoriteItem>) => (
-    <FavoriteCard
-      item={item}
-      colors={colors}
-      onPress={() =>
-        item.type === 'aarti'
-          ? router.push(`/aarti/${item.id}`)
-          : router.push(`/chalisa/${item.id}`)
-      }
-      onRemove={() => toggleFavorite(`${item.type}-${item.id}`)}
-    />
-  ), [colors, toggleFavorite]);
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<FavoriteItem>) => {
+    const onPress = () => {
+      if (item.type === 'aarti') router.push(`/aarti/${item.id}`);
+      else if (item.type === 'chalisa') router.push(`/chalisa/${item.id}`);
+      else router.push(`/katha/${item.id}`);
+    };
+    return (
+      <FavoriteCard
+        item={item}
+        colors={colors}
+        onPress={onPress}
+        onRemove={() => toggleFavorite(`${item.type}-${item.id}`)}
+      />
+    );
+  }, [colors, toggleFavorite]);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -146,7 +169,7 @@ interface FavoriteCardProps {
 const ItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
 
 const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemove }: FavoriteCardProps) {
-  const typeLabel = item.type === 'aarti' ? 'Aarti' : 'Chalisa';
+  const typeLabel = item.type === 'aarti' ? 'Aarti' : item.type === 'chalisa' ? 'Chalisa' : 'Katha';
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -191,7 +214,7 @@ function EmptyState({ colors }: { colors: ColorPalette }) {
         No favourites yet
       </Text>
       <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-        Tap the ♡ on any aarti or chalisa to save it here
+        Tap the ♡ on any aarti, chalisa, or katha to save it here
       </Text>
       <TouchableOpacity
         onPress={() => router.push('/(tabs)/library')}
