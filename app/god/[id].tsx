@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Image,
-  Animated,
   Dimensions,
   SectionList,
   TouchableOpacity,
@@ -94,8 +93,6 @@ function countChaupais(sections: IChalisaSection[]): number {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const BANNER_HEIGHT = 260;
-const COLLAPSED_HEIGHT = 56;
-const SCROLL_DISTANCE = BANNER_HEIGHT - COLLAPSED_HEIGHT;
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -104,8 +101,6 @@ export default function GodDetailScreen() {
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
-  const scrollY = useRef(new Animated.Value(0)).current;
-
   const deity = DEITY_BY_ID[id ?? ''];
 
   const [aartis, setAartis] = useState<IAarti[]>([]);
@@ -215,45 +210,18 @@ export default function GodDetailScreen() {
   const deityImage = getDeityImage(deity.name);
   const hasImage = !!deityImage;
 
-  // ─── Animated values ───────────────────────────────────────────────
-  const headerHeight = hasImage
-    ? scrollY.interpolate({
-        inputRange: [0, SCROLL_DISTANCE],
-        outputRange: [BANNER_HEIGHT, COLLAPSED_HEIGHT],
-        extrapolate: 'clamp',
-      })
-    : undefined;
-
-  const bannerOpacity = scrollY.interpolate({
-    inputRange: [0, SCROLL_DISTANCE * 0.6],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const miniBarOpacity = scrollY.interpolate({
-    inputRange: [SCROLL_DISTANCE * 0.5, SCROLL_DISTANCE],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-  const bannerScale = scrollY.interpolate({
-    inputRange: [-100, 0],
-    outputRange: [1.3, 1],
-    extrapolate: 'clamp',
-  });
-
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
-      {/* ── Collapsible Header ──────────────────────────────────────── */}
-      <Animated.View style={[styles.headerWrap, hasImage && { height: headerHeight }]}>
+      {/* ── Fixed Header ───────────────────────────────────────────── */}
+      <View style={[styles.headerWrap, hasImage && { height: BANNER_HEIGHT }]}>
         {hasImage ? (
           <>
-            {/* Full banner image */}
-            <Animated.View style={[styles.bannerBox, { opacity: bannerOpacity }]}>
-              <Animated.Image
+            {/* Banner image */}
+            <View style={styles.bannerBox}>
+              <Image
                 source={deityImage}
-                style={[styles.bannerImage, { transform: [{ scale: bannerScale }] }]}
+                style={styles.bannerImage}
                 resizeMode="cover"
               />
               {/* Bottom gradient fade */}
@@ -266,25 +234,7 @@ export default function GodDetailScreen() {
                 <Text style={styles.bannerName}>{deity.displayName}</Text>
                 <Text style={styles.bannerDesc}>{deity.description}</Text>
               </View>
-            </Animated.View>
-
-            {/* Collapsed mini bar */}
-            <Animated.View
-              style={[
-                styles.miniBar,
-                { opacity: miniBarOpacity, backgroundColor: colors.surface, borderBottomColor: colors.border },
-              ]}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={styles.miniBackBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
-              </TouchableOpacity>
-              <Image source={deityImage} style={styles.miniImage} resizeMode="cover" />
-              <Text style={[styles.miniName, { color: colors.textPrimary }]} numberOfLines={1}>
-                {deity.displayName}
-              </Text>
-            </Animated.View>
+            </View>
           </>
         ) : (
           /* No image: simple gradient header */
@@ -304,30 +254,16 @@ export default function GodDetailScreen() {
           </LinearGradient>
         )}
 
-        {/* Back button on banner (visible when expanded) */}
-        {hasImage && (
-          <Animated.View style={[styles.bannerBackWrap, { opacity: bannerOpacity }]}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.bannerBackBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {/* Back button for fallback header */}
-        {!hasImage && (
-          <View style={styles.bannerBackWrap}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={[styles.bannerBackBtn, { backgroundColor: 'rgba(0,0,0,0.25)' }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </Animated.View>
+        {/* Back button */}
+        <View style={styles.bannerBackWrap}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.bannerBackBtn, !hasImage && { backgroundColor: 'rgba(0,0,0,0.25)' }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* ── List ──────────────────────────────────────────────────────── */}
       <SectionList
@@ -337,11 +273,6 @@ export default function GodDetailScreen() {
         renderSectionHeader={renderSectionHeader}
         contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
         ItemSeparatorComponent={ListItemSeparator}
         SectionSeparatorComponent={ListSectionSeparator}
         initialNumToRender={10}
@@ -557,37 +488,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-
-  // Mini bar (collapsed)
-  miniBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: COLLAPSED_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.screenH,
-    gap: 10,
-    borderBottomWidth: 1,
-  },
-  miniBackBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  miniName: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Mukta_600SemiBold',
   },
 
   // Fallback header (no image)
