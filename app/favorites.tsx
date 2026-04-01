@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   FlatList,
@@ -88,7 +88,7 @@ export default function FavoritesScreen() {
     setItems(results);
   }, [db, favoriteIds]);
 
-  const renderItem = ({ item }: ListRenderItemInfo<FavoriteItem>) => (
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<FavoriteItem>) => (
     <FavoriteCard
       item={item}
       colors={colors}
@@ -99,7 +99,7 @@ export default function FavoritesScreen() {
       }
       onRemove={() => toggleFavorite(`${item.type}-${item.id}`)}
     />
-  );
+  ), [colors, toggleFavorite]);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -126,7 +126,7 @@ export default function FavoritesScreen() {
           renderItem={renderItem}
           contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
+          ItemSeparatorComponent={ItemSeparator}
         />
       )}
 
@@ -143,7 +143,9 @@ interface FavoriteCardProps {
   onRemove: () => void;
 }
 
-function FavoriteCard({ item, colors, onPress, onRemove }: FavoriteCardProps) {
+const ItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
+
+const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemove }: FavoriteCardProps) {
   const typeLabel = item.type === 'aarti' ? 'Aarti' : 'Chalisa';
   return (
     <TouchableOpacity
@@ -174,7 +176,7 @@ function FavoriteCard({ item, colors, onPress, onRemove }: FavoriteCardProps) {
       </TouchableOpacity>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 

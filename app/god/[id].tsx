@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import {
   View,
   Image,
@@ -300,10 +300,10 @@ export default function GodDetailScreen() {
           { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
-        SectionSeparatorComponent={({ leadingItem }) =>
-          leadingItem ? <View style={{ height: 8 }} /> : null
-        }
+        ItemSeparatorComponent={ListItemSeparator}
+        SectionSeparatorComponent={ListSectionSeparator}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
@@ -315,6 +315,12 @@ export default function GodDetailScreen() {
   );
 }
 
+// ─── List Separators ────────────────────────────────────────────────────────
+
+const ListItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
+const ListSectionSeparator = ({ leadingItem }: { leadingItem?: unknown }) =>
+  leadingItem ? <View style={{ height: 8 }} /> : null;
+
 // ─── Aarti Card ──────────────────────────────────────────────────────────────
 
 interface AartiCardProps {
@@ -325,7 +331,7 @@ interface AartiCardProps {
   onPress: () => void;
 }
 
-function AartiCard({ item, colors, isFavorite, onToggleFavorite, onPress }: AartiCardProps) {
+const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFavorite, onPress }: AartiCardProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -353,7 +359,7 @@ function AartiCard({ item, colors, isFavorite, onToggleFavorite, onPress }: Aart
       </TouchableOpacity>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Chalisa Card ────────────────────────────────────────────────────────────
 
@@ -365,7 +371,7 @@ interface ChalisaCardProps {
   onPress: () => void;
 }
 
-function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: ChalisaCardProps) {
+const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: ChalisaCardProps) {
   const chaupaiCount = countChaupais(item.sections);
   return (
     <TouchableOpacity
@@ -403,7 +409,7 @@ function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: Ch
       </TouchableOpacity>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 

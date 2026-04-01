@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import {
   View,
   FlatList,
@@ -91,6 +91,7 @@ export default function GodsScreen() {
         data={deities}
         keyExtractor={(item) => item.id}
         renderItem={renderDeity}
+        getItemLayout={(_, index) => ({ length: 98, offset: 98 * index, index })}
         contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}
       />
@@ -108,7 +109,7 @@ interface DeityCardProps {
   colors: ColorPalette;
 }
 
-function DeityCard({ deity, colors }: DeityCardProps) {
+const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
   const image = getDeityImage(deity.name);
   const totalCount = deity.aartiCount + deity.chalisaCount;
 
@@ -157,7 +158,7 @@ function DeityCard({ deity, colors }: DeityCardProps) {
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginRight: 4 }} />
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 

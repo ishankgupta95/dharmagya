@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Text, StyleSheet, type TextProps } from 'react-native';
 
 import { useStore } from '@/store/useStore';
@@ -10,14 +11,16 @@ export const FONT_SCALE: Record<FontSize, number> = {
   xl: 1.9,
 };
 
+const fontSizeSelector = (s: { fontSize: FontSize }) => s.fontSize;
+
 /**
  * Drop-in replacement for RN's Text.
  * Reads fontSize setting from the global store and scales every explicit
  * fontSize (and proportional lineHeight) in the style prop automatically.
  * Import as: import { AppText as Text } from '@/components/common/AppText';
  */
-export function AppText({ style, ...props }: TextProps) {
-  const { fontSize } = useStore();
+export const AppText = memo(function AppText({ style, ...props }: TextProps) {
+  const fontSize = useStore(fontSizeSelector);
   const scale = FONT_SCALE[fontSize];
 
   if (scale === 1) {
@@ -32,4 +35,4 @@ export function AppText({ style, ...props }: TextProps) {
   };
 
   return <Text style={scaledStyle} {...props} />;
-}
+});

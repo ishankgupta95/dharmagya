@@ -44,7 +44,7 @@ export default function SearchScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  // Query DB on every change (sync, fast enough without debounce)
+  // Debounced DB query (300ms) to avoid jank on every keystroke
   useEffect(() => {
     const q = query.trim();
     if (!q) {
@@ -53,19 +53,23 @@ export default function SearchScreen() {
       return;
     }
 
-    const like = `%${q}%`;
+    const timer = setTimeout(() => {
+      const like = `%${q}%`;
 
-    const aartiRows = db.getAllSync<Omit<SearchResult, 'type'>>(
-      'SELECT id, titleEnglish, titleNative, deity FROM aartis WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
-      [like, like, like]
-    );
-    setAartiResults(aartiRows.map((r) => ({ ...r, type: 'aarti' as const })));
+      const aartiRows = db.getAllSync<Omit<SearchResult, 'type'>>(
+        'SELECT id, titleEnglish, titleNative, deity FROM aartis WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
+        [like, like, like]
+      );
+      setAartiResults(aartiRows.map((r) => ({ ...r, type: 'aarti' as const })));
 
-    const chalisaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
-      'SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
-      [like, like, like]
-    );
-    setChalisaResults(chalisaRows.map((r) => ({ ...r, type: 'chalisa' as const })));
+      const chalisaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
+        'SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
+        [like, like, like]
+      );
+      setChalisaResults(chalisaRows.map((r) => ({ ...r, type: 'chalisa' as const })));
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [db, query]);
 
   const hasQuery = query.trim().length > 0;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import {
   View,
   ScrollView,
@@ -62,7 +62,7 @@ interface LimbRowProps {
   isLast?: boolean;
 }
 
-function LimbRow({ label, elements, colors, isLast }: LimbRowProps) {
+const LimbRow = memo(function LimbRow({ label, elements, colors, isLast }: LimbRowProps) {
   return (
     <>
       <View style={styles.limbRow}>
@@ -79,7 +79,7 @@ function LimbRow({ label, elements, colors, isLast }: LimbRowProps) {
       {!isLast && <View style={[styles.limbDivider, { backgroundColor: colors.divider }]} />}
     </>
   );
-}
+});
 
 interface SunCardProps {
   icon: 'sunny-outline' | 'moon-outline';
@@ -89,7 +89,7 @@ interface SunCardProps {
   iconColor: string;
 }
 
-function SunCard({ icon, label, time, colors, iconColor }: SunCardProps) {
+const SunCard = memo(function SunCard({ icon, label, time, colors, iconColor }: SunCardProps) {
   return (
     <View style={[styles.sunCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Ionicons name={icon} size={22} color={iconColor} />
@@ -97,7 +97,7 @@ function SunCard({ icon, label, time, colors, iconColor }: SunCardProps) {
       <Text style={[styles.sunCardTime, { color: colors.textPrimary }]}>{time}</Text>
     </View>
   );
-}
+});
 
 // ─── Date Picker ──────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ function DatePickerOverlay({
 
   const year = calMonth.getFullYear();
   const month = calMonth.getMonth();
-  const cells = buildCalendarCells(year, month);
+  const cells = useMemo(() => buildCalendarCells(year, month), [year, month]);
 
   function prevMonth() {
     setCalMonth(new Date(year, month - 1, 1));
@@ -335,14 +335,14 @@ function DatePickerOverlay({
   );
 }
 
-function MiniCell({ label, value, colors }: { label: string; value: string; colors: ColorPalette }) {
+const MiniCell = memo(function MiniCell({ label, value, colors }: { label: string; value: string; colors: ColorPalette }) {
   return (
     <View style={styles.miniCell}>
       <Text style={[styles.miniLabel, { color: colors.textMuted }]}>{label}</Text>
       <Text style={[styles.miniValue, { color: colors.textPrimary }]}>{value}</Text>
     </View>
   );
-}
+});
 
 function SectionHeader({ title, colors }: { title: string; colors: ColorPalette }) {
   return (

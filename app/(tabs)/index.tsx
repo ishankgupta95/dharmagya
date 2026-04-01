@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   type AppStateStatus,
@@ -82,8 +82,8 @@ export default function HomeScreen() {
 
   const refreshPanchang = useCallback((showSpinner = false) => {
     const now = Date.now();
-    // Throttle: don't re-fetch more than once per minute
-    if (!showSpinner && now - lastFetchRef.current < 60_000) return;
+    // Throttle: don't re-fetch more than once per hour (panchang only changes daily)
+    if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
     lastFetchRef.current = now;
     if (showSpinner) setPanchangLoading(true);
     fetchPanchangForToday(userLocation)
@@ -124,9 +124,10 @@ export default function HomeScreen() {
   }, [db, favoriteIds]);
 
   const greeting = getGreeting();
-  const panchangGradient: readonly [string, string] = isDarkMode
-    ? ['#2E2418', '#1E1E24']
-    : ['#FFF8F0', '#FFF0E4'];
+  const panchangGradient = useMemo<readonly [string, string]>(
+    () => isDarkMode ? ['#2E2418', '#1E1E24'] : ['#FFF8F0', '#FFF0E4'],
+    [isDarkMode]
+  );
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
