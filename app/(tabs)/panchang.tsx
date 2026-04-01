@@ -6,6 +6,7 @@ import {
   Modal,
   StyleSheet,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +30,13 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+const MONTH_NAMES_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+const YEAR_MIN = 2016;
+const YEAR_MAX = 2036;
+const YEARS = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MIN + i);
 
 function buildCalendarCells(year: number, month: number): (number | null)[] {
   const firstDay = new Date(year, month, 1).getDay();
@@ -110,6 +118,8 @@ function DatePickerOverlay({
   const [calMonth, setCalMonth] = useState(
     new Date(pickerDate.getFullYear(), pickerDate.getMonth(), 1)
   );
+  const [showJumper, setShowJumper] = useState(false);
+  const [jumperYear, setJumperYear] = useState(calMonth.getFullYear());
 
   const year = calMonth.getFullYear();
   const month = calMonth.getMonth();
@@ -122,91 +132,202 @@ function DatePickerOverlay({
     setCalMonth(new Date(year, month + 1, 1));
   }
 
+  function openJumper() {
+    setJumperYear(year);
+    setShowJumper(true);
+  }
+
+  function pickMonthYear(m: number) {
+    setCalMonth(new Date(jumperYear, m, 1));
+    setShowJumper(false);
+  }
+
+  function goToToday() {
+    setCalMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    setShowJumper(false);
+    onPickDate(today);
+  }
+
+  const isViewingToday = isSameDay(pickerDate, today) && year === today.getFullYear() && month === today.getMonth();
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.pickerOverlay}>
         <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
 
-          {/* Month nav */}
-          <View style={styles.pickerMonthRow}>
-            <TouchableOpacity onPress={prevMonth} hitSlop={12}>
-              <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <Text style={[styles.pickerMonthLabel, { color: colors.textPrimary }]}>
-              {MONTH_NAMES[month]} {year}
-            </Text>
-            <TouchableOpacity onPress={nextMonth} hitSlop={12}>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Day headers */}
-          <View style={styles.calRow}>
-            {DAY_HEADERS.map((d, i) => (
-              <Text
-                key={i}
-                style={[
-                  styles.calDayHeader,
-                  { color: (i === 0 || i === 6) ? colors.textDisabled : colors.textMuted },
-                ]}>
-                {d}
-              </Text>
-            ))}
-          </View>
-
-          {/* Calendar cells */}
-          <View style={styles.calGrid}>
-            {cells.map((cell, idx) => {
-              if (cell === null) return <View key={`blank-${idx}`} style={styles.calCell} />;
-              const cellDate = new Date(year, month, cell);
-              const isToday = isSameDay(cellDate, today);
-              const isSelected = isSameDay(cellDate, pickerDate);
-              const col = idx % 7;
-              const isWeekend = col === 0 || col === 6;
-              const textColor = isToday || isSelected
-                ? colors.base
-                : isWeekend ? colors.textDisabled : colors.textSecondary;
-
-              return (
-                <TouchableOpacity
-                  key={cell}
-                  style={styles.calCell}
-                  onPress={() => onPickDate(cellDate)}>
-                  <View style={[
-                    styles.calCellInner,
-                    isToday && { backgroundColor: colors.accent },
-                    isSelected && !isToday && { backgroundColor: colors.accent + 'AA' },
-                  ]}>
-                    <Text style={[styles.calDayNum, { color: textColor }]}>{cell}</Text>
-                  </View>
+          {showJumper ? (
+            <>
+              {/* Year selector */}
+              <View style={styles.pickerMonthRow}>
+                <TouchableOpacity onPress={() => setJumperYear(Math.max(YEAR_MIN, jumperYear - 1))} hitSlop={12}>
+                  <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+                <Text style={[styles.pickerMonthLabel, { color: colors.textPrimary }]}>
+                  {jumperYear}
+                </Text>
+                <TouchableOpacity onPress={() => setJumperYear(Math.min(YEAR_MAX, jumperYear + 1))} hitSlop={12}>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
-          {/* Legend */}
-          <View style={styles.pickerLegend}>
-            <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
-            <Text style={[styles.legendText, { color: colors.textMuted }]}>Today</Text>
-          </View>
+              {/* Month grid */}
+              <View style={styles.monthGrid}>
+                {MONTH_NAMES_SHORT.map((name, i) => {
+                  const isCurrent = jumperYear === year && i === month;
+                  const isThisMonth = jumperYear === today.getFullYear() && i === today.getMonth();
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[
+                        styles.monthCell,
+                        isThisMonth && { backgroundColor: colors.accent },
+                        isCurrent && !isThisMonth && { backgroundColor: colors.accent + 'AA' },
+                      ]}
+                      onPress={() => pickMonthYear(i)}>
+                      <Text style={[
+                        styles.monthCellText,
+                        { color: (isThisMonth || isCurrent) ? colors.base : colors.textSecondary },
+                      ]}>
+                        {name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-          {/* Mini panchang summary */}
-          {pickerLoading ? (
-            <ActivityIndicator color={colors.accent} style={{ marginVertical: 12 }} />
-          ) : pickerPanchang ? (
-            <View style={[styles.miniGrid, { borderColor: colors.border }]}>
-              <MiniCell label="TITHI" value={pickerPanchang.tithis[0]?.name ?? ''} colors={colors} />
-              <MiniCell label="NAKSHATRA" value={pickerPanchang.nakshatras[0]?.name ?? ''} colors={colors} />
-              <MiniCell label="YOGA" value={pickerPanchang.yogas[0]?.name ?? ''} colors={colors} />
-              <MiniCell label="KARANA" value={pickerPanchang.karanas[0]?.name ?? ''} colors={colors} />
-            </View>
-          ) : null}
+              {/* Year list for quick jump */}
+              <FlatList
+                data={YEARS}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.yearList}
+                initialScrollIndex={Math.max(0, jumperYear - YEAR_MIN - 2)}
+                getItemLayout={(_, index) => ({ length: 64, offset: 64 * index, index })}
+                renderItem={({ item: y }) => (
+                  <TouchableOpacity
+                    onPress={() => setJumperYear(y)}
+                    style={[
+                      styles.yearChip,
+                      { borderColor: y === jumperYear ? colors.accent : colors.border },
+                      y === jumperYear && { backgroundColor: colors.accent + '22' },
+                    ]}>
+                    <Text style={[
+                      styles.yearChipText,
+                      { color: y === jumperYear ? colors.accent : colors.textMuted },
+                    ]}>
+                      {y}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
 
-          <TouchableOpacity
-            onPress={onClose}
-            style={[styles.pickerDoneBtn, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.pickerDoneText, { color: colors.base }]}>Done</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowJumper(false)}
+                style={[styles.pickerDoneBtn, { backgroundColor: colors.accent, marginTop: 16 }]}>
+                <Text style={[styles.pickerDoneText, { color: colors.base }]}>Back</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Month nav */}
+              <View style={styles.pickerMonthRow}>
+                <TouchableOpacity onPress={prevMonth} hitSlop={12}>
+                  <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={openJumper} hitSlop={8}>
+                  <Text style={[styles.pickerMonthLabel, { color: colors.textPrimary }]}>
+                    {MONTH_NAMES[month]} {year}  <Ionicons name="caret-down" size={12} color={colors.textMuted} />
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={nextMonth} hitSlop={12}>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Day headers */}
+              <View style={styles.calRow}>
+                {DAY_HEADERS.map((d, i) => (
+                  <Text
+                    key={i}
+                    style={[
+                      styles.calDayHeader,
+                      { color: (i === 0 || i === 6) ? colors.textDisabled : colors.textMuted },
+                    ]}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
+
+              {/* Calendar cells */}
+              <View style={styles.calGrid}>
+                {cells.map((cell, idx) => {
+                  if (cell === null) return <View key={`blank-${idx}`} style={styles.calCell} />;
+                  const cellDate = new Date(year, month, cell);
+                  const isToday = isSameDay(cellDate, today);
+                  const isSelected = isSameDay(cellDate, pickerDate);
+                  const col = idx % 7;
+                  const isWeekend = col === 0 || col === 6;
+                  const textColor = isToday || isSelected
+                    ? colors.base
+                    : isWeekend ? colors.textDisabled : colors.textSecondary;
+
+                  return (
+                    <TouchableOpacity
+                      key={cell}
+                      style={styles.calCell}
+                      onPress={() => onPickDate(cellDate)}>
+                      <View style={[
+                        styles.calCellInner,
+                        isToday && { backgroundColor: colors.accent },
+                        isSelected && !isToday && { backgroundColor: colors.accent + 'AA' },
+                      ]}>
+                        <Text style={[styles.calDayNum, { color: textColor }]}>{cell}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Today button */}
+              {!isViewingToday && (
+                <View style={styles.todayBtnRow}>
+                  <TouchableOpacity onPress={goToToday} activeOpacity={0.7} style={[styles.todayBtn, { backgroundColor: colors.accent }]}>
+                    <Ionicons name="return-down-back" size={14} color={colors.base} />
+                    <Text style={[styles.todayBtnText, { color: colors.base }]}>Jump to Today</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Mini panchang summary */}
+              {pickerPanchang ? (
+                <View style={{ opacity: pickerLoading ? 0.4 : 1 }}>
+                  {pickerPanchang.festivals.length > 0 && (
+                    <View style={[styles.miniFestivalBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
+                      <Ionicons name="star" size={13} color="#F9A825" />
+                      <Text style={[styles.miniFestivalText, { color: '#F57F17' }]}>
+                        {pickerPanchang.festivals.map(f => f.name).join(', ')}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[styles.miniGrid, { borderColor: colors.border }]}>
+                    <MiniCell label="TITHI" value={pickerPanchang.tithis[0]?.name ?? ''} colors={colors} />
+                    <MiniCell label="NAKSHATRA" value={pickerPanchang.nakshatras[0]?.name ?? ''} colors={colors} />
+                    <MiniCell label="YOGA" value={pickerPanchang.yogas[0]?.name ?? ''} colors={colors} />
+                    <MiniCell label="KARANA" value={pickerPanchang.karanas[0]?.name ?? ''} colors={colors} />
+                  </View>
+                </View>
+              ) : pickerLoading ? (
+                <ActivityIndicator color={colors.accent} style={{ marginVertical: 12 }} />
+              ) : null}
+
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.pickerDoneBtn, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.pickerDoneText, { color: colors.base }]}>Done</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
         </View>
       </View>
@@ -253,8 +374,8 @@ export default function PanchangScreen() {
     setPickerDate(date);
     setPickerLoading(true);
     const result = await fetchPanchang(date, userLocation);
-    setPickerPanchang(result);
     setPickerLoading(false);
+    setPickerPanchang(result);
   }
 
   function handlePickerClose() {
@@ -571,10 +692,12 @@ const styles = StyleSheet.create({
   calCellInner: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
   calDayNum: { fontSize: 14, fontFamily: 'Mukta_400Regular' },
 
-  pickerLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  todayBtnRow: { alignItems: 'center', marginBottom: 14 },
+  todayBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: borderRadius.chip, paddingHorizontal: 14, paddingVertical: 6 },
+  todayBtnText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
+  miniFestivalBar: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
+  miniFestivalText: { fontSize: 12, fontFamily: 'Mukta_500Medium', flex: 1 },
   miniGrid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: 1, borderRadius: borderRadius.cardInner, padding: 12, gap: 8, marginBottom: 16 },
   miniCell: { width: '47%' },
   miniLabel: { fontSize: 10, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginBottom: 2 },
@@ -582,4 +705,12 @@ const styles = StyleSheet.create({
 
   pickerDoneBtn: { borderRadius: borderRadius.button, paddingVertical: 14, alignItems: 'center' },
   pickerDoneText: { fontSize: 15, fontFamily: 'Mukta_700Bold' },
+
+  // Month-year jumper
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
+  monthCell: { width: '28%', paddingVertical: 12, borderRadius: borderRadius.cardInner, alignItems: 'center' },
+  monthCellText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
+  yearList: { paddingVertical: 8, gap: 8 },
+  yearChip: { width: 56, paddingVertical: 6, borderRadius: borderRadius.chip, borderWidth: 1, alignItems: 'center' },
+  yearChipText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 });
