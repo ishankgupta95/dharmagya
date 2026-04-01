@@ -1,28 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   SectionList,
   TouchableOpacity,
   StyleSheet,
-  InteractionManager,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { getDailyPanchang } from 'panchang-ts';
 
-import { useStore, type CachedFestivalDay } from '@/store/useStore';
+import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
-import { FALLBACK_COORDS } from '@/services/astrology/panchangService';
+
+import festivalsData from '@/data/static/festivals.json';
 
 interface FestivalDay {
   date: Date;
   festivals: Array<{ name: string; type: string }>;
-}
-
-function makeCacheKey(year: number, lat: number, lon: number): string {
-  return `${year}:${lat.toFixed(2)}:${lon.toFixed(2)}`;
 }
 
 interface SectionData {
@@ -43,9 +38,8 @@ const TYPE_ICON: Record<string, { icon: string; color: string }> = {
   sankranti: { icon: 'sunny', color: '#E8893C' },
 };
 
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
+const MIN_YEAR = 2016;
+const MAX_YEAR = 2036;
 
 function isSameDay(a: Date, b: Date) {
   return a.getDate() === b.getDate() &&
@@ -53,73 +47,22 @@ function isSameDay(a: Date, b: Date) {
     a.getFullYear() === b.getFullYear();
 }
 
+function parseFestivalDays(year: number): FestivalDay[] {
+  const yearData = (festivalsData as Record<string, Array<{ date: string; festivals: Array<{ name: string; type: string }> }>>)[String(year)];
+  if (!yearData) return [];
+  return yearData.map(d => ({
+    date: new Date(d.date + 'T00:00:00'),
+    festivals: d.festivals,
+  }));
+}
+
 export default function FestivalsScreen() {
-  const { isDarkMode, userLocation, festivalCache, setFestivalCache } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [year, setYear] = useState(() => new Date().getFullYear());
-  const [festivalDays, setFestivalDays] = useState<FestivalDay[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const lat = userLocation?.lat ?? FALLBACK_COORDS.lat;
-  const lon = userLocation?.lon ?? FALLBACK_COORDS.lon;
-
-  useEffect(() => {
-    let cancelled = false;
-    const cacheKey = makeCacheKey(year, lat, lon);
-
-    // ── Check cache first ──
-    if (festivalCache?.key === cacheKey) {
-      setFestivalDays(
-        festivalCache.days.map(d => ({ date: new Date(d.dateISO), festivals: d.festivals })),
-      );
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (cancelled) return;
-      const timezone = -new Date().getTimezoneOffset();
-      const geo = { latitude: lat, longitude: lon };
-      const results: FestivalDay[] = [];
-
-      for (let m = 0; m < 12; m++) {
-        const days = daysInMonth(year, m);
-        for (let d = 1; d <= days; d++) {
-          const date = new Date(year, m, d);
-          try {
-            const r = getDailyPanchang(date, geo, { timezone, computeEndTimes: false });
-            if (r.festivals.length > 0) {
-              results.push({ date, festivals: r.festivals.map(f => ({ name: f.name, type: f.type })) });
-            }
-          } catch {
-            // skip problematic dates
-          }
-        }
-      }
-
-      if (!cancelled) {
-        setFestivalDays(results);
-        setLoading(false);
-
-        // Persist to cache
-        setFestivalCache({
-          key: cacheKey,
-          days: results.map(r => ({
-            dateISO: r.date.toISOString().slice(0, 10),
-            festivals: r.festivals,
-          })),
-        });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      handle.cancel();
-    };
-  }, [year, lat, lon, festivalCache?.key]);
+  const festivalDays = useMemo(() => parseFestivalDays(year), [year]);
 
   const sections: SectionData[] = useMemo(() => {
     const grouped = new Map<number, FestivalDay[]>();
@@ -134,6 +77,8 @@ export default function FestivalsScreen() {
   }, [festivalDays, year]);
 
   const today = new Date();
+  const canGoBack = year > MIN_YEAR;
+  const canGoForward = year < MAX_YEAR;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -148,41 +93,43 @@ export default function FestivalsScreen() {
 
       {/* Year selector */}
       <View style={[styles.yearRow, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity onPress={() => setYear(y => y - 1)} hitSlop={12}>
-          <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => setYear(y => y - 1)}
+          hitSlop={12}
+          disabled={!canGoBack}
+        >
+          <Ionicons name="chevron-back" size={20} color={canGoBack ? colors.textSecondary : colors.textMuted} />
         </TouchableOpacity>
         <Text style={[styles.yearLabel, { color: colors.textPrimary }]}>{year}</Text>
-        <TouchableOpacity onPress={() => setYear(y => y + 1)} hitSlop={12}>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => setYear(y => y + 1)}
+          hitSlop={12}
+          disabled={!canGoForward}
+        >
+          <Ionicons name="chevron-forward" size={20} color={canGoForward ? colors.textSecondary : colors.textMuted} />
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Computing festivals for {year}...</Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item, index) => `${item.date.getTime()}-${index}`}
-          contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled
-          renderSectionHeader={({ section }) => (
-            <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
-              <Text style={[styles.sectionTitle, { color: colors.accent }]}>{section.title}</Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <FestivalRow item={item} colors={colors} isToday={isSameDay(item.date, today)} />
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No festivals found for {year}</Text>
-            </View>
-          }
-        />
-      )}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item, index) => `${item.date.getTime()}-${index}`}
+        contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled
+        renderSectionHeader={({ section }) => (
+          <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
+            <Text style={[styles.sectionTitle, { color: colors.accent }]}>{section.title}</Text>
+          </View>
+        )}
+        renderItem={({ item }) => (
+          <FestivalRow item={item} colors={colors} isToday={isSameDay(item.date, today)} />
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>No festivals found for {year}</Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -223,9 +170,6 @@ const styles = StyleSheet.create({
 
   yearRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24, paddingBottom: 12 },
   yearLabel: { fontSize: 20, fontFamily: 'Mukta_700Bold' },
-
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 14, fontFamily: 'Mukta_400Regular' },
 
   sectionHeader: { paddingTop: 16, paddingBottom: 8 },
   sectionTitle: { fontSize: 12, fontFamily: 'Mukta_500Medium', letterSpacing: 1 },

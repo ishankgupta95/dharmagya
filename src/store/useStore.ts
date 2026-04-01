@@ -4,18 +4,6 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 
 export type FontSize = 'small' | 'normal' | 'large' | 'xl';
 
-export interface CachedFestivalDay {
-  /** ISO date string (YYYY-MM-DD) for serialization */
-  dateISO: string;
-  festivals: Array<{ name: string; type: string }>;
-}
-
-interface FestivalCache {
-  /** Cache key: "year:lat:lon" */
-  key: string;
-  days: CachedFestivalDay[];
-}
-
 interface AppStore {
   // Persisted
   isDarkMode: boolean;
@@ -26,7 +14,6 @@ interface AppStore {
   fontSize: FontSize;
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
-  festivalCache: FestivalCache | null;
 
   // Actions (not persisted)
   toggleTheme: () => void;
@@ -37,7 +24,6 @@ interface AppStore {
   setFontSize: (size: FontSize) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
-  setFestivalCache: (cache: FestivalCache) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -51,7 +37,6 @@ export const useStore = create<AppStore>()(
       fontSize: 'normal',
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
-      festivalCache: null,
 
       toggleTheme: () => set((s) => ({ isDarkMode: !s.isDarkMode })),
       toggleFavorite: (id) =>
@@ -66,7 +51,6 @@ export const useStore = create<AppStore>()(
       setFontSize: (size) => set({ fontSize: size }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
-      setFestivalCache: (cache) => set({ festivalCache: cache }),
     }),
     {
       name: 'dharmsetu-store',
