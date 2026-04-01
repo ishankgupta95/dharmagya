@@ -262,27 +262,21 @@ export default function HomeScreen() {
         {/* ── Quick Access Row ──────────────────────────────────────────── */}
         <View style={styles.quickRow}>
           <QuickCard
-            emoji="🙏"
+            emoji="❤️"
             label="Favorites"
             onPress={() => router.push('/favorites')}
-            colors={colors}
-          />
-          <QuickCard
-            emoji="🙏🏽"
-            label="Gods"
-            onPress={() => router.push('/(tabs)/library')}
-            colors={colors}
-          />
-          <QuickCard
-            emoji="🌅"
-            label="Panchang"
-            onPress={() => router.push('/(tabs)/panchang')}
             colors={colors}
           />
           <QuickCard
             emoji="🪔"
             label="Festivals"
             onPress={() => router.push('/festivals')}
+            colors={colors}
+          />
+          <QuickCard
+            emoji="🔍"
+            label="Search"
+            onPress={() => router.push('/search')}
             colors={colors}
           />
         </View>

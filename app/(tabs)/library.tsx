@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, memo } from 'react';
+import { useCallback, memo } from 'react';
 import {
   View,
   FlatList,
@@ -11,7 +11,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
@@ -23,44 +22,14 @@ import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface DeityCount {
-  deity: string;
-  count: number;
-}
-
-interface DeityCardData extends DeityMeta {
-  aartiCount: number;
-  chalisaCount: number;
-}
+type DeityCardData = DeityMeta;
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function GodsScreen() {
   const { isDarkMode } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
-
-  const [deities, setDeities] = useState<DeityCardData[]>([]);
-
-  useEffect(() => {
-    const aartiCounts = db.getAllSync<DeityCount>(
-      'SELECT deity, COUNT(*) as count FROM aartis GROUP BY deity'
-    );
-    const chalisaCounts = db.getAllSync<DeityCount>(
-      'SELECT deity, COUNT(*) as count FROM chalisas GROUP BY deity'
-    );
-
-    const aartiMap = Object.fromEntries(aartiCounts.map(r => [r.deity, r.count]));
-    const chalisaMap = Object.fromEntries(chalisaCounts.map(r => [r.deity, r.count]));
-
-    const data: DeityCardData[] = ALL_DEITIES.map(d => ({
-      ...d,
-      aartiCount: aartiMap[d.name] ?? 0,
-      chalisaCount: chalisaMap[d.name] ?? 0,
-    }));
-
-    setDeities(data);
-  }, [db]);
+  const deities: DeityCardData[] = ALL_DEITIES;
 
   const renderDeity = useCallback(
     ({ item }: ListRenderItemInfo<DeityCardData>) => (
@@ -111,7 +80,6 @@ interface DeityCardProps {
 
 const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
   const image = getDeityImage(deity.name);
-  const totalCount = deity.aartiCount + deity.chalisaCount;
 
   return (
     <TouchableOpacity
@@ -144,15 +112,6 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
         <Text style={[styles.cardDesc, { color: colors.textMuted }]} numberOfLines={1}>
           {deity.description}
         </Text>
-        {totalCount > 0 && (
-          <View style={styles.countRow}>
-            <View style={[styles.countBadge, { backgroundColor: deity.color + '15' }]}>
-              <Text style={[styles.countText, { color: deity.color }]}>
-                {totalCount} भजन
-              </Text>
-            </View>
-          </View>
-        )}
       </View>
 
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginRight: 4 }} />
@@ -208,7 +167,4 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, gap: 2 },
   cardName: { fontSize: 16, fontFamily: 'Mukta_600SemiBold', lineHeight: 22 },
   cardDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', lineHeight: 16 },
-  countRow: { flexDirection: 'row', marginTop: 4 },
-  countBadge: { paddingHorizontal: 8, paddingVertical: 1, borderRadius: 10 },
-  countText: { fontSize: 11, fontFamily: 'Mukta_500Medium', lineHeight: 16 },
 });

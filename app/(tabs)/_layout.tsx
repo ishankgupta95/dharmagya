@@ -69,7 +69,7 @@ export default function TabLayout() {
           title: 'Gods',
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
-              name={(focused ? 'flower' : 'flower-outline') as IoniconName}
+              name={(focused ? 'people' : 'people-outline') as IoniconName}
               size={22}
               color={color}
             />
