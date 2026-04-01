@@ -124,6 +124,8 @@ export default function SearchScreen() {
         <ScrollView
           contentContainerStyle={[styles.results, { paddingHorizontal: spacing.screenH }]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}>
 
           {/* Aartis group */}
