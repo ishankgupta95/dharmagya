@@ -27,6 +27,14 @@ const images: Record<string, ImageSourcePropType> = {
   Jagannath:        require('../../assets/images/deities/jagannath.jpg'),
   'Santoshi Mata':  require('../../assets/images/deities/santoshi-mata.jpg'),
   Radha:            require('../../assets/images/deities/radha.jpg'),
+  Sita:             require('../../assets/images/deities/sita.jpg'),
+  Venkateswara:     require('../../assets/images/deities/venkateswara.jpg'),
+  'Khatu Shyam':    require('../../assets/images/deities/khatu-shyam.jpg'),
+  Ayyappa:          require('../../assets/images/deities/ayyappa.jpg'),
+  'Vaishno Devi':   require('../../assets/images/deities/vaishno-devi.jpg'),
+  Narasimha:        require('../../assets/images/deities/narasimha.jpg'),
+  Dattatreya:       require('../../assets/images/deities/dattatreya.jpg'),
+  Ganga:            require('../../assets/images/deities/ganga.jpg'),
 };
 
 export function getDeityImage(deityName: string): ImageSourcePropType | null {

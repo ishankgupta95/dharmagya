@@ -29,6 +29,14 @@ export const ALL_DEITIES: DeityMeta[] = [
   { id: 'jagannath',     name: 'Jagannath',     nameHindi: 'जगन्नाथ',   displayName: 'भगवान जगन्नाथ',    initial: 'ज',  color: deityColors.Jagannath,       description: 'जगत के नाथ, पुरी धाम' },
   { id: 'santoshi-mata', name: 'Santoshi Mata', nameHindi: 'संतोषी माता', displayName: 'संतोषी माता',       initial: 'सं', color: deityColors['Santoshi Mata'], description: 'संतोष और सुख की देवी' },
   { id: 'radha',         name: 'Radha',         nameHindi: 'राधा',       displayName: 'श्री राधा जी',      initial: 'रा', color: deityColors.Radha,           description: 'कृष्ण प्रिया, प्रेम स्वरूपा' },
+  { id: 'sita',          name: 'Sita',          nameHindi: 'सीता',       displayName: 'माता सीता जी',      initial: 'सी', color: deityColors.Sita,            description: 'जानकी, राम अर्धांगिनी' },
+  { id: 'venkateswara',  name: 'Venkateswara',  nameHindi: 'वेंकटेश्वर', displayName: 'भगवान वेंकटेश्वर',  initial: 'वें', color: deityColors.Venkateswara,    description: 'तिरुपति बालाजी, कलियुग के देव' },
+  { id: 'khatu-shyam',   name: 'Khatu Shyam',   nameHindi: 'खाटू श्याम', displayName: 'श्री खाटू श्याम जी', initial: 'खा', color: deityColors['Khatu Shyam'],  description: 'बर्बरीक, हारे का सहारा' },
+  { id: 'ayyappa',       name: 'Ayyappa',       nameHindi: 'अय्यप्पा',   displayName: 'भगवान अय्यप्पा',    initial: 'अ',  color: deityColors.Ayyappa,         description: 'शबरीमला के स्वामी, धर्मशास्ता' },
+  { id: 'vaishno-devi',  name: 'Vaishno Devi',  nameHindi: 'वैष्णो देवी', displayName: 'माँ वैष्णो देवी',   initial: 'वै', color: deityColors['Vaishno Devi'], description: 'त्रिकूट पर्वत वासिनी, जगजननी' },
+  { id: 'narasimha',     name: 'Narasimha',     nameHindi: 'नरसिंह',     displayName: 'भगवान नरसिंह',      initial: 'नर', color: deityColors.Narasimha,       description: 'प्रह्लाद रक्षक, उग्र अवतार' },
+  { id: 'dattatreya',    name: 'Dattatreya',    nameHindi: 'दत्तात्रेय',  displayName: 'भगवान दत्तात्रेय',   initial: 'द',  color: deityColors.Dattatreya,      description: 'त्रिदेव स्वरूप, अवधूत' },
+  { id: 'ganga',         name: 'Ganga',         nameHindi: 'गंगा',       displayName: 'माँ गंगा',          initial: 'गं', color: deityColors.Ganga,           description: 'पतित पावनी, मोक्षदायिनी' },
 ];
 
 export const DEITY_BY_ID = Object.fromEntries(ALL_DEITIES.map(d => [d.id, d])) as Record<string, DeityMeta>;

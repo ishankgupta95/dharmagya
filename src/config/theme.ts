@@ -70,6 +70,14 @@ export const deityColors: Record<string, string> = {
   Jagannath: '#3A8FD4',
   'Santoshi Mata': '#E8A060',
   Radha: '#E888A0',
+  Sita: '#D4876E',
+  Venkateswara: '#E8C840',
+  'Khatu Shyam': '#4A90D9',
+  Ayyappa: '#2E8B57',
+  'Vaishno Devi': '#E05070',
+  Narasimha: '#D4A030',
+  Dattatreya: '#7B68EE',
+  Ganga: '#40B5C4',
 };
 
 export const semanticColors = {

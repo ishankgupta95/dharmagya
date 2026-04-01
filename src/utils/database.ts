@@ -5,7 +5,7 @@ import aartiSeedData from '@/data/static/aartis.json';
 import chalisaSeedData from '@/data/static/chalisas.json';
 
 // Bump this whenever seed data changes to trigger a re-seed on existing installs.
-const SEED_VERSION = 2;
+const SEED_VERSION = 3;
 
 function seedAartis(db: SQLiteDatabase): void {
   const aartis = aartiSeedData as IAarti[];
