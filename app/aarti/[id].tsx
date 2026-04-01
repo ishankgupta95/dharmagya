@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,6 +39,25 @@ export default function AartiDetailScreen() {
   const [aarti, setAarti] = useState<IAarti | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Hero collapse animations (collapse over 0–100px of scroll)
+  const COLLAPSE_END = 100;
+  const heroOpacity = scrollY.interpolate({
+    inputRange: [0, COLLAPSE_END * 0.6],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const heroHeight = scrollY.interpolate({
+    inputRange: [0, COLLAPSE_END],
+    outputRange: [140, 0],
+    extrapolate: 'clamp',
+  });
+  const compactTitleOpacity = scrollY.interpolate({
+    inputRange: [COLLAPSE_END * 0.5, COLLAPSE_END],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -90,6 +110,12 @@ export default function AartiDetailScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={20} color="#F0E6D3" />
           </TouchableOpacity>
+
+          {/* Compact title (visible when hero collapsed) */}
+          <Animated.View style={[styles.compactTitle, { opacity: compactTitleOpacity }]}>
+            <Text style={styles.compactTitleText} numberOfLines={1}>{aarti.titleNative}</Text>
+          </Animated.View>
+
           <TouchableOpacity
             onPress={() => toggleFavorite(favoriteKey)}
             style={styles.navBtn}
@@ -102,30 +128,35 @@ export default function AartiDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Hero: avatar + title */}
-        <View style={styles.hero}>
+        {/* Hero: avatar + title (collapses on scroll) */}
+        <Animated.View style={[styles.hero, { opacity: heroOpacity, maxHeight: heroHeight, overflow: 'hidden' }]}>
           <DeityAvatar deity={aarti.deity} size={72} />
           <Text style={styles.heroTitleNative}>{aarti.titleNative}</Text>
           <Text style={styles.heroTitleEn}>{aarti.titleEnglish}</Text>
           <View style={styles.deityBadge}>
             <Text style={[styles.deityBadgeText, { color: colors.accent }]}>{aarti.deity}</Text>
           </View>
-        </View>
+        </Animated.View>
 
       </LinearGradient>
 
       {/* ── Verses ──────────────────────────────────────────────────── */}
-      <ScrollView
+      <Animated.ScrollView
         style={{ backgroundColor: colors.base }}
         contentContainerStyle={[styles.verseScroll, { paddingHorizontal: spacing.screenH }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}>
         {aarti.content.map((verse, index) => (
           <Text key={index} style={[styles.verse, { color: colors.textPrimary }]}>
             {verse}
           </Text>
         ))}
         <View style={{ height: 100 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── Bottom CTA ──────────────────────────────────────────────── */}
       <View style={[styles.bottomBar, { backgroundColor: colors.base, borderTopColor: colors.border }]}>
@@ -171,7 +202,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
 
   // Header
-  header: { paddingBottom: 28 },
+  header: { paddingBottom: 12 },
   navRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -187,6 +218,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  compactTitle: { flex: 1, alignItems: 'center', marginHorizontal: 8 },
+  compactTitleText: {
+    fontSize: 16,
+    fontFamily: 'Mukta_700Bold',
+    color: '#F0E6D3',
+    textAlign: 'center',
   },
   hero: { alignItems: 'center', paddingTop: 8, paddingBottom: 4, gap: 10 },
   heroTitleNative: {

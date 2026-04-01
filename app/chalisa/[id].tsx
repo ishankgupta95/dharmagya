@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,6 +45,25 @@ export default function ChalisaDetailScreen() {
   const db = useSQLiteContext();
 
   const [chalisa, setChalisa] = useState<ChalisaDetail | null>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Hero collapse animations (collapse over 0–100px of scroll)
+  const COLLAPSE_END = 100;
+  const heroOpacity = scrollY.interpolate({
+    inputRange: [0, COLLAPSE_END * 0.6],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const heroHeight = scrollY.interpolate({
+    inputRange: [0, COLLAPSE_END],
+    outputRange: [140, 0],
+    extrapolate: 'clamp',
+  });
+  const compactTitleOpacity = scrollY.interpolate({
+    inputRange: [COLLAPSE_END * 0.5, COLLAPSE_END],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -86,6 +106,12 @@ export default function ChalisaDetailScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={20} color="#F0E6D3" />
           </TouchableOpacity>
+
+          {/* Compact title (visible when hero collapsed) */}
+          <Animated.View style={[styles.compactTitle, { opacity: compactTitleOpacity }]}>
+            <Text style={styles.compactTitleText} numberOfLines={1}>{chalisa.titleNative}</Text>
+          </Animated.View>
+
           <TouchableOpacity
             onPress={() => toggleFavorite(favoriteKey)}
             style={styles.navBtn}
@@ -98,23 +124,28 @@ export default function ChalisaDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Hero: avatar + title */}
-        <View style={styles.hero}>
+        {/* Hero: avatar + title (collapses on scroll) */}
+        <Animated.View style={[styles.hero, { opacity: heroOpacity, maxHeight: heroHeight, overflow: 'hidden' }]}>
           <DeityAvatar deity={chalisa.deity} size={72} />
           <Text style={styles.heroTitleNative}>{chalisa.titleNative}</Text>
           <Text style={styles.heroTitleEn}>{chalisa.titleEnglish}</Text>
           <View style={styles.deityBadge}>
             <Text style={[styles.deityBadgeText, { color: colors.accent }]}>{chalisa.deity}</Text>
           </View>
-        </View>
+        </Animated.View>
 
       </LinearGradient>
 
       {/* ── Sections ────────────────────────────────────────────────── */}
-      <ScrollView
+      <Animated.ScrollView
         style={{ backgroundColor: colors.base }}
         contentContainerStyle={[styles.contentScroll, { paddingHorizontal: spacing.screenH }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}>
 
         {chalisa.sections.map((section, sectionIndex) => {
           const isChaupai = section.type === 'chaupai';
@@ -151,7 +182,7 @@ export default function ChalisaDetailScreen() {
         })}
 
         <View style={{ height: 48 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
     </SafeAreaView>
   );
@@ -191,7 +222,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
 
   // Header
-  header: { paddingBottom: 28 },
+  header: { paddingBottom: 12 },
   navRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -207,6 +238,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  compactTitle: { flex: 1, alignItems: 'center', marginHorizontal: 8 },
+  compactTitleText: {
+    fontSize: 16,
+    fontFamily: 'Mukta_700Bold',
+    color: '#F0E6D3',
+    textAlign: 'center',
   },
   hero: { alignItems: 'center', paddingTop: 8, paddingBottom: 4, gap: 10 },
   heroTitleNative: {

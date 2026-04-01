@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
-  FlatList,
+  Image,
+  Animated,
+  Dimensions,
+  SectionList,
   TouchableOpacity,
   StyleSheet,
-  ListRenderItemInfo,
+  SectionListRenderItemInfo,
+  SectionListData,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +20,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { getDeityImage } from '@/config/deityImages';
 import { DEITY_BY_ID } from '@/config/deities';
 import type { IAarti, IChalisaSection } from '@/types';
 
@@ -45,7 +50,14 @@ interface ChalisaItem {
   sections: IChalisaSection[];
 }
 
-type ActiveTab = 'aartis' | 'chalisas';
+type ListItem =
+  | { type: 'aarti'; data: IAarti }
+  | { type: 'chalisa'; data: ChalisaItem };
+
+interface ListSection {
+  title: string;
+  data: ListItem[];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +73,13 @@ function countChaupais(sections: IChalisaSection[]): number {
   return sections.filter((s) => s.type === 'chaupai').length;
 }
 
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const BANNER_HEIGHT = 260;
+const COLLAPSED_HEIGHT = 56;
+const SCROLL_DISTANCE = BANNER_HEIGHT - COLLAPSED_HEIGHT;
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function GodDetailScreen() {
@@ -68,10 +87,10 @@ export default function GodDetailScreen() {
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const deity = DEITY_BY_ID[id ?? ''];
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('aartis');
   const [aartis, setAartis] = useState<IAarti[]>([]);
   const [chalisas, setChalisas] = useState<ChalisaItem[]>([]);
 
@@ -90,37 +109,57 @@ export default function GodDetailScreen() {
     setChalisas(chalisaRows.map(rowToChalisa));
   }, [db, deity]);
 
-  // Auto-switch to chalisas tab if no aartis but chalisas exist
-  useEffect(() => {
-    if (aartis.length === 0 && chalisas.length > 0) {
-      setActiveTab('chalisas');
-    }
-  }, [aartis.length, chalisas.length]);
+  const sections: ListSection[] = [];
+  if (aartis.length > 0) {
+    sections.push({
+      title: `Aartis (${aartis.length})`,
+      data: aartis.map((a) => ({ type: 'aarti' as const, data: a })),
+    });
+  }
+  if (chalisas.length > 0) {
+    sections.push({
+      title: `Chalisas (${chalisas.length})`,
+      data: chalisas.map((c) => ({ type: 'chalisa' as const, data: c })),
+    });
+  }
 
-  const renderAarti = useCallback(
-    ({ item }: ListRenderItemInfo<IAarti>) => (
-      <AartiCard
-        item={item}
-        colors={colors}
-        isFavorite={favoriteIds.includes(`aarti-${item.id}`)}
-        onToggleFavorite={() => toggleFavorite(`aarti-${item.id}`)}
-        onPress={() => router.push(`/aarti/${item.id}`)}
-      />
-    ),
+  const renderItem = useCallback(
+    ({ item }: SectionListRenderItemInfo<ListItem, ListSection>) => {
+      if (item.type === 'aarti') {
+        const a = item.data;
+        return (
+          <AartiCard
+            item={a}
+            colors={colors}
+            isFavorite={favoriteIds.includes(`aarti-${a.id}`)}
+            onToggleFavorite={() => toggleFavorite(`aarti-${a.id}`)}
+            onPress={() => router.push(`/aarti/${a.id}`)}
+          />
+        );
+      }
+      const c = item.data;
+      return (
+        <ChalisaCard
+          item={c}
+          colors={colors}
+          isFavorite={favoriteIds.includes(`chalisa-${c.id}`)}
+          onToggleFavorite={() => toggleFavorite(`chalisa-${c.id}`)}
+          onPress={() => router.push(`/chalisa/${c.id}`)}
+        />
+      );
+    },
     [colors, favoriteIds, toggleFavorite]
   );
 
-  const renderChalisa = useCallback(
-    ({ item }: ListRenderItemInfo<ChalisaItem>) => (
-      <ChalisaCard
-        item={item}
-        colors={colors}
-        isFavorite={favoriteIds.includes(`chalisa-${item.id}`)}
-        onToggleFavorite={() => toggleFavorite(`chalisa-${item.id}`)}
-        onPress={() => router.push(`/chalisa/${item.id}`)}
-      />
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: SectionListData<ListItem, ListSection> }) => (
+      <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
+        <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+          {section.title}
+        </Text>
+      </View>
     ),
-    [colors, favoriteIds, toggleFavorite]
+    [colors]
   );
 
   if (!deity) {
@@ -131,97 +170,147 @@ export default function GodDetailScreen() {
     );
   }
 
-  const isAartiTab = activeTab === 'aartis';
-  const headerGradient: readonly [string, string] = [deity.color + '30', colors.base];
+  const deityImage = getDeityImage(deity.name);
+  const hasImage = !!deityImage;
+
+  // ─── Animated values ───────────────────────────────────────────────
+  const headerHeight = hasImage
+    ? scrollY.interpolate({
+        inputRange: [0, SCROLL_DISTANCE],
+        outputRange: [BANNER_HEIGHT, COLLAPSED_HEIGHT],
+        extrapolate: 'clamp',
+      })
+    : undefined;
+
+  const bannerOpacity = scrollY.interpolate({
+    inputRange: [0, SCROLL_DISTANCE * 0.6],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const miniBarOpacity = scrollY.interpolate({
+    inputRange: [SCROLL_DISTANCE * 0.5, SCROLL_DISTANCE],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const bannerScale = scrollY.interpolate({
+    inputRange: [-100, 0],
+    outputRange: [1.3, 1],
+    extrapolate: 'clamp',
+  });
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
-      {/* ── Header ────────────────────────────────────────────────────── */}
-      <LinearGradient colors={headerGradient} style={styles.header}>
-        <View style={[styles.headerNav, { paddingHorizontal: spacing.screenH }]}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[styles.navBtn, { backgroundColor: 'rgba(0,0,0,0.25)' }]}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+      {/* ── Collapsible Header ──────────────────────────────────────── */}
+      <Animated.View style={[styles.headerWrap, hasImage && { height: headerHeight }]}>
+        {hasImage ? (
+          <>
+            {/* Full banner image */}
+            <Animated.View style={[styles.bannerBox, { opacity: bannerOpacity }]}>
+              <Animated.Image
+                source={deityImage}
+                style={[styles.bannerImage, { transform: [{ scale: bannerScale }] }]}
+                resizeMode="cover"
+              />
+              {/* Bottom gradient fade */}
+              <LinearGradient
+                colors={['transparent', colors.base]}
+                style={styles.bannerGradientBottom}
+              />
+              {/* Name overlay on banner */}
+              <View style={styles.bannerOverlay}>
+                <Text style={styles.bannerName}>{deity.displayName}</Text>
+                <Text style={styles.bannerDesc}>{deity.description}</Text>
+              </View>
+            </Animated.View>
 
-        <View style={styles.headerContent}>
-          <DeityAvatar deity={deity.name} size={72} />
-          <Text style={[styles.headerNameHindi, { color: colors.textPrimary }]}>
-            {deity.nameHindi}
-          </Text>
-          <Text style={[styles.headerName, { color: colors.textSecondary }]}>
-            {deity.name}
-          </Text>
-          <Text style={[styles.headerDesc, { color: colors.textMuted }]}>
-            {deity.description}
-          </Text>
-        </View>
-      </LinearGradient>
+            {/* Collapsed mini bar */}
+            <Animated.View
+              style={[
+                styles.miniBar,
+                { opacity: miniBarOpacity, backgroundColor: colors.surface, borderBottomColor: colors.border },
+              ]}>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.miniBackBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Image source={deityImage} style={styles.miniImage} resizeMode="cover" />
+              <Text style={[styles.miniName, { color: colors.textPrimary }]} numberOfLines={1}>
+                {deity.displayName}
+              </Text>
+            </Animated.View>
+          </>
+        ) : (
+          /* No image: simple gradient header */
+          <LinearGradient colors={[deity.color + '30', colors.base]} style={styles.fallbackHeader}>
+            <View style={styles.fallbackContent}>
+              <DeityAvatar deity={deity.name} size={72} />
+              <Text style={[styles.fallbackName, { color: colors.textPrimary }]}>
+                {deity.displayName}
+              </Text>
+              <Text style={[styles.fallbackSubname, { color: colors.textSecondary }]}>
+                {deity.name}
+              </Text>
+              <Text style={[styles.fallbackDesc, { color: colors.textMuted }]}>
+                {deity.description}
+              </Text>
+            </View>
+          </LinearGradient>
+        )}
 
-      {/* ── Segment Control ───────────────────────────────────────────── */}
-      <View style={[styles.segmentWrap, { paddingHorizontal: spacing.screenH }]}>
-        <View style={[styles.segmentContainer, { backgroundColor: colors.surfaceRecessed }]}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveTab('aartis')}
-            style={[styles.segmentBtn, isAartiTab && { backgroundColor: colors.accent }]}>
-            <Text
-              style={[
-                styles.segmentText,
-                { color: isAartiTab ? '#FFFFFF' : colors.textSecondary },
-              ]}>
-              Aartis ({aartis.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveTab('chalisas')}
-            style={[styles.segmentBtn, !isAartiTab && { backgroundColor: colors.accent }]}>
-            <Text
-              style={[
-                styles.segmentText,
-                { color: !isAartiTab ? '#FFFFFF' : colors.textSecondary },
-              ]}>
-              Chalisas ({chalisas.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        {/* Back button on banner (visible when expanded) */}
+        {hasImage && (
+          <Animated.View style={[styles.bannerBackWrap, { opacity: bannerOpacity }]}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.bannerBackBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Back button for fallback header */}
+        {!hasImage && (
+          <View style={styles.bannerBackWrap}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={[styles.bannerBackBtn, { backgroundColor: 'rgba(0,0,0,0.25)' }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </Animated.View>
 
       {/* ── List ──────────────────────────────────────────────────────── */}
-      {isAartiTab ? (
-        <FlatList
-          data={aartis}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAarti}
-          contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              No aartis available yet
-            </Text>
-          }
-        />
-      ) : (
-        <FlatList
-          data={chalisas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderChalisa}
-          contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              No chalisas available yet
-            </Text>
-          }
-        />
-      )}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => `${item.type}-${item.data.id}`}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.gridGap }} />}
+        SectionSeparatorComponent={({ leadingItem }) =>
+          leadingItem ? <View style={{ height: 8 }} /> : null
+        }
+        stickySectionHeadersEnabled={false}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+            No aartis or chalisas available yet
+          </Text>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -321,35 +410,116 @@ function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: Ch
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  // Header
-  header: { paddingBottom: 20 },
-  headerNav: { flexDirection: 'row', paddingTop: 8, paddingBottom: 16 },
-  navBtn: {
+  // ── Collapsible header ──
+  headerWrap: { overflow: 'hidden' },
+
+  // Banner (expanded)
+  bannerBox: {
+    width: SCREEN_WIDTH,
+    height: BANNER_HEIGHT,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  bannerImage: {
+    width: SCREEN_WIDTH,
+    height: BANNER_HEIGHT,
+  },
+  bannerGradientBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 100,
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    left: spacing.screenH,
+    right: spacing.screenH,
+  },
+  bannerName: {
+    fontSize: 24,
+    fontFamily: 'Mukta_700Bold',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  bannerDesc: {
+    fontSize: 13,
+    fontFamily: 'Mukta_400Regular',
+    color: 'rgba(255,255,255,0.85)',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginTop: 2,
+  },
+  bannerBackWrap: {
+    position: 'absolute',
+    top: 8,
+    left: spacing.screenH,
+    zIndex: 10,
+  },
+  bannerBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Mini bar (collapsed)
+  miniBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: COLLAPSED_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenH,
+    gap: 10,
+    borderBottomWidth: 1,
+  },
+  miniBackBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerContent: { alignItems: 'center', gap: 4 },
-  headerNameHindi: { fontSize: 22, fontFamily: 'Mukta_700Bold', marginTop: 8 },
-  headerName: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
-  headerDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
-
-  // Segment
-  segmentWrap: { marginVertical: 14 },
-  segmentContainer: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.button,
-    padding: 3,
+  miniImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
-  segmentBtn: {
+  miniName: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: borderRadius.button - 2,
-    alignItems: 'center',
+    fontSize: 16,
+    fontFamily: 'Mukta_600SemiBold',
   },
-  segmentText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
+
+  // Fallback header (no image)
+  fallbackHeader: { paddingBottom: 20 },
+  fallbackContent: { alignItems: 'center', gap: 4, paddingTop: 52 },
+  fallbackName: { fontSize: 22, fontFamily: 'Mukta_700Bold', marginTop: 8 },
+  fallbackSubname: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
+  fallbackDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
+
+  // Section headers
+  sectionHeader: {
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontFamily: 'Mukta_500Medium',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
 
   // List
   listContent: { paddingTop: 2, paddingBottom: 32 },

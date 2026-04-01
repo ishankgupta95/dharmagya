@@ -4,9 +4,10 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  Image,
   ListRenderItemInfo,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -16,6 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { getDeityImage } from '@/config/deityImages';
 import { AdBanner } from '@/components/common/AdBanner';
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 
@@ -30,13 +32,6 @@ interface DeityCardData extends DeityMeta {
   aartiCount: number;
   chalisaCount: number;
 }
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const NUM_COLUMNS = 3;
-const CARD_GAP = 12;
-const CARD_WIDTH = (SCREEN_WIDTH - spacing.screenH * 2 - CARD_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -91,14 +86,12 @@ export default function GodsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── God Grid ──────────────────────────────────────────────────── */}
+      {/* ── God List ─────────────────────────────────────────────────── */}
       <FlatList
         data={deities}
         keyExtractor={(item) => item.id}
         renderItem={renderDeity}
-        numColumns={NUM_COLUMNS}
-        contentContainerStyle={[styles.gridContent, { paddingHorizontal: spacing.screenH }]}
-        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}
       />
 
@@ -116,34 +109,52 @@ interface DeityCardProps {
 }
 
 function DeityCard({ deity, colors }: DeityCardProps) {
+  const image = getDeityImage(deity.name);
   const totalCount = deity.aartiCount + deity.chalisaCount;
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={() => router.push(`/god/${deity.id}`)}
-      style={[
-        styles.card,
-        {
-          width: CARD_WIDTH,
-          backgroundColor: colors.surface,
-          borderColor: deity.color + '30',
-        },
-      ]}>
-      <DeityAvatar deity={deity.name} size={56} />
-      <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
-        {deity.nameHindi}
-      </Text>
-      <Text style={[styles.cardName, { color: colors.textSecondary }]} numberOfLines={1}>
-        {deity.name}
-      </Text>
-      {totalCount > 0 && (
-        <View style={[styles.countBadge, { backgroundColor: deity.color + '18' }]}>
-          <Text style={[styles.countText, { color: deity.color }]}>
-            {totalCount} {totalCount === 1 ? 'भजन' : 'भजन'}
-          </Text>
-        </View>
-      )}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: deity.color + '25' }]}>
+
+      {/* ── Portrait ── */}
+      <View style={[styles.imageBox, { backgroundColor: deity.color + '15' }]}>
+        {image ? (
+          <Image source={image} style={styles.image} resizeMode="cover" />
+        ) : (
+          <DeityAvatar deity={deity.name} size={72} />
+        )}
+      </View>
+
+      {/* ── Gradient overlay on image edge ── */}
+      <LinearGradient
+        colors={['transparent', colors.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.imageGradient}
+      />
+
+      {/* ── Info ── */}
+      <View style={styles.cardInfo}>
+        <Text style={[styles.cardName, { color: colors.textPrimary }]} numberOfLines={1}>
+          {deity.displayName}
+        </Text>
+        <Text style={[styles.cardDesc, { color: colors.textMuted }]} numberOfLines={1}>
+          {deity.description}
+        </Text>
+        {totalCount > 0 && (
+          <View style={styles.countRow}>
+            <View style={[styles.countBadge, { backgroundColor: deity.color + '15' }]}>
+              <Text style={[styles.countText, { color: deity.color }]}>
+                {totalCount} भजन
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginRight: 4 }} />
     </TouchableOpacity>
   );
 }
@@ -165,26 +176,38 @@ const styles = StyleSheet.create({
   screenTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginTop: 1 },
   searchBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
-  // Grid
-  gridContent: { paddingTop: 4, paddingBottom: 32 },
-  gridRow: { gap: CARD_GAP, marginBottom: CARD_GAP },
+  // List
+  listContent: { paddingTop: 4, paddingBottom: 32, gap: 10 },
 
   // Card
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: borderRadius.card,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  imageBox: {
+    width: 88,
+    height: 88,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    gap: 4,
   },
-  cardNameHindi: { fontSize: 15, fontFamily: 'Mukta_500Medium', marginTop: 4 },
-  cardName: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
-  countBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: borderRadius.chip,
-    marginTop: 4,
+  image: {
+    width: 88,
+    height: 88,
   },
-  countText: { fontSize: 10, fontFamily: 'Mukta_400Regular' },
+  imageGradient: {
+    position: 'absolute',
+    left: 72,
+    top: 0,
+    bottom: 0,
+    width: 24,
+  },
+  cardInfo: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, gap: 2 },
+  cardName: { fontSize: 16, fontFamily: 'Mukta_600SemiBold', lineHeight: 22 },
+  cardDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', lineHeight: 16 },
+  countRow: { flexDirection: 'row', marginTop: 4 },
+  countBadge: { paddingHorizontal: 8, paddingVertical: 1, borderRadius: 10 },
+  countText: { fontSize: 11, fontFamily: 'Mukta_500Medium', lineHeight: 16 },
 });

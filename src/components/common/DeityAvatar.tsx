@@ -1,6 +1,7 @@
-import { Text, StyleSheet } from 'react-native';
+import { Text, Image, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DEITY_BY_NAME } from '@/config/deities';
+import { getDeityImage } from '@/config/deityImages';
 import { deityColors } from '@/config/theme';
 
 interface DeityAvatarProps {
@@ -12,9 +13,20 @@ const FALLBACK = { initial: 'ॐ', color: deityColors.Ganesh };
 
 export function DeityAvatar({ deity, size = 48 }: DeityAvatarProps) {
   const meta = DEITY_BY_NAME[deity];
-  const initial = meta?.initial ?? FALLBACK.initial;
   const color = meta?.color ?? FALLBACK.color;
   const radius = size * 0.25;
+  const image = getDeityImage(deity);
+
+  if (image) {
+    return (
+      <View style={[styles.imageContainer, { width: size, height: size, borderRadius: radius, borderColor: color + '40' }]}>
+        <Image source={image} style={{ width: size, height: size, borderRadius: radius }} resizeMode="cover" />
+      </View>
+    );
+  }
+
+  // Fallback: Devanagari initial in gradient circle
+  const initial = meta?.initial ?? FALLBACK.initial;
   const fontSize = size * 0.42;
 
   return (
@@ -37,5 +49,9 @@ const styles = StyleSheet.create({
   },
   initial: {
     fontFamily: 'Mukta_700Bold',
+  },
+  imageContainer: {
+    overflow: 'hidden',
+    borderWidth: 1.5,
   },
 });
