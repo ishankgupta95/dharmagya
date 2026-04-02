@@ -2,7 +2,6 @@ import { useEffect, useState, Suspense } from 'react';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { PaperProvider } from 'react-native-paper';
 import { SQLiteProvider } from 'expo-sqlite';
 import {
   useFonts,
@@ -12,7 +11,7 @@ import {
 } from '@expo-google-fonts/mukta';
 
 import { useStore } from '@/store/useStore';
-import { darkTheme, lightTheme } from '@/config/theme';
+import { darkColors, lightColors } from '@/config/theme';
 import { initDatabase } from '@/utils/database';
 
 SplashScreen.preventAutoHideAsync();
@@ -54,12 +53,14 @@ export default function RootLayout() {
   return (
     <Suspense fallback={null}>
       <SQLiteProvider databaseName="dharmsetu.db" useSuspense onInit={initDatabase}>
-        <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        </PaperProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
+          }}>
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       </SQLiteProvider>
     </Suspense>
   );

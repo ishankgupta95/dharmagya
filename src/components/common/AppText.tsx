@@ -28,10 +28,16 @@ export const AppText = memo(function AppText({ style, ...props }: TextProps) {
   }
 
   const flat = StyleSheet.flatten(style) ?? {};
+  const scaledFontSize = flat.fontSize !== undefined ? Math.round(flat.fontSize * scale) : undefined;
+  const scaledLineHeight = flat.lineHeight !== undefined
+    ? Math.round(flat.lineHeight * scale)
+    : scaledFontSize !== undefined
+      ? Math.round(scaledFontSize * 1.6)
+      : undefined;
   const scaledStyle = {
     ...flat,
-    ...(flat.fontSize !== undefined ? { fontSize: Math.round(flat.fontSize * scale) } : {}),
-    ...(flat.lineHeight !== undefined ? { lineHeight: Math.round(flat.lineHeight * scale) } : {}),
+    ...(scaledFontSize !== undefined ? { fontSize: scaledFontSize } : {}),
+    ...(scaledLineHeight !== undefined ? { lineHeight: scaledLineHeight } : {}),
   };
 
   return <Text style={scaledStyle} {...props} />;

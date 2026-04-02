@@ -1,5 +1,3 @@
-import { MD3DarkTheme, MD3LightTheme, configureFonts } from 'react-native-paper';
-
 // ─── Color Palette type (shared interface for dark & light) ──────────────────
 
 export interface ColorPalette {
@@ -108,60 +106,8 @@ export const borderRadius = {
 
 // ─── Font Config ─────────────────────────────────────────────────────────────
 
-const fontConfig = {
-  displayLarge:   { fontFamily: 'Mukta_500Medium' },
-  displayMedium:  { fontFamily: 'Mukta_500Medium' },
-  displaySmall:   { fontFamily: 'Mukta_500Medium' },
-  headlineLarge:  { fontFamily: 'Mukta_500Medium' },
-  headlineMedium: { fontFamily: 'Mukta_500Medium' },
-  headlineSmall:  { fontFamily: 'Mukta_500Medium' },
-  titleLarge:     { fontFamily: 'Mukta_500Medium' },
-  titleMedium:    { fontFamily: 'Mukta_500Medium' },
-  titleSmall:     { fontFamily: 'Mukta_500Medium' },
-  bodyLarge:      { fontFamily: 'Mukta_400Regular' },
-  bodyMedium:     { fontFamily: 'Mukta_400Regular' },
-  bodySmall:      { fontFamily: 'Mukta_400Regular' },
-  labelLarge:     { fontFamily: 'Mukta_400Regular' },
-  labelMedium:    { fontFamily: 'Mukta_400Regular' },
-  labelSmall:     { fontFamily: 'Mukta_400Regular' },
-};
-
-const fonts = configureFonts({ config: fontConfig });
-
-// ─── MD3 Themes ──────────────────────────────────────────────────────────────
-
-export const darkTheme = {
-  ...MD3DarkTheme,
-  colors: {
-    ...MD3DarkTheme.colors,
-    primary: darkColors.accent,
-    background: darkColors.base,
-    surface: darkColors.surface,
-    onSurface: darkColors.textPrimary,
-    onBackground: darkColors.textPrimary,
-    surfaceVariant: darkColors.surfaceRecessed,
-    onSurfaceVariant: darkColors.textSecondary,
-    outline: darkColors.border,
-    error: semanticColors.error,
-    onError: '#FFFFFF',
-  },
-  fonts,
-};
-
-export const lightTheme = {
-  ...MD3LightTheme,
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: lightColors.accent,
-    background: lightColors.base,
-    surface: lightColors.surface,
-    onSurface: lightColors.textPrimary,
-    onBackground: lightColors.textPrimary,
-    surfaceVariant: lightColors.surfaceRecessed,
-    onSurfaceVariant: lightColors.textSecondary,
-    outline: lightColors.border,
-    error: semanticColors.error,
-    onError: '#FFFFFF',
-  },
-  fonts,
-};
+export const fonts = {
+  heading: 'Mukta_500Medium',
+  body: 'Mukta_400Regular',
+  bold: 'Mukta_700Bold',
+} as const;
