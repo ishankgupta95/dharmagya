@@ -23,9 +23,9 @@ export default {
     greetingMorning: 'Good Morning',
     greetingAfternoon: 'Good Afternoon',
     greetingEvening: 'Good Evening',
-    greetingMorningHi: 'शुभ प्रभात',
-    greetingAfternoonHi: 'शुभ दोपहर',
-    greetingEveningHi: 'शुभ संध्या',
+    greetingMorningHi: 'Good Morning',
+    greetingAfternoonHi: 'Good Afternoon',
+    greetingEveningHi: 'Good Evening',
     todaysPanchang: "TODAY'S PANCHANG",
     tithi: 'TITHI',
     nakshatra: 'NAKSHATRA',
@@ -94,13 +94,13 @@ export default {
 
   // ── Library Screen ──────────────────────────────────────────────────────
   library: {
-    godsTitle: 'देवी देवता',
+    godsTitle: 'Gods',
     godsTitleEn: 'Gods',
-    kathasTitle: 'कथाएँ',
+    kathasTitle: 'Kathas',
     kathasTitleEn: 'Kathas',
-    kathaSegment: 'कथाएँ',
-    godsSegment: 'देवी देवता',
-    kathaBadge: 'कथा',
+    kathaSegment: 'Kathas',
+    godsSegment: 'Gods',
+    kathaBadge: 'Katha',
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
@@ -108,10 +108,10 @@ export default {
     aartisCount: 'Aartis ({{count}})',
     chalisasCount: 'Chalisas ({{count}})',
     kathasCount: 'Kathas ({{count}})',
-    aartiBadge: 'आरती',
-    chalisaBadge: 'चालीसा',
-    kathaBadge: 'कथा',
-    chaupaiCount: '{{count}} चौपाई',
+    aartiBadge: 'Aarti',
+    chalisaBadge: 'Chalisa',
+    kathaBadge: 'Katha',
+    chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
   },
@@ -125,13 +125,13 @@ export default {
 
   // ── Katha Detail ────────────────────────────────────────────────────────
   katha: {
-    badge: 'कथा',
+    badge: 'Katha',
   },
 
   // ── Search Screen ───────────────────────────────────────────────────────
   search: {
     placeholder: 'Search aartis, chalisas, kathas…',
-    emptyTitle: 'खोज करें',
+    emptyTitle: 'Search',
     emptyDesc: 'Search by title, transliteration, or deity name',
     noResults: 'No results',
     noResultsFor: 'Nothing found for "{{query}}"',
@@ -230,14 +230,14 @@ export default {
     // Step 2
     step2of3: 'Step 2 of 3',
     chooseDeities: 'Choose Your Deities',
-    chooseDeitiesHi: 'अपने देवता चुनें',
+    chooseDeitiesHi: 'Choose Your Deities',
     chooseDeitiesDesc:
       "We'll highlight aartis and chalisas for the deities you love. You can change this anytime.",
     selectedCount: '{{count}} selected',
     // Step 3
     step3of3: 'Step 3 of 3',
     preferences: 'Set Your Preferences',
-    preferencesHi: 'प्राथमिकताएँ',
+    preferencesHi: 'Preferences',
     dark: 'Dark',
     light: 'Light',
     useGpsLocation: 'Use GPS Location',
@@ -247,11 +247,41 @@ export default {
     startExploring: 'Start Exploring  🙏',
   },
 
+  // ── Deity Names & Descriptions ──────────────────────────────────────────
+  deities: {
+    ganesh:        { displayName: 'Shri Ganesh Ji',           description: 'Remover of obstacles, first worshipped' },
+    shiva:         { displayName: 'Lord Shiva',               description: 'Mahadev, the destroyer' },
+    vishnu:        { displayName: 'Lord Vishnu',              description: 'The preserver, protector of the universe' },
+    hanuman:       { displayName: 'Shri Hanuman Ji',          description: 'Bajrangbali, devotee of Rama' },
+    lakshmi:       { displayName: 'Maa Lakshmi',              description: 'Goddess of wealth and prosperity' },
+    krishna:       { displayName: 'Shri Krishna Ji',          description: 'Govind, teacher of the Gita' },
+    rama:          { displayName: 'Shri Ram Ji',              description: 'Maryada Purushottam' },
+    durga:         { displayName: 'Maa Durga',                description: 'Embodiment of Shakti, slayer of Mahishasura' },
+    saraswati:     { displayName: 'Maa Saraswati',            description: 'Goddess of knowledge and arts' },
+    parvati:       { displayName: 'Maa Parvati',              description: 'Consort of Shiva, mother of the world' },
+    kali:          { displayName: 'Maa Kali',                 description: 'Mahakali, destroyer of fear' },
+    surya:         { displayName: 'Surya Dev',                description: 'The Sun God, giver of light' },
+    kartikeya:     { displayName: 'Lord Kartikeya',           description: 'Commander of the gods, Shadanana' },
+    brahma:        { displayName: 'Lord Brahma',              description: 'The creator, four-faced one' },
+    'sai-baba':    { displayName: 'Shri Sai Baba',            description: 'Saint of Shirdi, one God for all' },
+    jagannath:     { displayName: 'Lord Jagannath',           description: 'Lord of the universe, Puri Dham' },
+    'santoshi-mata': { displayName: 'Santoshi Mata',          description: 'Goddess of contentment and happiness' },
+    radha:         { displayName: 'Shri Radha Ji',            description: 'Beloved of Krishna, embodiment of love' },
+    sita:          { displayName: 'Mata Sita Ji',             description: 'Janaki, consort of Rama' },
+    venkateswara:  { displayName: 'Lord Venkateswara',        description: 'Tirupati Balaji, deity of Kali Yuga' },
+    'khatu-shyam': { displayName: 'Shri Khatu Shyam Ji',     description: 'Barbarik, refuge of the helpless' },
+    ayyappa:       { displayName: 'Lord Ayyappa',             description: 'Lord of Sabarimala, Dharmashastha' },
+    'vaishno-devi': { displayName: 'Maa Vaishno Devi',       description: 'Dweller of Trikuta, mother of the world' },
+    narasimha:     { displayName: 'Lord Narasimha',           description: 'Protector of Prahlada, fierce avatar' },
+    dattatreya:    { displayName: 'Lord Dattatreya',          description: 'Form of the trinity, Avadhut' },
+    ganga:         { displayName: 'Maa Ganga',                description: 'Purifier of the fallen, giver of moksha' },
+  },
+
   // ── Notifications ───────────────────────────────────────────────────────
   notifications: {
-    dailyReminderTitle: '🙏 प्रातः स्मरण',
+    dailyReminderTitle: '🙏 Morning Prayer',
     dailyReminderBody: 'Begin your day with an aarti. May your morning be blessed.',
-    sunriseAlertTitle: '🌅 सूर्योदय',
+    sunriseAlertTitle: '🌅 Sunrise',
     sunriseAlertBody: 'Sunrise at {{time}}. A sacred moment for prayer.',
   },
 } as const;

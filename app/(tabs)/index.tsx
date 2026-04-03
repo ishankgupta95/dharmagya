@@ -193,13 +193,8 @@ export default function HomeScreen() {
 
         {/* ── Greeting ─────────────────────────────────────────────────── */}
         <Text style={[styles.greeting, { color: colors.textPrimary }]}>
-          {t(`home.greeting${greetingKey}Hi`)}
+          {t(`home.greeting${greetingKey}`)}
         </Text>
-        {lang === 'en' && (
-          <Text style={[styles.greetingEn, { color: colors.textMuted }]}>
-            {t(`home.greeting${greetingKey}`)}
-          </Text>
-        )}
 
         {/* ── Panchang Card ─────────────────────────────────────────────── */}
         <TouchableOpacity
@@ -432,8 +427,7 @@ const styles = StyleSheet.create({
   settingsBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
   // Greeting
-  greeting: { fontSize: 26, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
-  greetingEn: { fontSize: 13, fontFamily: 'Mukta_400Regular', marginBottom: 20 },
+  greeting: { fontSize: 26, fontFamily: 'Mukta_500Medium', marginBottom: 20 },
 
   // Panchang card
   panchangCard: {

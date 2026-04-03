@@ -112,6 +112,7 @@ interface DeityCardProps {
 }
 
 function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -130,7 +131,7 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
       </LinearGradient>
 
       <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
-        {deity.nameHindi}
+        {t(`deities.${deity.id}.displayName`)}
       </Text>
 
       {/* Selection checkmark */}

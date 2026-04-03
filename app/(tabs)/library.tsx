@@ -226,6 +226,7 @@ interface DeityCardProps {
 }
 
 const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
+  const { t } = useTranslation();
   const image = getDeityImage(deity.name);
 
   return (
@@ -246,10 +247,10 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
       {/* ── Info ── */}
       <View style={styles.cardInfo}>
         <Text style={[styles.cardName, { color: colors.textPrimary }]} numberOfLines={1}>
-          {deity.displayName}
+          {t(`deities.${deity.id}.displayName`)}
         </Text>
         <Text style={[styles.cardDesc, { color: colors.textMuted }]} numberOfLines={1}>
-          {deity.description}
+          {t(`deities.${deity.id}.description`)}
         </Text>
       </View>
 

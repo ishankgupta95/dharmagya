@@ -66,6 +66,7 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
+            animation: 'slide_from_right',
           }}>
           <Stack.Screen name="(tabs)" />
         </Stack>

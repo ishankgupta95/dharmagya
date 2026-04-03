@@ -233,8 +233,8 @@ export default function GodDetailScreen() {
               />
               {/* Name overlay on banner */}
               <View style={styles.bannerOverlay}>
-                <Text style={styles.bannerName}>{deity.displayName}</Text>
-                <Text style={styles.bannerDesc}>{deity.description}</Text>
+                <Text style={styles.bannerName}>{t(`deities.${deity.id}.displayName`)}</Text>
+                <Text style={styles.bannerDesc}>{t(`deities.${deity.id}.description`)}</Text>
               </View>
             </View>
           </>
@@ -244,13 +244,13 @@ export default function GodDetailScreen() {
             <View style={styles.fallbackContent}>
               <DeityAvatar deity={deity.name} size={72} />
               <Text style={[styles.fallbackName, { color: colors.textPrimary }]}>
-                {deity.displayName}
+                {t(`deities.${deity.id}.displayName`)}
               </Text>
               <Text style={[styles.fallbackSubname, { color: colors.textSecondary }]}>
                 {deity.name}
               </Text>
               <Text style={[styles.fallbackDesc, { color: colors.textMuted }]}>
-                {deity.description}
+                {t(`deities.${deity.id}.description`)}
               </Text>
             </View>
           </LinearGradient>

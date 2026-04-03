@@ -243,6 +243,36 @@ export default {
     startExploring: 'अन्वेषण शुरू करें  🙏',
   },
 
+  // ── Deity Names & Descriptions ──────────────────────────────────────────
+  deities: {
+    ganesh:        { displayName: 'श्री गणेश जी',            description: 'विघ्नहर्ता, प्रथम पूज्य' },
+    shiva:         { displayName: 'भगवान शिव',               description: 'महादेव, संहारकर्ता' },
+    vishnu:        { displayName: 'भगवान विष्णु',            description: 'पालनहार, जगत के रक्षक' },
+    hanuman:       { displayName: 'श्री हनुमान जी',          description: 'बजरंगबली, राम भक्त' },
+    lakshmi:       { displayName: 'माँ लक्ष्मी',             description: 'धन और समृद्धि की देवी' },
+    krishna:       { displayName: 'श्री कृष्ण जी',           description: 'गोविन्द, गीता उपदेशक' },
+    rama:          { displayName: 'श्री राम जी',             description: 'मर्यादा पुरुषोत्तम' },
+    durga:         { displayName: 'माँ दुर्गा',              description: 'शक्ति स्वरूपा, महिषासुरमर्दिनी' },
+    saraswati:     { displayName: 'माँ सरस्वती',             description: 'विद्या और कला की देवी' },
+    parvati:       { displayName: 'माँ पार्वती',             description: 'शिव अर्धांगिनी, जगदम्बा' },
+    kali:          { displayName: 'माँ काली',                description: 'महाकाली, भयहारिणी' },
+    surya:         { displayName: 'सूर्य देव',               description: 'सूर्य देव, प्रकाश दाता' },
+    kartikeya:     { displayName: 'भगवान कार्तिकेय',         description: 'देवसेनापति, षडानन' },
+    brahma:        { displayName: 'भगवान ब्रह्मा',           description: 'सृष्टिकर्ता, चतुर्मुख' },
+    'sai-baba':    { displayName: 'श्री साईं बाबा',          description: 'शिर्डी वाले, सबका मालिक एक' },
+    jagannath:     { displayName: 'भगवान जगन्नाथ',          description: 'जगत के नाथ, पुरी धाम' },
+    'santoshi-mata': { displayName: 'संतोषी माता',           description: 'संतोष और सुख की देवी' },
+    radha:         { displayName: 'श्री राधा जी',            description: 'कृष्ण प्रिया, प्रेम स्वरूपा' },
+    sita:          { displayName: 'माता सीता जी',            description: 'जानकी, राम अर्धांगिनी' },
+    venkateswara:  { displayName: 'भगवान वेंकटेश्वर',        description: 'तिरुपति बालाजी, कलियुग के देव' },
+    'khatu-shyam': { displayName: 'श्री खाटू श्याम जी',     description: 'बर्बरीक, हारे का सहारा' },
+    ayyappa:       { displayName: 'भगवान अय्यप्पा',          description: 'शबरीमला के स्वामी, धर्मशास्ता' },
+    'vaishno-devi': { displayName: 'माँ वैष्णो देवी',        description: 'त्रिकूट पर्वत वासिनी, जगजननी' },
+    narasimha:     { displayName: 'भगवान नरसिंह',            description: 'प्रह्लाद रक्षक, उग्र अवतार' },
+    dattatreya:    { displayName: 'भगवान दत्तात्रेय',         description: 'त्रिदेव स्वरूप, अवधूत' },
+    ganga:         { displayName: 'माँ गंगा',                description: 'पतित पावनी, मोक्षदायिनी' },
+  },
+
   // ── Notifications ───────────────────────────────────────────────────────
   notifications: {
     dailyReminderTitle: '🙏 प्रातः स्मरण',
