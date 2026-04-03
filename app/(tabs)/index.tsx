@@ -23,6 +23,7 @@ import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
+import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ function getActiveElement(elements: IPanchangElement[]): IPanchangElement | unde
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { isDarkMode, favoriteIds, userLocation, locationName, language } = useStore();
+  const { isDarkMode, favoriteIds, userLocation, locationName, language, walkthroughStep, setWalkthroughStep } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const { t, i18n } = useTranslation();
@@ -138,6 +139,39 @@ export default function HomeScreen() {
     [isDarkMode]
   );
 
+  // ── Walkthrough refs & measurement ────────────────────────────────────────
+  const panchangCardRef = useRef<View>(null);
+  const settingsBtnRef = useRef<View>(null);
+  const [panchangRect, setPanchangRect] = useState<SpotlightRect | null>(null);
+  const [settingsRect, setSettingsRect] = useState<SpotlightRect | null>(null);
+
+  const measurePanchang = useCallback(() => {
+    panchangCardRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0) setPanchangRect({ x, y, width, height });
+    });
+  }, []);
+
+  const measureSettings = useCallback(() => {
+    settingsBtnRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0) setSettingsRect({ x, y, width, height });
+    });
+  }, []);
+
+  // Measure targets when this tab is focused and walkthrough is active
+  useFocusEffect(
+    useCallback(() => {
+      if (walkthroughStep === 1 || walkthroughStep === 4) {
+        const timer = setTimeout(() => {
+          if (walkthroughStep === 1) measurePanchang();
+          if (walkthroughStep === 4) measureSettings();
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }, [walkthroughStep, measurePanchang, measureSettings])
+  );
+
+  const skipWalkthrough = useCallback(() => setWalkthroughStep(0), [setWalkthroughStep]);
+
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
       <ScrollView
@@ -150,6 +184,7 @@ export default function HomeScreen() {
             {getTodayDateString(lang)}
           </Text>
           <TouchableOpacity
+            ref={settingsBtnRef}
             onPress={() => router.push('/settings')}
             style={[styles.settingsBtn, { backgroundColor: colors.surfaceRecessed }]}>
             <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
@@ -168,6 +203,7 @@ export default function HomeScreen() {
 
         {/* ── Panchang Card ─────────────────────────────────────────────── */}
         <TouchableOpacity
+          ref={panchangCardRef}
           activeOpacity={0.85}
           onPress={() => router.push('/(tabs)/panchang')}>
           <LinearGradient
@@ -297,6 +333,42 @@ export default function HomeScreen() {
       </ScrollView>
 
       <AdBanner colors={colors} />
+
+      {/* ── Walkthrough Step 1: Spotlight panchang card ── */}
+      {walkthroughStep === 1 && panchangRect && (
+        <WalkthroughSpotlight
+          spotlight={panchangRect}
+          title={t('walkthrough.step1Title')}
+          description={t('walkthrough.step1Desc')}
+          tooltipPosition="below"
+          stepIndex={0}
+          totalSteps={4}
+          onSpotlightTap={() => {
+            setWalkthroughStep(2);
+            router.push('/(tabs)/panchang');
+          }}
+          onSkip={skipWalkthrough}
+          colors={colors}
+        />
+      )}
+
+      {/* ── Walkthrough Step 4: Spotlight settings gear ── */}
+      {walkthroughStep === 4 && settingsRect && (
+        <WalkthroughSpotlight
+          spotlight={settingsRect}
+          title={t('walkthrough.step4Title')}
+          description={t('walkthrough.step4Desc')}
+          tooltipPosition="below"
+          stepIndex={3}
+          totalSteps={4}
+          onSpotlightTap={() => {
+            setWalkthroughStep(0);
+            router.push('/settings');
+          }}
+          onSkip={skipWalkthrough}
+          colors={colors}
+        />
+      )}
 
     </SafeAreaView>
   );

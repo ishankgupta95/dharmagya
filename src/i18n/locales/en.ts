@@ -187,6 +187,28 @@ export default {
     appVersion: 'App Version',
     madeWithDevotion: 'Made with devotion',
     offlineFirst: 'Offline-first, always free',
+    replayWalkthrough: 'App Walkthrough',
+    replayWalkthroughDesc: 'Learn how to use the app',
+  },
+
+  // ── Walkthrough ──────────────────────────────────────────────────────────
+  walkthrough: {
+    skip: 'Skip tour',
+    next: 'Next',
+    done: 'Done!',
+    tapHighlighted: 'Tap the highlighted area',
+    // Step 1 – Home: spotlight on panchang card
+    step1Title: "Today's Panchang",
+    step1Desc: 'This card shows the current tithi, nakshatra, and today\'s highlights. Tap it to see the full daily panchang.',
+    // Step 2 – Panchang screen: explain what's here
+    step2Title: 'Full Panchang Details',
+    step2Desc: 'All five limbs of the panchang, sunrise/sunset, auspicious & inauspicious times, and planetary positions — all in one place.',
+    // Step 3 – Library screen: explain what's here
+    step3Title: 'Deities, Aartis & More',
+    step3Desc: 'Browse deities, read aartis, chalisas, and kathas. Bookmark your favourites for quick access from the home screen.',
+    // Step 4 – Home: spotlight on settings gear
+    step4Title: 'Personalise Your Experience',
+    step4Desc: 'Change the app language, switch themes, adjust font size, set your location, and manage notifications.',
   },
 
   // ── Location Permission ─────────────────────────────────────────────────

@@ -49,6 +49,7 @@ export default function SettingsScreen() {
     setDailyReminderEnabled,
     sunriseAlertEnabled,
     setSunriseAlertEnabled,
+    setWalkthroughStep,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
@@ -240,6 +241,23 @@ export default function SettingsScreen() {
         {/* ── About ─────────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.about')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              setWalkthroughStep(1);
+              router.back();
+            }}>
+            <SettingRow
+              icon="walk-outline"
+              label={t('settings.replayWalkthrough')}
+              sublabel={t('settings.replayWalkthroughDesc')}
+              colors={colors}
+              right={<Ionicons name="arrow-forward" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+
+          <Divider colors={colors} />
 
           <SettingRow
             icon="apps-outline"

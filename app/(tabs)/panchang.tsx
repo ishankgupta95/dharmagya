@@ -1,4 +1,5 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useCallback, useRef, useMemo, memo } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import {
   View,
   ScrollView,
@@ -20,6 +21,7 @@ import { usePanchang } from '@/hooks/usePanchang';
 import { resolveLanguage } from '@/i18n';
 import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
+import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
 import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
@@ -409,12 +411,34 @@ function formatDuration(minutes: number): string {
 
 export default function PanchangScreen() {
   const { t } = useTranslation();
-  const { isDarkMode, userLocation, locationName, language } = useStore();
+  const { isDarkMode, userLocation, locationName, language, walkthroughStep, setWalkthroughStep } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const panchangLang = resolveLanguage(language) as 'en' | 'hi' | 'sa';
   const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang);
+
+  // ── Walkthrough ref & measurement ──────────────────────────────────────
+  const panchaAngaRef = useRef<View>(null);
+  const [panchaAngaRect, setPanchaAngaRect] = useState<SpotlightRect | null>(null);
+
+  const measurePanchaAnga = useCallback(() => {
+    panchaAngaRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0) {
+        // Cap height so the tooltip fits above the spotlight
+        setPanchaAngaRect({ x, y, width, height: Math.min(height, 320) });
+      }
+    });
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (walkthroughStep === 2) {
+        const timer = setTimeout(measurePanchaAnga, 300);
+        return () => clearTimeout(timer);
+      }
+    }, [walkthroughStep, measurePanchaAnga])
+  );
 
   const [showPicker, setShowPicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
@@ -533,7 +557,9 @@ export default function PanchangScreen() {
             )}
 
             {/* ── Pancha Anga card ── */}
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View
+              ref={panchaAngaRef}
+              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <LimbRow label={t('panchang.tithiLunarDay')} elements={panchang.tithis} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
               <LimbRow label={t('panchang.nakshatraLunarMansion')} elements={panchang.nakshatras} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
               <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
@@ -665,6 +691,24 @@ export default function PanchangScreen() {
         pickerLoading={pickerLoading}
         colors={colors}
       />
+
+      {/* ── Walkthrough Step 2: Spotlight Pancha Anga card ── */}
+      {walkthroughStep === 2 && panchaAngaRect && (
+        <WalkthroughSpotlight
+          spotlight={panchaAngaRect}
+          title={t('walkthrough.step2Title')}
+          description={t('walkthrough.step2Desc')}
+          tooltipPosition="above"
+          stepIndex={1}
+          totalSteps={4}
+          onNext={() => {
+            setWalkthroughStep(3);
+            router.push('/(tabs)/library');
+          }}
+          onSkip={() => setWalkthroughStep(0)}
+          colors={colors}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -6,6 +6,14 @@ import type { AppLanguage } from '@/i18n';
 
 export type FontSize = 'small' | 'normal' | 'large' | 'xl';
 
+/**
+ * walkthroughStep values:
+ *  0  = completed / skipped
+ *  1  = Home → highlight panchang card (tap → go to Panchang)
+ *  2  = Panchang → explain the screen (tap Next → go to Library)
+ *  3  = Library → explain the screen (tap Next → go to Home)
+ *  4  = Home → highlight settings gear (tap → finish)
+ */
 interface AppStore {
   // Persisted
   isDarkMode: boolean;
@@ -18,6 +26,7 @@ interface AppStore {
   language: AppLanguage;
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
+  walkthroughStep: number;
 
   // Actions (not persisted)
   toggleTheme: () => void;
@@ -29,6 +38,7 @@ interface AppStore {
   setLanguage: (lang: AppLanguage) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
+  setWalkthroughStep: (step: number) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -44,6 +54,7 @@ export const useStore = create<AppStore>()(
       language: 'system' as AppLanguage,
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
+      walkthroughStep: 1,
 
       toggleTheme: () => set((s) => ({ isDarkMode: !s.isDarkMode })),
       toggleFavorite: (id) =>
@@ -59,6 +70,7 @@ export const useStore = create<AppStore>()(
       setLanguage: (lang) => set({ language: lang }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
+      setWalkthroughStep: (step) => set({ walkthroughStep: step }),
     }),
     {
       name: 'dharmsetu-store',

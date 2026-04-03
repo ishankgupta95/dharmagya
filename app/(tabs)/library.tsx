@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import {
   View,
   FlatList,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -20,6 +20,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { getDeityImage } from '@/config/deityImages';
 import { AdBanner } from '@/components/common/AdBanner';
+import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -39,12 +40,35 @@ interface KathaListItem {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function LibraryScreen() {
-  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
+  const { isDarkMode, favoriteIds, toggleFavorite, walkthroughStep, setWalkthroughStep } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const { t } = useTranslation();
   const [segment, setSegment] = useState<Segment>('gods');
   const [kathas, setKathas] = useState<KathaListItem[]>([]);
+
+  // ── Walkthrough ref & measurement ──────────────────────────────────────
+  const deityGridRef = useRef<View>(null);
+  const [deityGridRect, setDeityGridRect] = useState<SpotlightRect | null>(null);
+
+  const measureDeityGrid = useCallback(() => {
+    deityGridRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0) {
+        // Spotlight just the top portion (first ~2 cards) so the tooltip fits below
+        setDeityGridRect({ x, y, width, height: Math.min(height, 210) });
+      }
+    });
+  }, []);
+
+  // Measure when this tab gains focus and walkthrough is on step 3
+  useFocusEffect(
+    useCallback(() => {
+      if (walkthroughStep === 3) {
+        const timer = setTimeout(measureDeityGrid, 300);
+        return () => clearTimeout(timer);
+      }
+    }, [walkthroughStep, measureDeityGrid])
+  );
 
   const deities: DeityCardData[] = ALL_DEITIES;
 
@@ -115,14 +139,16 @@ export default function LibraryScreen() {
 
       {/* ── Content ──────────────────────────────────────────────────── */}
       {segment === 'gods' ? (
-        <FlatList
-          data={deities}
-          keyExtractor={(item) => item.id}
-          renderItem={renderDeity}
-          getItemLayout={(_, index) => ({ length: 98, offset: 98 * index, index })}
-          contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}
-        />
+        <View ref={deityGridRef} style={{ flex: 1 }}>
+          <FlatList
+            data={deities}
+            keyExtractor={(item) => item.id}
+            renderItem={renderDeity}
+            getItemLayout={(_, index) => ({ length: 98, offset: 98 * index, index })}
+            contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
       ) : (
         <FlatList
           data={kathas}
@@ -136,6 +162,23 @@ export default function LibraryScreen() {
 
       <AdBanner colors={colors} />
 
+      {/* ── Walkthrough Step 3: Spotlight deity grid ── */}
+      {walkthroughStep === 3 && deityGridRect && (
+        <WalkthroughSpotlight
+          spotlight={deityGridRect}
+          title={t('walkthrough.step3Title')}
+          description={t('walkthrough.step3Desc')}
+          tooltipPosition="below"
+          stepIndex={2}
+          totalSteps={4}
+          onNext={() => {
+            setWalkthroughStep(4);
+            router.push('/(tabs)');
+          }}
+          onSkip={() => setWalkthroughStep(0)}
+          colors={colors}
+        />
+      )}
     </SafeAreaView>
   );
 }
