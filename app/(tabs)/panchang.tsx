@@ -62,22 +62,67 @@ interface LimbRowProps {
   elements: IPanchangElement[];
   colors: ColorPalette;
   isLast?: boolean;
+  isToday?: boolean;
 }
 
-const LimbRow = memo(function LimbRow({ label, elements, colors, isLast }: LimbRowProps) {
+/** Parse "8:43 AM" style time into minutes since midnight for comparison. */
+function parseTimeToMinutes(timeStr: string): number | null {
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'AM' && h === 12) h = 0;
+  if (ampm === 'PM' && h !== 12) h += 12;
+  return h * 60 + m;
+}
+
+function getActiveIndex(elements: IPanchangElement[]): number {
+  if (elements.length <= 1) return 0;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (!el.endTime) return i; // no end time = extends past midnight, so it's the last active
+    const endMin = parseTimeToMinutes(el.endTime);
+    if (endMin !== null && nowMinutes < endMin) return i;
+  }
+  return elements.length - 1;
+}
+
+const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday }: LimbRowProps) {
   const { t } = useTranslation();
+  const activeIdx = isToday ? getActiveIndex(elements) : -1;
   return (
     <>
       <View style={styles.limbRow}>
         <Text style={[styles.limbLabel, { color: colors.accent }]}>{label}</Text>
-        {elements.map((el, i) => (
-          <View key={i} style={i > 0 ? styles.limbSecondary : undefined}>
-            <Text style={[styles.limbValue, { color: colors.textPrimary }]}>{el.name}</Text>
-            {el.endTime && (
-              <Text style={[styles.limbEndTime, { color: colors.textMuted }]}>{t('home.untilTime', { time: el.endTime })}</Text>
-            )}
-          </View>
-        ))}
+        {elements.map((el, i) => {
+          const isActive = i === activeIdx;
+          return (
+            <View
+              key={i}
+              style={[
+                styles.limbElement,
+                i > 0 && styles.limbSecondary,
+                isActive && { backgroundColor: colors.accent + '18', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginHorizontal: -10 },
+              ]}>
+              <View style={styles.limbNameRow}>
+                <View style={styles.limbNameLeft}>
+                  <Text style={[styles.limbValue, { color: colors.textPrimary }]}>{el.name}</Text>
+                  {el.endTime && (
+                    <Text style={[styles.limbEndTime, { color: colors.textMuted }]}>{t('home.untilTime', { time: el.endTime })}</Text>
+                  )}
+                </View>
+                {isActive && (
+                  <View style={[styles.limbActiveBadge, { backgroundColor: colors.accent }]}>
+                    <Text style={[styles.limbActiveText, { color: colors.base }]}>{t('panchang.activeNow')}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })}
       </View>
       {!isLast && <View style={[styles.limbDivider, { backgroundColor: colors.divider }]} />}
     </>
@@ -439,7 +484,10 @@ export default function PanchangScreen() {
               {t('panchang.vsSamvat', { year: panchang.vikramSamvat })}
             </Text>
           )}
-          <Ionicons name="chevron-down" size={14} color={colors.textMuted} style={{ marginTop: 4 }} />
+          <View style={styles.dateTapHint}>
+            <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+            <Text style={[styles.dateTapHintText, { color: colors.textMuted }]}>{t('panchang.tapToChangeDate')}</Text>
+          </View>
         </TouchableOpacity>
 
         {loading ? (
@@ -486,10 +534,10 @@ export default function PanchangScreen() {
 
             {/* ── Pancha Anga card ── */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <LimbRow label={t('panchang.tithiLunarDay')} elements={panchang.tithis} colors={colors} />
-              <LimbRow label={t('panchang.nakshatraLunarMansion')} elements={panchang.nakshatras} colors={colors} />
-              <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} />
-              <LimbRow label={t('home.karana')} elements={panchang.karanas} colors={colors} />
+              <LimbRow label={t('panchang.tithiLunarDay')} elements={panchang.tithis} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
+              <LimbRow label={t('panchang.nakshatraLunarMansion')} elements={panchang.nakshatras} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
+              <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
+              <LimbRow label={t('home.karana')} elements={panchang.karanas} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
               <LimbRow label={t('panchang.varaDayOfWeek')} elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} />
               {panchang.chandraRashi && (
                 <LimbRow label={t('panchang.chandraRashi')} elements={[{ name: panchang.chandraRashi }]} colors={colors} />
@@ -639,14 +687,21 @@ const styles = StyleSheet.create({
   dateBigNumber: { fontSize: 42, fontFamily: 'Mukta_500Medium', lineHeight: 52 },
   dateGregorian: { fontSize: 14, fontFamily: 'Mukta_400Regular' },
   dateSamvat: { fontSize: 13, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
+  dateTapHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  dateTapHintText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
 
   // Pancha Anga card
   card: { borderRadius: borderRadius.card, borderWidth: 1, padding: 16, marginBottom: 16 },
   limbRow: { paddingVertical: 12 },
   limbLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, marginBottom: 4 },
-  limbSecondary: { marginTop: 8 },
-  limbValue: { fontSize: 17, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
+  limbElement: {},
+  limbSecondary: { marginTop: 6 },
+  limbNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  limbNameLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 },
+  limbValue: { fontSize: 17, fontFamily: 'Mukta_700Bold' },
   limbEndTime: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  limbActiveBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
+  limbActiveText: { fontSize: 10, fontFamily: 'Mukta_700Bold', letterSpacing: 0.8 },
   limbDivider: { height: 0.5 },
 
   // Sun / Moon grid (2×2)

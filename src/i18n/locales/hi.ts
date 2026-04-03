@@ -78,6 +78,8 @@ export default {
     pada: 'पद {{number}}',
     dayTab: 'दिन',
     nightTab: 'रात',
+    tapToChangeDate: 'तिथि बदलने के लिए टैप करें',
+    activeNow: 'अभी',
     hora: 'होरा',
     dayHeaders: ['र', 'सो', 'मं', 'बु', 'गु', 'शु', 'श'],
     monthNames: [

@@ -78,6 +78,8 @@ export default {
     pada: 'Pada {{number}}',
     dayTab: 'Day',
     nightTab: 'Night',
+    tapToChangeDate: 'Tap to change date',
+    activeNow: 'NOW',
     hora: 'HORA',
     dayHeaders: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
     monthNames: [
