@@ -3,11 +3,14 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { darkColors, borderRadius, spacing } from '@/config/theme';
 
 const colors = darkColors;
 
 export default function OnboardingStep1() {
+  const { t } = useTranslation();
+
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
 
@@ -30,9 +33,9 @@ export default function OnboardingStep1() {
           <Text style={styles.omSymbol}>ॐ</Text>
         </LinearGradient>
 
-        <Text style={styles.appName}>dharmagya</Text>
-        <Text style={styles.appNameHindi}>धर्मज्ञ</Text>
-        <Text style={styles.tagline}>Your daily bridge to the divine</Text>
+        <Text style={styles.appName}>{t('common.appName')}</Text>
+        <Text style={styles.appNameHindi}>{t('common.appNameHindi')}</Text>
+        <Text style={styles.tagline}>{t('onboarding.tagline')}</Text>
 
       </View>
 
@@ -43,9 +46,9 @@ export default function OnboardingStep1() {
           onPress={() => router.push('/onboarding/step2')}
           activeOpacity={0.85}
           style={styles.cta}>
-          <Text style={styles.ctaText}>Begin Journey  →</Text>
+          <Text style={styles.ctaText}>{t('onboarding.beginJourney')}</Text>
         </TouchableOpacity>
-        <Text style={styles.skipHint}>Takes just 30 seconds</Text>
+        <Text style={styles.skipHint}>{t('onboarding.takesSeconds')}</Text>
       </View>
 
     </SafeAreaView>

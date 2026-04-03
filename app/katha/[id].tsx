@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
@@ -41,6 +42,7 @@ interface KathaDetail {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function KathaDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
@@ -132,7 +134,7 @@ export default function KathaDetailScreen() {
               <Text style={[styles.deityBadgeText, { color: colors.accent }]}>{katha.deity}</Text>
             </View>
             <View style={[styles.typeBadge, { backgroundColor: 'rgba(139,195,74,0.18)', borderColor: 'rgba(139,195,74,0.3)' }]}>
-              <Text style={[styles.deityBadgeText, { color: '#8BC34A' }]}>कथा</Text>
+              <Text style={[styles.deityBadgeText, { color: '#8BC34A' }]}>{t('katha.badge')}</Text>
             </View>
           </View>
         </Animated.View>

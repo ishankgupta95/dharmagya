@@ -9,6 +9,7 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
@@ -57,6 +58,7 @@ function parseFestivalDays(year: number): FestivalDay[] {
 }
 
 export default function FestivalsScreen() {
+  const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -87,7 +89,7 @@ export default function FestivalsScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>Festivals & Vrats</Text>
+        <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>{t('festivals.title')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -126,7 +128,7 @@ export default function FestivalsScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>No festivals found for {year}</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('festivals.noFestivals', { year })}</Text>
           </View>
         }
       />

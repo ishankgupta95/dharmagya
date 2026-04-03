@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
-import { getDailyPanchang } from 'panchang-ts';
+import { getDailyPanchang, type Language } from 'panchang-ts';
 
 import {
   FALLBACK_COORDS,
@@ -21,6 +21,7 @@ interface UsePanchangResult {
 export function usePanchang(
   date: Date,
   location: { lat: number; lon: number } | null,
+  language: Language = 'en',
 ): UsePanchangResult {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [isFullyLoaded, setIsFullyLoaded] = useState(false);
@@ -44,7 +45,7 @@ export function usePanchang(
 
     // ── Pass 1: Fast — names only (~60–100ms on budget Android) ──────────────
     try {
-      const fast = getDailyPanchang(date, loc, { timezone, computeEndTimes: false });
+      const fast = getDailyPanchang(date, loc, { timezone, computeEndTimes: false, language });
       if (!cancelled) {
         setPanchang(mapToPanchangDay(fast));
         setLoading(false);
@@ -61,12 +62,12 @@ export function usePanchang(
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
       try {
-        const full = getDailyPanchang(date, loc, { timezone, computeEndTimes: true });
+        const full = getDailyPanchang(date, loc, { timezone, computeEndTimes: true, language });
         if (!cancelled) {
           const mapped = mapToPanchangDay(full);
           // Planetary positions are computed separately (CPU-heavy)
           try {
-            mapped.planetaryPositions = fetchGrahaPositions(date);
+            mapped.planetaryPositions = fetchGrahaPositions(date, language);
           } catch {
             // Non-critical — positions just won't appear
           }
@@ -82,7 +83,7 @@ export function usePanchang(
       cancelled = true;
       handle.cancel();
     };
-  }, [date, lat, lon, retryCount]);
+  }, [date, lat, lon, language, retryCount]);
 
   return { panchang, isFullyLoaded, loading, error, retry };
 }

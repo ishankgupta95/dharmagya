@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
 import { borderRadius, type ColorPalette } from '@/config/theme';
 import type { IGrahaPosition } from '@/types';
@@ -21,9 +22,10 @@ interface Props {
 }
 
 export function PlanetaryPositionsCard({ positions, colors }: Props) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.label, { color: colors.accent }]}>GRAHA STHITI</Text>
+      <Text style={[styles.label, { color: colors.accent }]}>{t('panchang.grahaSthiti')}</Text>
       {positions.map((p, i) => (
         <View
           key={p.planet}
@@ -43,7 +45,7 @@ export function PlanetaryPositionsCard({ positions, colors }: Props) {
               {p.rashi} {p.degreeInRashi}°
             </Text>
             <Text style={[styles.nakshatra, { color: colors.textMuted }]}>
-              {p.nakshatra} (Pada {p.nakshatraPada})
+              {p.nakshatra} ({t('panchang.pada', { number: p.nakshatraPada })})
             </Text>
           </View>
         </View>

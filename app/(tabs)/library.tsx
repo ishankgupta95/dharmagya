@@ -13,6 +13,8 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useTranslation } from 'react-i18next';
+
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
@@ -40,6 +42,7 @@ export default function LibraryScreen() {
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
+  const { t } = useTranslation();
   const [segment, setSegment] = useState<Segment>('gods');
   const [kathas, setKathas] = useState<KathaListItem[]>([]);
 
@@ -80,10 +83,10 @@ export default function LibraryScreen() {
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
         <View>
           <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>
-            {segment === 'gods' ? 'देवी देवता' : 'कथाएँ'}
+            {segment === 'gods' ? t('library.godsTitle') : t('library.kathasTitle')}
           </Text>
           <Text style={[styles.screenTitleEn, { color: colors.textMuted }]}>
-            {segment === 'gods' ? 'Gods' : 'Kathas'}
+            {segment === 'gods' ? t('library.godsTitleEn') : t('library.kathasTitleEn')}
           </Text>
         </View>
         <TouchableOpacity
@@ -97,13 +100,13 @@ export default function LibraryScreen() {
       {/* ── Segment Control ──────────────────────────────────────────── */}
       <View style={[styles.segmentRow, { paddingHorizontal: spacing.screenH }]}>
         <SegmentButton
-          label="देवी देवता"
+          label={t('library.godsSegment')}
           active={segment === 'gods'}
           onPress={() => setSegment('gods')}
           colors={colors}
         />
         <SegmentButton
-          label="कथाएँ"
+          label={t('library.kathaSegment')}
           active={segment === 'kathas'}
           onPress={() => setSegment('kathas')}
           colors={colors}
@@ -222,6 +225,7 @@ interface KathaCardProps {
 }
 
 const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFavorite }: KathaCardProps) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -255,7 +259,7 @@ const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFa
 
       <View style={styles.kathaBadgeRow}>
         <View style={[styles.kathaBadge, { backgroundColor: colors.borderAccent }]}>
-          <Text style={[styles.kathaBadgeText, { color: colors.accent }]}>कथा</Text>
+          <Text style={[styles.kathaBadgeText, { color: colors.accent }]}>{t('library.kathaBadge')}</Text>
         </View>
         <View style={[styles.kathaBadge, { backgroundColor: colors.surfaceRecessed }]}>
           <Text style={[styles.kathaBadgeText, { color: colors.textSecondary }]}>{item.deity}</Text>

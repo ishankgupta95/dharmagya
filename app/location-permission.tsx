@@ -12,6 +12,7 @@ import {
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -39,6 +40,7 @@ function findNearestCity(lat: number, lon: number): City | null {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LocationPickerScreen() {
+  const { t } = useTranslation();
   const { isDarkMode, setUserLocation, userLocation, locationName } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -116,7 +118,7 @@ export default function LocationPickerScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Set Location</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('locationPermission.title')}</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -124,7 +126,7 @@ export default function LocationPickerScreen() {
       <View style={[styles.currentRow, { paddingHorizontal: spacing.screenH, backgroundColor: colors.surfaceRecessed }]}>
         <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
         <Text style={[styles.currentLabel, { color: colors.textSecondary }]}>
-          Current: <Text style={{ color: colors.textPrimary }}>{currentLabel}</Text>
+          {t('locationPermission.currentPrefix')}<Text style={{ color: colors.textPrimary }}>{currentLabel}</Text>
         </Text>
       </View>
 
@@ -140,7 +142,7 @@ export default function LocationPickerScreen() {
           ) : (
             <>
               <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.gpsBtnText}>Use GPS Location</Text>
+              <Text style={styles.gpsBtnText}>{t('locationPermission.useGps')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -149,7 +151,7 @@ export default function LocationPickerScreen() {
       {/* ── Divider ───────────────────────────────────────────────────── */}
       <View style={[styles.orRow, { paddingHorizontal: spacing.screenH }]}>
         <View style={[styles.orLine, { backgroundColor: colors.divider }]} />
-        <Text style={[styles.orText, { color: colors.textMuted }]}>or search a city</Text>
+        <Text style={[styles.orText, { color: colors.textMuted }]}>{t('locationPermission.orSearchCity')}</Text>
         <View style={[styles.orLine, { backgroundColor: colors.divider }]} />
       </View>
 
@@ -159,7 +161,7 @@ export default function LocationPickerScreen() {
           <Ionicons name="search-outline" size={16} color={colors.textMuted} />
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }]}
-            placeholder="Search city..."
+            placeholder={t('locationPermission.searchPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             value={query}
             onChangeText={setQuery}
@@ -184,7 +186,7 @@ export default function LocationPickerScreen() {
         contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 32 }}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No cities found for "{query}"
+            {t('locationPermission.noCitiesFound', { query })}
           </Text>
         }
       />

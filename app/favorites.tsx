@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
@@ -50,6 +51,7 @@ interface KathaRow {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FavoritesScreen() {
+  const { t } = useTranslation();
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
@@ -135,7 +137,7 @@ export default function FavoritesScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Favourites</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('favorites.title')}</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -169,7 +171,8 @@ interface FavoriteCardProps {
 const ItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
 
 const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemove }: FavoriteCardProps) {
-  const typeLabel = item.type === 'aarti' ? 'Aarti' : item.type === 'chalisa' ? 'Chalisa' : 'Katha';
+  const { t } = useTranslation();
+  const typeLabel = item.type === 'aarti' ? t('favorites.aartiBadge') : item.type === 'chalisa' ? t('favorites.chalisaBadge') : t('favorites.kathaBadge');
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -204,6 +207,7 @@ const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemov
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 function EmptyState({ colors }: { colors: ColorPalette }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyWrap}>
       {/* Dashed heart */}
@@ -211,15 +215,15 @@ function EmptyState({ colors }: { colors: ColorPalette }) {
         <Ionicons name="heart-outline" size={40} color={colors.textDisabled} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-        No favourites yet
+        {t('favorites.emptyTitle')}
       </Text>
       <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-        Tap the ♡ on any aarti, chalisa, or katha to save it here
+        {t('favorites.emptyDesc')}
       </Text>
       <TouchableOpacity
         onPress={() => router.push('/(tabs)/library')}
         style={[styles.browseBtn, { borderColor: colors.accent }]}>
-        <Text style={[styles.browseBtnText, { color: colors.accent }]}>Browse Library</Text>
+        <Text style={[styles.browseBtnText, { color: colors.accent }]}>{t('favorites.browseLibrary')}</Text>
       </TouchableOpacity>
     </View>
   );

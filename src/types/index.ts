@@ -33,6 +33,8 @@ export interface IKatha {
 export interface IQualitySlot {
   name: string;
   quality: 'auspicious' | 'inauspicious' | 'neutral';
+  /** Localized display name for the quality (e.g. "शुभ" in Hindi). */
+  qualityName: string;
   start: string;
   end: string;
 }

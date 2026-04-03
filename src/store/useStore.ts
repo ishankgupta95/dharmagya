@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from 'expo-sqlite/kv-store';
 
+import type { AppLanguage } from '@/i18n';
+
 export type FontSize = 'small' | 'normal' | 'large' | 'xl';
 
 interface AppStore {
@@ -13,6 +15,7 @@ interface AppStore {
   userLocation: { lat: number; lon: number } | null;
   locationName: string | null; // e.g. "Mumbai, MH" or "GPS"
   fontSize: FontSize;
+  language: AppLanguage;
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
 
@@ -23,6 +26,7 @@ interface AppStore {
   setHasOnboarded: () => void;
   setSelectedDeities: (deities: string[]) => void;
   setFontSize: (size: FontSize) => void;
+  setLanguage: (lang: AppLanguage) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
 }
@@ -37,6 +41,7 @@ export const useStore = create<AppStore>()(
       userLocation: null,
       locationName: null,
       fontSize: 'normal',
+      language: 'system' as AppLanguage,
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
 
@@ -51,6 +56,7 @@ export const useStore = create<AppStore>()(
       setHasOnboarded: () => set({ hasOnboarded: true }),
       setSelectedDeities: (deities) => set({ selectedDeities: deities }),
       setFontSize: (size) => set({ fontSize: size }),
+      setLanguage: (lang) => set({ language: lang }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
     }),

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
 import { borderRadius, type ColorPalette } from '@/config/theme';
 import type { IHoraSlot } from '@/types';
@@ -20,20 +21,21 @@ interface Props {
 }
 
 export function HoraCard({ slots, colors }: Props) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'day' | 'night'>('day');
   const active = tab === 'day' ? slots.day : slots.night;
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.header}>
-        <Text style={[styles.label, { color: colors.accent }]}>HORA</Text>
+        <Text style={[styles.label, { color: colors.accent }]}>{t('panchang.hora')}</Text>
         <View style={[styles.tabs, { backgroundColor: colors.surfaceRecessed }]}>
-          {(['day', 'night'] as const).map(t => (
+          {(['day', 'night'] as const).map(key => (
             <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.tab, tab === t && { backgroundColor: colors.accent }]}>
-              <Text style={[styles.tabText, { color: tab === t ? colors.base : colors.textMuted }]}>
-                {t === 'day' ? 'Day' : 'Night'}
+              key={key}
+              onPress={() => setTab(key)}
+              style={[styles.tab, tab === key && { backgroundColor: colors.accent }]}>
+              <Text style={[styles.tabText, { color: tab === key ? colors.base : colors.textMuted }]}>
+                {key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
               </Text>
             </TouchableOpacity>
           ))}

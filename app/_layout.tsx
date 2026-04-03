@@ -13,11 +13,12 @@ import {
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
 import { initDatabase } from '@/utils/database';
+import i18n, { resolveLanguage } from '@/i18n';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isDarkMode, hasOnboarded } = useStore();
+  const { isDarkMode, hasOnboarded, language } = useStore();
   const [storeHydrated, setStoreHydrated] = useState(
     () => useStore.persist.hasHydrated()
   );
@@ -33,6 +34,14 @@ export default function RootLayout() {
     if (storeHydrated) return;
     return useStore.persist.onFinishHydration(() => setStoreHydrated(true));
   }, [storeHydrated]);
+
+  // Sync i18n language whenever the persisted preference changes
+  useEffect(() => {
+    if (storeHydrated) {
+      const resolved = resolveLanguage(language);
+      if (i18n.language !== resolved) i18n.changeLanguage(resolved);
+    }
+  }, [language, storeHydrated]);
 
   const appReady = (fontsLoaded || !!fontError) && storeHydrated;
 

@@ -4,9 +4,11 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { useStore, type FontSize } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { LANGUAGE_OPTIONS, resolveLanguage, type AppLanguage } from '@/i18n';
 import {
   scheduleDailyReminder,
   cancelDailyReminder,
@@ -41,12 +43,20 @@ export default function SettingsScreen() {
     locationName,
     fontSize,
     setFontSize,
+    language,
+    setLanguage,
     dailyReminderEnabled,
     setDailyReminderEnabled,
     sunriseAlertEnabled,
     setSunriseAlertEnabled,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
+  const { t, i18n } = useTranslation();
+
+  function handleLanguageChange(lang: AppLanguage) {
+    setLanguage(lang);
+    i18n.changeLanguage(resolveLanguage(lang));
+  }
 
   const [sunriseTime, setSunriseTime] = useState<string | null>(null);
 
@@ -61,7 +71,7 @@ export default function SettingsScreen() {
     ? locationName
     : userLocation
       ? `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`
-      : 'Using default (Pune)';
+      : t('settings.usingDefault');
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -70,8 +80,8 @@ export default function SettingsScreen() {
       const ok = await scheduleDailyReminder();
       if (!ok) {
         Alert.alert(
-          'Permission Required',
-          'Please allow notifications in Settings to enable this.',
+          t('settings.permissionRequired'),
+          t('settings.permissionRequiredDesc'),
         );
         return;
       }
@@ -84,14 +94,14 @@ export default function SettingsScreen() {
   async function handleSunriseAlertToggle(val: boolean) {
     if (val) {
       if (!sunriseTime) {
-        Alert.alert('Sunrise Unavailable', 'Could not determine sunrise time for today.');
+        Alert.alert(t('settings.sunriseUnavailable'), t('settings.sunriseUnavailableDesc'));
         return;
       }
       const ok = await scheduleSunriseAlert(sunriseTime);
       if (!ok) {
         Alert.alert(
-          'Permission Required',
-          'Please allow notifications in Settings to enable this.',
+          t('settings.permissionRequired'),
+          t('settings.permissionRequiredDesc'),
         );
         return;
       }
@@ -112,7 +122,7 @@ export default function SettingsScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Settings</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('settings.title')}</Text>
         <View style={styles.backBtn} />
       </View>
 
@@ -120,13 +130,27 @@ export default function SettingsScreen() {
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
+        {/* ── Language ──────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.language')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingRow
+            icon="language-outline"
+            label={t('settings.appLanguage')}
+            sublabel={LANGUAGE_OPTIONS.find(o => o.key === language)?.nativeLabel ?? t('settings.systemDefault')}
+            colors={colors}
+            right={
+              <LanguagePicker value={language} onChange={handleLanguageChange} colors={colors} />
+            }
+          />
+        </View>
+
         {/* ── Appearance ────────────────────────────────────────────── */}
-        <SectionHeader label="APPEARANCE" colors={colors} />
+        <SectionHeader label={t('settings.appearance')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
             icon="moon-outline"
-            label="Dark Mode"
+            label={t('settings.darkMode')}
             colors={colors}
             right={
               <Switch
@@ -143,8 +167,8 @@ export default function SettingsScreen() {
           {/* Font Size — inline segmented picker */}
           <SettingRow
             icon="text-outline"
-            label="Font Size"
-            sublabel={FONT_SIZE_LABELS[fontSize]}
+            label={t('settings.fontSize')}
+            sublabel={t(`settings.fontSize${fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}` as any)}
             colors={colors}
             right={
               <FontSizePicker value={fontSize} onChange={setFontSize} colors={colors} />
@@ -154,7 +178,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Location ──────────────────────────────────────────────── */}
-        <SectionHeader label="LOCATION" colors={colors} />
+        <SectionHeader label={t('settings.location')} colors={colors} />
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => router.push('/location-permission')}
@@ -162,7 +186,7 @@ export default function SettingsScreen() {
 
           <SettingRow
             icon="location-outline"
-            label="GPS Location"
+            label={t('settings.gpsLocation')}
             sublabel={locationText}
             colors={colors}
             right={
@@ -176,13 +200,13 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         {/* ── Notifications ─────────────────────────────────────────── */}
-        <SectionHeader label="NOTIFICATIONS" colors={colors} />
+        <SectionHeader label={t('settings.notifications')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
             icon="notifications-outline"
-            label="Daily Reminder"
-            sublabel="Morning aarti nudge at 7:00 AM"
+            label={t('settings.dailyReminder')}
+            sublabel={t('settings.dailyReminderDesc')}
             colors={colors}
             right={
               <Switch
@@ -198,8 +222,8 @@ export default function SettingsScreen() {
 
           <SettingRow
             icon="sunny-outline"
-            label="Sunrise Alert"
-            sublabel={sunriseTime ? `Notification at ${sunriseTime}` : 'Notification at sunrise'}
+            label={t('settings.sunriseAlert')}
+            sublabel={sunriseTime ? t('settings.sunriseAlertAt', { time: sunriseTime }) : t('settings.sunriseAlertGeneric')}
             colors={colors}
             right={
               <Switch
@@ -214,13 +238,13 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── About ─────────────────────────────────────────────────── */}
-        <SectionHeader label="ABOUT" colors={colors} />
+        <SectionHeader label={t('settings.about')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
             icon="apps-outline"
-            label="App Version"
-            sublabel="dharmagya"
+            label={t('settings.appVersion')}
+            sublabel={t('common.appNameHindi')}
             colors={colors}
             right={<Text style={[styles.versionText, { color: colors.textMuted }]}>v1.0.0</Text>}
           />
@@ -229,8 +253,8 @@ export default function SettingsScreen() {
 
           <SettingRow
             icon="heart-outline"
-            label="Made with devotion"
-            sublabel="Offline-first, always free"
+            label={t('settings.madeWithDevotion')}
+            sublabel={t('settings.offlineFirst')}
             colors={colors}
             right={<Text style={{ fontSize: 18 }}>🙏</Text>}
           />
@@ -275,6 +299,40 @@ function FontSizePicker({ value, onChange, colors }: FontSizePickerProps) {
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
             <RNText style={[styles.fontPickerLabel, { fontSize, color: active ? '#FFFFFF' : colors.textSecondary }]}>
               A
+            </RNText>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Language Picker ──────────────────────────────────────────────────────────
+
+interface LanguagePickerProps {
+  value: AppLanguage;
+  onChange: (lang: AppLanguage) => void;
+  colors: ColorPalette;
+}
+
+function LanguagePicker({ value, onChange, colors }: LanguagePickerProps) {
+  return (
+    <View style={[styles.fontPicker, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+      {LANGUAGE_OPTIONS.map(({ key, nativeLabel }, i) => {
+        const active = value === key;
+        const label = key === 'system' ? '📱' : nativeLabel.slice(0, 2);
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => onChange(key)}
+            style={[
+              styles.langPickerBtn,
+              i < LANGUAGE_OPTIONS.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
+              active && { backgroundColor: colors.accent },
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            <RNText style={[styles.langPickerLabel, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
+              {label}
             </RNText>
           </TouchableOpacity>
         );
@@ -407,6 +465,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fontPickerLabel: {
+    fontFamily: 'Mukta_500Medium',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+
+  // Language picker
+  langPickerBtn: {
+    paddingHorizontal: 10,
+    height: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  langPickerLabel: {
+    fontSize: 13,
     fontFamily: 'Mukta_500Medium',
     includeFontPadding: false,
     textAlignVertical: 'center',

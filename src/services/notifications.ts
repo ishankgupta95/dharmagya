@@ -1,4 +1,5 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import i18n from '@/i18n';
 
 // expo-notifications Android push support was removed from Expo Go in SDK 53.
 // Skip the require entirely in Expo Go to prevent the native error overlay.
@@ -47,8 +48,8 @@ export async function scheduleDailyReminder(): Promise<boolean> {
   await Notifications.scheduleNotificationAsync({
     identifier: DAILY_REMINDER_ID,
     content: {
-      title: '🙏 प्रातः स्मरण',
-      body: 'Begin your day with an aarti. May your morning be blessed.',
+      title: i18n.t('notifications.dailyReminderTitle'),
+      body: i18n.t('notifications.dailyReminderBody'),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -83,8 +84,8 @@ export async function scheduleSunriseAlert(sunriseTime: string): Promise<boolean
   await Notifications.scheduleNotificationAsync({
     identifier: SUNRISE_ALERT_ID,
     content: {
-      title: '🌅 सूर्योदय',
-      body: `Sunrise at ${sunriseTime}. A sacred moment for prayer.`,
+      title: i18n.t('notifications.sunriseAlertTitle'),
+      body: i18n.t('notifications.sunriseAlertBody', { time: sunriseTime }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
 import { borderRadius, type ColorPalette } from '@/config/theme';
 import type { IQualitySlot } from '@/types';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function QualitySlotsCard({ label, slots, colors }: Props) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'day' | 'night'>('day');
   const active = tab === 'day' ? slots.day : slots.night;
   return (
@@ -24,13 +26,13 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
       <View style={styles.header}>
         <Text style={[styles.label, { color: colors.accent }]}>{label}</Text>
         <View style={[styles.tabs, { backgroundColor: colors.surfaceRecessed }]}>
-          {(['day', 'night'] as const).map(t => (
+          {(['day', 'night'] as const).map(key => (
             <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.tab, tab === t && { backgroundColor: colors.accent }]}>
-              <Text style={[styles.tabText, { color: tab === t ? colors.base : colors.textMuted }]}>
-                {t === 'day' ? 'Day' : 'Night'}
+              key={key}
+              onPress={() => setTab(key)}
+              style={[styles.tab, tab === key && { backgroundColor: colors.accent }]}>
+              <Text style={[styles.tabText, { color: tab === key ? colors.base : colors.textMuted }]}>
+                {key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -45,6 +47,7 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
           ]}>
           <View style={[styles.dot, { backgroundColor: QUALITY_COLOR[slot.quality] }]} />
           <Text style={[styles.name, { color: colors.textPrimary }]}>{slot.name}</Text>
+          <Text style={[styles.qualityLabel, { color: QUALITY_COLOR[slot.quality] }]}>{slot.qualityName}</Text>
           <Text style={[styles.time, { color: colors.textMuted }]}>{slot.start} – {slot.end}</Text>
         </View>
       ))}
@@ -62,5 +65,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   name: { fontSize: 15, fontFamily: 'Mukta_500Medium', flex: 1 },
+  qualityLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', minWidth: 48 },
   time: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
 });

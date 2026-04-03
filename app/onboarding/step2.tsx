@@ -4,6 +4,7 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
@@ -20,6 +21,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - spacing.screenH * 2 - CARD_GAP * (NUM_COLUMNS
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OnboardingStep2() {
+  const { t } = useTranslation();
   const { selectedDeities, setSelectedDeities } = useStore();
   const [localSelected, setLocalSelected] = useState<string[]>(selectedDeities);
 
@@ -53,16 +55,16 @@ export default function OnboardingStep2() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerStep}>Step 2 of 3</Text>
+        <Text style={styles.headerStep}>{t('onboarding.step2of3')}</Text>
         <View style={{ width: 20 }} />
       </View>
 
       {/* ── Title ─────────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: spacing.screenH }}>
-        <Text style={styles.titleHindi}>अपने देवता चुनें</Text>
-        <Text style={styles.title}>Choose Your Deities</Text>
+        <Text style={styles.titleHindi}>{t('onboarding.chooseDeitiesHi')}</Text>
+        <Text style={styles.title}>{t('onboarding.chooseDeities')}</Text>
         <Text style={styles.subtitle}>
-          We'll highlight aartis and chalisas for the deities you love. You can change this anytime.
+          {t('onboarding.chooseDeitiesDesc')}
         </Text>
       </View>
 
@@ -79,7 +81,7 @@ export default function OnboardingStep2() {
 
       {localSelected.length > 0 && (
         <Text style={styles.selectionCount}>
-          {localSelected.length} selected
+          {t('onboarding.selectedCount', { count: localSelected.length })}
         </Text>
       )}
 
@@ -90,10 +92,10 @@ export default function OnboardingStep2() {
           onPress={handleContinue}
           activeOpacity={0.85}
           style={styles.cta}>
-          <Text style={styles.ctaText}>Continue  →</Text>
+          <Text style={styles.ctaText}>{t('common.continue')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleContinue}>
-          <Text style={styles.skipText}>Skip for now</Text>
+          <Text style={styles.skipText}>{t('common.skip')}</Text>
         </TouchableOpacity>
       </View>
 

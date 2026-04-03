@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
@@ -97,6 +98,7 @@ const BANNER_HEIGHT = 260;
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function GodDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
@@ -131,19 +133,19 @@ export default function GodDetailScreen() {
   const sections: ListSection[] = [];
   if (aartis.length > 0) {
     sections.push({
-      title: `Aartis (${aartis.length})`,
+      title: t('god.aartisCount', { count: aartis.length }),
       data: aartis.map((a) => ({ type: 'aarti' as const, data: a })),
     });
   }
   if (chalisas.length > 0) {
     sections.push({
-      title: `Chalisas (${chalisas.length})`,
+      title: t('god.chalisasCount', { count: chalisas.length }),
       data: chalisas.map((c) => ({ type: 'chalisa' as const, data: c })),
     });
   }
   if (kathas.length > 0) {
     sections.push({
-      title: `Kathas (${kathas.length})`,
+      title: t('god.kathasCount', { count: kathas.length }),
       data: kathas.map((k) => ({ type: 'katha' as const, data: k })),
     });
   }
@@ -202,7 +204,7 @@ export default function GodDetailScreen() {
   if (!deity) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>Deity not found</Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('god.deityNotFound')}</Text>
       </SafeAreaView>
     );
   }
@@ -280,7 +282,7 @@ export default function GodDetailScreen() {
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No content available yet
+            {t('god.noContent')}
           </Text>
         }
       />
@@ -305,6 +307,7 @@ interface AartiCardProps {
 }
 
 const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFavorite, onPress }: AartiCardProps) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -318,7 +321,7 @@ const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFa
           {item.titleEnglish}
         </Text>
         <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-          <Text style={[styles.badgeText, { color: colors.accent }]}>आरती</Text>
+          <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.aartiBadge')}</Text>
         </View>
       </View>
       <TouchableOpacity
@@ -345,6 +348,7 @@ interface ChalisaCardProps {
 }
 
 const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: ChalisaCardProps) {
+  const { t } = useTranslation();
   const chaupaiCount = countChaupais(item.sections);
   return (
     <TouchableOpacity
@@ -360,12 +364,12 @@ const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onTogg
         </Text>
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-            <Text style={[styles.badgeText, { color: colors.accent }]}>चालीसा</Text>
+            <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.chalisaBadge')}</Text>
           </View>
           {chaupaiCount > 0 && (
             <View style={[styles.badge, { backgroundColor: colors.surfaceRecessed }]}>
               <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
-                {chaupaiCount} चौपाई
+                {t('god.chaupaiCount', { count: chaupaiCount })}
               </Text>
             </View>
           )}
@@ -395,6 +399,7 @@ interface KathaCardProps {
 }
 
 const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: KathaCardProps) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -408,7 +413,7 @@ const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFa
           {item.titleEnglish}
         </Text>
         <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-          <Text style={[styles.badgeText, { color: colors.accent }]}>कथा</Text>
+          <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.kathaBadge')}</Text>
         </View>
       </View>
       <TouchableOpacity

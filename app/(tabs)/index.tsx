@@ -14,9 +14,12 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useTranslation } from 'react-i18next';
+
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
+import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
@@ -34,16 +37,19 @@ interface AartiRow {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getGreeting(): { hindi: string; english: string } {
+function getGreetingKey(): 'Morning' | 'Afternoon' | 'Evening' {
   const h = new Date().getHours();
-  if (h < 12) return { hindi: 'शुभ प्रभात', english: 'Good Morning' };
-  if (h < 17) return { hindi: 'शुभ दोपहर', english: 'Good Afternoon' };
-  return { hindi: 'शुभ संध्या', english: 'Good Evening' };
+  if (h < 12) return 'Morning';
+  if (h < 17) return 'Afternoon';
+  return 'Evening';
 }
 
-function getTodayDateString(): string {
+const DATE_LOCALE_MAP: Record<string, string> = { en: 'en-IN', hi: 'hi-IN', sa: 'hi-IN' };
+
+function getTodayDateString(lang: string): string {
+  const locale = DATE_LOCALE_MAP[lang] ?? 'en-IN';
   return new Date()
-    .toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+    .toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase();
 }
 
@@ -69,9 +75,11 @@ function getActiveElement(elements: IPanchangElement[]): IPanchangElement | unde
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { isDarkMode, favoriteIds, userLocation, locationName } = useStore();
+  const { isDarkMode, favoriteIds, userLocation, locationName, language } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
 
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
@@ -80,16 +88,17 @@ export default function HomeScreen() {
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
   const lastFetchRef = useRef(0);
 
+  const panchangLang = resolveLanguage(language) as 'en' | 'hi' | 'sa';
   const refreshPanchang = useCallback((showSpinner = false) => {
     const now = Date.now();
     // Throttle: don't re-fetch more than once per hour (panchang only changes daily)
     if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
     lastFetchRef.current = now;
     if (showSpinner) setPanchangLoading(true);
-    fetchPanchangForToday(userLocation)
+    fetchPanchangForToday(userLocation, panchangLang)
       .then(p => { if (p) setPanchang(p); })
       .finally(() => setPanchangLoading(false));
-  }, [userLocation]);
+  }, [userLocation, panchangLang]);
 
   // Initial load
   useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
@@ -123,7 +132,7 @@ export default function HomeScreen() {
     setFeaturedAarti(row ? rowToAarti(row) : null);
   }, [db, favoriteIds]);
 
-  const greeting = getGreeting();
+  const greetingKey = getGreetingKey();
   const panchangGradient = useMemo<readonly [string, string]>(
     () => isDarkMode ? ['#2E2418', '#1E1E24'] : ['#FFF8F0', '#FFF0E4'],
     [isDarkMode]
@@ -138,7 +147,7 @@ export default function HomeScreen() {
         {/* ── Header ───────────────────────────────────────────────────── */}
         <View style={styles.header}>
           <Text style={[styles.dateLabel, { color: colors.textMuted }]}>
-            {getTodayDateString()}
+            {getTodayDateString(lang)}
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/settings')}
@@ -149,11 +158,13 @@ export default function HomeScreen() {
 
         {/* ── Greeting ─────────────────────────────────────────────────── */}
         <Text style={[styles.greeting, { color: colors.textPrimary }]}>
-          {greeting.hindi}
+          {t(`home.greeting${greetingKey}Hi`)}
         </Text>
-        <Text style={[styles.greetingEn, { color: colors.textMuted }]}>
-          {greeting.english}
-        </Text>
+        {lang === 'en' && (
+          <Text style={[styles.greetingEn, { color: colors.textMuted }]}>
+            {t(`home.greeting${greetingKey}`)}
+          </Text>
+        )}
 
         {/* ── Panchang Card ─────────────────────────────────────────────── */}
         <TouchableOpacity
@@ -168,7 +179,7 @@ export default function HomeScreen() {
             {/* Card header row */}
             <View style={styles.panchangCardHeader}>
               <Text style={[styles.sectionLabel, { color: colors.accent }]}>
-                TODAY'S PANCHANG
+                {t('home.todaysPanchang')}
               </Text>
               <View style={styles.panchangCardHeaderRight}>
                 <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
@@ -186,10 +197,10 @@ export default function HomeScreen() {
             ) : panchang ? (
               <>
                 {/* Single-column element rows showing currently-active element */}
-                <PanchangRow label="TITHI"     el={getActiveElement(panchang.tithis)}     colors={colors} />
-                <PanchangRow label="NAKSHATRA" el={getActiveElement(panchang.nakshatras)} colors={colors} />
-                <PanchangRow label="YOGA"      el={getActiveElement(panchang.yogas)}      colors={colors} />
-                <PanchangRow label="KARANA"    el={getActiveElement(panchang.karanas)}    colors={colors} />
+                <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)}     colors={colors} />
+                <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} colors={colors} />
+                <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)}      colors={colors} />
+                <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)}    colors={colors} />
 
                 <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
@@ -197,7 +208,7 @@ export default function HomeScreen() {
                 <View style={styles.sunRow}>
                   <View style={styles.sunItem}>
                     <Ionicons name="sunny-outline" size={14} color={colors.accent} />
-                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> SUNRISE</Text>
+                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> {t('home.sunrise')}</Text>
                     <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
                       {panchang.sunrise}
                     </Text>
@@ -205,7 +216,7 @@ export default function HomeScreen() {
                   <View style={[styles.sunSep, { backgroundColor: colors.divider }]} />
                   <View style={styles.sunItem}>
                     <Ionicons name="moon-outline" size={14} color={colors.textMuted} />
-                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> SUNSET</Text>
+                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> {t('home.sunset')}</Text>
                     <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
                       {panchang.sunset}
                     </Text>
@@ -214,7 +225,7 @@ export default function HomeScreen() {
               </>
             ) : (
               <Text style={[styles.errorText, { color: colors.textMuted }]}>
-                Could not load Panchang
+                {t('home.couldNotLoadPanchang')}
               </Text>
             )}
           </LinearGradient>
@@ -234,11 +245,13 @@ export default function HomeScreen() {
 
               <View style={styles.featuredText}>
                 <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {featuredAarti.titleNative}
+                  {lang === 'en' ? featuredAarti.titleNative : featuredAarti.titleNative}
                 </Text>
-                <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
-                  {featuredAarti.titleEnglish}
-                </Text>
+                {lang === 'en' && (
+                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {featuredAarti.titleEnglish}
+                  </Text>
+                )}
                 <Text style={[styles.featuredDeity, { color: colors.accent }]}>
                   {featuredAarti.deity}
                 </Text>
@@ -253,8 +266,8 @@ export default function HomeScreen() {
 
             <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
               {favoriteIds.some((id) => id.startsWith('aarti-'))
-                ? 'FROM YOUR FAVOURITES'
-                : 'FEATURED AARTI'}
+                ? t('home.fromYourFavourites')
+                : t('home.featuredAarti')}
             </Text>
           </TouchableOpacity>
         )}
@@ -263,19 +276,19 @@ export default function HomeScreen() {
         <View style={styles.quickRow}>
           <QuickCard
             emoji="❤️"
-            label="Favorites"
+            label={t('home.favorites')}
             onPress={() => router.push('/favorites')}
             colors={colors}
           />
           <QuickCard
             emoji="🪔"
-            label="Festivals"
+            label={t('home.festivals')}
             onPress={() => router.push('/festivals')}
             colors={colors}
           />
           <QuickCard
             emoji="🔍"
-            label="Search"
+            label={t('common.search')}
             onPress={() => router.push('/search')}
             colors={colors}
           />
@@ -298,6 +311,7 @@ interface PanchangRowProps {
 }
 
 function PanchangRow({ label, el, colors }: PanchangRowProps) {
+  const { t } = useTranslation();
   if (!el) return null;
   return (
     <View style={styles.panchangRow}>
@@ -305,7 +319,7 @@ function PanchangRow({ label, el, colors }: PanchangRowProps) {
       <View style={styles.panchangRowRight}>
         <Text style={[styles.panchangValue, { color: colors.textPrimary }]}>{el.name}</Text>
         {el.endTime && (
-          <Text style={[styles.panchangEndTime, { color: colors.textMuted }]}>until {el.endTime}</Text>
+          <Text style={[styles.panchangEndTime, { color: colors.textMuted }]}>{t('home.untilTime', { time: el.endTime })}</Text>
         )}
       </View>
     </View>

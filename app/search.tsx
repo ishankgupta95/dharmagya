@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
@@ -29,6 +30,7 @@ interface SearchResult {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
+  const { t } = useTranslation();
   const { isDarkMode } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
@@ -100,7 +102,7 @@ export default function SearchScreen() {
             ref={inputRef}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search aartis, chalisas, kathas…"
+            placeholder={t('search.placeholder')}
             placeholderTextColor={colors.textMuted}
             style={[styles.input, { color: colors.textPrimary }]}
             returnKeyType="search"
@@ -131,7 +133,7 @@ export default function SearchScreen() {
           {/* Aartis group */}
           {aartiResults.length > 0 && (
             <View>
-              <GroupHeader label={`AARTIS  ·  ${aartiResults.length}`} colors={colors} />
+              <GroupHeader label={t('search.aartisSection', { count: aartiResults.length })} colors={colors} />
               {aartiResults.map((item) => (
                 <ResultCard
                   key={item.id}
@@ -147,7 +149,7 @@ export default function SearchScreen() {
           {/* Chalisas group */}
           {chalisaResults.length > 0 && (
             <View style={aartiResults.length > 0 ? { marginTop: 8 } : undefined}>
-              <GroupHeader label={`CHALISAS  ·  ${chalisaResults.length}`} colors={colors} />
+              <GroupHeader label={t('search.chalisasSection', { count: chalisaResults.length })} colors={colors} />
               {chalisaResults.map((item) => (
                 <ResultCard
                   key={item.id}
@@ -163,7 +165,7 @@ export default function SearchScreen() {
           {/* Kathas group */}
           {kathaResults.length > 0 && (
             <View style={(aartiResults.length > 0 || chalisaResults.length > 0) ? { marginTop: 8 } : undefined}>
-              <GroupHeader label={`KATHAS  ·  ${kathaResults.length}`} colors={colors} />
+              <GroupHeader label={t('search.kathasSection', { count: kathaResults.length })} colors={colors} />
               {kathaResults.map((item) => (
                 <ResultCard
                   key={item.id}
@@ -268,24 +270,26 @@ function GroupHeader({ label, colors }: { label: string; colors: ColorPalette })
 // ─── Empty States ─────────────────────────────────────────────────────────────
 
 function EmptyPrompt({ colors }: { colors: ColorPalette }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyEmoji}>🔍</Text>
-      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>खोज करें</Text>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{t('search.emptyTitle')}</Text>
       <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-        Search by title, transliteration, or deity name
+        {t('search.emptyDesc')}
       </Text>
     </View>
   );
 }
 
 function NoResults({ query, colors }: { query: string; colors: ColorPalette }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyEmoji}>🙏</Text>
-      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No results</Text>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{t('search.noResults')}</Text>
       <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-        Nothing found for "{query}"
+        {t('search.noResultsFor', { query })}
       </Text>
     </View>
   );

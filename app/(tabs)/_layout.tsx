@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { useStore } from '@/store/useStore';
@@ -11,6 +12,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 export default function TabLayout() {
   const { isDarkMode } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -40,7 +42,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
               name={(focused ? 'home' : 'home-outline') as IoniconName}
@@ -53,7 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="panchang"
         options={{
-          title: 'Panchang',
+          title: t('tabs.panchang'),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
               name={(focused ? 'calendar' : 'calendar-outline') as IoniconName}
@@ -66,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Gods',
+          title: t('tabs.gods'),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
               name={(focused ? 'people' : 'people-outline') as IoniconName}

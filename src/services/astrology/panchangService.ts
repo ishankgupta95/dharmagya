@@ -3,6 +3,7 @@ import {
   getDailyPanchang,
   computePlanetaryPositions,
   type DailyPanchangResult,
+  type Language,
 } from 'panchang-ts';
 
 import type {
@@ -15,18 +16,51 @@ import type {
 
 export const FALLBACK_COORDS = { lat: 18.6298, lon: 73.7997 }; // Pune
 
-const RASHI_NAMES = [
-  'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
-  'Tula', 'Vrischika', 'Dhanu', 'Makara', 'Kumbha', 'Meena',
-];
+// Name tables for computePlanetaryPositions (which uses callbacks, not a language option)
+const RASHI_NAMES: Record<Language, string[]> = {
+  en: [
+    'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
+    'Tula', 'Vrischika', 'Dhanu', 'Makara', 'Kumbha', 'Meena',
+  ],
+  hi: [
+    'मेष', 'वृषभ', 'मिथुन', 'कर्क', 'सिंह', 'कन्या',
+    'तुला', 'वृश्चिक', 'धनु', 'मकर', 'कुम्भ', 'मीन',
+  ],
+  sa: [
+    'मेषः', 'वृषभः', 'मिथुनम्', 'कर्कटः', 'सिंहः', 'कन्या',
+    'तुला', 'वृश्चिकः', 'धनुः', 'मकरः', 'कुम्भः', 'मीनः',
+  ],
+};
 
-const NAKSHATRA_NAMES = [
-  'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashirsha', 'Ardra',
-  'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
-  'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
-  'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
-  'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati',
-];
+const NAKSHATRA_NAMES: Record<Language, string[]> = {
+  en: [
+    'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashirsha', 'Ardra',
+    'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
+    'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+    'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
+    'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati',
+  ],
+  hi: [
+    'अश्विनी', 'भरणी', 'कृत्तिका', 'रोहिणी', 'मृगशिरा', 'आर्द्रा',
+    'पुनर्वसु', 'पुष्य', 'आश्लेषा', 'मघा', 'पूर्वा फाल्गुनी', 'उत्तरा फाल्गुनी',
+    'हस्त', 'चित्रा', 'स्वाति', 'विशाखा', 'अनुराधा', 'ज्येष्ठा',
+    'मूल', 'पूर्वाषाढ़ा', 'उत्तराषाढ़ा', 'श्रवण', 'धनिष्ठा', 'शतभिषा',
+    'पूर्वा भाद्रपद', 'उत्तरा भाद्रपद', 'रेवती',
+  ],
+  sa: [
+    'अश्विनी', 'भरणी', 'कृत्तिका', 'रोहिणी', 'मृगशीर्षा', 'आर्द्रा',
+    'पुनर्वसु', 'पुष्यः', 'आश्लेषा', 'मघा', 'पूर्वफल्गुनी', 'उत्तरफल्गुनी',
+    'हस्तः', 'चित्रा', 'स्वाती', 'विशाखा', 'अनुराधा', 'ज्येष्ठा',
+    'मूलम्', 'पूर्वाषाढा', 'उत्तराषाढा', 'श्रवणः', 'धनिष्ठा', 'शतभिषा',
+    'पूर्वभाद्रपदा', 'उत्तरभाद्रपदा', 'रेवती',
+  ],
+};
+
+const GRAHA_NAMES: Record<Language, Record<string, string>> = {
+  en: { Sun: 'Sun', Moon: 'Moon', Mars: 'Mars', Mercury: 'Mercury', Jupiter: 'Jupiter', Venus: 'Venus', Saturn: 'Saturn', Rahu: 'Rahu', Ketu: 'Ketu' },
+  hi: { Sun: 'सूर्य', Moon: 'चंद्र', Mars: 'मंगल', Mercury: 'बुध', Jupiter: 'बृहस्पति', Venus: 'शुक्र', Saturn: 'शनि', Rahu: 'राहु', Ketu: 'केतु' },
+  sa: { Sun: 'सूर्यः', Moon: 'चन्द्रः', Mars: 'मङ्गलः', Mercury: 'बुधः', Jupiter: 'बृहस्पतिः', Venus: 'शुक्रः', Saturn: 'शनिः', Rahu: 'राहुः', Ketu: 'केतुः' },
+};
 
 // Dates from panchang-ts are offset-adjusted local display dates — read via getUTC*.
 function formatTime(date: Date | null | undefined): string | undefined {
@@ -52,6 +86,7 @@ function toQualitySlots(
   return slots.map(s => ({
     name: s.name,
     quality: s.quality,
+    qualityName: s.qualityName,
     start: formatTime(s.start) ?? '',
     end: formatTime(s.end) ?? '',
   }));
@@ -88,9 +123,9 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
       start: formatTime(dm.start) ?? '',
       end: formatTime(dm.end) ?? '',
     })),
-    vara: result.vara.englishName,
+    vara: result.vara.name,
     hinduMonth: result.chandramasa.name,
-    masa: result.masa?.name,
+    masa: result.masa.name,
     vikramSamvat: result.samvat.vikramSamvat,
     shakaSamvat: result.samvat.shakaSamvat,
     chandraRashi: result.chandraRashi.name,
@@ -119,16 +154,24 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
   };
 }
 
-export function fetchGrahaPositions(date: Date): IGrahaPosition[] {
-  const raw = computePlanetaryPositions(date, 'lahiri');
+export function fetchGrahaPositions(date: Date, language: Language = 'en'): IGrahaPosition[] {
+  const grahaNames = GRAHA_NAMES[language];
+  const rashiNames = RASHI_NAMES[language];
+  const nakshatraNames = NAKSHATRA_NAMES[language];
+  const raw = computePlanetaryPositions(
+    date,
+    'lahiri',
+    (idx) => nakshatraNames[idx],
+    (idx) => rashiNames[idx],
+  );
   const planets = ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn', 'rahu', 'ketu'] as const;
   return planets.map(key => {
     const p = (raw as Record<string, any>)[key];
     return {
-      planet: p.planet,
-      rashi: RASHI_NAMES[p.rashi.index] ?? p.rashi.name,
+      planet: grahaNames[p.planet] ?? p.planet,
+      rashi: p.rashi.name,
       degreeInRashi: Math.round(p.degreeInRashi * 100) / 100,
-      nakshatra: NAKSHATRA_NAMES[p.nakshatra.index] ?? p.nakshatra.name,
+      nakshatra: p.nakshatra.name,
       nakshatraPada: p.nakshatra.pada,
       isRetrograde: p.isRetrograde,
     };
@@ -156,6 +199,7 @@ export async function fetchPanchang(
   date: Date,
   savedCoords?: { lat: number; lon: number } | null,
   computeEndTimes = true,
+  language: Language = 'en',
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
@@ -163,7 +207,7 @@ export async function fetchPanchang(
     const result = getDailyPanchang(
       date,
       { latitude: coords.lat, longitude: coords.lon },
-      { timezone, computeEndTimes },
+      { timezone, computeEndTimes, language },
     );
     return mapToPanchangDay(result);
   } catch {
@@ -173,6 +217,7 @@ export async function fetchPanchang(
 
 export async function fetchPanchangForToday(
   savedCoords?: { lat: number; lon: number } | null,
+  language: Language = 'en',
 ): Promise<IPanchangDay | null> {
-  return fetchPanchang(new Date(), savedCoords);
+  return fetchPanchang(new Date(), savedCoords, true, language);
 }

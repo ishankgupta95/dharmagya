@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
@@ -31,6 +32,7 @@ interface AartiRow {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AartiDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
@@ -165,7 +167,7 @@ export default function AartiDetailScreen() {
           activeOpacity={0.85}
           style={[styles.readAlongBtn, { backgroundColor: colors.accent }]}>
           <Ionicons name="book-outline" size={18} color="#FFFFFF" />
-          <Text style={styles.readAlongText}>Read Along Mode</Text>
+          <Text style={styles.readAlongText}>{t('aarti.readAlongMode')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -183,14 +185,15 @@ interface ToastProps {
 }
 
 function ComingSoonToast({ colors }: ToastProps) {
+  const { t } = useTranslation();
   return (
     <View
       style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.border }]}
       pointerEvents="none">
       <Text style={styles.toastEmoji}>✨</Text>
-      <Text style={[styles.toastText, { color: colors.textPrimary }]}>Coming Soon!</Text>
+      <Text style={[styles.toastText, { color: colors.textPrimary }]}>{t('aarti.comingSoon')}</Text>
       <Text style={[styles.toastSub, { color: colors.textSecondary }]}>
-        Read Along Mode is on the way
+        {t('aarti.comingSoonDesc')}
       </Text>
     </View>
   );

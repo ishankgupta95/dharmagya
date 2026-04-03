@@ -3,6 +3,7 @@ import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useStore } from '@/store/useStore';
@@ -13,6 +14,7 @@ type LocationChoice = 'gps' | 'default';
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OnboardingStep3() {
+  const { t } = useTranslation();
   const { isDarkMode, toggleTheme, setHasOnboarded } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -42,7 +44,7 @@ export default function OnboardingStep3() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerStep, { color: colors.textMuted }]}>Step 3 of 3</Text>
+        <Text style={[styles.headerStep, { color: colors.textMuted }]}>{t('onboarding.step3of3')}</Text>
         <View style={{ width: 20 }} />
       </View>
 
@@ -51,11 +53,11 @@ export default function OnboardingStep3() {
         showsVerticalScrollIndicator={false}>
 
         {/* ── Title ─────────────────────────────────────────────────── */}
-        <Text style={[styles.titleHindi, { color: colors.textPrimary }]}>प्राथमिकताएँ</Text>
-        <Text style={[styles.title, { color: colors.textSecondary }]}>Set Your Preferences</Text>
+        <Text style={[styles.titleHindi, { color: colors.textPrimary }]}>{t('onboarding.preferencesHi')}</Text>
+        <Text style={[styles.title, { color: colors.textSecondary }]}>{t('onboarding.preferences')}</Text>
 
         {/* ── Theme Section ─────────────────────────────────────────── */}
-        <SectionLabel label="APPEARANCE" colors={colors} />
+        <SectionLabel label={t('settings.appearance')} colors={colors} />
         <View style={styles.themeRow}>
           <ThemeCard
             dark
@@ -70,12 +72,12 @@ export default function OnboardingStep3() {
         </View>
 
         {/* ── Location Section ──────────────────────────────────────── */}
-        <SectionLabel label="LOCATION" colors={colors} />
+        <SectionLabel label={t('settings.location')} colors={colors} />
         <View style={[styles.radioGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <RadioRow
-            label="Use GPS Location"
-            sublabel="Accurate sunrise & Panchang times"
+            label={t('onboarding.useGpsLocation')}
+            sublabel={t('onboarding.gpsDesc')}
             icon="location-outline"
             selected={locationChoice === 'gps'}
             onPress={() => setLocationChoice('gps')}
@@ -85,8 +87,8 @@ export default function OnboardingStep3() {
           <View style={[styles.radioDivider, { backgroundColor: colors.divider }]} />
 
           <RadioRow
-            label="Use Pune (default)"
-            sublabel="No location permission needed"
+            label={t('onboarding.usePuneDefault')}
+            sublabel={t('onboarding.puneDesc')}
             icon="map-outline"
             selected={locationChoice === 'default'}
             onPress={() => setLocationChoice('default')}
@@ -105,7 +107,7 @@ export default function OnboardingStep3() {
           onPress={handleFinish}
           activeOpacity={0.85}
           style={[styles.cta, { backgroundColor: colors.accent }]}>
-          <Text style={styles.ctaText}>Start Exploring  🙏</Text>
+          <Text style={styles.ctaText}>{t('onboarding.startExploring')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -122,6 +124,7 @@ interface ThemeCardProps {
 }
 
 function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
+  const { t } = useTranslation();
   const bg = dark ? '#1A1A1F' : '#FAF6F0';
   const surface = dark ? '#222228' : '#FFFFFF';
   const textPrimary = dark ? '#F0E6D3' : '#2A2218';
@@ -146,7 +149,7 @@ function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
       </View>
 
       <Text style={[styles.themeLabel, { color: textPrimary }]}>
-        {dark ? '🌙  Dark' : '☀️  Light'}
+        {dark ? `🌙  ${t('onboarding.dark')}` : `☀️  ${t('onboarding.light')}`}
       </Text>
 
       {isSelected && (
