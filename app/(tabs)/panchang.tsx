@@ -411,7 +411,7 @@ function formatDuration(minutes: number): string {
 
 export default function PanchangScreen() {
   const { t } = useTranslation();
-  const { isDarkMode, userLocation, locationName, language, walkthroughStep, setWalkthroughStep } = useStore();
+  const { isDarkMode, userLocation, locationName, language, masaSystem, setMasaSystem, walkthroughStep, setWalkthroughStep } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -498,7 +498,7 @@ export default function PanchangScreen() {
           style={styles.dateDisplay}>
           <Text style={[styles.dateTopLabel, { color: colors.textMuted }]}>
             {panchang
-              ? `${panchang.hinduMonth ?? ''} · ${panchang.tithis[0]?.name ?? ''}`.toUpperCase()
+              ? `${(masaSystem === 'purnimanta' ? panchang.hinduMonthPurnimanta : panchang.hinduMonthAmanta) ?? ''} · ${panchang.tithis[0]?.name ?? ''}`.toUpperCase()
               : ' '}
           </Text>
           <Text style={[styles.dateBigNumber, { color: colors.accent }]}>{dateDay}</Text>
@@ -570,6 +570,26 @@ export default function PanchangScreen() {
               )}
               {panchang.suryaNakshatra && (
                 <LimbRow label={t('panchang.suryaNakshatra')} elements={[{ name: panchang.suryaNakshatra }]} colors={colors} />
+              )}
+              {(panchang.hinduMonthPurnimanta || panchang.hinduMonthAmanta) && (
+                <>
+                  <View style={[styles.limbDivider, { backgroundColor: colors.divider }]} />
+                  <View style={styles.limbRow}>
+                    <Text style={[styles.limbLabel, { color: colors.accent }]}>{t('panchang.chandraMasa')}</Text>
+                    <Text style={[styles.limbValue, { color: colors.textPrimary }]}>
+                      {masaSystem === 'purnimanta' ? panchang.hinduMonthPurnimanta : panchang.hinduMonthAmanta}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setMasaSystem(masaSystem === 'purnimanta' ? 'amanta' : 'purnimanta')}
+                      activeOpacity={0.7}
+                      style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}>
+                      <Text style={[styles.masaChipText, { color: colors.accent }]}>
+                        {masaSystem === 'purnimanta' ? t('panchang.purnimanta') : t('panchang.amanta')}
+                      </Text>
+                      <Ionicons name="swap-horizontal" size={12} color={colors.accent} />
+                    </TouchableOpacity>
+                  </View>
+                </>
               )}
               {panchang.masa && (
                 <LimbRow label={t('panchang.masaSolarMonth')} elements={[{ name: panchang.masa }]} colors={colors} isLast />
@@ -747,6 +767,10 @@ const styles = StyleSheet.create({
   limbActiveBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
   limbActiveText: { fontSize: 10, fontFamily: 'Mukta_700Bold', letterSpacing: 0.8 },
   limbDivider: { height: 0.5 },
+
+  // Masa system chip
+  masaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6, alignSelf: 'flex-start' },
+  masaChipText: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 0.3 },
 
   // Sun / Moon grid (2×2)
   sunGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },

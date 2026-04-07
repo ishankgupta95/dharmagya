@@ -23,8 +23,8 @@ if (!isExpoGo) {
   }
 }
 
-const DAILY_REMINDER_ID = 'dharmsetu-daily-reminder';
-const SUNRISE_ALERT_ID = 'dharmsetu-sunrise-alert';
+const DAILY_REMINDER_ID = 'dharmagya-daily-reminder';
+const SUNRISE_ALERT_ID = 'dharmagya-sunrise-alert';
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 

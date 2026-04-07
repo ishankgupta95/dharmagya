@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type FontSize } from '@/store/useStore';
+import { useStore, type FontSize, type MasaSystem } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { LANGUAGE_OPTIONS, resolveLanguage, type AppLanguage } from '@/i18n';
 import {
@@ -49,6 +49,8 @@ export default function SettingsScreen() {
     setDailyReminderEnabled,
     sunriseAlertEnabled,
     setSunriseAlertEnabled,
+    masaSystem,
+    setMasaSystem,
     setWalkthroughStep,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
@@ -176,6 +178,20 @@ export default function SettingsScreen() {
             }
           />
 
+        </View>
+
+        {/* ── Calendar ─────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.calendar')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingRow
+            icon="calendar-outline"
+            label={t('settings.masaSystem')}
+            sublabel={t('settings.masaSystemDesc')}
+            colors={colors}
+            right={
+              <MasaSystemPicker value={masaSystem} onChange={setMasaSystem} colors={colors} />
+            }
+          />
         </View>
 
         {/* ── Location ──────────────────────────────────────────────── */}
@@ -359,6 +375,45 @@ function LanguagePicker({ value, onChange, colors }: LanguagePickerProps) {
   );
 }
 
+// ─── Masa System Picker ─────────────────────────────────────────────────────
+
+interface MasaSystemPickerProps {
+  value: MasaSystem;
+  onChange: (system: MasaSystem) => void;
+  colors: ColorPalette;
+}
+
+const MASA_OPTIONS: { key: MasaSystem; tKey: string }[] = [
+  { key: 'purnimanta', tKey: 'panchang.purnimanta' },
+  { key: 'amanta', tKey: 'panchang.amanta' },
+];
+
+function MasaSystemPicker({ value, onChange, colors }: MasaSystemPickerProps) {
+  const { t } = useTranslation();
+  return (
+    <View style={[styles.fontPicker, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+      {MASA_OPTIONS.map(({ key, tKey }, i) => {
+        const active = value === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => onChange(key)}
+            style={[
+              styles.masaPickerBtn,
+              i < MASA_OPTIONS.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
+              active && { backgroundColor: colors.accent },
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            <RNText style={[styles.langPickerLabel, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
+              {t(tKey)}
+            </RNText>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 interface SectionHeaderProps {
@@ -500,5 +555,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Mukta_500Medium',
     includeFontPadding: false,
     textAlignVertical: 'center',
+  },
+
+  // Masa system picker
+  masaPickerBtn: {
+    paddingHorizontal: 12,
+    height: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

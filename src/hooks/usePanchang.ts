@@ -8,7 +8,6 @@ import {
   fetchGrahaPositions,
 } from '@/services/astrology/panchangService';
 import type { IPanchangDay } from '@/types';
-
 interface UsePanchangResult {
   panchang: IPanchangDay | null;
   /** True once end-times (pass 2) have been computed. */

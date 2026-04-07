@@ -104,6 +104,8 @@ export interface IPanchangDay {
   durMuhurta: Array<{ start: string; end: string }>;
   vara?: string;
   hinduMonth?: string;
+  hinduMonthAmanta?: string;
+  hinduMonthPurnimanta?: string;
   masa?: string;
   vikramSamvat: number;
   shakaSamvat: number;

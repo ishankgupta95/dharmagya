@@ -5,6 +5,7 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 import type { AppLanguage } from '@/i18n';
 
 export type FontSize = 'small' | 'normal' | 'large' | 'xl';
+export type MasaSystem = 'purnimanta' | 'amanta';
 
 /**
  * walkthroughStep values:
@@ -24,6 +25,7 @@ interface AppStore {
   locationName: string | null; // e.g. "Mumbai, MH" or "GPS"
   fontSize: FontSize;
   language: AppLanguage;
+  masaSystem: MasaSystem;
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
   walkthroughStep: number;
@@ -36,6 +38,7 @@ interface AppStore {
   setSelectedDeities: (deities: string[]) => void;
   setFontSize: (size: FontSize) => void;
   setLanguage: (lang: AppLanguage) => void;
+  setMasaSystem: (system: MasaSystem) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
   setWalkthroughStep: (step: number) => void;
@@ -52,6 +55,7 @@ export const useStore = create<AppStore>()(
       locationName: null,
       fontSize: 'normal',
       language: 'system' as AppLanguage,
+      masaSystem: 'purnimanta' as MasaSystem,
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
       walkthroughStep: 1,
@@ -68,12 +72,13 @@ export const useStore = create<AppStore>()(
       setSelectedDeities: (deities) => set({ selectedDeities: deities }),
       setFontSize: (size) => set({ fontSize: size }),
       setLanguage: (lang) => set({ language: lang }),
+      setMasaSystem: (system) => set({ masaSystem: system }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
     }),
     {
-      name: 'dharmsetu-store',
+      name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

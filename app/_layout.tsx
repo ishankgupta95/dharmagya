@@ -61,7 +61,7 @@ export default function RootLayout() {
 
   return (
     <Suspense fallback={null}>
-      <SQLiteProvider databaseName="dharmsetu.db" useSuspense onInit={initDatabase}>
+      <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
         <Stack
           screenOptions={{
             headerShown: false,
