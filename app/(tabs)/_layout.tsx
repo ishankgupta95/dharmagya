@@ -25,7 +25,7 @@ export default function TabLayout() {
           backgroundColor: colors.base,
           borderTopWidth: 0.5,
           borderTopColor: colors.border,
-          paddingTop: 10,
+          marginBottom: 10,
         },
         tabBarLabel: ({ focused, color, children }) => (
           <Text

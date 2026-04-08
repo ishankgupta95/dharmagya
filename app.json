@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ishank1995.dharmagya"
     },
     "android": {
       "adaptiveIcon": {
@@ -53,7 +54,8 @@
           "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "react-native-edge-to-edge"
     ],
     "experiments": {
       "typedRoutes": true,

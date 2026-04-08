@@ -3,6 +3,7 @@ import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import {
   useFonts,
   Mukta_400Regular,
@@ -60,18 +61,20 @@ export default function RootLayout() {
   if (!appReady) return null;
 
   return (
-    <Suspense fallback={null}>
-      <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
-            animation: 'slide_from_right',
-          }}>
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-      </SQLiteProvider>
-    </Suspense>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <Suspense fallback={null}>
+        <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
+              animation: 'slide_from_right',
+            }}>
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+        </SQLiteProvider>
+      </Suspense>
+    </SafeAreaProvider>
   );
 }
