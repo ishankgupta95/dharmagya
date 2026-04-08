@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useStore, type FontSize, type MasaSystem } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
-import { LANGUAGE_OPTIONS, resolveLanguage, type AppLanguage } from '@/i18n';
+import { LANGUAGE_OPTIONS, resolveLanguage, changeLanguage, type AppLanguage } from '@/i18n';
 import {
   scheduleDailyReminder,
   cancelDailyReminder,
@@ -58,7 +58,7 @@ export default function SettingsScreen() {
 
   function handleLanguageChange(lang: AppLanguage) {
     setLanguage(lang);
-    i18n.changeLanguage(resolveLanguage(lang));
+    changeLanguage(resolveLanguage(lang));
   }
 
   const [sunriseTime, setSunriseTime] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import {
   AppState,
   type AppStateStatus,
@@ -76,7 +76,13 @@ function getActiveElement(elements: IPanchangElement[]): IPanchangElement | unde
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { isDarkMode, favoriteIds, userLocation, locationName, language, walkthroughStep, setWalkthroughStep } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const userLocation = useStore(s => s.userLocation);
+  const locationName = useStore(s => s.locationName);
+  const language = useStore(s => s.language);
+  const walkthroughStep = useStore(s => s.walkthroughStep);
+  const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const { t, i18n } = useTranslation();
@@ -133,7 +139,8 @@ export default function HomeScreen() {
     setFeaturedAarti(row ? rowToAarti(row) : null);
   }, [db, favoriteIds]);
 
-  const greetingKey = getGreetingKey();
+  const greetingKey = useMemo(() => getGreetingKey(), []);
+  const dateString = useMemo(() => getTodayDateString(lang), [lang]);
   const panchangGradient = useMemo<readonly [string, string]>(
     () => isDarkMode ? ['#2E2418', '#1E1E24'] : ['#FFF8F0', '#FFF0E4'],
     [isDarkMode]
@@ -181,7 +188,7 @@ export default function HomeScreen() {
         {/* ── Header ───────────────────────────────────────────────────── */}
         <View style={styles.header}>
           <Text style={[styles.dateLabel, { color: colors.textMuted }]}>
-            {getTodayDateString(lang)}
+            {dateString}
           </Text>
           <TouchableOpacity
             ref={settingsBtnRef}
@@ -216,7 +223,7 @@ export default function HomeScreen() {
                 <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
                   <Ionicons name="location-outline" size={10} color={colors.textMuted} />
                   <Text style={[styles.locationText, { color: colors.textMuted }]}>
-                    {'  '}{locationName ?? (userLocation ? 'GPS' : 'Pune, MH')}
+                    {'  '}{locationName ?? (userLocation ? 'GPS' : 'Varanasi, UP')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />
@@ -377,7 +384,7 @@ interface PanchangRowProps {
   colors: ColorPalette;
 }
 
-function PanchangRow({ label, el, colors }: PanchangRowProps) {
+const PanchangRow = memo(function PanchangRow({ label, el, colors }: PanchangRowProps) {
   const { t } = useTranslation();
   if (!el) return null;
   return (
@@ -391,7 +398,7 @@ function PanchangRow({ label, el, colors }: PanchangRowProps) {
       </View>
     </View>
   );
-}
+});
 
 interface QuickCardProps {
   emoji: string;
@@ -400,7 +407,7 @@ interface QuickCardProps {
   colors: ColorPalette;
 }
 
-function QuickCard({ emoji, label, onPress, colors }: QuickCardProps) {
+const QuickCard = memo(function QuickCard({ emoji, label, onPress, colors }: QuickCardProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -413,7 +420,7 @@ function QuickCard({ emoji, label, onPress, colors }: QuickCardProps) {
       <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>{label}</Text>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 

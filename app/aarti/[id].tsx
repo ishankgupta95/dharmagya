@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Animated,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
@@ -34,32 +34,30 @@ interface AartiRow {
 export default function AartiDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 
   const [aarti, setAarti] = useState<IAarti | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useSharedValue(0);
 
-  // Hero collapse animations (collapse over 0–100px of scroll)
   const COLLAPSE_END = 100;
-  const heroOpacity = scrollY.interpolate({
-    inputRange: [0, COLLAPSE_END * 0.6],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { scrollY.value = event.contentOffset.y; },
   });
-  const heroHeight = scrollY.interpolate({
-    inputRange: [0, COLLAPSE_END],
-    outputRange: [140, 0],
-    extrapolate: 'clamp',
-  });
-  const compactTitleOpacity = scrollY.interpolate({
-    inputRange: [COLLAPSE_END * 0.5, COLLAPSE_END],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, COLLAPSE_END * 0.6], [1, 0], Extrapolation.CLAMP),
+    maxHeight: interpolate(scrollY.value, [0, COLLAPSE_END], [140, 0], Extrapolation.CLAMP),
+    overflow: 'hidden' as const,
+  }));
+  const compactTitleAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [COLLAPSE_END * 0.5, COLLAPSE_END], [0, 1], Extrapolation.CLAMP),
+  }));
 
   useEffect(() => {
     if (!id) return;
@@ -114,7 +112,7 @@ export default function AartiDetailScreen() {
           </TouchableOpacity>
 
           {/* Compact title (visible when hero collapsed) */}
-          <Animated.View style={[styles.compactTitle, { opacity: compactTitleOpacity }]}>
+          <Animated.View style={[styles.compactTitle, compactTitleAnimatedStyle]}>
             <Text style={styles.compactTitleText} numberOfLines={1}>{aarti.titleNative}</Text>
           </Animated.View>
 
@@ -131,7 +129,7 @@ export default function AartiDetailScreen() {
         </View>
 
         {/* Hero: avatar + title (collapses on scroll) */}
-        <Animated.View style={[styles.hero, { opacity: heroOpacity, maxHeight: heroHeight, overflow: 'hidden' }]}>
+        <Animated.View style={[styles.hero, heroAnimatedStyle]}>
           <DeityAvatar deity={aarti.deity} size={72} />
           <Text style={styles.heroTitleNative}>{aarti.titleNative}</Text>
           <Text style={styles.heroTitleEn}>{aarti.titleEnglish}</Text>
@@ -147,10 +145,7 @@ export default function AartiDetailScreen() {
         style={{ backgroundColor: colors.base }}
         contentContainerStyle={[styles.verseScroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={scrollHandler}
         scrollEventThrottle={16}>
         {aarti.content.map((verse, index) => (
           <Text key={index} style={[styles.verse, { color: colors.textPrimary }]}>

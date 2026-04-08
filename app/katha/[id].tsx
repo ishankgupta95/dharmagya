@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Animated,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
@@ -44,30 +44,28 @@ interface KathaDetail {
 export default function KathaDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 
   const [katha, setKatha] = useState<KathaDetail | null>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useSharedValue(0);
 
-  // Hero collapse animations
   const COLLAPSE_END = 100;
-  const heroOpacity = scrollY.interpolate({
-    inputRange: [0, COLLAPSE_END * 0.6],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { scrollY.value = event.contentOffset.y; },
   });
-  const heroHeight = scrollY.interpolate({
-    inputRange: [0, COLLAPSE_END],
-    outputRange: [160, 0],
-    extrapolate: 'clamp',
-  });
-  const compactTitleOpacity = scrollY.interpolate({
-    inputRange: [COLLAPSE_END * 0.5, COLLAPSE_END],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, COLLAPSE_END * 0.6], [1, 0], Extrapolation.CLAMP),
+    maxHeight: interpolate(scrollY.value, [0, COLLAPSE_END], [160, 0], Extrapolation.CLAMP),
+    overflow: 'hidden' as const,
+  }));
+  const compactTitleAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [COLLAPSE_END * 0.5, COLLAPSE_END], [0, 1], Extrapolation.CLAMP),
+  }));
 
   useEffect(() => {
     if (!id) return;
@@ -108,7 +106,7 @@ export default function KathaDetailScreen() {
           </TouchableOpacity>
 
           {/* Compact title (visible when hero collapsed) */}
-          <Animated.View style={[styles.compactTitle, { opacity: compactTitleOpacity }]}>
+          <Animated.View style={[styles.compactTitle, compactTitleAnimatedStyle]}>
             <Text style={styles.compactTitleText} numberOfLines={1}>{katha.titleNative}</Text>
           </Animated.View>
 
@@ -125,7 +123,7 @@ export default function KathaDetailScreen() {
         </View>
 
         {/* Hero: avatar + title (collapses on scroll) */}
-        <Animated.View style={[styles.hero, { opacity: heroOpacity, maxHeight: heroHeight, overflow: 'hidden' }]}>
+        <Animated.View style={[styles.hero, heroAnimatedStyle]}>
           <DeityAvatar deity={katha.deity} size={72} />
           <Text style={styles.heroTitleNative}>{katha.titleNative}</Text>
           <Text style={styles.heroTitleEn}>{katha.titleEnglish}</Text>
@@ -146,10 +144,7 @@ export default function KathaDetailScreen() {
         style={{ backgroundColor: colors.base }}
         contentContainerStyle={[styles.contentScroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={scrollHandler}
         scrollEventThrottle={16}>
 
         {/* Summary */}

@@ -3,8 +3,6 @@ import { initReactI18next } from 'react-i18next';
 import { getLocales } from 'expo-localization';
 
 import en from './locales/en';
-import hi from './locales/hi';
-import sa from './locales/sa';
 
 export type AppLanguage = 'system' | 'en' | 'hi' | 'sa';
 
@@ -31,16 +29,37 @@ export function resolveLanguage(pref: AppLanguage): string {
   return pref === 'system' ? getDeviceLanguage() : pref;
 }
 
+/** Lazily load a language bundle and add it to i18next. */
+async function loadLanguage(lng: string): Promise<void> {
+  if (i18n.hasResourceBundle(lng, 'translation')) return;
+  let resources;
+  if (lng === 'hi') resources = (await import('./locales/hi')).default;
+  else if (lng === 'sa') resources = (await import('./locales/sa')).default;
+  else return;
+  i18n.addResourceBundle(lng, 'translation', resources);
+}
+
+const deviceLang = getDeviceLanguage();
+
 i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
-    hi: { translation: hi },
-    sa: { translation: sa },
   },
-  lng: getDeviceLanguage(),
+  lng: deviceLang,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
   compatibilityJSON: 'v4',
 });
+
+// Load non-English device language eagerly (but async to avoid blocking startup)
+if (deviceLang !== 'en') {
+  loadLanguage(deviceLang);
+}
+
+/** Change the active language, loading the bundle if needed. */
+export async function changeLanguage(lng: string): Promise<void> {
+  await loadLanguage(lng);
+  await i18n.changeLanguage(lng);
+}
 
 export default i18n;

@@ -40,7 +40,11 @@ interface KathaListItem {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function LibraryScreen() {
-  const { isDarkMode, favoriteIds, toggleFavorite, walkthroughStep, setWalkthroughStep } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
+  const walkthroughStep = useStore(s => s.walkthroughStep);
+  const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const { t } = useTranslation();
@@ -157,6 +161,10 @@ export default function LibraryScreen() {
           contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={ItemSeparator}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews
         />
       )}
 

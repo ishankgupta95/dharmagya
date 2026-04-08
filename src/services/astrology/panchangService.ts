@@ -14,7 +14,7 @@ import type {
   IGrahaPosition,
 } from '@/types';
 
-export const FALLBACK_COORDS = { lat: 18.6298, lon: 73.7997 }; // Pune
+export const FALLBACK_COORDS = { lat: 25.3176, lon: 83.0103 }; // Varanasi (Kashi)
 
 // Name tables for computePlanetaryPositions (which uses callbacks, not a language option)
 const RASHI_NAMES: Record<Language, string[]> = {

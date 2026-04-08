@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   View,
   Image,
@@ -100,7 +100,9 @@ const BANNER_HEIGHT = 260;
 export default function GodDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const deity = DEITY_BY_ID[id ?? ''];
@@ -111,44 +113,50 @@ export default function GodDetailScreen() {
 
   useEffect(() => {
     if (!deity) return;
-    const aartiRows = db.getAllSync<AartiRow>(
-      'SELECT * FROM aartis WHERE deity = ? ORDER BY titleEnglish',
-      [deity.name]
-    );
-    setAartis(aartiRows.map(rowToAarti));
+    // Batch all three queries in a single transaction for better performance
+    db.withTransactionSync(() => {
+      const aartiRows = db.getAllSync<AartiRow>(
+        'SELECT * FROM aartis WHERE deity = ? ORDER BY titleEnglish',
+        [deity.name]
+      );
+      setAartis(aartiRows.map(rowToAarti));
 
-    const chalisaRows = db.getAllSync<ChalisaRow>(
-      'SELECT * FROM chalisas WHERE deity = ? ORDER BY titleEnglish',
-      [deity.name]
-    );
-    setChalisas(chalisaRows.map(rowToChalisa));
+      const chalisaRows = db.getAllSync<ChalisaRow>(
+        'SELECT * FROM chalisas WHERE deity = ? ORDER BY titleEnglish',
+        [deity.name]
+      );
+      setChalisas(chalisaRows.map(rowToChalisa));
 
-    const kathaRows = db.getAllSync<KathaRow>(
-      'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity = ? ORDER BY titleEnglish',
-      [deity.name]
-    );
-    setKathas(kathaRows);
+      const kathaRows = db.getAllSync<KathaRow>(
+        'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity = ? ORDER BY titleEnglish',
+        [deity.name]
+      );
+      setKathas(kathaRows);
+    });
   }, [db, deity]);
 
-  const sections: ListSection[] = [];
-  if (aartis.length > 0) {
-    sections.push({
-      title: t('god.aartisCount', { count: aartis.length }),
-      data: aartis.map((a) => ({ type: 'aarti' as const, data: a })),
-    });
-  }
-  if (chalisas.length > 0) {
-    sections.push({
-      title: t('god.chalisasCount', { count: chalisas.length }),
-      data: chalisas.map((c) => ({ type: 'chalisa' as const, data: c })),
-    });
-  }
-  if (kathas.length > 0) {
-    sections.push({
-      title: t('god.kathasCount', { count: kathas.length }),
-      data: kathas.map((k) => ({ type: 'katha' as const, data: k })),
-    });
-  }
+  const sections = useMemo<ListSection[]>(() => {
+    const result: ListSection[] = [];
+    if (aartis.length > 0) {
+      result.push({
+        title: t('god.aartisCount', { count: aartis.length }),
+        data: aartis.map((a) => ({ type: 'aarti' as const, data: a })),
+      });
+    }
+    if (chalisas.length > 0) {
+      result.push({
+        title: t('god.chalisasCount', { count: chalisas.length }),
+        data: chalisas.map((c) => ({ type: 'chalisa' as const, data: c })),
+      });
+    }
+    if (kathas.length > 0) {
+      result.push({
+        title: t('god.kathasCount', { count: kathas.length }),
+        data: kathas.map((k) => ({ type: 'katha' as const, data: k })),
+      });
+    }
+    return result;
+  }, [aartis, chalisas, kathas, t]);
 
   const renderItem = useCallback(
     ({ item }: SectionListRenderItemInfo<ListItem, ListSection>) => {

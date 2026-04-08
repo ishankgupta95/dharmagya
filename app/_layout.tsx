@@ -13,7 +13,7 @@ import {
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
 import { initDatabase } from '@/utils/database';
-import i18n, { resolveLanguage } from '@/i18n';
+import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,7 +39,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (storeHydrated) {
       const resolved = resolveLanguage(language);
-      if (i18n.language !== resolved) i18n.changeLanguage(resolved);
+      if (i18n.language !== resolved) changeLanguage(resolved);
     }
   }, [language, storeHydrated]);
 

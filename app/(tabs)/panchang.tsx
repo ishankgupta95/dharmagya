@@ -411,7 +411,14 @@ function formatDuration(minutes: number): string {
 
 export default function PanchangScreen() {
   const { t } = useTranslation();
-  const { isDarkMode, userLocation, locationName, language, masaSystem, setMasaSystem, walkthroughStep, setWalkthroughStep } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const userLocation = useStore(s => s.userLocation);
+  const locationName = useStore(s => s.locationName);
+  const language = useStore(s => s.language);
+  const masaSystem = useStore(s => s.masaSystem);
+  const setMasaSystem = useStore(s => s.setMasaSystem);
+  const walkthroughStep = useStore(s => s.walkthroughStep);
+  const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -482,7 +489,7 @@ export default function PanchangScreen() {
           <Text style={[styles.locationText, { color: colors.textMuted }]}>
             {' '}{locationName ?? (userLocation
               ? `${userLocation.lat.toFixed(2)}°N, ${userLocation.lon.toFixed(2)}°E`
-              : 'Pune, MH (default)')}
+              : 'Varanasi, UP (default)')}
           </Text>
         </View>
       </View>

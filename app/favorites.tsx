@@ -52,7 +52,9 @@ interface KathaRow {
 
 export default function FavoritesScreen() {
   const { t } = useTranslation();
-  const { isDarkMode, favoriteIds, toggleFavorite } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 

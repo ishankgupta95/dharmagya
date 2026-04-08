@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import {
   View,
   TextInput,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
+  ListRenderItemInfo,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,15 +32,13 @@ interface SearchResult {
 
 export default function SearchScreen() {
   const { t } = useTranslation();
-  const { isDarkMode } = useStore();
+  const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const inputRef = useRef<TextInput>(null);
 
   const [query, setQuery] = useState('');
-  const [aartiResults, setAartiResults] = useState<SearchResult[]>([]);
-  const [chalisaResults, setChalisaResults] = useState<SearchResult[]>([]);
-  const [kathaResults, setKathaResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -51,39 +50,52 @@ export default function SearchScreen() {
   useEffect(() => {
     const q = query.trim();
     if (!q) {
-      setAartiResults([]);
-      setChalisaResults([]);
-      setKathaResults([]);
+      setResults([]);
       return;
     }
 
     const timer = setTimeout(() => {
       const like = `%${q}%`;
+      const all: SearchResult[] = [];
 
       const aartiRows = db.getAllSync<Omit<SearchResult, 'type'>>(
         'SELECT id, titleEnglish, titleNative, deity FROM aartis WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
         [like, like, like]
       );
-      setAartiResults(aartiRows.map((r) => ({ ...r, type: 'aarti' as const })));
+      aartiRows.forEach(r => all.push({ ...r, type: 'aarti' }));
 
       const chalisaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
         'SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
         [like, like, like]
       );
-      setChalisaResults(chalisaRows.map((r) => ({ ...r, type: 'chalisa' as const })));
+      chalisaRows.forEach(r => all.push({ ...r, type: 'chalisa' }));
 
       const kathaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
         'SELECT id, titleEnglish, titleNative, deity FROM kathas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
         [like, like, like]
       );
-      setKathaResults(kathaRows.map((r) => ({ ...r, type: 'katha' as const })));
+      kathaRows.forEach(r => all.push({ ...r, type: 'katha' }));
+
+      setResults(all);
     }, 300);
 
     return () => clearTimeout(timer);
   }, [db, query]);
 
   const hasQuery = query.trim().length > 0;
-  const hasResults = aartiResults.length > 0 || chalisaResults.length > 0 || kathaResults.length > 0;
+  const hasResults = results.length > 0;
+
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<SearchResult>) => {
+    const route = item.type === 'aarti' ? `/aarti/${item.id}` : item.type === 'chalisa' ? `/chalisa/${item.id}` : `/katha/${item.id}`;
+    return (
+      <ResultCard
+        item={item}
+        query={query}
+        colors={colors}
+        onPress={() => router.push(route as any)}
+      />
+    );
+  }, [query, colors]);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
@@ -123,63 +135,19 @@ export default function SearchScreen() {
       ) : !hasResults ? (
         <NoResults query={query} colors={colors} />
       ) : (
-        <ScrollView
+        <FlatList
+          data={results}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
+          renderItem={renderItem}
           contentContainerStyle={[styles.results, { paddingHorizontal: spacing.screenH }]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           automaticallyAdjustKeyboardInsets
-          showsVerticalScrollIndicator={false}>
-
-          {/* Aartis group */}
-          {aartiResults.length > 0 && (
-            <View>
-              <GroupHeader label={t('search.aartisSection', { count: aartiResults.length })} colors={colors} />
-              {aartiResults.map((item) => (
-                <ResultCard
-                  key={item.id}
-                  item={item}
-                  query={query}
-                  colors={colors}
-                  onPress={() => router.push(`/aarti/${item.id}`)}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Chalisas group */}
-          {chalisaResults.length > 0 && (
-            <View style={aartiResults.length > 0 ? { marginTop: 8 } : undefined}>
-              <GroupHeader label={t('search.chalisasSection', { count: chalisaResults.length })} colors={colors} />
-              {chalisaResults.map((item) => (
-                <ResultCard
-                  key={item.id}
-                  item={item}
-                  query={query}
-                  colors={colors}
-                  onPress={() => router.push(`/chalisa/${item.id}`)}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Kathas group */}
-          {kathaResults.length > 0 && (
-            <View style={(aartiResults.length > 0 || chalisaResults.length > 0) ? { marginTop: 8 } : undefined}>
-              <GroupHeader label={t('search.kathasSection', { count: kathaResults.length })} colors={colors} />
-              {kathaResults.map((item) => (
-                <ResultCard
-                  key={item.id}
-                  item={item}
-                  query={query}
-                  colors={colors}
-                  onPress={() => router.push(`/katha/${item.id}`)}
-                />
-              ))}
-            </View>
-          )}
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+        />
       )}
 
     </SafeAreaView>
@@ -195,7 +163,7 @@ interface ResultCardProps {
   onPress: () => void;
 }
 
-function ResultCard({ item, query, colors, onPress }: ResultCardProps) {
+const ResultCard = memo(function ResultCard({ item, query, colors, onPress }: ResultCardProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -225,7 +193,7 @@ function ResultCard({ item, query, colors, onPress }: ResultCardProps) {
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Highlight Text ───────────────────────────────────────────────────────────
 
@@ -236,7 +204,7 @@ interface HighlightTextProps {
   highlightColor: string;
 }
 
-function HighlightText({ text, query, baseStyle, highlightColor }: HighlightTextProps) {
+const HighlightText = memo(function HighlightText({ text, query, baseStyle, highlightColor }: HighlightTextProps) {
   const q = query.trim();
   if (!q) return <Text style={baseStyle}>{text}</Text>;
 
@@ -257,15 +225,7 @@ function HighlightText({ text, query, baseStyle, highlightColor }: HighlightText
       {after}
     </Text>
   );
-}
-
-// ─── Group Header ─────────────────────────────────────────────────────────────
-
-function GroupHeader({ label, colors }: { label: string; colors: ColorPalette }) {
-  return (
-    <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{label}</Text>
-  );
-}
+});
 
 // ─── Empty States ─────────────────────────────────────────────────────────────
 
@@ -329,13 +289,6 @@ const styles = StyleSheet.create({
 
   // Results
   results: { paddingTop: 16, paddingBottom: 32 },
-  groupHeader: {
-    fontSize: 11,
-    fontFamily: 'Mukta_400Regular',
-    letterSpacing: 1,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
 
   // Card
   card: {

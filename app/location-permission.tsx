@@ -105,7 +105,7 @@ export default function LocationPickerScreen() {
     );
   }
 
-  const currentLabel = locationName ?? (userLocation ? 'GPS' : 'Pune (default)');
+  const currentLabel = locationName ?? (userLocation ? 'GPS' : 'Varanasi (default)');
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>

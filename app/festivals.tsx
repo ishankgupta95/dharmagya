@@ -118,6 +118,9 @@ export default function FestivalsScreen() {
         contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         renderSectionHeader={({ section }) => (
           <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
             <Text style={[styles.sectionTitle, { color: colors.accent }]}>{section.title}</Text>
