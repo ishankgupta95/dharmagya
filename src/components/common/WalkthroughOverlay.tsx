@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, TouchableOpacity, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
 import { borderRadius, type ColorPalette } from '@/config/theme';
 
@@ -53,10 +61,39 @@ export function WalkthroughSpotlight({
   const { t } = useTranslation();
   const [tooltipHeight, setTooltipHeight] = useState(0);
 
+  // Measure the overlay's own screen position so we can offset spotlight
+  // coordinates (which come from measureInWindow = screen-absolute) to be
+  // relative to this container.
+  const rootRef = useRef<View>(null);
+  const [containerOffset, setContainerOffset] = useState<{ x: number; y: number } | null>(null);
+
+  const measureSelf = useCallback(() => {
+    rootRef.current?.measureInWindow((cx, cy) => {
+      setContainerOffset({ x: cx, y: cy });
+    });
+  }, []);
+
+  // Pulsing animation for the spotlight border
+  const pulseOpacity = useSharedValue(1);
+  useEffect(() => {
+    pulseOpacity.value = withRepeat(
+      withTiming(0.4, { duration: 900, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [pulseOpacity]);
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+  }));
+
+  // Offset spotlight from screen-absolute to container-relative coords
+  const ox = containerOffset?.x ?? 0;
+  const oy = containerOffset?.y ?? 0;
+
   // Spotlight rect with padding
   const s = {
-    x: spotlight.x - PADDING,
-    y: spotlight.y - PADDING,
+    x: spotlight.x - PADDING - ox,
+    y: spotlight.y - PADDING - oy,
     w: spotlight.width + PADDING * 2,
     h: spotlight.height + PADDING * 2,
   };
@@ -73,13 +110,24 @@ export function WalkthroughSpotlight({
   // Hide tooltip until measured for 'above' positioning
   const tooltipReady = tooltipPosition === 'below' || tooltipHeight > 0;
 
+  // Hide everything until we know our own screen offset
+  const overlayReady = containerOffset !== null;
+
   return (
+    <View
+      ref={rootRef}
+      style={styles.root}
+      pointerEvents="box-none"
+      onLayout={measureSelf}
+    >
     <Animated.View
       entering={FadeIn.duration(300)}
       exiting={FadeOut.duration(200)}
-      style={styles.root}
+      style={StyleSheet.absoluteFillObject}
       pointerEvents="box-none"
     >
+      {overlayReady && (
+        <>
       {/* ── 4 dark strips forming the backdrop with a cutout ── */}
       <View style={[styles.strip, { top: 0, left: 0, right: 0, height: s.y }]} />
       <View style={[styles.strip, { top: s.y + s.h, left: 0, right: 0, bottom: 0 }]} />
@@ -87,7 +135,7 @@ export function WalkthroughSpotlight({
       <View style={[styles.strip, { top: s.y, left: s.x + s.w, right: 0, height: s.h }]} />
 
       {/* ── Glowing border around spotlight ── */}
-      <View
+      <Animated.View
         style={[
           styles.spotlightBorder,
           {
@@ -96,8 +144,10 @@ export function WalkthroughSpotlight({
             width: s.w,
             height: s.h,
             borderColor: colors.accent,
+            backgroundColor: colors.accent + '20',
             shadowColor: colors.accent,
           },
+          pulseStyle,
         ]}
       />
 
@@ -195,7 +245,10 @@ export function WalkthroughSpotlight({
           />
         )}
       </View>
+        </>
+      )}
     </Animated.View>
+    </View>
   );
 }
 
