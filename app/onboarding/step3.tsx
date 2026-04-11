@@ -22,9 +22,10 @@ export default function OnboardingStep3() {
 
   function handleFinish() {
     setHasOnboarded();
+    // Dismiss all onboarding screens from the stack before navigating,
+    // so the user can't swipe back into the onboarding flow.
+    router.dismissAll();
     if (locationChoice === 'gps') {
-      // Replace history with tabs first so router.back() from location-permission
-      // lands on the main app, not the onboarding flow.
       router.replace('/(tabs)');
       router.push('/location-permission');
     } else {

@@ -35,7 +35,6 @@ export default function RootLayout() {
     if (storeHydrated) return;
     return useStore.persist.onFinishHydration(() => setStoreHydrated(true));
   }, [storeHydrated]);
-
   // Sync i18n language whenever the persisted preference changes
   useEffect(() => {
     if (storeHydrated) {

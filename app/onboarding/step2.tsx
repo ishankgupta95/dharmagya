@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { View, TouchableOpacity, FlatList, StyleSheet, Dimensions, ListRenderItemInfo } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -10,12 +9,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, borderRadius, spacing } from '@/config/theme';
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
+import { DeityAvatar } from '@/components/common/DeityAvatar';
 
 const colors = darkColors;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const NUM_COLUMNS = 3;
-const CARD_GAP = 10;
+const NUM_COLUMNS = 2;
+const CARD_GAP = 12;
 const CARD_WIDTH = (SCREEN_WIDTH - spacing.screenH * 2 - CARD_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -123,12 +123,8 @@ function DeityCard({ deity, isSelected, onPress }: DeityCardProps) {
         isSelected && { backgroundColor: deity.color + '12' },
       ]}>
 
-      {/* Avatar circle */}
-      <LinearGradient
-        colors={[deity.color + '50', deity.color + '20']}
-        style={styles.cardAvatar}>
-        <Text style={[styles.cardInitial, { color: deity.color }]}>{deity.initial}</Text>
-      </LinearGradient>
+      {/* Deity image */}
+      <DeityAvatar deity={deity.name} size={64} />
 
       <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
         {t(`deities.${deity.id}.displayName`)}
@@ -203,19 +199,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     backgroundColor: colors.surface,
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingHorizontal: 6,
     gap: 4,
     position: 'relative',
   },
-  cardAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardInitial: { fontSize: 20, fontFamily: 'Mukta_700Bold' },
   cardNameHindi: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
   checkCircle: {
