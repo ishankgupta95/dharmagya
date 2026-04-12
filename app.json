@@ -2,7 +2,7 @@
   "expo": {
     "name": "dharmagya",
     "slug": "dharmSetu",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/dharmagya_logo_small.png",
     "scheme": "dharmagya",
@@ -19,7 +19,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.ishank1995.dharmagya"
+      "package": "com.ishank1995.dharmagya",
+      "versionCode": 2
     },
     "web": {
       "output": "static",
@@ -50,7 +51,7 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "androidAppId": "ca-app-pub-3308933648799485~9721445524",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ],

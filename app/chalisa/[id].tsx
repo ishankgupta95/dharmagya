@@ -17,6 +17,7 @@ import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, i
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import type { IChalisaSection } from '@/types';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ interface ChalisaDetail {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ChalisaDetailScreen() {
+  useInterstitialOnExit();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isDarkMode = useStore(s => s.isDarkMode);
   const favoriteIds = useStore(s => s.favoriteIds);

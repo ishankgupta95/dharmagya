@@ -1,0 +1,34 @@
+{
+  "banner": {
+    "home": {
+      "android": "ca-app-pub-3308993640799405/8895661047",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    },
+    "panchangInline": {
+      "android": "ca-app-pub-3308993640799405/8815769991",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    },
+    "libraryGodsInline": {
+      "android": "ca-app-pub-3308993640799405/2685475915",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    },
+    "libraryKathasInline": {
+      "android": "ca-app-pub-3308993640799405/5227878774",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    },
+    "festivals": {
+      "android": "ca-app-pub-3308993640799405/3563443318",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    }
+  },
+  "interstitial": {
+    "contentExit": {
+      "android": "ca-app-pub-3308993640799405/5391318272",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    },
+    "appResume": {
+      "android": "ca-app-pub-3308993640799405/1811377946",
+      "ios": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+    }
+  }
+}

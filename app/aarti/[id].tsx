@@ -18,6 +18,7 @@ import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, i
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import type { IAarti } from '@/types';
 // ─── DB Row Type ──────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ interface AartiRow {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AartiDetailScreen() {
+  useInterstitialOnExit();
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isDarkMode = useStore(s => s.isDarkMode);

@@ -29,6 +29,8 @@ interface AppStore {
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
   walkthroughStep: number;
+  /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
+  firstOpenTimestamp: number;
 
   // Actions (not persisted)
   toggleTheme: () => void;
@@ -42,6 +44,7 @@ interface AppStore {
   setDailyReminderEnabled: (val: boolean) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
   setWalkthroughStep: (step: number) => void;
+  initFirstOpen: () => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -59,6 +62,7 @@ export const useStore = create<AppStore>()(
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
       walkthroughStep: 1,
+      firstOpenTimestamp: 0,
 
       toggleTheme: () => set((s) => ({ isDarkMode: !s.isDarkMode })),
       toggleFavorite: (id) =>
@@ -76,6 +80,7 @@ export const useStore = create<AppStore>()(
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
+      initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
     }),
     {
       name: 'dharmagya-store',

@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { AdBanner } from '@/components/common/AdBanner';
 
 import festivalsData from '@/data/static/festivals.json';
 
@@ -135,6 +136,8 @@ export default function FestivalsScreen() {
           </View>
         }
       />
+
+      <AdBanner colors={colors} placement="festivals" />
     </SafeAreaView>
   );
 }

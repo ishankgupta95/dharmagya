@@ -626,6 +626,9 @@ export default function PanchangScreen() {
               </View>
             </View>
 
+            {/* ── Inline Ad ── */}
+            <AdBanner colors={colors} placement="panchangInline" inline />
+
             {/* ── Auspicious Times ── */}
             <SectionHeader title={t('panchang.auspiciousTimes')} colors={colors} />
 
@@ -706,8 +709,6 @@ export default function PanchangScreen() {
         ) : null}
 
       </ScrollView>
-
-      <AdBanner colors={colors} />
 
       <DatePickerOverlay
         visible={showPicker}

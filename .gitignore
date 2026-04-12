@@ -44,3 +44,7 @@ app-example
 
 # Metro bundler temp files
 .com.facebook.react.*
+
+# Build artifacts
+*.apk
+*.aab

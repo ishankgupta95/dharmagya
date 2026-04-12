@@ -1,4 +1,5 @@
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -15,11 +16,13 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
 import { initDatabase } from '@/utils/database';
 import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
+import { preloadInterstitial, showInterstitial } from '@/services/interstitialAds';
+import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isDarkMode, hasOnboarded, language } = useStore();
+  const { isDarkMode, hasOnboarded, language, initFirstOpen } = useStore();
   const [storeHydrated, setStoreHydrated] = useState(
     () => useStore.persist.hasHydrated()
   );
@@ -47,14 +50,37 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (appReady) {
+      initFirstOpen();
       SplashScreen.hideAsync();
     }
-  }, [appReady]);
+  }, [appReady, initFirstOpen]);
 
   useEffect(() => {
     if (appReady && !hasOnboarded) {
       router.replace('/onboarding/step1');
     }
+  }, [appReady, hasOnboarded]);
+
+  // ── App resume interstitial ───────────────────────────────────────────────
+  const backgroundTimestampRef = useRef(0);
+
+  useEffect(() => {
+    if (!appReady || !hasOnboarded) return;
+
+    preloadInterstitial('appResume');
+
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'background' || state === 'inactive') {
+        backgroundTimestampRef.current = Date.now();
+      } else if (state === 'active' && backgroundTimestampRef.current > 0) {
+        const elapsed = Date.now() - backgroundTimestampRef.current;
+        backgroundTimestampRef.current = 0;
+        if (elapsed >= APP_RESUME_MIN_BACKGROUND_MS) {
+          showInterstitial('appResume');
+        }
+      }
+    });
+    return () => sub.remove();
   }, [appReady, hasOnboarded]);
 
   if (!appReady) return null;

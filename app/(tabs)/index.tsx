@@ -334,7 +334,7 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      <AdBanner colors={colors} />
+      <AdBanner colors={colors} placement="home" />
 
       {/* ── Walkthrough Step 1: Spotlight panchang card ── */}
       {walkthroughStep === 1 && panchangRect && (

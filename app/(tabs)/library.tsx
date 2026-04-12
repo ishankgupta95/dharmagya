@@ -151,6 +151,7 @@ export default function LibraryScreen() {
             getItemLayout={(_, index) => ({ length: 98, offset: 98 * index, index })}
             contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
             showsVerticalScrollIndicator={false}
+            ListFooterComponent={<AdBanner colors={colors} placement="libraryGodsInline" inline />}
           />
         </View>
       ) : (
@@ -165,10 +166,9 @@ export default function LibraryScreen() {
           maxToRenderPerBatch={10}
           windowSize={5}
           removeClippedSubviews
+          ListFooterComponent={<AdBanner colors={colors} placement="libraryKathasInline" inline />}
         />
       )}
-
-      <AdBanner colors={colors} />
 
       {/* ── Walkthrough Step 3: Spotlight deity grid ── */}
       {walkthroughStep === 3 && deityGridRect && (
