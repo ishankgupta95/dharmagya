@@ -651,11 +651,11 @@ Do NOT overwrite files blindly. Read first, then modify.
 
 ---
 
-## 7. Execution Plan (Phase 1)
+## 7. Execution Plan (Phase 1) — ✅ COMPLETED
 
-Do not execute all steps at once. Acknowledge this plan, and wait for me to command you to start "Step 1".
+All Phase 1 steps below have shipped. Steps 1–17 are done. See Section 9 onward for Phase 2+.
 
-### Step 1: Dependency Installation & Scaffolding
+### Step 1: Dependency Installation & Scaffolding — ✅
 
 - Install only the missing dependencies: `react-native-paper`, `zustand`, `expo-sqlite`, `expo-location`, `@ishubhamx/panchangam-js`, and `@expo-google-fonts/mukta`.
 - Do NOT reinstall `react-native-reanimated` (already at v4.1.1), `expo-splash-screen`, or `react-native-gesture-handler`.
@@ -663,7 +663,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - Create folder structure: `src/components/common`, `src/config`, `src/data/static`, `src/services/astrology`, `src/store`, `src/types`, `src/utils`.
 - Migrate existing `components/`, `hooks/`, `constants/` from root into `src/` and update all import paths.
 
-### Step 2: Strict Data Interfaces & Global State
+### Step 2: Strict Data Interfaces & Global State — ✅
 
 - In `src/types/index.ts`, explicitly define these exact interfaces:
 
@@ -708,7 +708,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   ```
 
 - In `src/store/useStore.ts`, implement the full Zustand store with persistence **exactly as specified in Section 3.4**. Update `favoriteAartiIds` to `favoriteIds` — this stores both aarti and chalisa IDs (they have distinct prefixes: `aarti-*` and `chalisa-*`).
-### Step 3: Theme & Typography Configuration
+### Step 3: Theme & Typography Configuration — ✅
 
 - In `src/config/theme.ts`, extend the `MD3DarkTheme` and `MD3LightTheme` using the color palette from Section 4.1.
 - Map dark theme colors: primary = `#E8893C`, background = `#1A1A1F`, surface = `#222228`, onSurface = `#F0E6D3`.
@@ -716,7 +716,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - Load Mukta fonts as specified in Section 3.5 (`Mukta_400Regular`, `Mukta_500Medium`, `Mukta_700Bold`).
 - Configure RN Paper's `fontConfig` to use `Mukta_400Regular` as the default body font and `Mukta_500Medium` for headings.
 
-### Step 4: App Shell, Routing & Splash Screen
+### Step 4: App Shell, Routing & Splash Screen — ✅
 
 - **FIRST:** Read `app.json` (or `app.config.ts`) and `tsconfig.json` to understand current config before modifying.
 - Set up `tsconfig.json` path alias as specified in Section 3.3 (if not already present).
@@ -731,7 +731,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - Tab bar styling: `#1A1A1F` background (dark), `#FAF6F0` (light), 0.5px top border. Active = filled icon + accent label. Inactive = outline icon + textMuted label.
 - Create empty screen files: `app/(tabs)/panchang.tsx` and `app/(tabs)/library.tsx`.
 
-### Step 5: The Panchang Engine Service
+### Step 5: The Panchang Engine Service — ✅ (migrated to `panchang-ts` with extended limbs: Choghadiya, Gowri, Hora, planetary positions)
 
 - In `src/services/astrology/panchangService.ts`, create a service that:
   1. Checks for Expo Location permissions via `expo-location`.
@@ -749,7 +749,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   7. Wraps in try/catch — returns null on failure so screens can show error state.
 - See Section 3.1 for the complete `Panchangam` return type and import paths.
 
-### Step 6: Initialization & Data Seeding (Crucial)
+### Step 6: Initialization & Data Seeding (Crucial) — ✅ (expanded: 29 aartis, 12 chalisas, 12 kathas across 25 deities)
 
 - In `src/utils/database.ts`, write an initialization function using the synchronous API (Section 3.2):
   ```typescript
@@ -798,7 +798,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - **Chalisa sections field:** `sections` is an array of `IChalisaSection` objects. Store as `JSON.stringify(sections)` in SQLite. Parse back on read. Each section has `type` ("doha" or "chaupai"), `label`, and `verses[]`.
 - Seeding runs only when the respective table has 0 rows (first launch). No AsyncStorage needed.
 
-### Step 7: Home Screen UI
+### Step 7: Home Screen UI — ✅
 
 - In `app/(tabs)/index.tsx`, build the Home screen per Section 6.2:
   - Greeting based on time of day (Shubh Prabhat / Shubh Dopahar / Shubh Sandhya).
@@ -807,7 +807,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Quick Access row (Favorites, All Aartis, Panchang).
   - All data sourced from the Zustand store / panchangService — no hardcoded values.
 
-### Step 8: Panchang Screen UI
+### Step 8: Panchang Screen UI — ✅ (extended with Choghadiya, Gowri Panchangam, Hora, planetary positions, Panchaka)
 
 - In `app/(tabs)/panchang.tsx`, build per Section 6.3:
   - Centered date display with Hindu month, large day number, Gregorian date, Vikram Samvat year.
@@ -817,7 +817,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Handle loading state (skeleton shimmer) while service calculates.
   - Handle error state with retry button and fallback note.
 
-### Step 9: Library Screen UI (Aartis + Chalisas)
+### Step 9: Library Screen UI (Aartis + Chalisas) — ✅ (extended with Kathas and Gods tabs, deity-based browsing)
 
 - In `app/(tabs)/library.tsx`, build an expanded library with two content types:
   - **Top-level segment control:** Two pill-shaped tabs — "Aartis" and "Chalisas" — to switch between the two categories. Use a simple Zustand or local state toggle (not a nested tab navigator). Active segment: accent bg, base text. Inactive: surfaceRecessed bg, textSecondary.
@@ -832,7 +832,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Tapping an aarti navigates to `app/aarti/[id].tsx`. Tapping a chalisa navigates to `app/chalisa/[id].tsx`.
   - Favorites toggle (heart icon) updates Zustand `favoriteIds` — works for both aartis and chalisas.
 
-### Step 10a: Aarti Detail Screen
+### Step 10a: Aarti Detail Screen — ✅
 
 - In `app/aarti/[id].tsx`, build per Section 6.5.
 - Read the aarti ID using `const { id } = useLocalSearchParams<{ id: string }>()` (see Section 3.6).
@@ -843,7 +843,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - Scrollable lyrics with verse labels, center-aligned Devanagari text, dividers.
 - Bottom "Read Along Mode" CTA — **shows "Coming Soon" toast on press in MVP** (see Section 3.7).
 
-### Step 10b: Chalisa Detail Screen
+### Step 10b: Chalisa Detail Screen — ✅ (plus Katha detail at `app/katha/[id].tsx` and Deity detail at `app/god/[id].tsx`)
 
 - In `app/chalisa/[id].tsx`, build a Chalisa-specific detail view.
 - Read ID using `const { id } = useLocalSearchParams<{ id: string }>()`.
@@ -857,7 +857,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Dividers between sections (not between every chaupai — keep the flow continuous within the chaupai block, with subtle spacing between pairs).
 - Bottom CTA: "Read Along Mode" — shows "Coming Soon" toast in MVP.
 
-### Step 11: Settings Screen
+### Step 11: Settings Screen — ✅ (notifications wired in Phase 2; font size + language + masa system now functional)
 
 - In `app/settings.tsx`, build per Section 6.6:
   - Grouped settings sections: Appearance, Location, Notifications, About.
@@ -867,7 +867,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Notification toggles: **UI stubs only** — toggle state saved in Zustand but NO `expo-notifications` wiring (Section 3.7). Phase 2 adds real scheduling.
   - About section: version "1.0.0 (MVP)", engine "panchangam-js".
 
-### Step 12: Search Screen
+### Step 12: Search Screen — ✅ (extended to include Kathas)
 
 - In `app/search.tsx`, build per Section 6.7:
   - Search bar with accent border on focus.
@@ -877,14 +877,14 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
   - Result count and bilingual support note.
   - Tapping an aarti result navigates to `app/aarti/[id].tsx`. Tapping a chalisa result navigates to `app/chalisa/[id].tsx`.
 
-### Step 13: Favorites Screen
+### Step 13: Favorites Screen — ✅
 
 - In `app/favorites.tsx`, build per Section 6.8:
   - Filtered list of favorited items — query both `aartis` and `chalisas` tables using IDs from Zustand `favoriteIds`.
   - Mix aartis and chalisas in one list, each card showing a small type badge ("Aarti" or "Chalisa") in textMuted.
   - Empty state with dashed heart, explanation text, "Browse library" CTA.
 
-### Step 14: Onboarding Flow
+### Step 14: Onboarding Flow — ✅ (3-step flow + 4-step in-app walkthrough spotlight)
 
 - In `app/onboarding/` directory:
   - `step1.tsx` — Deity preference (2×2 grid, multi-select). Saves to `useStore().setSelectedDeities()`.
@@ -894,7 +894,7 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - On completion: call `useStore().setHasOnboarded()`, navigate to Home via `router.replace('/(tabs)')`.
 - Onboarding gate: In `app/_layout.tsx`, check `useStore().hasOnboarded`. If false, redirect to `app/onboarding/step1.tsx`. This works because `hasOnboarded` is persisted via Zustand middleware (Section 3.4).
 
-### Step 15: Location Permission Flow
+### Step 15: Location Permission Flow — ✅
 
 - Pre-prompt screen (Section 6.10): shown before calling `expo-location` requestPermissions.
 - Trust signals card list (3 items with green checks).
@@ -902,14 +902,14 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 - "Skip" sets fallback coordinates and continues.
 - If denied at OS level: show Location Error state (Section 6.11) with "Grant location access" (opens device settings) and "Continue with fallback".
 
-### Step 16: Loading & Error States
+### Step 16: Loading & Error States — ✅
 
 - Create reusable skeleton component (`src/components/common/SkeletonLoader.tsx`) with shimmer animation using `react-native-reanimated`.
 - Home skeleton: matches home screen card dimensions.
 - Panchang error card: error icon, message, retry button, fallback note.
 - Location error card: location-X icon, message, fallback info, dual CTAs.
 
-### Step 17: Integration & Polish
+### Step 17: Integration & Polish — ✅ (plus AdMob banners/interstitials, i18n: en/hi/sa, Festival calendar 2016–2036, date picker)
 
 - Ensure favorites state is consistent across Home and Library screens.
 - Verify splash screen dismisses correctly after fonts and DB are ready.
@@ -922,13 +922,273 @@ Do not execute all steps at once. Acknowledge this plan, and wait for me to comm
 
 ---
 
-## 8. Future Enhancements (Phase 2)
+## 8. Phase 1.5 Follow-ups (status as of 2026-04-12)
 
-- Notification scheduling using `expo-notifications` (morning at sunrise, evening at sunset).
-- Read Along Mode: auto-scroll lyrics at configurable speed.
-- Panchang date picker: navigate to any future/past date.
-- Audio playback: MP3 aarti recordings with background audio support.
-- Widget: Home screen widget showing today's tithi and sunrise.
-- Expanded Aarti library: 50+ aartis with categorization by occasion (daily, festival, deity-specific).
-- Mantra counter: tap-based counter with haptic feedback and session history.
-- Festival calendar: upcoming Hindu festivals derived from Panchang data.
+- ✅ Notification scheduling (`expo-notifications`) — daily reminder at 7 AM + sunrise alert.
+- ⏳ Read Along Mode: auto-scroll lyrics. **Deferred — tied to audio track (see Phase 5).**
+- ✅ Panchang date picker (2016–2036).
+- ⏳ Audio playback. **Deferred — see Phase 5 (far-future).**
+- ⏳ Home-screen widget. **Moved into Phase 4 below.**
+- 🟡 Expanded library: 29 aartis / 12 chalisas / 12 kathas across 25 deities. Further expansion continues in Phase 3.
+- ⏳ Mantra counter (Jaap). **Moved into Phase 4 below.**
+- ✅ Festival calendar (precomputed 2016–2036, 5 festival types).
+- ✅ AdMob banners + interstitials with grace period (not in original plan).
+- ✅ i18n: English, Hindi, Sanskrit (not in original plan).
+- ✅ Dark/light theme + font size + Purnimanta/Amanta toggle (not in original plan).
+
+---
+
+## 9. Competitive-Gap Roadmap — Phases 2–5
+
+**Source:** Comparative analysis against Sri Mandir, AstroSage, Drik Panchang, myMandir, Hindu Calendar (Mandavgane), etc. Goal: close the feature gap that prevents Dharmagya from moving beyond a niche reference tool, while leaning into our existing `panchang-ts` accuracy moat.
+
+**Guiding rules for every phase below:**
+1. Never break offline-first. Every new feature must work without a network after first install (the one exception is remote content pulls for Rashifal, which must gracefully degrade to a cached payload).
+2. Integrate with existing Zustand store, SQLite database, theme tokens, and i18n system. Do not introduce a second state/storage/theme/i18n layer.
+3. Respect the ad gating rules already established (`INTERSTITIAL_MIN_GAP_MS`, `FIRST_SESSION_GRACE_MS`, never show ads before the user has engaged with content — see `feedback_no_ads_after_onboarding.md`).
+4. All new text must be wired through `i18next` bundles, not hard-coded. Add keys to en/hi/sa at minimum.
+5. All new calculations must be locale-aware (IST timezone, device language for display).
+6. No new native modules unless a feature is impossible without one (widgets are the only Phase-2-to-4 exception).
+
+---
+
+## 10. Phase 2 — Daily Habit Drivers (highest-ROI, ship first)
+
+**Goal:** Turn the app from a reference tool into something users open every morning. These four features are what every competitor has and Dharmagya lacks — they drive daily returns with low-to-medium implementation cost.
+
+### Step P2.1: Daily Rashifal (12 Zodiac Signs)
+
+**Why:** Daily Rashifal is the single biggest habit-former in Indian devotional/astrology apps. Every successful competitor ships it. Implementation is straightforward — it's content delivery + a shareable card.
+
+**Implementation:**
+- Add a new tab OR a prominent home-screen card titled "Aaj Ka Rashifal" / "Today's Horoscope".
+- Content model — two options, pick one up front:
+  - **(A) Static generation:** pre-compute a year's worth of daily Rashifal entries per sign via an LLM pipeline, bundle as JSON. Zero network dependency. Risk: repetitive content.
+  - **(B) Remote content with offline cache:** fetch daily from a JSON endpoint (Cloudflare R2 or Firebase Storage), cache last 7 days in SQLite. Risk: requires backend.
+  - **Recommendation:** start with (A) for launch, migrate to (B) once we have >10K DAUs and content quality matters more than ops simplicity.
+- Data schema: `rashifal(date TEXT, sign TEXT, language TEXT, body TEXT, PRIMARY KEY(date, sign, language))`. Seed en/hi/sa.
+- Sign selection: derived from user's birth date (captured during onboarding Step 2.5 — add a new optional step for DOB/time/place; skip-able but gates Kundli unlock). If user skips, default to "All signs" grid view.
+- Screens:
+  - `app/rashifal/index.tsx` — 12-sign grid with the user's sign highlighted at top.
+  - `app/rashifal/[sign].tsx` — detail screen: today's prediction + 7-day strip (tappable to see past entries from cache) + share button (**share deferred to Phase 5**).
+- Home card: "Aaj Ka Rashifal — [user's sign]" showing a 2-line excerpt + chevron.
+- i18n: add `rashifal.*` keys.
+- Ads: banner on index, NO interstitial (daily return screens should be frictionless).
+
+### Step P2.2: Extended Muhurats Surfacing (calculations already exist)
+
+**Why:** The `panchang-ts` engine already computes Choghadiya, Gowri Panchangam, Hora, Abhijit, Brahma Muhurta, Rahu Kalam, Yamaganda, Gulika, Dur Muhurta — these are already surfaced in the Panchang tab. The gap vs. Drik Panchang / AstroSage is **occasion-specific muhurats** (Vivah / marriage, Griha Pravesh / housewarming, Namkaran / naming, Vahan / vehicle purchase, Mundan, Annaprashan).
+
+**Implementation:**
+- New screen: `app/muhurat/index.tsx` — list of occasions (Vivah, Griha Pravesh, Namkaran, Vahan, Mundan, Annaprashan, Vidyarambh).
+- Per occasion: a date-range picker (today → +90 days) returning **auspicious days** within the range, computed from rules (Tithi / Nakshatra / Yoga / Vara combinations plus exclusion of Rahu Kalam & Yamaganda). Rules are static lookup tables per occasion.
+- Rule source: encode classical Muhurat rules in `src/services/astrology/muhurat.ts`. Each rule set = `{ auspiciousTithis, auspiciousNakshatras, excludedYogas, excludedVaras, requiresShuklaPaksha }`.
+- Result view: calendar strip highlighting auspicious dates in accent, with tap-through to a day detail showing which slots inside that day are best (using existing Choghadiya + Abhijit + Brahma Muhurta).
+- Entry point: card on Home screen ("Find an auspicious date") + entry from Panchang screen.
+- No audio / no ads on compute result (user is mid-flow).
+
+### Step P2.3: Vrat Katha Library (pair with existing Vrat data)
+
+**Why:** The app already tracks Ekadashi (27/yr), Pradosha Vrata (13/yr), and festival dates. We already ship 12 kathas. Gap: no *Vrat Katha* — the specific fasting-day stories users want to read on that day. Low effort because Vrat dates are already computed and a Katha table exists.
+
+**Implementation:**
+- Extend the `kathas` table with a `vrat_type` column (nullable): one of `ekadashi`, `pradosha`, `purnima`, `amavasya`, `sankashti`, `shivaratri`, `karwa_chauth`, `janmashtami`, `navratri`, `satyanarayan`. NULL for general kathas.
+- Seed new Vrat Kathas (12–15 entries): Satyanarayan Katha (already exists — tag it), Shivaratri Vrat Katha, Karwa Chauth, Vat Savitri, Sankashti Ganesh Chaturthi, Ekadashi Mahatmya, etc.
+- On the Festivals screen, each festival row that has an associated Vrat Katha gets a "📖 Read Katha" chip that deep-links into `app/katha/[id].tsx`.
+- Home screen: if today is a Vrat day (query festivals table), surface a "Today's Vrat Katha" card above the Featured Aarti.
+- Notifications: piggy-back on the existing daily reminder infra — when scheduling daily reminder, check tomorrow's Vrat status and, if present, append Vrat name to the notification body.
+- No new screens — reuses existing katha detail view.
+
+### Step P2.4: Festival & Tithi Reminders (recursive push notifications)
+
+**Why:** Drik Panchang & myMandir both let users subscribe to recurring reminders for specific Tithis (e.g., every Ekadashi, every Pradosha, every Purnima/Amavasya). Converts reference tool into calendar companion.
+
+**Implementation:**
+- New screen: `app/settings/reminders.tsx` (accessible from the existing Notifications section in Settings).
+- User can toggle recurring reminders per Tithi type: Ekadashi, Pradosha, Purnima, Amavasya, Sankashti Chaturthi, Shivaratri (monthly), Sankranti.
+- Per-toggle time preference (default 7:00 PM evening before, to allow user to prepare for next-day Vrat).
+- Implementation: on every app foreground (or nightly via background task) recompute next 30 days of reminder triggers and re-schedule via `expo-notifications`. Clear + re-schedule pattern is safe because Expo notification IDs are deterministic per (tithi_type, date).
+- Festival reminders: major festivals (from existing 2024–2036 festival data) get a one-time scheduled notification 1 day prior. User opts in per festival type (major / minor / ekadashi / pradosha / sankranti) with separate toggles.
+- Reuse existing notification permission flow — no new UX.
+- Respect `feedback_no_ads_after_onboarding.md`: first-time user opening this screen during onboarding walkthrough does not trigger permission prompt automatically; they must tap a toggle first.
+
+### Phase 2 Exit Criteria
+
+- Daily Rashifal visible on Home, tab/route in place, 12-sign grid, detail screens, 7-day history, English + Hindi bundle seeded for 365 days × 12 signs.
+- 7 occasion-specific Muhurat screens shipping with correct classical rules.
+- Vrat Katha library seeded with at least 10 new entries, Vrat-day surfacing on Home, Festival deep-links wired.
+- Recurring Tithi reminders with 6 toggles, festival reminders with 5 category toggles, scheduling proven correct via a test harness (mock "today" and assert next 30 days of scheduled notifications).
+- All new strings in en/hi/sa.
+
+---
+
+## 11. Phase 3 — Reach Expansion (languages + content depth)
+
+**Goal:** Unlock pan-India audiences. English + Hindi + Sanskrit cover maybe 45% of the devotional market; adding 4 more regional languages expands reach to ~80%. Also deepens the deity/content library that users browse.
+
+### Step P3.1: Multilingual Expansion (Marathi, Gujarati, Tamil, Telugu)
+
+**Why:** Drik Panchang supports 10 languages, AstroSage 9. Without regional languages, Dharmagya cannot compete in Maharashtra, Gujarat, Tamil Nadu, Andhra/Telangana.
+
+**Implementation:**
+- Add 4 new i18n bundles: `mr` (Marathi), `gu` (Gujarati), `ta` (Tamil), `te` (Telugu). Keep existing lazy-loading — only the selected language loads at runtime.
+- Translate UI strings: split into two tiers:
+  - **Tier 1 (ship together with language toggle):** navigation, settings, panchang labels, notification templates, onboarding. Machine-translate via professional MT (DeepL/Google) then native-speaker QA pass for each language (budget: 1 freelancer per language for 4–6 hours).
+  - **Tier 2 (ship progressively):** devotional content (aarti/chalisa/katha translations in regional scripts). These are content-heavy; translate the 10 most-popular items per language first, add rest over subsequent releases.
+- Font loading: Mukta already covers Devanagari (Hindi/Marathi/Sanskrit) and Gujarati via `@expo-google-fonts/mukta-*` variants. Add Tamil and Telugu fonts (`@expo-google-fonts/mukta-malar` / `@expo-google-fonts/mukta-vaani`). Verify no rendering regressions on Android.
+- Panchang terminology: the `panchang-ts` library may not have Marathi/Gujarati/Tamil/Telugu tithi/nakshatra/yoga names built-in. Extend our own mapping tables in `src/config/panchang-labels.ts` with regional transliterations.
+- Settings language picker: add 4 rows below existing en/hi/sa.
+- Persist selected language in Zustand (already supported).
+- **Gate:** do not ship a language publicly until Tier 1 + at least 5 devotional items in that language are QA-passed.
+
+### Step P3.2: Deity / Aarti / Chalisa / Katha Library Expansion
+
+**Why:** 25 deities is thin vs. 100+ in Sri Mandir. Content depth is a direct retention metric.
+
+**Implementation:**
+- Target: 50 deities, 100 aartis, 30 chalisas, 50 kathas by end of Phase 3.
+- Content sourcing: curate from public-domain devotional texts (Gita Press / Valmiki Ramayana translations / regional devotional literature). Run through a 2-step editorial review (accuracy + Devanagari/regional script correctness).
+- Add regional deities: Ayyappa, Murugan (expand beyond Kartikeya), Venkateswara (already have), Jagannath (already have), Vitthal/Panduranga (new — Maharashtra), Meenakshi (new — Tamil Nadu), Swaminarayan (new — Gujarat), Jyotirlinga-specific Shiva forms (Somnath, Mahakaleshwar, Kedarnath etc. as sub-deity entries).
+- Database migration: bump seed version, trigger re-seed. New content arrives additively — no user data lost.
+- New Library filters: "Regional" chip group alongside existing deity filter, filtering by primary-language/region.
+
+### Step P3.3: Isht Devata Personalization (surface content based on onboarding selection)
+
+**Why:** Onboarding already captures `selectedDeities`. This data is currently underused — selected deities do not meaningfully re-rank content. Sri Mandir and Dharmayana both tailor Home feeds to selected Isht Devata.
+
+**Implementation:**
+- Home screen re-ranking: Featured Aarti, Featured Chalisa, Featured Katha each prefer content from `selectedDeities` first, random fallback only if none.
+- New Home section: "Your Deities" strip — horizontal scroll of selected deity avatars, each deep-linking to that deity's detail page (existing `app/god/[id].tsx`).
+- Search re-ranking: results where `deity ∈ selectedDeities` float to top.
+- Rashifal + Vrat Katha are unaffected (they are date/sign-driven, not deity-driven).
+- Settings: "Manage Your Deities" row that navigates back into the selection UI (reuses onboarding Step 3 component).
+
+### Phase 3 Exit Criteria
+
+- 7 languages shipped with Tier 1 complete and Tier 2 ≥5 items each.
+- Content library at 50 deities / 100 aartis / 30 chalisas / 50 kathas.
+- Home re-ranking live, "Your Deities" strip on Home, settings entry for re-selection.
+
+---
+
+## 12. Phase 4 — Native Extensions (widgets, Kundli, mantra counter)
+
+**Goal:** Add features that require more engineering effort but meaningfully differentiate Dharmagya. Order here is pragmatic: start with the lowest-native-surface-area feature and build up.
+
+### Step P4.1: Kundli Generation (no native modules)
+
+**Why:** AstroSage owns 80% of the Kundli market via exactly this feature. Our `panchang-ts` library already computes planetary longitudes for all 9 grahas — Kundli is mostly presentation + a small amount of new astrology logic (house system, aspects).
+
+**Implementation:**
+- New tab or section: "Kundli" (can start as a route under a new "Astrology" pillar that also hosts Rashifal from Phase 2).
+- Input: DOB (date), birth time (HH:MM), birth place (reuse the 690-city picker from Location onboarding). Store as a new `birth_chart` entry in Zustand (keep only user's own + up to 5 saved charts like "spouse", "child").
+- Compute:
+  - Planetary longitudes at birth → cast into 12 rashis → assign to houses via **Whole Sign** house system (simplest, canonical in North Indian Jyotish). Later add Placidus for KP astrology users.
+  - Ascendant (Lagna) from sidereal time + latitude.
+  - Basic yogas: Gaj Kesari, Raj Yoga, Panch Mahapurusha Yogas — encode as predicate functions over planet/house combinations.
+  - Dasha system: Vimshottari Mahadasha periods (computable from moon's nakshatra at birth).
+- Display:
+  - North Indian diamond chart (SVG) and South Indian square chart (SVG) — user-toggleable.
+  - Planetary positions table with rashi + house + degree + retrograde.
+  - Current Dasha + Antardasha + remaining duration.
+  - Yoga highlights (if any).
+- **Do NOT ship Kundli Matching (Ashtakoot Milan) in P4.1.** Defer to P4.1b after baseline Kundli validated. Matching requires correct gun assignments + synastry logic that's easy to get wrong.
+- Ads: banner ok on index, no interstitial (serious feature, low-tolerance for interruption).
+
+### Step P4.1b: Kundli Matching (Ashtakoot Milan) — sub-step
+
+- After P4.1 ships and is validated, add matching: Varna, Vashya, Tara, Yoni, Graha Maitri, Gana, Bhakoot, Nadi — 36-point scoring system.
+- Input: two saved charts (or the user's + another DOB/time/place).
+- Output: 8 koota scores + total + compatibility interpretation paragraph.
+- All text in i18n bundles (critical — users read match interpretations carefully).
+
+### Step P4.2: Home Screen Widgets (native modules required)
+
+**Why:** Hindu Calendar by Mandavgane ships 4 widgets (moon phase, lunar date, moonrise, sunrise/sunset). Widgets drive passive daily visibility — user sees tithi without opening the app, reducing dependence on notifications. Apple and Google both weight widget-having apps higher in discovery.
+
+**Implementation:**
+- This is a known hard problem for Expo/RN apps. Use `expo-modules-core` with a custom config plugin approach:
+  - **iOS:** WidgetKit extension (SwiftUI). Data is passed from RN → widget via App Groups + a JSON file written on panchang recalculation.
+  - **Android:** AppWidgetProvider (Kotlin). Data passed via SharedPreferences written from RN side.
+- Start with ONE widget: "Today's Panchang" — shows tithi, nakshatra, sunrise, rahu kalam. Small + medium sizes.
+- Add incrementally: Festival countdown widget, Rashifal widget (user's sign), Brahma Muhurta alarm widget.
+- Update frequency: widgets refresh on app launch + once daily at 4:00 AM local time via a background task that recomputes panchang and writes to the shared store.
+- **Risk:** EAS Build config complexity. Budget 1 full sprint for the first widget. Expect iOS/Android asymmetry.
+- Offline compatible: all data is computed locally, no network.
+
+### Step P4.3: Mantra Counter (Jaap)
+
+**Why:** Standard feature in devotional apps. Low effort, high-touch daily engagement moment (users open during their actual puja).
+
+**Implementation:**
+- New route: `app/jaap.tsx`.
+- Large tappable circle in the center; each tap = +1 count with haptic feedback (`expo-haptics`).
+- Configurable mala size (108 default, 27, 54, 216, 1008).
+- Progress ring filling around the tap circle as user approaches mala completion.
+- On mala completion: celebratory animation + "108 completed" toast + auto-increment mala counter.
+- Persist session history in SQLite: `jaap_sessions(id, started_at, ended_at, mantra_name, mala_count, total_count)`.
+- Mantra picker: preset list (Om Namah Shivaya, Om Namo Narayanaya, Gayatri, Maha Mrityunjaya, Hare Krishna, Ganesh Mantra) + "Custom" text input.
+- History screen showing sessions by date with total counts.
+- No ads during active jaap session. Banner ok on history screen.
+
+### Phase 4 Exit Criteria
+
+- Kundli generation live with North + South Indian charts, Vimshottari Dasha, yoga detection.
+- At least 1 widget shipped on both iOS and Android via EAS Build.
+- Mantra counter with 6 preset mantras, configurable mala size, session history.
+
+---
+
+## 13. Phase 5 — Far-Future (audio, booking, social) [ON HOLD]
+
+**User directive (2026-04-12):** Hold the items below until Phases 2–4 land. They require the most operational investment (audio licensing, ops infrastructure, social moderation) and should not block competitive-parity features that deliver immediate daily-habit value.
+
+Listed in rough priority order for when we do revisit:
+
+### Step P5.1: Audio Playback for Aarti / Chalisa / Mantra
+
+- The single biggest retention feature per the competitor report (Sri Mandir 5000+ tracks).
+- Scope: licensed or custom-recorded tracks for existing 29 aartis + 12 chalisas + mantra library built in P4.3.
+- Implementation: `expo-av` or `expo-audio`, background audio entitlement (iOS/Android), lock-screen controls, offline downloads, verse-sync read-along (unblocks the deferred Phase 1 "Read Along Mode").
+- Content sourcing: evaluate licensing Saregama catalog vs. commissioning fresh Gita Press-style recordings. Budget implications significant.
+- CDN: Cloudflare R2 for audio hosting, progressive download + offline cache with user-controlled size limit.
+
+### Step P5.2: Puja Booking / Astrologer Consult / E-commerce
+
+- Sri Mandir's primary revenue driver ($12M+ ARR).
+- Requires temple partnerships, payment integration (Razorpay / UPI), video proof infrastructure, operational support team, refund policies, KYC for astrologers.
+- Minimum viable slice: Prasad delivery from 3 partner temples (Vaishno Devi, Tirupati, Siddhivinayak), ₹500 price point, partnered fulfillment.
+- Decision point before starting: do we have an ops co-founder or external partner willing to run fulfillment? If no, do not start.
+
+### Step P5.3: Social / Community / Sharing / Video
+
+- **Sharing:** add native share sheet on aarti/chalisa/katha/rashifal detail screens — simplest, ship anytime.
+- **Video content:** katha animations, festival explainer videos, live aarti streams from partner temples. Requires video infra (Mux/Cloudflare Stream) and content production.
+- **Community:** discussion threads per festival/deity, user-posted bhajans, moderator tooling. High moderation overhead; only pursue if the product has clear community demand signals from Phase 2–4 usage data.
+
+---
+
+## 14. Out-of-Scope / Explicitly Not Doing
+
+- Paid subscription tier (we stay ad-supported until ad revenue clearly plateaus; no rush to introduce paywall friction).
+- Live streaming temple darshan (requires partnerships and 24/7 stream infra — revisit alongside P5.2).
+- AI chat astrologer (hallucination risk on religious content is unacceptable; only consider with heavy guardrails and explicit "AI-generated, not from an astrologer" disclaimers, and not before P5).
+- Cryptocurrency donations / NFTs / Web3 anything.
+
+---
+
+## 15. Phase Dependencies Summary
+
+```
+Phase 1 ✅
+    ↓
+Phase 2 (Daily habit drivers)  ──┐
+    ↓                             │
+Phase 3 (Reach + content depth)  ─┤
+    ↓                             │   (P4.1 Kundli can proceed in parallel
+Phase 4 (Native extensions)     ──┘    with P3 once P2 ships)
+    ↓
+Phase 5 (Far-future — on hold)
+```
+
+Each phase should ship as its own production release. Do not bundle phases. Measure daily active users and D7 retention after each release before starting the next.
