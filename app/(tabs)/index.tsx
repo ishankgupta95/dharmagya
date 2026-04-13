@@ -24,6 +24,9 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
+import { vratFestivalNameForDate } from '@/utils/vrat';
+import { signFromBirthDate } from '@/utils/rashi';
+import { type RashiSign } from '@/types';
 import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -34,6 +37,14 @@ interface AartiRow {
   titleNative: string;
   content: string;
   deity: string;
+}
+
+interface VratKathaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -81,6 +92,8 @@ export default function HomeScreen() {
   const userLocation = useStore(s => s.userLocation);
   const locationName = useStore(s => s.locationName);
   const language = useStore(s => s.language);
+  const userBirthDate = useStore(s => s.userBirthDate);
+  const userRashi = useStore(s => s.userRashi);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const colors = isDarkMode ? darkColors : lightColors;
@@ -91,6 +104,8 @@ export default function HomeScreen() {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
   const [featuredAarti, setFeaturedAarti] = useState<IAarti | null>(null);
+  const [vratKatha, setVratKatha] = useState<{ row: VratKathaRow; festivalName: string } | null>(null);
+  const [rashifalExcerpt, setRashifalExcerpt] = useState<string | null>(null);
 
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
   const lastFetchRef = useRef(0);
@@ -120,6 +135,49 @@ export default function HomeScreen() {
     });
     return () => sub.remove();
   }, [refreshPanchang]);
+
+  // ── Today's Rashifal ─────────────────────────────────────────────────────
+  const userSign: RashiSign | null = useMemo(() => {
+    if (userRashi) return userRashi;
+    if (userBirthDate) return signFromBirthDate(new Date(userBirthDate + 'T12:00:00'));
+    return null;
+  }, [userRashi, userBirthDate]);
+
+  useEffect(() => {
+    if (!userSign) {
+      setRashifalExcerpt(null);
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const preferredLang = lang === 'hi' ? 'hi' : 'en';
+    const row =
+      db.getFirstSync<{ body: string }>(
+        'SELECT body FROM rashifal WHERE date = ? AND sign = ? AND language = ? LIMIT 1',
+        [ymd, userSign, preferredLang]
+      )
+      ?? db.getFirstSync<{ body: string }>(
+        'SELECT body FROM rashifal WHERE date = ? AND sign = ? AND language = ? LIMIT 1',
+        [ymd, userSign, 'en']
+      );
+    setRashifalExcerpt(row?.body ?? null);
+  }, [db, userSign, lang]);
+
+  // ── Today's Vrat Katha (if today is a vrat day) ──────────────────────────
+  useEffect(() => {
+    const today = new Date();
+    const vrat = vratFestivalNameForDate(today);
+    if (!vrat) {
+      setVratKatha(null);
+      return;
+    }
+    const row = db.getFirstSync<VratKathaRow>(
+      'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE vrat_type = ? LIMIT 1',
+      [vrat.vratType]
+    );
+    setVratKatha(row ? { row, festivalName: vrat.name } : null);
+  }, [db]);
 
   // ── Featured Aarti ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -269,6 +327,59 @@ export default function HomeScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* ── Today's Rashifal Card ─────────────────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push(userSign ? `/rashifal/${userSign}` : '/rashifal')}
+          style={[styles.rashifalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.rashifalTopRow}>
+            <Text style={[styles.vratCardLabel, { color: colors.accent }]}>
+              {userSign
+                ? t('home.aajKaRashifal', { sign: t(`rashifal.sign.${userSign}.name`) })
+                : t('home.aajKaRashifalGeneric')}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+          </View>
+          <Text
+            style={[styles.rashifalExcerpt, { color: colors.textPrimary }]}
+            numberOfLines={2}>
+            {rashifalExcerpt ?? t('home.rashifalPickSign')}
+          </Text>
+        </TouchableOpacity>
+
+        {/* ── Today's Vrat Katha Card ───────────────────────────────────── */}
+        {vratKatha && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/katha/${vratKatha.row.id}`)}
+            style={[
+              styles.vratCard,
+              { backgroundColor: colors.surface, borderColor: colors.borderAccent },
+            ]}>
+            <View style={styles.vratCardTopRow}>
+              <Text style={[styles.vratCardLabel, { color: colors.accent }]}>
+                {t('home.todaysVratKatha', { festival: vratKatha.festivalName })}
+              </Text>
+              <Ionicons name="book-outline" size={14} color={colors.accent} />
+            </View>
+            <View style={styles.featuredInner}>
+              <DeityAvatar deity={vratKatha.row.deity} size={52} />
+              <View style={styles.featuredText}>
+                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {vratKatha.row.titleNative}
+                </Text>
+                <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {vratKatha.row.titleEnglish}
+                </Text>
+                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
+                  {vratKatha.row.deity}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* ── Featured Aarti Card ───────────────────────────────────────── */}
         {featuredAarti && (
           <TouchableOpacity
@@ -331,6 +442,25 @@ export default function HomeScreen() {
             colors={colors}
           />
         </View>
+
+        {/* ── Find Auspicious Date Card ─────────────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/muhurat')}
+          style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.muhuratIconWrap, { backgroundColor: colors.borderAccent }]}>
+            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.muhuratTitle, { color: colors.textPrimary }]}>
+              {t('home.findMuhuratTitle')}
+            </Text>
+            <Text style={[styles.muhuratDesc, { color: colors.textMuted }]} numberOfLines={2}>
+              {t('home.findMuhuratDesc')}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
 
       </ScrollView>
 
@@ -465,6 +595,36 @@ const styles = StyleSheet.create({
 
   errorText: { fontSize: 13, fontFamily: 'Mukta_400Regular', textAlign: 'center', paddingVertical: 16 },
 
+  // Rashifal card
+  rashifalCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  rashifalTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  rashifalExcerpt: { fontSize: 14, fontFamily: 'Mukta_400Regular', lineHeight: 20 },
+
+  // Vrat katha card
+  vratCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  vratCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  vratCardLabel: {
+    fontSize: 11,
+    fontFamily: 'Mukta_500Medium',
+    letterSpacing: 1,
+    flex: 1,
+  },
+
   // Featured aarti
   featuredCard: {
     borderRadius: borderRadius.card,
@@ -486,6 +646,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  // Muhurat card
+  muhuratCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 16,
+  },
+  muhuratIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muhuratTitle: { fontSize: 14, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
+  muhuratDesc: { fontSize: 11, fontFamily: 'Mukta_400Regular', lineHeight: 15 },
 
   // Quick access
   quickRow: { flexDirection: 'row', gap: spacing.gridGap },

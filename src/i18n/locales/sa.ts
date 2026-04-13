@@ -9,6 +9,7 @@ export default {
     skip: 'अधुना त्यजतु',
     continue: 'अग्रे गच्छतु  →',
     search: 'अन्वेषणम्',
+    clear: 'अपसारयतु',
   },
 
   // ── Tabs ────────────────────────────────────────────────────────────────
@@ -39,6 +40,12 @@ export default {
     featuredAarti: 'विशिष्टा आरती',
     favorites: 'प्रियाणि',
     festivals: 'उत्सवाः',
+    todaysVratKatha: 'अद्य व्रतकथा  ·  {{festival}}',
+    findMuhuratTitle: 'शुभं मुहूर्तं अन्विष्यतु',
+    findMuhuratDesc: 'विवाहः, गृहप्रवेशः, नामकरणम् — शास्त्रीयनियमाः',
+    aajKaRashifal: 'अद्य राशिफलम्  ·  {{sign}}',
+    aajKaRashifalGeneric: 'अद्य राशिफलम्  ·  राशिं चिनोतु',
+    rashifalPickSign: 'स्वराशेः अद्यतनफलं द्रष्टुं स्पृशतु।',
   },
 
   // ── Panchang Screen ─────────────────────────────────────────────────────
@@ -84,6 +91,7 @@ export default {
     tapToChangeDate: 'तिथिपरिवर्तनाय स्पृशतु',
     activeNow: 'सम्प्रति',
     hora: 'होरा',
+    findAuspiciousDate: 'अवसरार्थं शुभं दिनं अन्विष्यतु',
     dayHeaders: ['र', 'सो', 'मं', 'बु', 'गु', 'शु', 'श'],
     monthNames: [
       'जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून',
@@ -158,6 +166,7 @@ export default {
   festivals: {
     title: 'उत्सवाः व्रतानि च',
     noFestivals: '{{year}} वर्षे उत्सवाः न प्राप्ताः',
+    readKatha: 'कथा पठतु',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -179,6 +188,10 @@ export default {
     location: 'स्थानम्',
     gpsLocation: 'GPS स्थानम्',
     usingDefault: 'पूर्वनिर्धारितम् (वाराणसी)',
+    horoscope: 'राशिफलम्',
+    birthDate: 'जन्मतिथिः',
+    birthDateNotSet: 'न निर्धारिता — चिनोतु',
+    birthDatePickerTitle: 'जन्मतिथिं चिनोतु',
     notifications: 'सूचनाः',
     dailyReminder: 'दैनिकस्मारकम्',
     dailyReminderDesc: 'प्रातः 7:00 वादने आरतीस्मारकम्',
@@ -195,6 +208,58 @@ export default {
     offlineFirst: 'जालविहीनम्, सदा निःशुल्कम्',
     replayWalkthrough: 'अनुप्रयोगपरिचयः',
     replayWalkthroughDesc: 'अनुप्रयोगस्य उपयोगं जानातु',
+    festivalTithiReminders: 'उत्सव-तिथि-स्मारकाः',
+    festivalTithiRemindersDesc: 'एकादशी, प्रदोषं, उत्सवानां कृते आवर्तन-स्मारकाः',
+  },
+
+  // ── Reminders Screen ────────────────────────────────────────────────────
+  reminders: {
+    title: 'स्मारकाः',
+    intro: 'चिनोतु यैः व्रतैः स्मारकं आवश्यकम्। पूर्वदिने सायंकाले एकं सूचनं प्रेषयामः।',
+    footer: 'स्मारकाः आगामि ३० दिनानि यावत् निर्धारिताः, प्रत्येकं अनुप्रयोग-उद्घाटने पुनर्निर्धार्यन्ते।',
+    tithiSection: 'तिथि-स्मारकाः',
+    festivalSection: 'उत्सव-वर्गाः',
+    tithiLabel: {
+      ekadashi: 'एकादशी',
+      pradosha: 'प्रदोषः',
+      purnima: 'पूर्णिमा',
+      amavasya: 'अमावस्या',
+      sankashti: 'संकष्टी चतुर्थी',
+      shivaratri: 'शिवरात्रिः',
+    },
+    tithiSublabel: {
+      ekadashi: '११तिथिः (वर्षे ~२४)',
+      pradosha: '१३तिथिः (वर्षे ~२४)',
+      purnima: 'पूर्णचन्द्रः (वर्षे ~१२)',
+      amavasya: 'नवचन्द्रः (वर्षे ~१२)',
+      sankashti: 'गणेशतिथिः (वर्षे ~१२)',
+      shivaratri: 'मासिक शिवरात्रिः',
+    },
+    festivalLabel: {
+      major: 'मुख्योत्सवाः',
+      minor: 'लघूत्सवाः',
+      ekadashi: 'एकादशी (वर्गः)',
+      pradosha: 'प्रदोषः (वर्गः)',
+      sankranti: 'संक्रान्तिः',
+    },
+    festivalSublabel: {
+      major: 'दीपावली, होली, दशहरा, इत्यादयः',
+      minor: 'लघुव्रतोत्सवाः',
+      ekadashi: 'तिथि-एकादशी-समानः — एकः एव पर्याप्तः',
+      pradosha: 'तिथि-प्रदोष-समानः — एकः एव पर्याप्तः',
+      sankranti: 'सूर्यसंक्रमणम् (मकर संक्रान्ति आदि)',
+    },
+    tithiTitle: {
+      ekadashi: '🌙 श्वः एकादशी',
+      pradosha: '🌒 श्वः प्रदोषः',
+      purnima: '🌕 श्वः पूर्णिमा',
+      amavasya: '🌑 श्वः अमावस्या',
+      sankashti: '🕉️ श्वः संकष्टी',
+      shivaratri: '🔱 श्वः शिवरात्रिः',
+    },
+    tithiBody: 'श्वः {{name}} — सज्जः भवतु।',
+    festivalTitle: '🪔 {{name}}',
+    festivalBody: 'श्वः {{name}}।',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -279,11 +344,67 @@ export default {
     ganga:         { displayName: 'गङ्गादेवी',               description: 'पतितपावनी, मोक्षदायिनी' },
   },
 
+  // ── Rashifal Screen ─────────────────────────────────────────────────────
+  rashifal: {
+    title: 'राशिफलम्',
+    yourSign: 'भवतः राशिः',
+    allSignsLabel: 'सर्वाः राशयः',
+    pickYoursLabel: 'स्वराशिं चिनोतु',
+    selectPrompt: 'अद्य राशिफलं द्रष्टुं राशिं स्पृशतु।',
+    resetSign: 'राशिं परिवर्तयतु',
+    weekLabel: 'अस्मिन् सप्ताहे',
+    notFound: 'राशिः न प्राप्ता',
+    unavailable: 'अस्य दिवसस्य राशिफलं अधुनापि न प्राप्तम्।',
+    disclaimer: 'राशिफलं मार्गदर्शनम्, न तु भविष्यवाणी।',
+    sign: {
+      aries:       { name: 'मेषः',     traits: 'मेषः · अग्निः · मङ्गलस्वामी' },
+      taurus:      { name: 'वृषभः',    traits: 'वृषः · पृथ्वी · शुक्रस्वामी' },
+      gemini:      { name: 'मिथुनम्',  traits: 'यमलौ · वायुः · बुधस्वामी' },
+      cancer:      { name: 'कर्कटः',   traits: 'कर्कटः · जलम् · चन्द्रस्वामी' },
+      leo:         { name: 'सिंहः',    traits: 'सिंहः · अग्निः · सूर्यस्वामी' },
+      virgo:       { name: 'कन्या',    traits: 'कन्या · पृथ्वी · बुधस्वामी' },
+      libra:       { name: 'तुला',     traits: 'तुला · वायुः · शुक्रस्वामी' },
+      scorpio:     { name: 'वृश्चिकः', traits: 'वृश्चिकः · जलम् · मङ्गलस्वामी' },
+      sagittarius: { name: 'धनुः',     traits: 'धनुर्धरः · अग्निः · गुरुस्वामी' },
+      capricorn:   { name: 'मकरः',     traits: 'मकरः · पृथ्वी · शनिस्वामी' },
+      aquarius:    { name: 'कुम्भः',   traits: 'कुम्भः · वायुः · शनिस्वामी' },
+      pisces:      { name: 'मीनः',     traits: 'मीनः · जलम् · गुरुस्वामी' },
+    },
+  },
+
+  // ── Muhurat Screen ──────────────────────────────────────────────────────
+  muhurat: {
+    title: 'शुभं मुहूर्तम्',
+    intro: 'जीवनस्य विशिष्टकार्याणां कृते शास्त्रीयमुहूर्त-नियमैः शुभं दिनं अन्विष्यतु — तिथि, नक्षत्र, योग, वार-संयोगः।',
+    footer: 'एते नियम-आधारिताः सम्भव्य-दिवसाः। महत्त्वपूर्णकार्येषु अन्तिमं निर्णयं पण्डितात् प्राप्नुयात्।',
+    notFound: 'अवसरः न प्राप्तः',
+    scanRange: 'आगामि {{days}} दिनानां शुभदिनानि दर्शितानि',
+    computing: 'मुहूर्त-गणनं भवति…',
+    scanFailed: 'मुहूर्त-गणना न अभवत्। पुनः प्रयत्नं कुर्वतु।',
+    noMatches: 'शुभदिनं न प्राप्तम्',
+    noMatchesDesc: 'आगामि 90 दिनेषु अस्य अवसरस्य कृते सर्वनियमाः न पूर्यन्ते। आगामि मासे पुनः पश्यतु।',
+    resultsCount: '{{count}} शुभदिनानि',
+    bestSlots: 'दिवसस्य श्रेष्ठाः समयाः',
+    noSlots: 'विशिष्टसमयानां सूचना न उपलब्धा',
+    avoidRahu: 'राहुकालं परिहरतु: {{start}} – {{end}}',
+    disclaimer: 'नियमाधारितम्; योग्यस्य पण्डितस्य विकल्पः न।',
+    occasion: {
+      vivah: { name: 'विवाहः', desc: 'विवाह-संस्कारस्य मुहूर्तम्' },
+      'griha-pravesh': { name: 'गृहप्रवेशः', desc: 'नव-गृहे प्रवेशस्य मुहूर्तम्' },
+      namkaran: { name: 'नामकरणम्', desc: 'बालकस्य नामकरण-संस्कारः' },
+      vahan: { name: 'वाहन-क्रयः', desc: 'वाहन-क्रयस्य मुहूर्तम्' },
+      mundan: { name: 'मुण्डनम्', desc: 'बालकस्य प्रथम-केश-कर्तनम्' },
+      annaprashan: { name: 'अन्नप्राशनम्', desc: 'प्रथम-अन्न-ग्रहण-संस्कारः (~६ मासे)' },
+      vidyarambh: { name: 'विद्यारम्भः', desc: 'औपचारिकशिक्षायाः आरम्भः' },
+    },
+  },
+
   // ── Notifications ───────────────────────────────────────────────────────
   notifications: {
     dailyReminderTitle: '🙏 प्रातःस्मरणम्',
     dailyReminderBody: 'आरत्या दिनम् आरभतु। भवतः प्रभातं मङ्गलमयम् भवतु।',
     sunriseAlertTitle: '🌅 सूर्योदयः',
     sunriseAlertBody: '{{time}} समये सूर्योदयः। प्रार्थनायाः पवित्रः क्षणः।',
+    dailyReminderBodyWithVrat: '🪔 श्वः {{vrat}} अस्ति। प्रार्थनायै सज्जः भवतु।',
   },
 } as const;

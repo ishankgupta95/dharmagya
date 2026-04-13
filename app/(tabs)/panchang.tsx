@@ -543,6 +543,18 @@ export default function PanchangScreen() {
           </View>
         ) : panchang ? (
           <>
+            {/* ── Muhurat finder entry ── */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push('/muhurat')}
+              style={[styles.muhuratEntry, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+              <Ionicons name="calendar-outline" size={16} color={colors.accent} />
+              <Text style={[styles.muhuratEntryText, { color: colors.accent }]}>
+                {t('panchang.findAuspiciousDate')}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+            </TouchableOpacity>
+
             {/* ── Banners (festivals, special yogas, panchaka) ── */}
             {panchang.festivals.length > 0 && panchang.festivals.map((f, i) => (
               <View key={i} style={[styles.panchakaBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
@@ -790,6 +802,18 @@ const styles = StyleSheet.create({
   // Panchaka
   panchakaBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
   panchakaText: { fontSize: 12, fontFamily: 'Mukta_500Medium', flex: 1 },
+
+  muhuratEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: borderRadius.cardInner,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  muhuratEntryText: { flex: 1, fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
   // Rahukaal / Brahma Muhurta
   rahuBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },

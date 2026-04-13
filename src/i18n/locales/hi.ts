@@ -9,6 +9,7 @@ export default {
     skip: 'अभी छोड़ें',
     continue: 'आगे बढ़ें  →',
     search: 'खोजें',
+    clear: 'हटाएँ',
   },
 
   // ── Tabs ────────────────────────────────────────────────────────────────
@@ -39,6 +40,12 @@ export default {
     featuredAarti: 'विशेष आरती',
     favorites: 'पसंदीदा',
     festivals: 'त्योहार',
+    todaysVratKatha: 'आज की व्रत कथा  ·  {{festival}}',
+    findMuhuratTitle: 'शुभ मुहूर्त खोजें',
+    findMuhuratDesc: 'विवाह, गृह प्रवेश, नामकरण — शास्त्रीय मुहूर्त नियम',
+    aajKaRashifal: 'आज का राशिफल  ·  {{sign}}',
+    aajKaRashifalGeneric: 'आज का राशिफल  ·  राशि चुनें',
+    rashifalPickSign: 'अपनी राशि का आज का फल देखने के लिए टैप करें।',
   },
 
   // ── Panchang Screen ─────────────────────────────────────────────────────
@@ -84,6 +91,7 @@ export default {
     tapToChangeDate: 'तिथि बदलने के लिए टैप करें',
     activeNow: 'अभी',
     hora: 'होरा',
+    findAuspiciousDate: 'किसी अवसर के लिए शुभ दिन खोजें',
     dayHeaders: ['र', 'सो', 'मं', 'बु', 'गु', 'शु', 'श'],
     monthNames: [
       'जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून',
@@ -158,6 +166,7 @@ export default {
   festivals: {
     title: 'त्योहार और व्रत',
     noFestivals: '{{year}} के लिए कोई त्योहार नहीं मिला',
+    readKatha: 'कथा पढ़ें',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -179,6 +188,10 @@ export default {
     location: 'स्थान',
     gpsLocation: 'GPS स्थान',
     usingDefault: 'डिफ़ॉल्ट (वाराणसी)',
+    horoscope: 'राशिफल',
+    birthDate: 'जन्म तिथि',
+    birthDateNotSet: 'निर्धारित नहीं — चुनने के लिए टैप करें',
+    birthDatePickerTitle: 'अपनी जन्म तिथि चुनें',
     notifications: 'सूचनाएँ',
     dailyReminder: 'दैनिक अनुस्मारक',
     dailyReminderDesc: 'सुबह 7:00 बजे आरती अनुस्मारक',
@@ -195,6 +208,58 @@ export default {
     offlineFirst: 'ऑफ़लाइन, सदैव निःशुल्क',
     replayWalkthrough: 'ऐप परिचय',
     replayWalkthroughDesc: 'ऐप का उपयोग कैसे करें जानें',
+    festivalTithiReminders: 'त्योहार एवं तिथि अनुस्मारक',
+    festivalTithiRemindersDesc: 'एकादशी, प्रदोष, त्योहारों के लिए नियमित अनुस्मारक',
+  },
+
+  // ── Reminders Screen ────────────────────────────────────────────────────
+  reminders: {
+    title: 'अनुस्मारक',
+    intro: 'चुनें कि किन व्रतों का अनुस्मारक चाहिए। हम एक दिन पहले संध्या को एक सूचना भेजते हैं।',
+    footer: 'अनुस्मारक अगले 30 दिनों तक निर्धारित होते हैं और ऐप खोलने पर अद्यतन होते हैं।',
+    tithiSection: 'तिथि अनुस्मारक',
+    festivalSection: 'त्योहार श्रेणियाँ',
+    tithiLabel: {
+      ekadashi: 'एकादशी',
+      pradosha: 'प्रदोष',
+      purnima: 'पूर्णिमा',
+      amavasya: 'अमावस्या',
+      sankashti: 'संकष्टी चतुर्थी',
+      shivaratri: 'शिवरात्रि',
+    },
+    tithiSublabel: {
+      ekadashi: '११वीं तिथि (वर्ष में ~२४ बार)',
+      pradosha: '१३वीं तिथि (वर्ष में ~२४ बार)',
+      purnima: 'पूर्ण चंद्र (वर्ष में ~१२ बार)',
+      amavasya: 'नव चंद्र (वर्ष में ~१२ बार)',
+      sankashti: 'गणेश तिथि (वर्ष में ~१२ बार)',
+      shivaratri: 'मासिक शिवरात्रि (प्रति माह)',
+    },
+    festivalLabel: {
+      major: 'मुख्य त्योहार',
+      minor: 'लघु त्योहार',
+      ekadashi: 'एकादशी (श्रेणी)',
+      pradosha: 'प्रदोष (श्रेणी)',
+      sankranti: 'संक्रान्ति',
+    },
+    festivalSublabel: {
+      major: 'दीवाली, होली, दशहरा, आदि।',
+      minor: 'छोटे व्रत-त्योहार',
+      ekadashi: 'तिथि एकादशी के समान — एक ही काफी है',
+      pradosha: 'तिथि प्रदोष के समान — एक ही काफी है',
+      sankranti: 'सूर्य संक्रमण (मकर संक्रान्ति आदि)',
+    },
+    tithiTitle: {
+      ekadashi: '🌙 कल एकादशी है',
+      pradosha: '🌒 कल प्रदोष है',
+      purnima: '🌕 कल पूर्णिमा है',
+      amavasya: '🌑 कल अमावस्या है',
+      sankashti: '🕉️ कल संकष्टी है',
+      shivaratri: '🔱 कल शिवरात्रि है',
+    },
+    tithiBody: 'कल {{name}} है — अपनी तैयारी करें।',
+    festivalTitle: '🪔 {{name}}',
+    festivalBody: 'कल {{name}} है।',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -279,11 +344,67 @@ export default {
     ganga:         { displayName: 'माँ गंगा',                description: 'पतित पावनी, मोक्षदायिनी' },
   },
 
+  // ── Rashifal Screen ─────────────────────────────────────────────────────
+  rashifal: {
+    title: 'राशिफल',
+    yourSign: 'आपकी राशि',
+    allSignsLabel: 'सभी राशियाँ',
+    pickYoursLabel: 'अपनी राशि चुनें',
+    selectPrompt: 'कोई राशि टैप करके आज का फल देखें। दोबारा टैप करके अपनी राशि चुनें।',
+    resetSign: 'राशि बदलें',
+    weekLabel: 'इस सप्ताह',
+    notFound: 'राशि नहीं मिली',
+    unavailable: 'इस तिथि का राशिफल अभी उपलब्ध नहीं है।',
+    disclaimer: 'राशिफल मार्गदर्शन है, भविष्यवाणी नहीं। संकल्प और धर्म के साथ कार्य करें।',
+    sign: {
+      aries:       { name: 'मेष',     traits: 'मेढ़ा · अग्नि · मंगल स्वामी' },
+      taurus:      { name: 'वृषभ',    traits: 'वृष · पृथ्वी · शुक्र स्वामी' },
+      gemini:      { name: 'मिथुन',   traits: 'जुड़वाँ · वायु · बुध स्वामी' },
+      cancer:      { name: 'कर्क',    traits: 'केकड़ा · जल · चन्द्र स्वामी' },
+      leo:         { name: 'सिंह',    traits: 'सिंह · अग्नि · सूर्य स्वामी' },
+      virgo:       { name: 'कन्या',   traits: 'कन्या · पृथ्वी · बुध स्वामी' },
+      libra:       { name: 'तुला',    traits: 'तुला · वायु · शुक्र स्वामी' },
+      scorpio:     { name: 'वृश्चिक', traits: 'बिच्छू · जल · मंगल स्वामी' },
+      sagittarius: { name: 'धनु',     traits: 'धनुर्धर · अग्नि · गुरु स्वामी' },
+      capricorn:   { name: 'मकर',     traits: 'मगर · पृथ्वी · शनि स्वामी' },
+      aquarius:    { name: 'कुम्भ',   traits: 'कुम्भ · वायु · शनि स्वामी' },
+      pisces:      { name: 'मीन',     traits: 'मछली · जल · गुरु स्वामी' },
+    },
+  },
+
+  // ── Muhurat Screen ──────────────────────────────────────────────────────
+  muhurat: {
+    title: 'शुभ मुहूर्त',
+    intro: 'शास्त्रीय मुहूर्त नियमों के अनुसार जीवन के महत्वपूर्ण कार्यों के लिए शुभ दिन ढूंढें — तिथि, नक्षत्र, योग, वार का संयोग।',
+    footer: 'ये नियम-आधारित संभावित दिन हैं। महत्वपूर्ण कार्यों के लिए अंतिम निर्णय हेतु किसी पंडित से परामर्श करें।',
+    notFound: 'अवसर नहीं मिला',
+    scanRange: 'अगले {{days}} दिनों के शुभ दिन दिखाए जा रहे हैं',
+    computing: 'मुहूर्त गणना हो रही है…',
+    scanFailed: 'मुहूर्त की गणना नहीं हो सकी। कृपया पुनः प्रयास करें।',
+    noMatches: 'कोई शुभ दिन नहीं मिला',
+    noMatchesDesc: 'अगले 90 दिनों में इस अवसर के लिए सभी शास्त्रीय नियम पूरे नहीं होते। अगले मास पुनः देखें।',
+    resultsCount: '{{count}} शुभ दिन',
+    bestSlots: 'दिन के सर्वोत्तम क्षण',
+    noSlots: 'विशेष क्षण की जानकारी उपलब्ध नहीं',
+    avoidRahu: 'राहु काल से बचें: {{start}} – {{end}}',
+    disclaimer: 'नियम-आधारित; योग्य पंडित का विकल्प नहीं।',
+    occasion: {
+      vivah: { name: 'विवाह', desc: 'विवाह संस्कार का मुहूर्त' },
+      'griha-pravesh': { name: 'गृह प्रवेश', desc: 'नए घर में प्रवेश का मुहूर्त' },
+      namkaran: { name: 'नामकरण', desc: 'बालक के नामकरण का संस्कार' },
+      vahan: { name: 'वाहन खरीदी', desc: 'वाहन क्रय का मुहूर्त' },
+      mundan: { name: 'मुंडन', desc: 'बालक का प्रथम केश-कर्तन संस्कार' },
+      annaprashan: { name: 'अन्नप्राशन', desc: 'प्रथम अन्न ग्रहण संस्कार (लगभग 6 माह)' },
+      vidyarambh: { name: 'विद्यारंभ', desc: 'औपचारिक शिक्षा का आरंभ' },
+    },
+  },
+
   // ── Notifications ───────────────────────────────────────────────────────
   notifications: {
     dailyReminderTitle: '🙏 प्रातः स्मरण',
     dailyReminderBody: 'आरती से दिन की शुरुआत करें। आपकी सुबह मंगलमय हो।',
     sunriseAlertTitle: '🌅 सूर्योदय',
     sunriseAlertBody: '{{time}} पर सूर्योदय। प्रार्थना का पवित्र समय।',
+    dailyReminderBodyWithVrat: '🪔 कल {{vrat}} है। अपनी प्रार्थना की तैयारी करें।',
   },
 } as const;

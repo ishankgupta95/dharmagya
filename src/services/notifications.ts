@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import i18n from '@/i18n';
+import { vratFestivalNameForDate } from '@/utils/vrat';
 
 // expo-notifications Android push support was removed from Expo Go in SDK 53.
 // Skip the require entirely in Expo Go to prevent the native error overlay.
@@ -23,8 +24,13 @@ if (!isExpoGo) {
   }
 }
 
-const DAILY_REMINDER_ID = 'dharmagya-daily-reminder';
+// Legacy single-shot identifier, kept for cancel-on-upgrade from older installs.
+const LEGACY_DAILY_REMINDER_ID = 'dharmagya-daily-reminder';
+const DAILY_REMINDER_PREFIX = 'dharmagya-daily-reminder-';
 const SUNRISE_ALERT_ID = 'dharmagya-sunrise-alert';
+// Rolling horizon: we re-schedule this many days ahead on each call so that
+// each day's reminder body can reference tomorrow's vrat (if any).
+const DAILY_REMINDER_HORIZON_DAYS = 14;
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 
@@ -37,32 +43,83 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 // ─── Daily Reminder (7:00 AM) ─────────────────────────────────────────────────
+//
+// We schedule one DATE-triggered notification per day for the next
+// DAILY_REMINDER_HORIZON_DAYS days, instead of a single recurring DAILY trigger.
+// This lets each day's body reference tomorrow's vrat by name (if any). The
+// horizon is re-scheduled on every call — safe because each day has a
+// deterministic identifier `dharmagya-daily-reminder-YYYY-MM-DD`, so cancel +
+// re-schedule is a no-op for unchanged days.
+
+function ymd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dailyReminderIdFor(date: Date): string {
+  return `${DAILY_REMINDER_PREFIX}${ymd(date)}`;
+}
+
+function dailyReminderBody(triggerDate: Date): string {
+  const tomorrow = new Date(triggerDate);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const vrat = vratFestivalNameForDate(tomorrow);
+  if (vrat) {
+    return i18n.t('notifications.dailyReminderBodyWithVrat', {
+      defaultValue: '{{vrat}} is tomorrow. Prepare your prayers.',
+      vrat: vrat.name,
+    });
+  }
+  return i18n.t('notifications.dailyReminderBody');
+}
 
 export async function scheduleDailyReminder(): Promise<boolean> {
   if (!Notifications) return false;
   const granted = await requestNotificationPermission();
   if (!granted) return false;
 
-  await Notifications.cancelScheduledNotificationAsync(DAILY_REMINDER_ID).catch(() => {});
+  // Clear the legacy single-shot recurring notification from earlier builds.
+  await Notifications.cancelScheduledNotificationAsync(LEGACY_DAILY_REMINDER_ID).catch(() => {});
 
-  await Notifications.scheduleNotificationAsync({
-    identifier: DAILY_REMINDER_ID,
-    content: {
-      title: i18n.t('notifications.dailyReminderTitle'),
-      body: i18n.t('notifications.dailyReminderBody'),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 7,
-      minute: 0,
-    },
-  });
+  const now = new Date();
+  for (let i = 0; i < DAILY_REMINDER_HORIZON_DAYS; i++) {
+    const triggerDate = new Date(now);
+    triggerDate.setDate(triggerDate.getDate() + i);
+    triggerDate.setHours(7, 0, 0, 0);
+
+    // Skip if this 7 AM has already passed for today.
+    if (triggerDate.getTime() <= now.getTime()) continue;
+
+    const id = dailyReminderIdFor(triggerDate);
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    await Notifications.scheduleNotificationAsync({
+      identifier: id,
+      content: {
+        title: i18n.t('notifications.dailyReminderTitle'),
+        body: dailyReminderBody(triggerDate),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+      },
+    });
+  }
   return true;
 }
 
 export async function cancelDailyReminder(): Promise<void> {
   if (!Notifications) return;
-  await Notifications.cancelScheduledNotificationAsync(DAILY_REMINDER_ID).catch(() => {});
+  // Legacy single-shot trigger.
+  await Notifications.cancelScheduledNotificationAsync(LEGACY_DAILY_REMINDER_ID).catch(() => {});
+  // Rolling per-day triggers.
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+  for (const n of scheduled) {
+    if (n.identifier.startsWith(DAILY_REMINDER_PREFIX)) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+    }
+  }
 }
 
 // ─── Sunrise Alert ────────────────────────────────────────────────────────────
