@@ -56,6 +56,7 @@ export default function SettingsScreen() {
     setMasaSystem,
     userBirthDate,
     setUserBirthDate,
+    userRashi,
     setUserRashi,
     setWalkthroughStep,
   } = useStore();
@@ -122,6 +123,12 @@ export default function SettingsScreen() {
         year: 'numeric',
       })
     : t('settings.birthDateNotSet');
+
+  // Surface a drift indicator when the user has a birth date AND has manually
+  // set userRashi to something different from what the DOB would derive. This
+  // prevents silent divergence between the two stored fields.
+  const derivedRashi = userBirthDateObj ? signFromBirthDate(userBirthDateObj) : null;
+  const rashiDrifted = !!derivedRashi && !!userRashi && userRashi !== derivedRashi;
 
   async function handleSunriseAlertToggle(val: boolean) {
     if (val) {
@@ -257,6 +264,24 @@ export default function SettingsScreen() {
               right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
+          {rashiDrifted && derivedRashi && userRashi && (
+            <>
+              <Divider colors={colors} />
+              <View style={styles.driftRow}>
+                <Text style={[styles.driftLabel, { color: colors.textSecondary }]}>
+                  {t('settings.rashiOverrideLabel', { sign: t(`rashifal.sign.${userRashi}.name`) })}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setUserRashi(derivedRashi)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <Text style={[styles.driftLink, { color: colors.accent }]}>
+                    {t('settings.rashiResetToDerived', { derived: t(`rashifal.sign.${derivedRashi}.name`) })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
 
         {/* ── Notifications ─────────────────────────────────────────── */}
@@ -363,6 +388,7 @@ export default function SettingsScreen() {
         onClear={handleDobClear}
         minYear={1900}
         maxYear={new Date().getFullYear()}
+        maxDate={new Date()}
         colors={colors}
         title={t('settings.birthDatePickerTitle')}
       />
@@ -585,6 +611,10 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end' },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
+
+  driftRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
+  driftLabel: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  driftLink: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
 
   // Status dot
   statusDot: { width: 8, height: 8, borderRadius: 4 },

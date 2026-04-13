@@ -114,6 +114,24 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // Muhurat cache — persists a rolling 365-day scan per (occasion, location).
+  // lat_key/lon_key are coordinates rounded to 1 decimal (~11km) so nearby
+  // users share cache. matches_json holds the full MuhuratMatch[] (incl. each
+  // day's panchang) so the UI renders expanded slots without refetching.
+  // scanned_through is the last YYYY-MM-DD successfully evaluated; a partial
+  // scan can resume from there. Past matches (date < today) are pruned on write.
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS muhurat_cache (
+      occasion TEXT NOT NULL,
+      lat_key TEXT NOT NULL,
+      lon_key TEXT NOT NULL,
+      matches_json TEXT NOT NULL DEFAULT '[]',
+      scanned_through TEXT,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (occasion, lat_key, lon_key)
+    );
+  `);
+
   // Meta table for tracking seed version
   db.execSync(`
     CREATE TABLE IF NOT EXISTS meta (

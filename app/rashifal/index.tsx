@@ -99,7 +99,7 @@ export default function RashifalIndexScreen() {
               key={sign}
               activeOpacity={0.85}
               onPress={() => {
-                if (!activeSign) setUserRashi(sign);
+                setUserRashi(sign);
                 router.push(`/rashifal/${sign}`);
               }}
               style={[styles.signCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

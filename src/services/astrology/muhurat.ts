@@ -147,45 +147,104 @@ export interface MuhuratMatch {
   panchang: IPanchangDay;
 }
 
+export interface ScanProgress {
+  /** YYYY-MM-DD of the day that was just evaluated. */
+  day: string;
+  /** 1-based index of the day within the scan window. */
+  scannedCount: number;
+  /** Total days in the scan window (end - start + 1). */
+  totalDays: number;
+}
+
+export interface ScanOptions {
+  occasion: Occasion;
+  /** Inclusive start. */
+  startDate: Date;
+  /** Inclusive end. */
+  endDate: Date;
+  coords?: { lat: number; lon: number } | null;
+  /** Abort to stop the scan early. Resolves with matches collected so far. */
+  signal?: AbortSignal;
+  /** Called synchronously after each match is found. */
+  onMatch?: (match: MuhuratMatch) => void;
+  /** Called after each day is evaluated (matched or not). */
+  onProgress?: (p: ScanProgress) => void;
+  /**
+   * Every this many days the scan yields to the event loop so the UI stays
+   * responsive on mid-tier Androids. Defaults to 5.
+   */
+  yieldEvery?: number;
+}
+
 /**
- * Scan a date range and return all days matching the occasion's muhurat rules.
- * This is a best-effort classical rule evaluator — never the final word; users
- * should consult a pandit for high-stakes events.
+ * Streaming, cancellable scan for auspicious days. Walks the date range one
+ * day at a time, computing the panchang and evaluating the occasion's rule.
+ * Yields to the event loop periodically so touches / taps aren't blocked,
+ * and honors `signal.aborted` between days so the caller can cancel.
+ *
+ * Best-effort classical rule evaluator — users should consult a pandit for
+ * high-stakes events.
  */
-export async function findAuspiciousDays(
-  occasion: Occasion,
-  startDate: Date,
-  endDate: Date,
-  savedCoords?: { lat: number; lon: number } | null,
-): Promise<MuhuratMatch[]> {
-  const rule = RULES[occasion];
+export async function scanAuspiciousDays(opts: ScanOptions): Promise<MuhuratMatch[]> {
+  const rule = RULES[opts.occasion];
+  const yieldEvery = opts.yieldEvery ?? 5;
   const out: MuhuratMatch[] = [];
 
-  const cursor = new Date(startDate);
+  const cursor = new Date(opts.startDate);
   cursor.setHours(12, 0, 0, 0); // noon to avoid DST-boundary drift
-  const end = new Date(endDate);
+  const end = new Date(opts.endDate);
   end.setHours(12, 0, 0, 0);
 
+  const totalDays = Math.max(
+    1,
+    Math.round((end.getTime() - cursor.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+  );
+  let scannedCount = 0;
+
   while (cursor.getTime() <= end.getTime()) {
-    // Skip endTime computation — rules only need which element is prevailing,
-    // and for simplicity we check the FIRST element in each list (sunrise-time).
-    const panchang = await fetchPanchang(new Date(cursor), savedCoords, false, 'en');
+    if (opts.signal?.aborted) return out;
+
+    const panchang = await fetchPanchang(new Date(cursor), opts.coords ?? null, false, 'en');
     if (panchang) {
       const match = evaluateDay(panchang, rule);
       if (match) {
-        out.push({
+        const entry: MuhuratMatch = {
           date: new Date(cursor),
           tithi: match.tithi,
           nakshatra: match.nakshatra,
           yoga: match.yoga,
           vara: match.vara,
           panchang,
-        });
+        };
+        out.push(entry);
+        opts.onMatch?.(entry);
       }
     }
+
+    scannedCount += 1;
+    opts.onProgress?.({
+      day: ymdLocal(cursor),
+      scannedCount,
+      totalDays,
+    });
+
     cursor.setDate(cursor.getDate() + 1);
+
+    // Yield to the event loop so touches / re-renders can happen between
+    // expensive panchang computations.
+    if (scannedCount % yieldEvery === 0) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
   }
+
   return out;
+}
+
+function ymdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 interface EvalMatch {

@@ -31,6 +31,12 @@ export interface DatePickerModalProps {
   minYear?: number;
   /** Upper bound for year selection (inclusive). Defaults to current year. */
   maxYear?: number;
+  /**
+   * Upper-bound date (inclusive). Cells after this date are disabled.
+   * Use e.g. `new Date()` for a DOB picker so the user can't pick a future
+   * birthday. If omitted, only the year range enforces bounds.
+   */
+  maxDate?: Date;
   colors: ColorPalette;
   /** Header title to display. */
   title?: string;
@@ -44,6 +50,7 @@ export function DatePickerModal({
   onClear,
   minYear = 1900,
   maxYear = new Date().getFullYear(),
+  maxDate,
   colors,
   title,
 }: DatePickerModalProps) {
@@ -72,9 +79,10 @@ export function DatePickerModal({
   const cells = useMemo(() => buildCalendarCells(year, month), [year, month]);
 
   const years = useMemo(() => {
-    const count = maxYear - minYear + 1;
-    return Array.from({ length: count }, (_, i) => maxYear - i);
-  }, [minYear, maxYear]);
+    const cap = maxDate ? Math.min(maxYear, maxDate.getFullYear()) : maxYear;
+    const count = cap - minYear + 1;
+    return Array.from({ length: count }, (_, i) => cap - i);
+  }, [minYear, maxYear, maxDate]);
 
   function prevMonth() {
     const next = new Date(year, month - 1, 1);
@@ -85,7 +93,17 @@ export function DatePickerModal({
   function nextMonth() {
     const next = new Date(year, month + 1, 1);
     if (next.getFullYear() > maxYear) return;
+    if (maxDate && next > startOfMonth(maxDate)) return;
     setCalMonth(next);
+  }
+
+  function startOfMonth(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+
+  function isMonthDisabled(y: number, m: number) {
+    if (!maxDate) return false;
+    return new Date(y, m, 1) > startOfMonth(maxDate);
   }
 
   function openJumper() {
@@ -104,7 +122,7 @@ export function DatePickerModal({
   }
 
   const canPrev = year > minYear || month > 0;
-  const canNext = year < maxYear || month < 11;
+  const canNext = (year < maxYear || month < 11) && !isMonthDisabled(year, month + 1);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -125,7 +143,12 @@ export function DatePickerModal({
                 <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
                   {jumperYear}
                 </Text>
-                <TouchableOpacity onPress={() => setJumperYear(Math.min(maxYear, jumperYear + 1))} hitSlop={12}>
+                <TouchableOpacity
+                  onPress={() => {
+                    const cap = maxDate ? Math.min(maxYear, maxDate.getFullYear()) : maxYear;
+                    setJumperYear(Math.min(cap, jumperYear + 1));
+                  }}
+                  hitSlop={12}>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -134,18 +157,21 @@ export function DatePickerModal({
               <View style={styles.monthGrid}>
                 {(t('panchang.monthNamesShort', { returnObjects: true }) as string[]).map((name, i) => {
                   const isCurrent = jumperYear === year && i === month;
+                  const disabled = isMonthDisabled(jumperYear, i);
                   return (
                     <TouchableOpacity
                       key={i}
+                      disabled={disabled}
                       style={[
                         styles.monthCell,
                         isCurrent && { backgroundColor: colors.accent },
+                        disabled && { opacity: 0.35 },
                       ]}
                       onPress={() => pickMonthYear(i)}>
                       <Text
                         style={[
                           styles.monthCellText,
-                          { color: isCurrent ? colors.base : colors.textSecondary },
+                          { color: isCurrent ? colors.base : disabled ? colors.textDisabled : colors.textSecondary },
                         ]}>
                         {name}
                       </Text>
@@ -227,18 +253,22 @@ export function DatePickerModal({
                   const isSelected = value ? isSameDay(cellDate, value) : false;
                   const col = idx % 7;
                   const isWeekend = col === 0 || col === 6;
+                  const isFuture = !!maxDate && cellDate > maxDate;
                   const textColor = isSelected
                     ? colors.base
+                    : isFuture ? colors.textDisabled
                     : isWeekend ? colors.textDisabled : colors.textSecondary;
 
                   return (
                     <TouchableOpacity
                       key={cell}
                       style={styles.cell}
+                      disabled={isFuture}
                       onPress={() => handlePick(cellDate)}>
                       <View style={[
                         styles.cellInner,
                         isSelected && { backgroundColor: colors.accent },
+                        isFuture && { opacity: 0.35 },
                       ]}>
                         <Text style={[styles.dayNum, { color: textColor }]}>{cell}</Text>
                       </View>

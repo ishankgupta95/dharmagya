@@ -1057,15 +1057,23 @@ Each sub-phase is a separate release with its own exit criteria. The aggregate *
 - 12-sign grid + detail screen + 7-day history strip.
 - Home card showing user's sign (or default grid link if skipped).
 
-### Phase 2 Known Follow-ups (deferred from shipping audit, 2026-04-13)
+### Phase 2 Follow-ups (landed 2026-04-13)
 
-Audit of the shipped P2D work found two issues that are intentionally deferred rather than blocking. These need to land before Phase 3 closes out so we don't carry them into reach-expansion work.
+Post-ship audit found two deferred items plus three surfaced during the smoke-test. All five landed in the Phase 2 wrap-up pass:
 
-- **[P2D-F1] `DatePickerModal` accepts future dates for DOB.** `maxYear` defaults to the current year but nothing stops the user from picking e.g. 2026-12-31 as a birth date. Add an optional `maxDate?: Date` prop and pass `new Date()` from the Settings birth-date row. Disable cells in the calendar grid after `maxDate` and in the year-jumper month grid if the resulting month starts after `maxDate`. Estimated effort: 30 min.
+- **[P2D-F1] ✅ `DatePickerModal` future-date guard.** Added optional `maxDate?: Date` prop; future cells disabled in the calendar grid, future months disabled in the month-jumper grid, year list + next-month arrow capped. Settings birth-date row passes `maxDate={new Date()}`.
 
-- **[P2D-F2] `userRashi` and `userBirthDate` can drift.** Picking a DOB writes both; tapping a different sign on the Rashifal grid writes only `userRashi`. Settings doesn't surface the override. Fix: in the Settings Horoscope row, if `userBirthDate` is set and `userRashi` differs from `signFromBirthDate(userBirthDate)`, show a "Manually set to {{sign}} — [Reset to derived]" sub-label. Tapping the reset link sets `userRashi = signFromBirthDate(birthDate)`. Estimated effort: 15 min.
+- **[P2D-F2] ✅ `userRashi` / `userBirthDate` drift indicator.** Settings Horoscope row now renders a "Rashi manually set to {{sign}} — Reset to {{derived}} (from birth date)" sub-row whenever `userBirthDate` is set and `userRashi` differs from `signFromBirthDate(userBirthDate)`. Tapping the link writes the derived sign.
 
-Not blocking production — both have sensible default behavior — but listed here so they aren't forgotten.
+- **[P2D-F3] ✅ Rashifal grid silently ignored sign override when DOB was set.** The old `onPress` gated `setUserRashi` on `!activeSign`, so once a DOB was set users could not change their sign via the grid — which also meant the P2D-F2 drift row never had a trigger. Gate removed; tapping any sign in the grid now writes `userRashi` unconditionally.
+
+- **[P2D-F4] ✅ Muhurat scan extended from 90 → 365 days with progressive streaming + SQLite cache.** New `muhurat_cache(occasion, lat_key, lon_key, matches_json, scanned_through, updated_at)` table keyed on 0.1°-rounded coords. Scan refactored to `scanAuspiciousDays({ ..., signal, onMatch, onProgress })` — streams matches into the UI as found, yields to the event loop every 5 days, honors `AbortSignal`. Screen is a state machine (scanning / cancelled / complete / error) with visible progress, Cancel/Resume/Refresh buttons, and partial persistence every 15 days so cancel never wastes work.
+
+- **[P2D-F5] ✅ Muhurat list grouped by month + "Soon" badge for near-term matches.** Flat 365-day list was visually messy; matches are now sectioned under localized month headers (e.g. "April 2026 · 3") and any match within the next 14 days gets an accent border plus a `Soon` / `शीघ्र` / `शीघ्रम्` badge.
+
+**Known deferred (needs dev-build verification, not Expo Go):**
+
+- **[P2D-F6] ⏸️ Reminder toggles surface "permission denied" in Expo Go.** `src/services/notifications.ts` intentionally sets `Notifications = null` in Expo Go (SDK 53 dropped Android push support from Expo Go), so `requestNotificationPermission()` returns `false` and the toggle flow aborts with a misleading "allow in Settings" alert. Not a real bug — notifications genuinely don't work in Expo Go. To verify: run an EAS development build and retest toggles. Optional polish: detect Expo Go and swap the alert text to "Notifications require a development build."
 
 ### Phase 2 Exit Criteria (aggregate)
 
