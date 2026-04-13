@@ -26,6 +26,7 @@ import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { vratFestivalNameForDate } from '@/utils/vrat';
 import { signFromBirthDate } from '@/utils/rashi';
+import { DEITY_BY_NAME } from '@/config/deities';
 import { type RashiSign } from '@/types';
 import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
 
@@ -45,6 +46,28 @@ interface VratKathaRow {
   titleNative: string;
   deity: string;
   summary: string;
+}
+
+interface ChalisaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+}
+
+interface KathaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
+}
+
+/** Builds a SQL `IN (?, ?, ...)` placeholder list. Returns null when the list
+ *  is empty so callers can short-circuit without emitting invalid SQL. */
+function inClause(values: string[]): { sql: string; params: string[] } | null {
+  if (!values.length) return null;
+  return { sql: `(${values.map(() => '?').join(',')})`, params: values };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -96,6 +119,7 @@ export default function HomeScreen() {
   const userRashi = useStore(s => s.userRashi);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
+  const selectedDeities = useStore(s => s.selectedDeities);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const { t, i18n } = useTranslation();
@@ -104,6 +128,11 @@ export default function HomeScreen() {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
   const [featuredAarti, setFeaturedAarti] = useState<IAarti | null>(null);
+  const [featuredAartiFromSelected, setFeaturedAartiFromSelected] = useState(false);
+  const [featuredChalisa, setFeaturedChalisa] = useState<ChalisaRow | null>(null);
+  const [featuredChalisaFromSelected, setFeaturedChalisaFromSelected] = useState(false);
+  const [featuredKatha, setFeaturedKatha] = useState<KathaRow | null>(null);
+  const [featuredKathaFromSelected, setFeaturedKathaFromSelected] = useState(false);
   const [vratKatha, setVratKatha] = useState<{ row: VratKathaRow; festivalName: string } | null>(null);
   const [rashifalExcerpt, setRashifalExcerpt] = useState<string | null>(null);
 
@@ -179,10 +208,14 @@ export default function HomeScreen() {
     setVratKatha(row ? { row, festivalName: vrat.name } : null);
   }, [db]);
 
-  // ── Featured Aarti ────────────────────────────────────────────────────────
+  // ── Featured Aarti / Chalisa / Katha ──────────────────────────────────────
+  // Ranking: explicit favorites (aarti only, existing behavior) → content where
+  // deity ∈ selectedDeities → random fallback. The `*FromSelected` flag lets the
+  // card show a "For your deities" label so users know the pick is personalised.
   useEffect(() => {
     const favAartiIds = favoriteIds.filter((id) => id.startsWith('aarti-'));
     let row: AartiRow | null = null;
+    let fromSelected = false;
 
     if (favAartiIds.length > 0) {
       const randomPrefixed = favAartiIds[Math.floor(Math.random() * favAartiIds.length)];
@@ -191,14 +224,79 @@ export default function HomeScreen() {
     }
 
     if (!row) {
+      const ic = inClause(selectedDeities);
+      if (ic) {
+        row = db.getFirstSync<AartiRow>(
+          `SELECT * FROM aartis WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
+          ic.params
+        );
+        if (row) fromSelected = true;
+      }
+    }
+
+    if (!row) {
       row = db.getFirstSync<AartiRow>('SELECT * FROM aartis ORDER BY RANDOM() LIMIT 1');
     }
 
     setFeaturedAarti(row ? rowToAarti(row) : null);
-  }, [db, favoriteIds]);
+    setFeaturedAartiFromSelected(fromSelected);
+  }, [db, favoriteIds, selectedDeities]);
+
+  useEffect(() => {
+    let row: ChalisaRow | null = null;
+    let fromSelected = false;
+
+    const ic = inClause(selectedDeities);
+    if (ic) {
+      row = db.getFirstSync<ChalisaRow>(
+        `SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
+        ic.params
+      );
+      if (row) fromSelected = true;
+    }
+
+    if (!row) {
+      row = db.getFirstSync<ChalisaRow>(
+        'SELECT id, titleEnglish, titleNative, deity FROM chalisas ORDER BY RANDOM() LIMIT 1'
+      );
+    }
+
+    setFeaturedChalisa(row);
+    setFeaturedChalisaFromSelected(fromSelected);
+  }, [db, selectedDeities]);
+
+  useEffect(() => {
+    let row: KathaRow | null = null;
+    let fromSelected = false;
+
+    const ic = inClause(selectedDeities);
+    if (ic) {
+      row = db.getFirstSync<KathaRow>(
+        `SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
+        ic.params
+      );
+      if (row) fromSelected = true;
+    }
+
+    if (!row) {
+      row = db.getFirstSync<KathaRow>(
+        'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas ORDER BY RANDOM() LIMIT 1'
+      );
+    }
+
+    setFeaturedKatha(row);
+    setFeaturedKathaFromSelected(fromSelected);
+  }, [db, selectedDeities]);
 
   const greetingKey = useMemo(() => getGreetingKey(), []);
   const dateString = useMemo(() => getTodayDateString(lang), [lang]);
+
+  // Map selected deity *names* to their metadata (id/color) for the avatar
+  // strip. Unknown names (e.g. after a content cleanup) are filtered out.
+  const selectedDeityMetas = useMemo(
+    () => selectedDeities.map((name) => DEITY_BY_NAME[name]).filter(Boolean),
+    [selectedDeities]
+  );
   const panchangGradient = useMemo<readonly [string, string]>(
     () => isDarkMode ? ['#2E2418', '#1E1E24'] : ['#FFF8F0', '#FFF0E4'],
     [isDarkMode]
@@ -347,6 +445,43 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/* ── Your Deities strip ────────────────────────────────────────── */}
+        {selectedDeityMetas.length > 0 && (
+          <View style={styles.yourDeitiesBlock}>
+            <View style={styles.yourDeitiesHeader}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                {t('home.yourDeities')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/settings/deities')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Text style={[styles.yourDeitiesManage, { color: colors.accent }]}>
+                  {t('home.yourDeitiesManage')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.yourDeitiesScroll}>
+              {selectedDeityMetas.map((deity) => (
+                <TouchableOpacity
+                  key={deity.id}
+                  activeOpacity={0.8}
+                  onPress={() => router.push(`/god/${deity.id}`)}
+                  style={styles.yourDeityChip}>
+                  <DeityAvatar deity={deity.name} size={52} />
+                  <Text
+                    style={[styles.yourDeityName, { color: colors.textSecondary }]}
+                    numberOfLines={1}>
+                    {t(`deities.${deity.id}.displayName`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* ── Today's Vrat Katha Card ───────────────────────────────────── */}
         {vratKatha && (
           <TouchableOpacity
@@ -416,7 +551,73 @@ export default function HomeScreen() {
             <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
               {favoriteIds.some((id) => id.startsWith('aarti-'))
                 ? t('home.fromYourFavourites')
-                : t('home.featuredAarti')}
+                : featuredAartiFromSelected
+                  ? t('home.forYourDeities')
+                  : t('home.featuredAarti')}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Featured Chalisa Card ─────────────────────────────────────── */}
+        {featuredChalisa && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/chalisa/${featuredChalisa.id}`)}
+            style={[
+              styles.featuredCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <View style={styles.featuredInner}>
+              <DeityAvatar deity={featuredChalisa.deity} size={52} />
+              <View style={styles.featuredText}>
+                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {featuredChalisa.titleNative}
+                </Text>
+                {lang === 'en' && (
+                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {featuredChalisa.titleEnglish}
+                  </Text>
+                )}
+                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
+                  {featuredChalisa.deity}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
+              {featuredChalisaFromSelected ? t('home.forYourDeities') : t('home.featuredChalisa')}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Featured Katha Card ───────────────────────────────────────── */}
+        {featuredKatha && (!vratKatha || vratKatha.row.id !== featuredKatha.id) && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/katha/${featuredKatha.id}`)}
+            style={[
+              styles.featuredCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <View style={styles.featuredInner}>
+              <DeityAvatar deity={featuredKatha.deity} size={52} />
+              <View style={styles.featuredText}>
+                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {featuredKatha.titleNative}
+                </Text>
+                {lang === 'en' && (
+                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {featuredKatha.titleEnglish}
+                  </Text>
+                )}
+                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
+                  {featuredKatha.deity}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
+              {featuredKathaFromSelected ? t('home.forYourDeities') : t('home.featuredKatha')}
             </Text>
           </TouchableOpacity>
         )}
@@ -624,6 +825,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     flex: 1,
   },
+
+  // Your deities strip
+  yourDeitiesBlock: { marginBottom: 16 },
+  yourDeitiesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  yourDeitiesManage: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
+  yourDeitiesScroll: { gap: 14, paddingRight: 4 },
+  yourDeityChip: { alignItems: 'center', width: 64, gap: 6 },
+  yourDeityName: { fontSize: 11, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
 
   // Featured aarti
   featuredCard: {

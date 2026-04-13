@@ -59,6 +59,7 @@ export default function SettingsScreen() {
     userRashi,
     setUserRashi,
     setWalkthroughStep,
+    selectedDeities,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
@@ -251,6 +252,26 @@ export default function SettingsScreen() {
           />
 
         </TouchableOpacity>
+
+        {/* ── Deities ──────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.deities')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/deities')}>
+            <SettingRow
+              icon="flower-outline"
+              label={t('settings.manageDeities')}
+              sublabel={
+                selectedDeities.length > 0
+                  ? t('settings.manageDeitiesCount', { count: selectedDeities.length })
+                  : t('settings.manageDeitiesNone')
+              }
+              colors={colors}
+              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+        </View>
 
         {/* ── Horoscope ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.horoscope')} colors={colors} />
