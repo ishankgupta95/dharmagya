@@ -79,7 +79,7 @@ export default function ChalisaDetailScreen() {
   // ── Loading state ──────────────────────────────────────────────────────────
   if (!chalisa) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
         <View style={[styles.root, { backgroundColor: colors.base, alignItems: 'center', justifyContent: 'center' }]}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -93,7 +93,7 @@ export default function ChalisaDetailScreen() {
   let globalChaupaiNum = 0;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
 
       {/* ── Gradient Header ─────────────────────────────────────────── */}
       <LinearGradient colors={headerGradient} style={styles.header}>

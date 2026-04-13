@@ -108,7 +108,7 @@ export default function LocationPickerScreen() {
   const currentLabel = locationName ?? (userLocation ? 'GPS' : 'Varanasi (default)');
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>

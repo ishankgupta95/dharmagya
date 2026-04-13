@@ -1,9 +1,9 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 
-import type { IAarti, IChalisa, IKatha } from '@/types';
+import type { IAarti, IChalisa, IKatha, IRashifal } from '@/types';
 
 // Bump this whenever seed data changes to trigger a re-seed on existing installs.
-const SEED_VERSION = 5;
+const SEED_VERSION = 7;
 
 async function seedAartis(db: SQLiteDatabase): Promise<void> {
   const aartiSeedData = (await import('@/data/static/aartis.json')).default;
@@ -27,13 +27,32 @@ async function seedChalisas(db: SQLiteDatabase): Promise<void> {
   }
 }
 
+async function seedRashifal(db: SQLiteDatabase): Promise<void> {
+  const rashifalSeedData = (await import('@/data/static/rashifal.json')).default;
+  const entries = rashifalSeedData as IRashifal[];
+  for (const r of entries) {
+    db.runSync(
+      'INSERT OR REPLACE INTO rashifal (date, sign, language, body) VALUES (?, ?, ?, ?)',
+      [r.date, r.sign, r.language, r.body]
+    );
+  }
+}
+
 async function seedKathas(db: SQLiteDatabase): Promise<void> {
   const kathaSeedData = (await import('@/data/static/kathas.json')).default;
   const kathas = kathaSeedData as IKatha[];
   for (const katha of kathas) {
     db.runSync(
-      'INSERT OR REPLACE INTO kathas (id, titleEnglish, titleNative, deity, summary, content) VALUES (?, ?, ?, ?, ?, ?)',
-      [katha.id, katha.titleEnglish, katha.titleNative, katha.deity, katha.summary, JSON.stringify(katha.paragraphs)]
+      'INSERT OR REPLACE INTO kathas (id, titleEnglish, titleNative, deity, summary, content, vrat_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        katha.id,
+        katha.titleEnglish,
+        katha.titleNative,
+        katha.deity,
+        katha.summary,
+        JSON.stringify(katha.paragraphs),
+        katha.vratType ?? null,
+      ]
     );
   }
 }
@@ -71,7 +90,45 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       titleNative TEXT NOT NULL,
       deity TEXT NOT NULL,
       summary TEXT NOT NULL,
-      content TEXT NOT NULL
+      content TEXT NOT NULL,
+      vrat_type TEXT
+    );
+  `);
+
+  // Migration: add vrat_type column for installs created before seed v6.
+  // ALTER TABLE ADD COLUMN is idempotent-unsafe in SQLite (errors if exists),
+  // so guard by checking pragma.
+  const kathaCols = db.getAllSync<{ name: string }>("PRAGMA table_info(kathas)");
+  if (!kathaCols.some(c => c.name === 'vrat_type')) {
+    db.execSync('ALTER TABLE kathas ADD COLUMN vrat_type TEXT');
+  }
+
+  // Rashifal table — daily horoscope per (date, sign, language)
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS rashifal (
+      date TEXT NOT NULL,
+      sign TEXT NOT NULL,
+      language TEXT NOT NULL,
+      body TEXT NOT NULL,
+      PRIMARY KEY (date, sign, language)
+    );
+  `);
+
+  // Muhurat cache — persists a rolling 365-day scan per (occasion, location).
+  // lat_key/lon_key are coordinates rounded to 1 decimal (~11km) so nearby
+  // users share cache. matches_json holds the full MuhuratMatch[] (incl. each
+  // day's panchang) so the UI renders expanded slots without refetching.
+  // scanned_through is the last YYYY-MM-DD successfully evaluated; a partial
+  // scan can resume from there. Past matches (date < today) are pruned on write.
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS muhurat_cache (
+      occasion TEXT NOT NULL,
+      lat_key TEXT NOT NULL,
+      lon_key TEXT NOT NULL,
+      matches_json TEXT NOT NULL DEFAULT '[]',
+      scanned_through TEXT,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (occasion, lat_key, lon_key)
     );
   `);
 
@@ -91,6 +148,7 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     await seedAartis(db);
     await seedChalisas(db);
     await seedKathas(db);
+    await seedRashifal(db);
     db.runSync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', ['seedVersion', String(SEED_VERSION)]);
   }
 }

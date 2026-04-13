@@ -24,6 +24,10 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
+import { vratFestivalNameForDate } from '@/utils/vrat';
+import { signFromBirthDate } from '@/utils/rashi';
+import { DEITY_BY_NAME } from '@/config/deities';
+import { type RashiSign } from '@/types';
 import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -34,6 +38,36 @@ interface AartiRow {
   titleNative: string;
   content: string;
   deity: string;
+}
+
+interface VratKathaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
+}
+
+interface ChalisaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+}
+
+interface KathaRow {
+  id: string;
+  titleEnglish: string;
+  titleNative: string;
+  deity: string;
+  summary: string;
+}
+
+/** Builds a SQL `IN (?, ?, ...)` placeholder list. Returns null when the list
+ *  is empty so callers can short-circuit without emitting invalid SQL. */
+function inClause(values: string[]): { sql: string; params: string[] } | null {
+  if (!values.length) return null;
+  return { sql: `(${values.map(() => '?').join(',')})`, params: values };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -81,8 +115,11 @@ export default function HomeScreen() {
   const userLocation = useStore(s => s.userLocation);
   const locationName = useStore(s => s.locationName);
   const language = useStore(s => s.language);
+  const userBirthDate = useStore(s => s.userBirthDate);
+  const userRashi = useStore(s => s.userRashi);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
+  const selectedDeities = useStore(s => s.selectedDeities);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const { t, i18n } = useTranslation();
@@ -91,6 +128,13 @@ export default function HomeScreen() {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
   const [featuredAarti, setFeaturedAarti] = useState<IAarti | null>(null);
+  const [featuredAartiFromSelected, setFeaturedAartiFromSelected] = useState(false);
+  const [featuredChalisa, setFeaturedChalisa] = useState<ChalisaRow | null>(null);
+  const [featuredChalisaFromSelected, setFeaturedChalisaFromSelected] = useState(false);
+  const [featuredKatha, setFeaturedKatha] = useState<KathaRow | null>(null);
+  const [featuredKathaFromSelected, setFeaturedKathaFromSelected] = useState(false);
+  const [vratKatha, setVratKatha] = useState<{ row: VratKathaRow; festivalName: string } | null>(null);
+  const [rashifalExcerpt, setRashifalExcerpt] = useState<string | null>(null);
 
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
   const lastFetchRef = useRef(0);
@@ -121,10 +165,57 @@ export default function HomeScreen() {
     return () => sub.remove();
   }, [refreshPanchang]);
 
-  // ── Featured Aarti ────────────────────────────────────────────────────────
+  // ── Today's Rashifal ─────────────────────────────────────────────────────
+  const userSign: RashiSign | null = useMemo(() => {
+    if (userRashi) return userRashi;
+    if (userBirthDate) return signFromBirthDate(new Date(userBirthDate + 'T12:00:00'));
+    return null;
+  }, [userRashi, userBirthDate]);
+
+  useEffect(() => {
+    if (!userSign) {
+      setRashifalExcerpt(null);
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const preferredLang = lang === 'hi' ? 'hi' : 'en';
+    const row =
+      db.getFirstSync<{ body: string }>(
+        'SELECT body FROM rashifal WHERE date = ? AND sign = ? AND language = ? LIMIT 1',
+        [ymd, userSign, preferredLang]
+      )
+      ?? db.getFirstSync<{ body: string }>(
+        'SELECT body FROM rashifal WHERE date = ? AND sign = ? AND language = ? LIMIT 1',
+        [ymd, userSign, 'en']
+      );
+    setRashifalExcerpt(row?.body ?? null);
+  }, [db, userSign, lang]);
+
+  // ── Today's Vrat Katha (if today is a vrat day) ──────────────────────────
+  useEffect(() => {
+    const today = new Date();
+    const vrat = vratFestivalNameForDate(today);
+    if (!vrat) {
+      setVratKatha(null);
+      return;
+    }
+    const row = db.getFirstSync<VratKathaRow>(
+      'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE vrat_type = ? LIMIT 1',
+      [vrat.vratType]
+    );
+    setVratKatha(row ? { row, festivalName: vrat.name } : null);
+  }, [db]);
+
+  // ── Featured Aarti / Chalisa / Katha ──────────────────────────────────────
+  // Ranking: explicit favorites (aarti only, existing behavior) → content where
+  // deity ∈ selectedDeities → random fallback. The `*FromSelected` flag lets the
+  // card show a "For your deities" label so users know the pick is personalised.
   useEffect(() => {
     const favAartiIds = favoriteIds.filter((id) => id.startsWith('aarti-'));
     let row: AartiRow | null = null;
+    let fromSelected = false;
 
     if (favAartiIds.length > 0) {
       const randomPrefixed = favAartiIds[Math.floor(Math.random() * favAartiIds.length)];
@@ -133,14 +224,79 @@ export default function HomeScreen() {
     }
 
     if (!row) {
+      const ic = inClause(selectedDeities);
+      if (ic) {
+        row = db.getFirstSync<AartiRow>(
+          `SELECT * FROM aartis WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
+          ic.params
+        );
+        if (row) fromSelected = true;
+      }
+    }
+
+    if (!row) {
       row = db.getFirstSync<AartiRow>('SELECT * FROM aartis ORDER BY RANDOM() LIMIT 1');
     }
 
     setFeaturedAarti(row ? rowToAarti(row) : null);
-  }, [db, favoriteIds]);
+    setFeaturedAartiFromSelected(fromSelected);
+  }, [db, favoriteIds, selectedDeities]);
+
+  useEffect(() => {
+    let row: ChalisaRow | null = null;
+    let fromSelected = false;
+
+    const ic = inClause(selectedDeities);
+    if (ic) {
+      row = db.getFirstSync<ChalisaRow>(
+        `SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
+        ic.params
+      );
+      if (row) fromSelected = true;
+    }
+
+    if (!row) {
+      row = db.getFirstSync<ChalisaRow>(
+        'SELECT id, titleEnglish, titleNative, deity FROM chalisas ORDER BY RANDOM() LIMIT 1'
+      );
+    }
+
+    setFeaturedChalisa(row);
+    setFeaturedChalisaFromSelected(fromSelected);
+  }, [db, selectedDeities]);
+
+  useEffect(() => {
+    let row: KathaRow | null = null;
+    let fromSelected = false;
+
+    const ic = inClause(selectedDeities);
+    if (ic) {
+      row = db.getFirstSync<KathaRow>(
+        `SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
+        ic.params
+      );
+      if (row) fromSelected = true;
+    }
+
+    if (!row) {
+      row = db.getFirstSync<KathaRow>(
+        'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas ORDER BY RANDOM() LIMIT 1'
+      );
+    }
+
+    setFeaturedKatha(row);
+    setFeaturedKathaFromSelected(fromSelected);
+  }, [db, selectedDeities]);
 
   const greetingKey = useMemo(() => getGreetingKey(), []);
   const dateString = useMemo(() => getTodayDateString(lang), [lang]);
+
+  // Map selected deity *names* to their metadata (id/color) for the avatar
+  // strip. Unknown names (e.g. after a content cleanup) are filtered out.
+  const selectedDeityMetas = useMemo(
+    () => selectedDeities.map((name) => DEITY_BY_NAME[name]).filter(Boolean),
+    [selectedDeities]
+  );
   const panchangGradient = useMemo<readonly [string, string]>(
     () => isDarkMode ? ['#2E2418', '#1E1E24'] : ['#FFF8F0', '#FFF0E4'],
     [isDarkMode]
@@ -269,6 +425,96 @@ export default function HomeScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* ── Today's Rashifal Card ─────────────────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push(userSign ? `/rashifal/${userSign}` : '/rashifal')}
+          style={[styles.rashifalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.rashifalTopRow}>
+            <Text style={[styles.vratCardLabel, { color: colors.accent }]}>
+              {userSign
+                ? t('home.aajKaRashifal', { sign: t(`rashifal.sign.${userSign}.name`) })
+                : t('home.aajKaRashifalGeneric')}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+          </View>
+          <Text
+            style={[styles.rashifalExcerpt, { color: colors.textPrimary }]}
+            numberOfLines={2}>
+            {rashifalExcerpt ?? t('home.rashifalPickSign')}
+          </Text>
+        </TouchableOpacity>
+
+        {/* ── Your Deities strip ────────────────────────────────────────── */}
+        {selectedDeityMetas.length > 0 && (
+          <View style={styles.yourDeitiesBlock}>
+            <View style={styles.yourDeitiesHeader}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                {t('home.yourDeities')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/settings/deities')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Text style={[styles.yourDeitiesManage, { color: colors.accent }]}>
+                  {t('home.yourDeitiesManage')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.yourDeitiesScroll}>
+              {selectedDeityMetas.map((deity) => (
+                <TouchableOpacity
+                  key={deity.id}
+                  activeOpacity={0.8}
+                  onPress={() => router.push(`/god/${deity.id}`)}
+                  style={styles.yourDeityChip}>
+                  <DeityAvatar deity={deity.name} size={52} />
+                  <Text
+                    style={[styles.yourDeityName, { color: colors.textSecondary }]}
+                    numberOfLines={1}>
+                    {t(`deities.${deity.id}.displayName`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Today's Vrat Katha Card ───────────────────────────────────── */}
+        {vratKatha && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/katha/${vratKatha.row.id}`)}
+            style={[
+              styles.vratCard,
+              { backgroundColor: colors.surface, borderColor: colors.borderAccent },
+            ]}>
+            <View style={styles.vratCardTopRow}>
+              <Text style={[styles.vratCardLabel, { color: colors.accent }]}>
+                {t('home.todaysVratKatha', { festival: vratKatha.festivalName })}
+              </Text>
+              <Ionicons name="book-outline" size={14} color={colors.accent} />
+            </View>
+            <View style={styles.featuredInner}>
+              <DeityAvatar deity={vratKatha.row.deity} size={52} />
+              <View style={styles.featuredText}>
+                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {vratKatha.row.titleNative}
+                </Text>
+                <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {vratKatha.row.titleEnglish}
+                </Text>
+                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
+                  {vratKatha.row.deity}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* ── Featured Aarti Card ───────────────────────────────────────── */}
         {featuredAarti && (
           <TouchableOpacity
@@ -305,7 +551,73 @@ export default function HomeScreen() {
             <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
               {favoriteIds.some((id) => id.startsWith('aarti-'))
                 ? t('home.fromYourFavourites')
-                : t('home.featuredAarti')}
+                : featuredAartiFromSelected
+                  ? t('home.forYourDeities')
+                  : t('home.featuredAarti')}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Featured Chalisa Card ─────────────────────────────────────── */}
+        {featuredChalisa && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/chalisa/${featuredChalisa.id}`)}
+            style={[
+              styles.featuredCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <View style={styles.featuredInner}>
+              <DeityAvatar deity={featuredChalisa.deity} size={52} />
+              <View style={styles.featuredText}>
+                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {featuredChalisa.titleNative}
+                </Text>
+                {lang === 'en' && (
+                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {featuredChalisa.titleEnglish}
+                  </Text>
+                )}
+                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
+                  {featuredChalisa.deity}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
+              {featuredChalisaFromSelected ? t('home.forYourDeities') : t('home.featuredChalisa')}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Featured Katha Card ───────────────────────────────────────── */}
+        {featuredKatha && (!vratKatha || vratKatha.row.id !== featuredKatha.id) && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push(`/katha/${featuredKatha.id}`)}
+            style={[
+              styles.featuredCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <View style={styles.featuredInner}>
+              <DeityAvatar deity={featuredKatha.deity} size={52} />
+              <View style={styles.featuredText}>
+                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {featuredKatha.titleNative}
+                </Text>
+                {lang === 'en' && (
+                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {featuredKatha.titleEnglish}
+                  </Text>
+                )}
+                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
+                  {featuredKatha.deity}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
+              {featuredKathaFromSelected ? t('home.forYourDeities') : t('home.featuredKatha')}
             </Text>
           </TouchableOpacity>
         )}
@@ -331,6 +643,25 @@ export default function HomeScreen() {
             colors={colors}
           />
         </View>
+
+        {/* ── Find Auspicious Date Card ─────────────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/muhurat')}
+          style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.muhuratIconWrap, { backgroundColor: colors.borderAccent }]}>
+            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.muhuratTitle, { color: colors.textPrimary }]}>
+              {t('home.findMuhuratTitle')}
+            </Text>
+            <Text style={[styles.muhuratDesc, { color: colors.textMuted }]} numberOfLines={2}>
+              {t('home.findMuhuratDesc')}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
 
       </ScrollView>
 
@@ -465,6 +796,49 @@ const styles = StyleSheet.create({
 
   errorText: { fontSize: 13, fontFamily: 'Mukta_400Regular', textAlign: 'center', paddingVertical: 16 },
 
+  // Rashifal card
+  rashifalCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  rashifalTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  rashifalExcerpt: { fontSize: 14, fontFamily: 'Mukta_400Regular', lineHeight: 20 },
+
+  // Vrat katha card
+  vratCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  vratCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  vratCardLabel: {
+    fontSize: 11,
+    fontFamily: 'Mukta_500Medium',
+    letterSpacing: 1,
+    flex: 1,
+  },
+
+  // Your deities strip
+  yourDeitiesBlock: { marginBottom: 16 },
+  yourDeitiesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  yourDeitiesManage: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
+  yourDeitiesScroll: { gap: 14, paddingRight: 4 },
+  yourDeityChip: { alignItems: 'center', width: 64, gap: 6 },
+  yourDeityName: { fontSize: 11, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
+
   // Featured aarti
   featuredCard: {
     borderRadius: borderRadius.card,
@@ -486,6 +860,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  // Muhurat card
+  muhuratCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 16,
+  },
+  muhuratIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muhuratTitle: { fontSize: 14, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
+  muhuratDesc: { fontSize: 11, fontFamily: 'Mukta_400Regular', lineHeight: 15 },
 
   // Quick access
   quickRow: { flexDirection: 'row', gap: spacing.gridGap },

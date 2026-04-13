@@ -16,6 +16,9 @@ import {
   cancelSunriseAlert,
 } from '@/services/notifications';
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
+import { DatePickerModal } from '@/components/common/DatePickerModal';
+import { signFromBirthDate } from '@/utils/rashi';
+import { ymd } from '@/utils/calendar';
 
 // ─── Font size config ─────────────────────────────────────────────────────────
 
@@ -51,7 +54,12 @@ export default function SettingsScreen() {
     setSunriseAlertEnabled,
     masaSystem,
     setMasaSystem,
+    userBirthDate,
+    setUserBirthDate,
+    userRashi,
+    setUserRashi,
     setWalkthroughStep,
+    selectedDeities,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
@@ -62,6 +70,7 @@ export default function SettingsScreen() {
   }
 
   const [sunriseTime, setSunriseTime] = useState<string | null>(null);
+  const [dobPickerOpen, setDobPickerOpen] = useState(false);
 
   // Fetch today's sunrise once (needed to schedule the sunrise alert)
   useEffect(() => {
@@ -94,6 +103,34 @@ export default function SettingsScreen() {
     setDailyReminderEnabled(val);
   }
 
+  function handleDobPick(date: Date) {
+    const iso = ymd(date);
+    setUserBirthDate(iso);
+    // Derive and store the rashi automatically so it flows to the Home card
+    // and Rashifal screen without a second tap.
+    setUserRashi(signFromBirthDate(date));
+  }
+
+  function handleDobClear() {
+    setUserBirthDate(null);
+    setUserRashi(null);
+  }
+
+  const userBirthDateObj = userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null;
+  const birthDateLabel = userBirthDateObj
+    ? userBirthDateObj.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : t('settings.birthDateNotSet');
+
+  // Surface a drift indicator when the user has a birth date AND has manually
+  // set userRashi to something different from what the DOB would derive. This
+  // prevents silent divergence between the two stored fields.
+  const derivedRashi = userBirthDateObj ? signFromBirthDate(userBirthDateObj) : null;
+  const rashiDrifted = !!derivedRashi && !!userRashi && userRashi !== derivedRashi;
+
   async function handleSunriseAlertToggle(val: boolean) {
     if (val) {
       if (!sunriseTime) {
@@ -115,7 +152,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
@@ -216,6 +253,58 @@ export default function SettingsScreen() {
 
         </TouchableOpacity>
 
+        {/* ── Deities ──────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.deities')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/deities')}>
+            <SettingRow
+              icon="flower-outline"
+              label={t('settings.manageDeities')}
+              sublabel={
+                selectedDeities.length > 0
+                  ? t('settings.manageDeitiesCount', { count: selectedDeities.length })
+                  : t('settings.manageDeitiesNone')
+              }
+              colors={colors}
+              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Horoscope ─────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.horoscope')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => setDobPickerOpen(true)}>
+            <SettingRow
+              icon="gift-outline"
+              label={t('settings.birthDate')}
+              sublabel={birthDateLabel}
+              colors={colors}
+              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+          {rashiDrifted && derivedRashi && userRashi && (
+            <>
+              <Divider colors={colors} />
+              <View style={styles.driftRow}>
+                <Text style={[styles.driftLabel, { color: colors.textSecondary }]}>
+                  {t('settings.rashiOverrideLabel', { sign: t(`rashifal.sign.${userRashi}.name`) })}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setUserRashi(derivedRashi)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <Text style={[styles.driftLink, { color: colors.accent }]}>
+                    {t('settings.rashiResetToDerived', { derived: t(`rashifal.sign.${derivedRashi}.name`) })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+
         {/* ── Notifications ─────────────────────────────────────────── */}
         <SectionHeader label={t('settings.notifications')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -251,6 +340,20 @@ export default function SettingsScreen() {
               />
             }
           />
+
+          <Divider colors={colors} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/reminders')}>
+            <SettingRow
+              icon="alarm-outline"
+              label={t('settings.festivalTithiReminders')}
+              sublabel={t('settings.festivalTithiRemindersDesc')}
+              colors={colors}
+              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
 
         </View>
 
@@ -297,6 +400,19 @@ export default function SettingsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <DatePickerModal
+        visible={dobPickerOpen}
+        onClose={() => setDobPickerOpen(false)}
+        value={userBirthDateObj}
+        onPick={handleDobPick}
+        onClear={handleDobClear}
+        minYear={1900}
+        maxYear={new Date().getFullYear()}
+        maxDate={new Date()}
+        colors={colors}
+        title={t('settings.birthDatePickerTitle')}
+      />
 
     </SafeAreaView>
   );
@@ -516,6 +632,10 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end' },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
+
+  driftRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
+  driftLabel: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  driftLink: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
 
   // Status dot
   statusDot: { width: 8, height: 8, borderRadius: 4 },

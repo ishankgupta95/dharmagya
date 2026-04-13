@@ -88,7 +88,7 @@ export default function AartiDetailScreen() {
   // ── Loading state ──────────────────────────────────────────────────────────
   if (!aarti) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
         <View style={[styles.root, { backgroundColor: colors.base, alignItems: 'center', justifyContent: 'center' }]}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -99,7 +99,7 @@ export default function AartiDetailScreen() {
   const headerGradient: readonly [string, string] = ['#2E2418', colors.base];
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
 
       {/* ── Gradient Header ─────────────────────────────────────────── */}
       <LinearGradient colors={headerGradient} style={styles.header}>

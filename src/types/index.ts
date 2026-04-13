@@ -20,6 +20,46 @@ export interface IChalisa {
   sections: IChalisaSection[]; // Ordered: opening doha → chaupais → closing doha
 }
 
+/** Western tropical zodiac signs — used for daily Rashifal. Stored as lowercase keys in DB. */
+export type RashiSign =
+  | 'aries'
+  | 'taurus'
+  | 'gemini'
+  | 'cancer'
+  | 'leo'
+  | 'virgo'
+  | 'libra'
+  | 'scorpio'
+  | 'sagittarius'
+  | 'capricorn'
+  | 'aquarius'
+  | 'pisces';
+
+export const ALL_RASHI_SIGNS: RashiSign[] = [
+  'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+  'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces',
+];
+
+export interface IRashifal {
+  date: string; // YYYY-MM-DD
+  sign: RashiSign;
+  language: string; // 'en' | 'hi'
+  body: string;
+}
+
+export type VratType =
+  | 'ekadashi'
+  | 'pradosha'
+  | 'purnima'
+  | 'amavasya'
+  | 'sankashti'
+  | 'shivaratri'
+  | 'karwa_chauth'
+  | 'janmashtami'
+  | 'navratri'
+  | 'satyanarayan'
+  | 'vat_savitri';
+
 export interface IKatha {
   id: string;
   titleEnglish: string;
@@ -27,6 +67,7 @@ export interface IKatha {
   deity: string;
   summary: string; // Short summary in Hindi
   paragraphs: string[]; // Narrative paragraphs in Hindi
+  vratType?: VratType | null; // Associates this katha with a recurring vrat/festival
 }
 
 /** Timed slot with quality rating (used by Choghadiya and Gowri Panchangam). */

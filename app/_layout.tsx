@@ -17,12 +17,14 @@ import { darkColors, lightColors } from '@/config/theme';
 import { initDatabase } from '@/utils/database';
 import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
 import { preloadInterstitial, showInterstitial } from '@/services/interstitialAds';
+import { scheduleDailyReminder } from '@/services/notifications';
+import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isDarkMode, hasOnboarded, language, initFirstOpen } = useStore();
+  const { isDarkMode, hasOnboarded, language, initFirstOpen, dailyReminderEnabled, reminderPrefs } = useStore();
   const [storeHydrated, setStoreHydrated] = useState(
     () => useStore.persist.hasHydrated()
   );
@@ -78,10 +80,26 @@ export default function RootLayout() {
         if (elapsed >= APP_RESUME_MIN_BACKGROUND_MS) {
           showInterstitial('appResume');
         }
+        // Roll the daily-reminder 14-day horizon forward so tomorrow's vrat
+        // stays accurate. Safe no-op when disabled.
+        if (dailyReminderEnabled) {
+          void scheduleDailyReminder();
+        }
+        // Roll the reminder horizon (next 30 days of tithi + festival reminders).
+        if (hasAnyReminderEnabled(reminderPrefs)) {
+          void rescheduleReminders(reminderPrefs);
+        }
       }
     });
     return () => sub.remove();
-  }, [appReady, hasOnboarded]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, reminderPrefs]);
+
+  // Roll reminder horizons once on each cold start too.
+  useEffect(() => {
+    if (!appReady || !hasOnboarded) return;
+    if (dailyReminderEnabled) void scheduleDailyReminder();
+    if (hasAnyReminderEnabled(reminderPrefs)) void rescheduleReminders(reminderPrefs);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, reminderPrefs]);
 
   if (!appReady) return null;
 

@@ -33,6 +33,7 @@ interface SearchResult {
 export default function SearchScreen() {
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
+  const selectedDeities = useStore(s => s.selectedDeities);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
   const inputRef = useRef<TextInput>(null);
@@ -76,11 +77,23 @@ export default function SearchScreen() {
       );
       kathaRows.forEach(r => all.push({ ...r, type: 'katha' }));
 
+      // Stable re-rank: matches whose deity ∈ selectedDeities float to the top
+      // while preserving the existing (deity, title) alphabetic order within each
+      // bucket. Array.prototype.sort is stable per ECMAScript 2019+.
+      if (selectedDeities.length > 0) {
+        const prefer = new Set(selectedDeities);
+        all.sort((a, b) => {
+          const aPref = prefer.has(a.deity) ? 0 : 1;
+          const bPref = prefer.has(b.deity) ? 0 : 1;
+          return aPref - bPref;
+        });
+      }
+
       setResults(all);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [db, query]);
+  }, [db, query, selectedDeities]);
 
   const hasQuery = query.trim().length > 0;
   const hasResults = results.length > 0;
@@ -98,7 +111,7 @@ export default function SearchScreen() {
   }, [query, colors]);
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Search Bar ────────────────────────────────────────────────── */}
       <View style={[styles.searchBar, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>

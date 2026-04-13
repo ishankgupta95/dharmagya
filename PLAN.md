@@ -952,11 +952,87 @@ All Phase 1 steps below have shipped. Steps 1–17 are done. See Section 9 onwar
 
 ---
 
-## 10. Phase 2 — Daily Habit Drivers (highest-ROI, ship first)
+## 10. Phase 2 — Daily Habit Drivers (highest-ROI, ship first) — 🟡 ALL SUB-PHASES IMPLEMENTED (2026-04-12)
+
+**Implementation status:** All four sub-phases shipped in a single session as of 2026-04-12. Exit-criteria met for P2A–P2C. P2D ships with a **30-day pilot** seed corpus (not the full 365 days called for in the original spec — upgrade is a follow-up content task). All code typechecks and lints cleanly; manual UI validation still required before the production release cut. See commit history for per-sub-phase changes.
+
+
 
 **Goal:** Turn the app from a reference tool into something users open every morning. These four features are what every competitor has and Dharmagya lacks — they drive daily returns with low-to-medium implementation cost.
 
-### Step P2.1: Daily Rashifal (12 Zodiac Signs)
+**Execution strategy (2026-04-12):** Originally scoped as one release, but split into 4 independently-shippable sub-phases so each lands in its own release and we can measure impact incrementally. Sub-phases below are ordered smallest → largest by engineering surface area, which also matches ROI-per-effort. The original step numbers (P2.1–P2.4) have been remapped to execution order (P2A–P2D); the old numbers are noted for traceability.
+
+| Sub-phase | Feature (old ref) | Size | Key dependency |
+| --- | --- | --- | --- |
+| **P2A** | Vrat Katha Library (was P2.3) | S | None — extends `kathas` table |
+| **P2B** | Festival & Tithi Reminders (was P2.4) | M | Existing `notifications.ts` |
+| **P2C** | Occasion-specific Muhurats (was P2.2) | L | None — standalone screens + rules engine |
+| **P2D** | Daily Rashifal (was P2.1) | XL | New onboarding step (DOB) + seed pipeline |
+
+Each sub-phase is a separate release with its own exit criteria. The aggregate **Phase 2 Exit Criteria** at the end applies only once all four have shipped.
+
+---
+
+### Step P2A: Vrat Katha Library (pair with existing Vrat data)
+
+**Why:** The app already tracks Ekadashi (27/yr), Pradosha Vrata (13/yr), and festival dates. We already ship 12 kathas. Gap: no *Vrat Katha* — the specific fasting-day stories users want to read on that day. Low effort because Vrat dates are already computed and a Katha table exists.
+
+**Implementation:**
+- Extend the `kathas` table with a `vrat_type` column (nullable): one of `ekadashi`, `pradosha`, `purnima`, `amavasya`, `sankashti`, `shivaratri`, `karwa_chauth`, `janmashtami`, `navratri`, `satyanarayan`. NULL for general kathas.
+- Seed new Vrat Kathas (12–15 entries): Satyanarayan Katha (already exists — tag it), Shivaratri Vrat Katha, Karwa Chauth, Vat Savitri, Sankashti Ganesh Chaturthi, Ekadashi Mahatmya, etc.
+- On the Festivals screen, each festival row that has an associated Vrat Katha gets a "📖 Read Katha" chip that deep-links into `app/katha/[id].tsx`.
+- Home screen: if today is a Vrat day (query festivals table), surface a "Today's Vrat Katha" card above the Featured Aarti.
+- Notifications: piggy-back on the existing daily reminder infra — when scheduling daily reminder, check tomorrow's Vrat status and, if present, append Vrat name to the notification body.
+- No new screens — reuses existing katha detail view.
+
+**P2A Exit Criteria:**
+- `kathas` table has `vrat_type` column, seed version bumped, migration tested.
+- ≥10 new vrat kathas seeded across the listed types; Satyanarayan tagged.
+- Festivals screen shows "Read Katha" chip on rows with a matching vrat_type.
+- Home surfaces "Today's Vrat Katha" card when today is a vrat day.
+- Daily reminder body appends tomorrow's vrat name when applicable.
+- All new strings in en/hi/sa.
+
+### Step P2B: Festival & Tithi Reminders (recursive push notifications)
+
+**Why:** Drik Panchang & myMandir both let users subscribe to recurring reminders for specific Tithis (e.g., every Ekadashi, every Pradosha, every Purnima/Amavasya). Converts reference tool into calendar companion.
+
+**Implementation:**
+- New screen: `app/settings/reminders.tsx` (accessible from the existing Notifications section in Settings).
+- User can toggle recurring reminders per Tithi type: Ekadashi, Pradosha, Purnima, Amavasya, Sankashti Chaturthi, Shivaratri (monthly), Sankranti.
+- Per-toggle time preference (default 7:00 PM evening before, to allow user to prepare for next-day Vrat).
+- Implementation: on every app foreground (or nightly via background task) recompute next 30 days of reminder triggers and re-schedule via `expo-notifications`. Clear + re-schedule pattern is safe because Expo notification IDs are deterministic per (tithi_type, date).
+- Festival reminders: major festivals (from existing 2024–2036 festival data) get a one-time scheduled notification 1 day prior. User opts in per festival type (major / minor / ekadashi / pradosha / sankranti) with separate toggles.
+- Reuse existing notification permission flow — no new UX.
+- Respect `feedback_no_ads_after_onboarding.md`: first-time user opening this screen during onboarding walkthrough does not trigger permission prompt automatically; they must tap a toggle first.
+
+**P2B Exit Criteria:**
+- `app/settings/reminders.tsx` live with 6 tithi toggles + 5 festival-type toggles.
+- Toggle state persisted in Zustand.
+- Scheduler clears + re-schedules next 30 days on app foreground.
+- Test harness (mock "today") asserts next 30 days of scheduled notifications are correct.
+- All new strings in en/hi/sa.
+
+### Step P2C: Extended Muhurats Surfacing (calculations already exist)
+
+**Why:** The `panchang-ts` engine already computes Choghadiya, Gowri Panchangam, Hora, Abhijit, Brahma Muhurta, Rahu Kalam, Yamaganda, Gulika, Dur Muhurta — these are already surfaced in the Panchang tab. The gap vs. Drik Panchang / AstroSage is **occasion-specific muhurats** (Vivah / marriage, Griha Pravesh / housewarming, Namkaran / naming, Vahan / vehicle purchase, Mundan, Annaprashan).
+
+**Implementation:**
+- New screen: `app/muhurat/index.tsx` — list of occasions (Vivah, Griha Pravesh, Namkaran, Vahan, Mundan, Annaprashan, Vidyarambh).
+- Per occasion: a date-range picker (today → +90 days) returning **auspicious days** within the range, computed from rules (Tithi / Nakshatra / Yoga / Vara combinations plus exclusion of Rahu Kalam & Yamaganda). Rules are static lookup tables per occasion.
+- Rule source: encode classical Muhurat rules in `src/services/astrology/muhurat.ts`. Each rule set = `{ auspiciousTithis, auspiciousNakshatras, excludedYogas, excludedVaras, requiresShuklaPaksha }`.
+- Result view: calendar strip highlighting auspicious dates in accent, with tap-through to a day detail showing which slots inside that day are best (using existing Choghadiya + Abhijit + Brahma Muhurta).
+- Entry point: card on Home screen ("Find an auspicious date") + entry from Panchang screen.
+- No audio / no ads on compute result (user is mid-flow).
+
+**P2C Exit Criteria:**
+- 7 occasion screens live, each with 90-day date range scan.
+- `src/services/astrology/muhurat.ts` encodes classical rules per occasion.
+- Day detail view shows best slots inside a chosen auspicious day.
+- Home card + Panchang entry-point wired.
+- All new strings in en/hi/sa.
+
+### Step P2D: Daily Rashifal (12 Zodiac Signs)
 
 **Why:** Daily Rashifal is the single biggest habit-former in Indian devotional/astrology apps. Every successful competitor ships it. Implementation is straightforward — it's content delivery + a shareable card.
 
@@ -975,44 +1051,31 @@ All Phase 1 steps below have shipped. Steps 1–17 are done. See Section 9 onwar
 - i18n: add `rashifal.*` keys.
 - Ads: banner on index, NO interstitial (daily return screens should be frictionless).
 
-### Step P2.2: Extended Muhurats Surfacing (calculations already exist)
+**P2D Exit Criteria:**
+- 365 days × 12 signs seeded in en/hi (sa can land as follow-up).
+- Onboarding captures optional DOB (skip-able).
+- 12-sign grid + detail screen + 7-day history strip.
+- Home card showing user's sign (or default grid link if skipped).
 
-**Why:** The `panchang-ts` engine already computes Choghadiya, Gowri Panchangam, Hora, Abhijit, Brahma Muhurta, Rahu Kalam, Yamaganda, Gulika, Dur Muhurta — these are already surfaced in the Panchang tab. The gap vs. Drik Panchang / AstroSage is **occasion-specific muhurats** (Vivah / marriage, Griha Pravesh / housewarming, Namkaran / naming, Vahan / vehicle purchase, Mundan, Annaprashan).
+### Phase 2 Follow-ups (landed 2026-04-13)
 
-**Implementation:**
-- New screen: `app/muhurat/index.tsx` — list of occasions (Vivah, Griha Pravesh, Namkaran, Vahan, Mundan, Annaprashan, Vidyarambh).
-- Per occasion: a date-range picker (today → +90 days) returning **auspicious days** within the range, computed from rules (Tithi / Nakshatra / Yoga / Vara combinations plus exclusion of Rahu Kalam & Yamaganda). Rules are static lookup tables per occasion.
-- Rule source: encode classical Muhurat rules in `src/services/astrology/muhurat.ts`. Each rule set = `{ auspiciousTithis, auspiciousNakshatras, excludedYogas, excludedVaras, requiresShuklaPaksha }`.
-- Result view: calendar strip highlighting auspicious dates in accent, with tap-through to a day detail showing which slots inside that day are best (using existing Choghadiya + Abhijit + Brahma Muhurta).
-- Entry point: card on Home screen ("Find an auspicious date") + entry from Panchang screen.
-- No audio / no ads on compute result (user is mid-flow).
+Post-ship audit found two deferred items plus three surfaced during the smoke-test. All five landed in the Phase 2 wrap-up pass:
 
-### Step P2.3: Vrat Katha Library (pair with existing Vrat data)
+- **[P2D-F1] ✅ `DatePickerModal` future-date guard.** Added optional `maxDate?: Date` prop; future cells disabled in the calendar grid, future months disabled in the month-jumper grid, year list + next-month arrow capped. Settings birth-date row passes `maxDate={new Date()}`.
 
-**Why:** The app already tracks Ekadashi (27/yr), Pradosha Vrata (13/yr), and festival dates. We already ship 12 kathas. Gap: no *Vrat Katha* — the specific fasting-day stories users want to read on that day. Low effort because Vrat dates are already computed and a Katha table exists.
+- **[P2D-F2] ✅ `userRashi` / `userBirthDate` drift indicator.** Settings Horoscope row now renders a "Rashi manually set to {{sign}} — Reset to {{derived}} (from birth date)" sub-row whenever `userBirthDate` is set and `userRashi` differs from `signFromBirthDate(userBirthDate)`. Tapping the link writes the derived sign.
 
-**Implementation:**
-- Extend the `kathas` table with a `vrat_type` column (nullable): one of `ekadashi`, `pradosha`, `purnima`, `amavasya`, `sankashti`, `shivaratri`, `karwa_chauth`, `janmashtami`, `navratri`, `satyanarayan`. NULL for general kathas.
-- Seed new Vrat Kathas (12–15 entries): Satyanarayan Katha (already exists — tag it), Shivaratri Vrat Katha, Karwa Chauth, Vat Savitri, Sankashti Ganesh Chaturthi, Ekadashi Mahatmya, etc.
-- On the Festivals screen, each festival row that has an associated Vrat Katha gets a "📖 Read Katha" chip that deep-links into `app/katha/[id].tsx`.
-- Home screen: if today is a Vrat day (query festivals table), surface a "Today's Vrat Katha" card above the Featured Aarti.
-- Notifications: piggy-back on the existing daily reminder infra — when scheduling daily reminder, check tomorrow's Vrat status and, if present, append Vrat name to the notification body.
-- No new screens — reuses existing katha detail view.
+- **[P2D-F3] ✅ Rashifal grid silently ignored sign override when DOB was set.** The old `onPress` gated `setUserRashi` on `!activeSign`, so once a DOB was set users could not change their sign via the grid — which also meant the P2D-F2 drift row never had a trigger. Gate removed; tapping any sign in the grid now writes `userRashi` unconditionally.
 
-### Step P2.4: Festival & Tithi Reminders (recursive push notifications)
+- **[P2D-F4] ✅ Muhurat scan extended from 90 → 365 days with progressive streaming + SQLite cache.** New `muhurat_cache(occasion, lat_key, lon_key, matches_json, scanned_through, updated_at)` table keyed on 0.1°-rounded coords. Scan refactored to `scanAuspiciousDays({ ..., signal, onMatch, onProgress })` — streams matches into the UI as found, yields to the event loop every 5 days, honors `AbortSignal`. Screen is a state machine (scanning / cancelled / complete / error) with visible progress, Cancel/Resume/Refresh buttons, and partial persistence every 15 days so cancel never wastes work.
 
-**Why:** Drik Panchang & myMandir both let users subscribe to recurring reminders for specific Tithis (e.g., every Ekadashi, every Pradosha, every Purnima/Amavasya). Converts reference tool into calendar companion.
+- **[P2D-F5] ✅ Muhurat list grouped by month + "Soon" badge for near-term matches.** Flat 365-day list was visually messy; matches are now sectioned under localized month headers (e.g. "April 2026 · 3") and any match within the next 14 days gets an accent border plus a `Soon` / `शीघ्र` / `शीघ्रम्` badge.
 
-**Implementation:**
-- New screen: `app/settings/reminders.tsx` (accessible from the existing Notifications section in Settings).
-- User can toggle recurring reminders per Tithi type: Ekadashi, Pradosha, Purnima, Amavasya, Sankashti Chaturthi, Shivaratri (monthly), Sankranti.
-- Per-toggle time preference (default 7:00 PM evening before, to allow user to prepare for next-day Vrat).
-- Implementation: on every app foreground (or nightly via background task) recompute next 30 days of reminder triggers and re-schedule via `expo-notifications`. Clear + re-schedule pattern is safe because Expo notification IDs are deterministic per (tithi_type, date).
-- Festival reminders: major festivals (from existing 2024–2036 festival data) get a one-time scheduled notification 1 day prior. User opts in per festival type (major / minor / ekadashi / pradosha / sankranti) with separate toggles.
-- Reuse existing notification permission flow — no new UX.
-- Respect `feedback_no_ads_after_onboarding.md`: first-time user opening this screen during onboarding walkthrough does not trigger permission prompt automatically; they must tap a toggle first.
+**Known deferred (needs dev-build verification, not Expo Go):**
 
-### Phase 2 Exit Criteria
+- **[P2D-F6] ⏸️ Reminder toggles surface "permission denied" in Expo Go.** `src/services/notifications.ts` intentionally sets `Notifications = null` in Expo Go (SDK 53 dropped Android push support from Expo Go), so `requestNotificationPermission()` returns `false` and the toggle flow aborts with a misleading "allow in Settings" alert. Not a real bug — notifications genuinely don't work in Expo Go. To verify: run an EAS development build and retest toggles. Optional polish: detect Expo Go and swap the alert text to "Notifications require a development build."
+
+### Phase 2 Exit Criteria (aggregate)
 
 - Daily Rashifal visible on Home, tab/route in place, 12-sign grid, detail screens, 7-day history, English + Hindi bundle seeded for 365 days × 12 signs.
 - 7 occasion-specific Muhurat screens shipping with correct classical rules.
