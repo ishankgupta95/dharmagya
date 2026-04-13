@@ -34,3 +34,13 @@ EAS_LOCAL_BUILD_SKIP_CLEANUP=1 ANDROID_HOME=$HOME/Library/Android/sdk eas build 
 ```
 
 The APK will be output to the project root when done. Transfer it to any Android device and install directly (enable "Install from unknown sources" on the device).
+
+## Build AAB (Android, for Play Store)
+
+Same prerequisites as APK. Uses the `production` profile, which defaults to `app-bundle` output.
+
+```bash
+EAS_LOCAL_BUILD_SKIP_CLEANUP=1 ANDROID_HOME=$HOME/Library/Android/sdk eas build --platform android --profile production --local
+```
+
+The `.aab` will be output to the project root. Upload it to Google Play Console.
