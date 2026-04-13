@@ -50,7 +50,7 @@ export default function RashifalIndexScreen() {
   const otherSigns = ALL_RASHI_SIGNS.filter(s => s !== activeSign);
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>

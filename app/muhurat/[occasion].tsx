@@ -212,7 +212,7 @@ export default function OccasionDetailScreen() {
 
   if (!occasion) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <Text style={{ color: colors.textPrimary, padding: 24 }}>{t('muhurat.notFound')}</Text>
       </SafeAreaView>
     );
@@ -221,7 +221,7 @@ export default function OccasionDetailScreen() {
   const progressPct = totalDays > 0 ? Math.min(100, Math.round((scannedCount / totalDays) * 100)) : 0;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />

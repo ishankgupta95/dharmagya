@@ -211,7 +211,7 @@ export default function GodDetailScreen() {
 
   if (!deity) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('god.deityNotFound')}</Text>
       </SafeAreaView>
     );
@@ -221,7 +221,7 @@ export default function GodDetailScreen() {
   const hasImage = !!deityImage;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Fixed Header ───────────────────────────────────────────── */}
       <View style={[styles.headerWrap, hasImage && { height: BANNER_HEIGHT }]}>

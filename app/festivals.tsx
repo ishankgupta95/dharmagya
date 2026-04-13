@@ -101,7 +101,7 @@ export default function FestivalsScreen() {
   const canGoForward = year < MAX_YEAR;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>

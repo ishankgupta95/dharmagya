@@ -87,14 +87,14 @@ export default function RashifalDetailScreen() {
 
   if (!sign) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <Text style={{ color: colors.textPrimary, padding: 24 }}>{t('rashifal.notFound')}</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
