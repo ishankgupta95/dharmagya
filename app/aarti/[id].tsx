@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -10,7 +9,6 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
@@ -19,30 +17,24 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
-import type { IAarti } from '@/types';
-// ─── DB Row Type ──────────────────────────────────────────────────────────────
-
-interface AartiRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  content: string;
-  deity: string;
-}
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
+import { resolveLanguage } from '@/i18n';
+import { getAartiForDeity, aartiVerses, titleFor, type ContentLang } from '@/services/content';
 
 export default function AartiDetailScreen() {
   useInterstitialOnExit();
   const { t } = useTranslation();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // The route file is `[id].tsx` for backwards compat; the value is now a deity slug.
+  const { id: deitySlug } = useLocalSearchParams<{ id: string }>();
   const isDarkMode = useStore(s => s.isDarkMode);
   const favoriteIds = useStore(s => s.favoriteIds);
   const toggleFavorite = useStore(s => s.toggleFavorite);
+  const appLanguage = useStore(s => s.language);
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
 
-  const [aarti, setAarti] = useState<IAarti | null>(null);
+  const aarti = useMemo(() => (deitySlug ? getAartiForDeity(deitySlug) : undefined), [deitySlug]);
+
+  const [lang, setLang] = useState<ContentLang>(() => resolveLanguage(appLanguage));
+
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollY = useSharedValue(0);
@@ -62,21 +54,12 @@ export default function AartiDetailScreen() {
   }));
 
   useEffect(() => {
-    if (!id) return;
-    const row = db.getFirstSync<AartiRow>('SELECT * FROM aartis WHERE id = ?', [id]);
-    if (row) {
-      setAarti({ ...row, content: JSON.parse(row.content) as string[] });
-    }
-  }, [db, id]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
 
-  const favoriteKey = `aarti-${id ?? ''}`;
+  const favoriteKey = `aarti-${deitySlug ?? ''}`;
   const isFavorite = favoriteIds.includes(favoriteKey);
 
   function handleReadAlong() {
@@ -85,26 +68,35 @@ export default function AartiDetailScreen() {
     toastTimer.current = setTimeout(() => setToastVisible(false), 2500);
   }
 
-  // ── Loading state ──────────────────────────────────────────────────────────
   if (!aarti) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
-        <View style={[styles.root, { backgroundColor: colors.base, alignItems: 'center', justifyContent: 'center' }]}>
-          <ActivityIndicator color={colors.accent} />
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+        <View style={styles.notFoundWrap}>
+          <Text style={[styles.notFoundText, { color: colors.textMuted }]}>
+            {t('aarti.notFound')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.notFoundBtn, { borderColor: colors.accent }]}>
+            <Text style={[styles.notFoundBtnText, { color: colors.accent }]}>
+              {t('common.back') ?? 'Back'}
+            </Text>
+          </TouchableOpacity>
         </View>
+        {!aarti && deitySlug == null && <ActivityIndicator color={colors.accent} />}
       </SafeAreaView>
     );
   }
 
   const headerGradient: readonly [string, string] = ['#2E2418', colors.base];
+  const verses = aartiVerses(aarti, lang);
+  const compactTitle = titleFor(aarti, lang);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
 
-      {/* ── Gradient Header ─────────────────────────────────────────── */}
       <LinearGradient colors={headerGradient} style={styles.header}>
 
-        {/* Nav row */}
         <View style={styles.navRow}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -113,9 +105,8 @@ export default function AartiDetailScreen() {
             <Ionicons name="arrow-back" size={20} color="#F0E6D3" />
           </TouchableOpacity>
 
-          {/* Compact title (visible when hero collapsed) */}
           <Animated.View style={[styles.compactTitle, compactTitleAnimatedStyle]}>
-            <Text style={styles.compactTitleText} numberOfLines={1}>{aarti.titleNative}</Text>
+            <Text style={styles.compactTitleText} numberOfLines={1}>{compactTitle}</Text>
           </Animated.View>
 
           <TouchableOpacity
@@ -130,34 +121,35 @@ export default function AartiDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Hero: avatar + title (collapses on scroll) */}
         <Animated.View style={[styles.hero, heroAnimatedStyle]}>
           <DeityAvatar deity={aarti.deity} size={72} />
-          <Text style={styles.heroTitleNative}>{aarti.titleNative}</Text>
+          <Text style={styles.heroTitleNative}>{aarti.titleHindi}</Text>
           <Text style={styles.heroTitleEn}>{aarti.titleEnglish}</Text>
           <View style={styles.deityBadge}>
-            <Text style={[styles.deityBadgeText, { color: colors.accent }]}>{aarti.deity}</Text>
+            <Text style={[styles.deityBadgeText, { color: colors.accent }]}>
+              {t(`deities.${aarti.deity}.displayName`)}
+            </Text>
           </View>
         </Animated.View>
 
       </LinearGradient>
 
-      {/* ── Verses ──────────────────────────────────────────────────── */}
+      <LangToggle lang={lang} onChange={setLang} colors={colors} t={t} />
+
       <Animated.ScrollView
         style={{ backgroundColor: colors.base }}
         contentContainerStyle={[styles.verseScroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}>
-        {aarti.content.map((verse, index) => (
-          <Text key={index} style={[styles.verse, { color: colors.textPrimary }]}>
+        {verses.map((verse, index) => (
+          <Text key={`${lang}-${index}`} style={[styles.verse, { color: colors.textPrimary }]}>
             {verse}
           </Text>
         ))}
         <View style={{ height: 100 }} />
       </Animated.ScrollView>
 
-      {/* ── Bottom CTA ──────────────────────────────────────────────── */}
       <View style={[styles.bottomBar, { backgroundColor: colors.base, borderTopColor: colors.border }]}>
         <TouchableOpacity
           onPress={handleReadAlong}
@@ -168,14 +160,66 @@ export default function AartiDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Toast ───────────────────────────────────────────────────── */}
       {toastVisible && <ComingSoonToast colors={colors} />}
 
     </SafeAreaView>
   );
 }
 
-// ─── Coming Soon Toast ────────────────────────────────────────────────────────
+interface LangToggleProps {
+  lang: ContentLang;
+  onChange: (next: ContentLang) => void;
+  colors: ColorPalette;
+  t: (key: string) => string;
+}
+
+function LangToggle({ lang, onChange, colors, t }: LangToggleProps) {
+  return (
+    <View style={[styles.langToggleBar, { backgroundColor: colors.base, borderBottomColor: colors.border }]}>
+      <View style={[styles.langToggle, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+        <LangChip
+          label={t('langToggle.english')}
+          active={lang === 'en'}
+          onPress={() => onChange('en')}
+          colors={colors}
+        />
+        <LangChip
+          label={t('langToggle.hindi')}
+          active={lang === 'hi'}
+          onPress={() => onChange('hi')}
+          colors={colors}
+        />
+      </View>
+    </View>
+  );
+}
+
+interface LangChipProps {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: ColorPalette;
+}
+
+function LangChip({ label, active, onPress, colors }: LangChipProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={[
+        styles.langChip,
+        active && { backgroundColor: colors.accent },
+      ]}>
+      <Text
+        style={[
+          styles.langChipText,
+          { color: active ? '#FFFFFF' : colors.textSecondary },
+        ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 interface ToastProps {
   colors: ColorPalette;
@@ -196,12 +240,9 @@ function ComingSoonToast({ colors }: ToastProps) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  // Header
   header: { paddingBottom: 12 },
   navRow: {
     flexDirection: 'row',
@@ -251,7 +292,29 @@ const styles = StyleSheet.create({
   },
   deityBadgeText: { fontSize: 12, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
 
-  // Verses
+  // Lang toggle
+  langToggleBar: {
+    paddingHorizontal: spacing.screenH,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  langToggle: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 3,
+    gap: 2,
+  },
+  langChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 17,
+    minWidth: 88,
+    alignItems: 'center',
+  },
+  langChipText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+
   verseScroll: { paddingTop: 24, paddingBottom: 32 },
   verse: {
     fontSize: 17,
@@ -261,7 +324,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // Bottom CTA
   bottomBar: {
     paddingHorizontal: spacing.screenH,
     paddingTop: 12,
@@ -282,7 +344,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Toast
   toast: {
     position: 'absolute',
     bottom: 100,
@@ -303,4 +364,9 @@ const styles = StyleSheet.create({
   toastEmoji: { fontSize: 24 },
   toastText: { fontSize: 16, fontFamily: 'Mukta_700Bold' },
   toastSub: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
+
+  notFoundWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 40 },
+  notFoundText: { fontSize: 15, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
+  notFoundBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
+  notFoundBtnText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
 });

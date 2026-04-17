@@ -6,12 +6,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
+import { computeChandraBalam, type ChandraBalamInfo } from 'panchang-ts';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { AdBanner } from '@/components/common/AdBanner';
 import { ALL_RASHI_SIGNS, type RashiSign } from '@/types';
 import { resolveLanguage } from '@/i18n';
+import { moonRashiIndexAtNoon } from '@/utils/rashi';
 
 const SIGN_SYMBOL: Record<RashiSign, string> = {
   aries: '♈', taurus: '♉', gemini: '♊', cancer: '♋',
@@ -26,21 +28,43 @@ function ymd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// 1-indexed house → localized ordinal suffix for English ("1st", "2nd" ...).
+// In Hindi we append "वाँ" — used by i18n.
+function ordinalEn(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function formatHouseLabel(house: number, lang: 'en' | 'hi'): string {
+  if (lang === 'hi') return `${house}वें`;
+  return ordinalEn(house);
+}
+
 export default function RashifalDetailScreen() {
   const { t, i18n } = useTranslation();
   const { sign: raw } = useLocalSearchParams<{ sign: string }>();
   const isDarkMode = useStore(s => s.isDarkMode);
   const language = useStore(s => s.language);
+  const userBirthDate = useStore(s => s.userBirthDate);
   const colors = isDarkMode ? darkColors : lightColors;
   const db = useSQLiteContext();
 
   const sign: RashiSign | null = ALL_RASHI_SIGNS.includes(raw as RashiSign) ? (raw as RashiSign) : null;
 
-  // Rashifal stored in en/hi only (sa falls back to en for now).
-  const storedLang = useMemo(() => {
-    const resolved = resolveLanguage(language);
-    return resolved === 'hi' ? 'hi' : 'en';
-  }, [language]);
+  const storedLang = useMemo<'en' | 'hi'>(() => resolveLanguage(language), [language]);
+
+  // Approximate Janma Rashi from the user's birth date (no time known → noon UTC).
+  // Moon moves ~½ rashi per day, so this can be off by one rashi for edge births;
+  // good enough for Chandra Balam, not good enough for a full kundli.
+  const janmaRashiIndex = useMemo<number | null>(() => {
+    if (!userBirthDate) return null;
+    try {
+      return moonRashiIndexAtNoon(new Date(userBirthDate + 'T12:00:00'));
+    } catch {
+      return null;
+    }
+  }, [userBirthDate]);
 
   // ── Day strip: 7 days (today + 6 forward).
   const days = useMemo(() => {
@@ -56,6 +80,17 @@ export default function RashifalDetailScreen() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [body, setBody] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+
+  // Chandra Balam for the selected day, relative to the user's janma rashi.
+  const chandraBalam = useMemo<ChandraBalamInfo | null>(() => {
+    if (janmaRashiIndex == null) return null;
+    try {
+      const transitIdx = moonRashiIndexAtNoon(days[selectedIdx]);
+      return computeChandraBalam(janmaRashiIndex, transitIdx, storedLang);
+    } catch {
+      return null;
+    }
+  }, [janmaRashiIndex, days, selectedIdx, storedLang]);
 
   useEffect(() => {
     if (!sign) return;
@@ -152,6 +187,16 @@ export default function RashifalDetailScreen() {
           )}
         </View>
 
+        {/* Chandra Balam */}
+        <ChandraBalamCard
+          info={chandraBalam}
+          hasBirthDate={userBirthDate != null}
+          lang={storedLang}
+          colors={colors}
+          t={t}
+          onOpenSettings={() => router.push('/settings')}
+        />
+
         <Text style={[styles.disclaimer, { color: colors.textMuted }]}>
           {t('rashifal.disclaimer')}
         </Text>
@@ -161,6 +206,79 @@ export default function RashifalDetailScreen() {
 
       <AdBanner colors={colors} placement="home" />
     </SafeAreaView>
+  );
+}
+
+interface ChandraBalamCardProps {
+  info: ChandraBalamInfo | null;
+  hasBirthDate: boolean;
+  lang: 'en' | 'hi';
+  colors: ColorPalette;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+  onOpenSettings: () => void;
+}
+
+function ChandraBalamCard({ info, hasBirthDate, lang, colors, t, onOpenSettings }: ChandraBalamCardProps) {
+  if (!hasBirthDate) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onOpenSettings}
+        style={[styles.chandraCard, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+        <View style={styles.chandraHeaderRow}>
+          <Ionicons name="moon-outline" size={14} color={colors.textMuted} />
+          <Text style={[styles.chandraTitle, { color: colors.textMuted }]}>
+            {t('rashifal.chandraBalam.title')}
+          </Text>
+        </View>
+        <Text style={[styles.chandraPrompt, { color: colors.textPrimary }]}>
+          {t('rashifal.chandraBalam.setBirthDatePrompt')}
+        </Text>
+        <View style={styles.chandraCtaRow}>
+          <Text style={[styles.chandraCta, { color: colors.accent }]}>
+            {t('rashifal.chandraBalam.openSettings')}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  if (!info) return null;
+
+  const isStrong = info.quality === 'strong';
+  const accentColor = isStrong ? '#5DCAA5' : '#D08B4A';
+  const iconName = isStrong ? 'checkmark-circle' : 'alert-circle';
+
+  return (
+    <View style={[styles.chandraCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.chandraHeaderRow}>
+        <Ionicons name="moon-outline" size={14} color={colors.accent} />
+        <Text style={[styles.chandraTitle, { color: colors.accent }]}>
+          {t('rashifal.chandraBalam.title')}
+        </Text>
+      </View>
+
+      <Text style={[styles.chandraSubtitle, { color: colors.textMuted }]}>
+        {t('rashifal.chandraBalam.subtitle')}
+      </Text>
+
+      <View style={styles.chandraQualityRow}>
+        <Ionicons name={iconName} size={20} color={accentColor} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.chandraQualityName, { color: colors.textPrimary }]}>
+            {info.name}
+          </Text>
+          <Text style={[styles.chandraHouse, { color: colors.textMuted }]}>
+            {t('rashifal.chandraBalam.house', { house: formatHouseLabel(info.house, lang) })}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={[styles.chandraApproxNote, { color: colors.textMuted }]}>
+        {t('rashifal.chandraBalam.approxNote')}
+      </Text>
+    </View>
   );
 }
 
@@ -218,6 +336,18 @@ const styles = StyleSheet.create({
   bodyCard: { borderRadius: borderRadius.card, borderWidth: 1, padding: 18 },
   bodyDate: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' },
   bodyText: { fontSize: 15, fontFamily: 'Mukta_400Regular', lineHeight: 24 },
+
+  chandraCard: { borderRadius: borderRadius.card, borderWidth: 1, padding: 16, marginTop: 16 },
+  chandraHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  chandraTitle: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1 },
+  chandraSubtitle: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginBottom: 14 },
+  chandraQualityRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  chandraQualityName: { fontSize: 20, fontFamily: 'Mukta_700Bold', lineHeight: 26 },
+  chandraHouse: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 1 },
+  chandraApproxNote: { fontSize: 11, fontFamily: 'Mukta_400Regular', fontStyle: 'italic', marginTop: 12 },
+  chandraPrompt: { fontSize: 14, fontFamily: 'Mukta_400Regular', lineHeight: 20, marginBottom: 12 },
+  chandraCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  chandraCta: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
 
   disclaimer: { fontSize: 11, fontFamily: 'Mukta_400Regular', marginTop: 20, textAlign: 'center', fontStyle: 'italic' },
 });

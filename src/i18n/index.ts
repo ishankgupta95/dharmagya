@@ -4,38 +4,33 @@ import { getLocales } from 'expo-localization';
 
 import en from './locales/en';
 
-export type AppLanguage = 'system' | 'en' | 'hi' | 'sa';
+export type AppLanguage = 'system' | 'en' | 'hi';
 
 export const LANGUAGE_OPTIONS: { key: AppLanguage; label: string; nativeLabel: string }[] = [
   { key: 'system', label: 'System Default', nativeLabel: 'System' },
   { key: 'en', label: 'English', nativeLabel: 'English' },
   { key: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी' },
-  { key: 'sa', label: 'Sanskrit', nativeLabel: 'संस्कृतम्' },
 ];
 
 /** Resolve the device's preferred language to one we support, falling back to 'en'. */
-export function getDeviceLanguage(): string {
+export function getDeviceLanguage(): 'en' | 'hi' {
   const locales = getLocales();
   if (!locales.length) return 'en';
   const tag = locales[0].languageCode ?? 'en';
-  // Map device language to our supported set
-  if (tag === 'hi') return 'hi';
-  if (tag === 'sa') return 'sa';
-  return 'en';
+  return tag === 'hi' ? 'hi' : 'en';
 }
 
-/** Resolve user preference ('system' | 'en' | 'hi' | 'sa') to an actual language code. */
-export function resolveLanguage(pref: AppLanguage): string {
-  return pref === 'system' ? getDeviceLanguage() : pref;
+/** Resolve user preference ('system' | 'en' | 'hi') to an actual language code. */
+export function resolveLanguage(pref: AppLanguage): 'en' | 'hi' {
+  if (pref === 'en' || pref === 'hi') return pref;
+  return getDeviceLanguage();
 }
 
 /** Lazily load a language bundle and add it to i18next. */
 async function loadLanguage(lng: string): Promise<void> {
   if (i18n.hasResourceBundle(lng, 'translation')) return;
-  let resources;
-  if (lng === 'hi') resources = (await import('./locales/hi')).default;
-  else if (lng === 'sa') resources = (await import('./locales/sa')).default;
-  else return;
+  if (lng !== 'hi') return;
+  const resources = (await import('./locales/hi')).default;
   i18n.addResourceBundle(lng, 'translation', resources);
 }
 

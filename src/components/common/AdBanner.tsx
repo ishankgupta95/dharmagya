@@ -6,7 +6,7 @@ const AdsModule = getAdsModule();
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type BannerPlacement = 'home' | 'panchangInline' | 'libraryGodsInline' | 'libraryKathasInline' | 'festivals';
+type BannerPlacement = 'home' | 'panchangInline' | 'libraryGodsInline' | 'festivals';
 
 interface AdBannerProps {
   colors: ColorPalette;

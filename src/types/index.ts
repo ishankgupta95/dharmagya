@@ -1,25 +1,3 @@
-export interface IAarti {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  content: string[]; // Array of verse strings
-  deity: string; // "Ganesh" | "Shiva" | "Lakshmi" | "Vishnu" | "Hanuman"
-}
-
-export interface IChalisaSection {
-  type: 'doha' | 'chaupai'; // Doha = couplet, Chaupai = quatrain
-  label: string; // "दोहा" or "चौपाई"
-  verses: string[]; // Array of verse strings
-}
-
-export interface IChalisa {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string; // "Hanuman" | "Shiva" | "Ganesh" etc.
-  sections: IChalisaSection[]; // Ordered: opening doha → chaupais → closing doha
-}
-
 /** Western tropical zodiac signs — used for daily Rashifal. Stored as lowercase keys in DB. */
 export type RashiSign =
   | 'aries'
@@ -59,16 +37,6 @@ export type VratType =
   | 'navratri'
   | 'satyanarayan'
   | 'vat_savitri';
-
-export interface IKatha {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  summary: string; // Short summary in Hindi
-  paragraphs: string[]; // Narrative paragraphs in Hindi
-  vratType?: VratType | null; // Associates this katha with a recurring vrat/festival
-}
 
 /** Timed slot with quality rating (used by Choghadiya and Gowri Panchangam). */
 export interface IQualitySlot {

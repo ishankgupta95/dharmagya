@@ -422,7 +422,7 @@ export default function PanchangScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const panchangLang = resolveLanguage(language) as 'en' | 'hi' | 'sa';
+  const panchangLang = resolveLanguage(language);
   const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang);
 
   // ── Walkthrough ref & measurement ──────────────────────────────────────

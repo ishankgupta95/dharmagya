@@ -1,22 +1,23 @@
 import { memo, useMemo } from 'react';
 import { Text, Image, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DEITY_BY_NAME } from '@/config/deities';
+import { DEITY_BY_ID } from '@/config/deities';
 import { getDeityImage } from '@/config/deityImages';
 import { deityColors } from '@/config/theme';
 
 interface DeityAvatarProps {
+  /** Deity slug (e.g. "ganesha"). Matches `Deity` from hindu-devotional-texts. */
   deity: string;
   size?: number;
 }
 
-const FALLBACK = { initial: 'ॐ', color: deityColors.Ganesh };
+const FALLBACK = { initial: 'ॐ', color: deityColors.ganesha };
 
 const GRADIENT_START = { x: 0, y: 0 };
 const GRADIENT_END = { x: 1, y: 1 };
 
 export const DeityAvatar = memo(function DeityAvatar({ deity, size = 48 }: DeityAvatarProps) {
-  const meta = DEITY_BY_NAME[deity];
+  const meta = DEITY_BY_ID[deity];
   const color = meta?.color ?? FALLBACK.color;
   const radius = size * 0.25;
   const image = getDeityImage(deity);

@@ -1,3 +1,5 @@
+import { getSiderealMoonLongitude } from 'panchang-ts';
+
 import type { RashiSign } from '@/types';
 
 // Tropical zodiac boundaries (month, day). Simple and matches Western expectations
@@ -25,6 +27,23 @@ const BOUNDS: SignBounds[] = [
   { sign: 'scorpio',     startMonth: 10, startDay: 23, endMonth: 11, endDay: 21 },
   { sign: 'sagittarius', startMonth: 11, startDay: 22, endMonth: 12, endDay: 21 },
 ];
+
+/**
+ * Moon's sidereal rashi index at noon UTC on `date` (0=Mesha … 11=Meena).
+ *
+ * Used to approximate Janma Rashi from a birth date without time. Moon travels
+ * ~12–13°/day (≈ half a rashi), so this is accurate within one rashi; births
+ * near a sign boundary may land in the neighbouring rashi. Good enough for
+ * Chandra Balam; not good enough for birth-chart calculations.
+ */
+export function moonRashiIndexAtNoon(date: Date): number {
+  const noon = new Date(Date.UTC(
+    date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0
+  ));
+  const lon = getSiderealMoonLongitude(noon, 'lahiri');
+  const normalized = ((lon % 360) + 360) % 360;
+  return Math.floor(normalized / 30);
+}
 
 /** Derive zodiac sign from a birth date. Month is 1-indexed. */
 export function signFromBirthDate(birthDate: Date): RashiSign {

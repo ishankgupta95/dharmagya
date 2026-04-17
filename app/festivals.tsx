@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   SectionList,
@@ -9,14 +9,11 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { AdBanner } from '@/components/common/AdBanner';
-import { vratTypeForFestival } from '@/utils/vrat';
-import type { VratType } from '@/types';
 
 import festivalsData from '@/data/static/festivals.json';
 
@@ -65,22 +62,8 @@ export default function FestivalsScreen() {
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
 
   const [year, setYear] = useState(() => new Date().getFullYear());
-
-  // Lookup: VratType → first katha id with that tag. Built once per session.
-  const [vratKathaByType, setVratKathaByType] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const rows = db.getAllSync<{ id: string; vrat_type: string }>(
-      'SELECT id, vrat_type FROM kathas WHERE vrat_type IS NOT NULL'
-    );
-    const map: Record<string, string> = {};
-    for (const row of rows) {
-      if (!map[row.vrat_type]) map[row.vrat_type] = row.id;
-    }
-    setVratKathaByType(map);
-  }, [db]);
 
   const festivalDays = useMemo(() => parseFestivalDays(year), [year]);
 
@@ -149,8 +132,6 @@ export default function FestivalsScreen() {
             item={item}
             colors={colors}
             isToday={isSameDay(item.date, today)}
-            vratKathaByType={vratKathaByType}
-            readKathaLabel={t('festivals.readKatha')}
           />
         )}
         ListEmptyComponent={
@@ -169,45 +150,28 @@ function FestivalRow({
   item,
   colors,
   isToday,
-  vratKathaByType,
-  readKathaLabel,
 }: {
   item: FestivalDay;
   colors: ColorPalette;
   isToday: boolean;
-  vratKathaByType: Record<string, string>;
-  readKathaLabel: string;
 }) {
   const dayName = item.date.toLocaleDateString('en-IN', { weekday: 'short' });
   const dayNum = item.date.getDate();
 
   return (
     <View style={[styles.festivalRow, { borderColor: colors.divider }, isToday && { borderColor: colors.accent, borderWidth: 1.5 }]}>
-      {/* Date column */}
       <View style={[styles.dateCol, { backgroundColor: isToday ? colors.accent : colors.surfaceRecessed }]}>
         <Text style={[styles.dateDayName, { color: isToday ? colors.base : colors.textMuted }]}>{dayName}</Text>
         <Text style={[styles.dateDayNum, { color: isToday ? colors.base : colors.textPrimary }]}>{dayNum}</Text>
       </View>
 
-      {/* Festival names */}
       <View style={styles.festivalCol}>
         {item.festivals.map((f, i) => {
           const typeInfo = TYPE_ICON[f.type] ?? TYPE_ICON.minor;
-          const vt: VratType | null = vratTypeForFestival(f);
-          const kathaId = vt ? vratKathaByType[vt] : undefined;
           return (
             <View key={i} style={styles.festivalItem}>
               <Ionicons name={typeInfo.icon as any} size={14} color={typeInfo.color} />
               <Text style={[styles.festivalName, { color: colors.textPrimary }]}>{f.name}</Text>
-              {kathaId && (
-                <TouchableOpacity
-                  onPress={() => router.push(`/katha/${kathaId}`)}
-                  activeOpacity={0.7}
-                  style={[styles.kathaChip, { backgroundColor: colors.borderAccent, borderColor: colors.accent }]}>
-                  <Ionicons name="book-outline" size={11} color={colors.accent} />
-                  <Text style={[styles.kathaChipText, { color: colors.accent }]}>{readKathaLabel}</Text>
-                </TouchableOpacity>
-              )}
             </View>
           );
         })}
@@ -250,17 +214,6 @@ const styles = StyleSheet.create({
   festivalCol: { flex: 1, paddingVertical: 10, paddingRight: 12, gap: 4 },
   festivalItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   festivalName: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  kathaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: borderRadius.chip,
-    borderWidth: 0.5,
-    marginLeft: 4,
-  },
-  kathaChipText: { fontSize: 11, fontFamily: 'Mukta_500Medium' },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontSize: 14, fontFamily: 'Mukta_400Regular' },

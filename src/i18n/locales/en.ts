@@ -40,19 +40,21 @@ export default {
     fromYourFavourites: 'FROM YOUR FAVOURITES',
     featuredAarti: 'FEATURED AARTI',
     featuredChalisa: 'FEATURED CHALISA',
-    featuredKatha: 'FEATURED KATHA',
     forYourDeities: 'FOR YOUR DEITIES',
     yourDeities: 'YOUR DEITIES',
     yourDeitiesEmpty: 'Pick your Isht Devatas to personalise your Home feed.',
     yourDeitiesManage: 'Manage',
     favorites: 'Favorites',
     festivals: 'Festivals',
-    todaysVratKatha: "TODAY'S VRAT KATHA  ·  {{festival}}",
     findMuhuratTitle: 'Find an auspicious date',
     findMuhuratDesc: 'Vivah, Griha Pravesh, Namkaran — classical muhurat rules',
     aajKaRashifal: "AAJ KA RASHIFAL  ·  {{sign}}",
     aajKaRashifalGeneric: "AAJ KA RASHIFAL  ·  TAP TO CHOOSE SIGN",
     rashifalPickSign: 'Tap to see today\'s forecast for your zodiac sign.',
+    dashaLink: {
+      label: 'VIMSHOTTARI DASHA',
+      description: 'Your 120-year planetary timeline',
+    },
   },
 
   // ── Panchang Screen ─────────────────────────────────────────────────────
@@ -114,66 +116,58 @@ export default {
   library: {
     godsTitle: 'Gods',
     godsTitleEn: 'Gods',
-    kathasTitle: 'Kathas',
-    kathasTitleEn: 'Kathas',
-    kathaSegment: 'Kathas',
     godsSegment: 'Gods',
-    kathaBadge: 'Katha',
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
   god: {
-    aartisCount: 'Aartis ({{count}})',
-    chalisasCount: 'Chalisas ({{count}})',
-    kathasCount: 'Kathas ({{count}})',
     aartiBadge: 'Aarti',
     chalisaBadge: 'Chalisa',
-    kathaBadge: 'Katha',
     chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
   },
 
-  // ── Aarti Detail ────────────────────────────────────────────────────────
+  // ── Aarti / Chalisa Detail ──────────────────────────────────────────────
   aarti: {
     readAlongMode: 'Read Along Mode',
     comingSoon: 'Coming Soon!',
     comingSoonDesc: 'Read Along Mode is on the way',
+    notFound: 'Aarti not available for this deity.',
   },
-
-  // ── Katha Detail ────────────────────────────────────────────────────────
-  katha: {
-    badge: 'Katha',
+  chalisa: {
+    notFound: 'Chalisa not available for this deity.',
+  },
+  langToggle: {
+    english: 'English',
+    hindi: 'हिन्दी',
   },
 
   // ── Search Screen ───────────────────────────────────────────────────────
   search: {
-    placeholder: 'Search aartis, chalisas, kathas…',
+    placeholder: 'Search aartis, chalisas…',
     emptyTitle: 'Search',
     emptyDesc: 'Search by title, transliteration, or deity name',
     noResults: 'No results',
     noResultsFor: 'Nothing found for "{{query}}"',
     aartisSection: 'AARTIS  ·  {{count}}',
     chalisasSection: 'CHALISAS  ·  {{count}}',
-    kathasSection: 'KATHAS  ·  {{count}}',
   },
 
   // ── Favorites Screen ────────────────────────────────────────────────────
   favorites: {
     title: 'Favourites',
     emptyTitle: 'No favourites yet',
-    emptyDesc: 'Tap the ♡ on any aarti, chalisa, or katha to save it here',
+    emptyDesc: 'Tap the ♡ on any aarti or chalisa to save it here',
     browseLibrary: 'Browse Library',
     aartiBadge: 'Aarti',
     chalisaBadge: 'Chalisa',
-    kathaBadge: 'Katha',
   },
 
   // ── Festivals Screen ────────────────────────────────────────────────────
   festivals: {
     title: 'Festivals & Vrats',
     noFestivals: 'No festivals found for {{year}}',
-    readKatha: 'Read Katha',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -291,10 +285,42 @@ export default {
     step2Desc: 'All five limbs of the panchang, sunrise/sunset, auspicious & inauspicious times, and planetary positions — all in one place.',
     // Step 3 – Library screen: explain what's here
     step3Title: 'Deities, Aartis & More',
-    step3Desc: 'Browse deities, read aartis, chalisas, and kathas. Bookmark your favourites for quick access from the home screen.',
+    step3Desc: 'Browse deities, read aartis and chalisas. Bookmark your favourites for quick access from the home screen.',
     // Step 4 – Home: spotlight on settings gear
     step4Title: 'Personalise Your Experience',
     step4Desc: 'Change the app language, switch themes, adjust font size, set your location, and manage notifications.',
+  },
+
+  // ── Vimshottari Dasha ───────────────────────────────────────────────────
+  dasha: {
+    title: 'Vimshottari Dasha',
+    subtitle: '120-year planetary timeline',
+    birthDateLabel: 'YOUR BIRTH DATE',
+    setBirthDate: 'Set your birth date',
+    changeBirthDate: 'Change',
+    currentLabel: 'CURRENTLY IN',
+    mahadashaSuffix: 'Mahadasha',
+    antardashaSuffix: 'Antardasha',
+    untilDate: 'until {{date}}',
+    dateRangeLong: '{{start}} – {{end}}',
+    yearsOne: '{{years}} year',
+    yearsOther: '{{years}} years',
+    fullCycle: 'FULL 120-YEAR CYCLE',
+    antardashasHeader: 'Antardashas',
+    notSetPrompt: 'Set your birth date to see your 120-year Vimshottari Dasha cycle.',
+    approxNote: 'Your first mahadasha is a partial balance — precise timing needs birth time, which is not recorded.',
+    birthDatePickerTitle: 'Pick your birth date',
+    planet: {
+      sun: 'Sun',
+      moon: 'Moon',
+      mars: 'Mars',
+      mercury: 'Mercury',
+      jupiter: 'Jupiter',
+      venus: 'Venus',
+      saturn: 'Saturn',
+      rahu: 'Rahu',
+      ketu: 'Ketu',
+    },
   },
 
   // ── Location Permission ─────────────────────────────────────────────────
@@ -335,7 +361,7 @@ export default {
 
   // ── Deity Names & Descriptions ──────────────────────────────────────────
   deities: {
-    ganesh:        { displayName: 'Shri Ganesh Ji',           description: 'Remover of obstacles, first worshipped' },
+    ganesha:       { displayName: 'Shri Ganesha Ji',          description: 'Remover of obstacles, first worshipped' },
     shiva:         { displayName: 'Lord Shiva',               description: 'Mahadev, the destroyer' },
     vishnu:        { displayName: 'Lord Vishnu',              description: 'The preserver, protector of the universe' },
     hanuman:       { displayName: 'Shri Hanuman Ji',          description: 'Bajrangbali, devotee of Rama' },
@@ -347,20 +373,13 @@ export default {
     parvati:       { displayName: 'Maa Parvati',              description: 'Consort of Shiva, mother of the world' },
     kali:          { displayName: 'Maa Kali',                 description: 'Mahakali, destroyer of fear' },
     surya:         { displayName: 'Surya Dev',                description: 'The Sun God, giver of light' },
-    kartikeya:     { displayName: 'Lord Kartikeya',           description: 'Commander of the gods, Shadanana' },
     brahma:        { displayName: 'Lord Brahma',              description: 'The creator, four-faced one' },
     'sai-baba':    { displayName: 'Shri Sai Baba',            description: 'Saint of Shirdi, one God for all' },
-    jagannath:     { displayName: 'Lord Jagannath',           description: 'Lord of the universe, Puri Dham' },
     'santoshi-mata': { displayName: 'Santoshi Mata',          description: 'Goddess of contentment and happiness' },
-    radha:         { displayName: 'Shri Radha Ji',            description: 'Beloved of Krishna, embodiment of love' },
     sita:          { displayName: 'Mata Sita Ji',             description: 'Janaki, consort of Rama' },
-    venkateswara:  { displayName: 'Lord Venkateswara',        description: 'Tirupati Balaji, deity of Kali Yuga' },
     'khatu-shyam': { displayName: 'Shri Khatu Shyam Ji',     description: 'Barbarik, refuge of the helpless' },
-    ayyappa:       { displayName: 'Lord Ayyappa',             description: 'Lord of Sabarimala, Dharmashastha' },
     'vaishno-devi': { displayName: 'Maa Vaishno Devi',       description: 'Dweller of Trikuta, mother of the world' },
     narasimha:     { displayName: 'Lord Narasimha',           description: 'Protector of Prahlada, fierce avatar' },
-    dattatreya:    { displayName: 'Lord Dattatreya',          description: 'Form of the trinity, Avadhut' },
-    ganga:         { displayName: 'Maa Ganga',                description: 'Purifier of the fallen, giver of moksha' },
   },
 
   // ── Rashifal Screen ─────────────────────────────────────────────────────
@@ -375,6 +394,14 @@ export default {
     notFound: 'Sign not found',
     unavailable: 'Rashifal for this date is not available yet.',
     disclaimer: 'Rashifal is guidance, not prophecy. Act with intention and dharma.',
+    chandraBalam: {
+      title: 'CHANDRA BALAM',
+      subtitle: 'Moon strength from your Janma Rashi',
+      house: 'Transit Moon is in the {{house}} house from your Janma Rashi',
+      approxNote: 'Based on your birth date without time — accurate within one rashi.',
+      setBirthDatePrompt: 'Set your birth date in Settings to unlock Chandra Balam.',
+      openSettings: 'Open Settings',
+    },
     sign: {
       aries:       { name: 'Aries',       traits: 'Ram · Fire · Ruled by Mars' },
       taurus:      { name: 'Taurus',      traits: 'Bull · Earth · Ruled by Venus' },

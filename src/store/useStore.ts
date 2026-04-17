@@ -149,6 +149,86 @@ export const useStore = create<AppStore>()(
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 2,
+      migrate: (persistedState, version) => {
+        const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
+        if (!state) return persistedState as AppStore;
+
+        // v0 → v1: Sanskrit was removed as a supported language.
+        if (version < 1 && (state.language as string) === 'sa') {
+          state.language = 'system';
+        }
+
+        // v1 → v2: aartis/chalisas now come from the hindu-devotional-texts
+        // package (slug-keyed, one per deity). Migrate persisted lists from the
+        // old display-name + numeric-suffix scheme to the package's slug scheme.
+        if (version < 2) {
+          // Display-name → slug map (matches ALL_DEITIES order in src/config/deities.ts).
+          // Old-name keys cover both the legacy roster (incl. removed deities) and
+          // the special-case `ganesh` -> `ganesha` rename.
+          const NAME_TO_SLUG: Record<string, string> = {
+            Ganesh: 'ganesha',
+            Ganesha: 'ganesha',
+            Shiva: 'shiva',
+            Vishnu: 'vishnu',
+            Hanuman: 'hanuman',
+            Lakshmi: 'lakshmi',
+            Krishna: 'krishna',
+            Rama: 'rama',
+            Durga: 'durga',
+            Saraswati: 'saraswati',
+            Parvati: 'parvati',
+            Kali: 'kali',
+            Surya: 'surya',
+            Brahma: 'brahma',
+            'Sai Baba': 'sai-baba',
+            'Santoshi Mata': 'santoshi-mata',
+            Sita: 'sita',
+            'Khatu Shyam': 'khatu-shyam',
+            'Vaishno Devi': 'vaishno-devi',
+            Narasimha: 'narasimha',
+          };
+          const SUPPORTED_SLUGS = new Set(Object.values(NAME_TO_SLUG));
+
+          // selectedDeities: previously stored as display names (e.g. "Ganesh");
+          // also handle the literal `ganesh` -> `ganesha` slug rename.
+          if (Array.isArray(state.selectedDeities)) {
+            const migrated: string[] = [];
+            for (const entry of state.selectedDeities) {
+              const slug = NAME_TO_SLUG[entry] ?? (entry === 'ganesh' ? 'ganesha' : entry);
+              if (SUPPORTED_SLUGS.has(slug) && !migrated.includes(slug)) {
+                migrated.push(slug);
+              }
+            }
+            state.selectedDeities = migrated;
+          }
+
+          // favoriteIds: old shape was `aarti-<id>`/`chalisa-<id>`/`katha-<id>`
+          // where <id> looked like `aarti-hanuman-001`. New shape is
+          // `aarti-<slug>` / `chalisa-<slug>`. Drop kathas; collapse numeric suffix.
+          if (Array.isArray(state.favoriteIds)) {
+            const migrated: string[] = [];
+            for (const fav of state.favoriteIds) {
+              if (fav.startsWith('katha-')) continue;
+              let prefix: 'aarti-' | 'chalisa-' | null = null;
+              if (fav.startsWith('aarti-')) prefix = 'aarti-';
+              else if (fav.startsWith('chalisa-')) prefix = 'chalisa-';
+              if (!prefix) continue;
+              const rest = fav.slice(prefix.length);
+              // Match `aarti-hanuman-001`, `chalisa-sai-baba-001`, etc.
+              const m = rest.match(/^([a-z][a-z-]*?)(?:-\d+)?$/);
+              if (!m) continue;
+              const slug = m[1] === 'ganesh' ? 'ganesha' : m[1];
+              if (!SUPPORTED_SLUGS.has(slug)) continue;
+              const next = `${prefix}${slug}`;
+              if (!migrated.includes(next)) migrated.push(next);
+            }
+            state.favoriteIds = migrated;
+          }
+        }
+
+        return state as AppStore;
+      },
     }
   )
 );

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import {
   View,
   TextInput,
@@ -10,96 +10,102 @@ import {
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { DEITY_BY_ID } from '@/config/deities';
+import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
 
 interface SearchResult {
-  type: 'aarti' | 'chalisa' | 'katha';
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
+  type: 'aarti' | 'chalisa';
+  /** Deity slug — also doubles as the route param. */
   deity: string;
+  titleEnglish: string;
+  titleHindi: string;
+  /** Localized display name for the deity badge (resolved via i18n). */
+  deityLabel: string;
 }
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const selectedDeities = useStore(s => s.selectedDeities);
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
   const inputRef = useRef<TextInput>(null);
 
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  // Auto-focus on mount
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(t);
   }, []);
 
-  // Debounced DB query (300ms) to avoid jank on every keystroke
   useEffect(() => {
-    const q = query.trim();
-    if (!q) {
-      setResults([]);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      const like = `%${q}%`;
-      const all: SearchResult[] = [];
-
-      const aartiRows = db.getAllSync<Omit<SearchResult, 'type'>>(
-        'SELECT id, titleEnglish, titleNative, deity FROM aartis WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
-        [like, like, like]
-      );
-      aartiRows.forEach(r => all.push({ ...r, type: 'aarti' }));
-
-      const chalisaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
-        'SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
-        [like, like, like]
-      );
-      chalisaRows.forEach(r => all.push({ ...r, type: 'chalisa' }));
-
-      const kathaRows = db.getAllSync<Omit<SearchResult, 'type'>>(
-        'SELECT id, titleEnglish, titleNative, deity FROM kathas WHERE titleEnglish LIKE ? OR titleNative LIKE ? OR deity LIKE ? ORDER BY deity, titleEnglish',
-        [like, like, like]
-      );
-      kathaRows.forEach(r => all.push({ ...r, type: 'katha' }));
-
-      // Stable re-rank: matches whose deity ∈ selectedDeities float to the top
-      // while preserving the existing (deity, title) alphabetic order within each
-      // bucket. Array.prototype.sort is stable per ECMAScript 2019+.
-      if (selectedDeities.length > 0) {
-        const prefer = new Set(selectedDeities);
-        all.sort((a, b) => {
-          const aPref = prefer.has(a.deity) ? 0 : 1;
-          const bPref = prefer.has(b.deity) ? 0 : 1;
-          return aPref - bPref;
-        });
-      }
-
-      setResults(all);
-    }, 300);
-
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => clearTimeout(timer);
-  }, [db, query, selectedDeities]);
+  }, [query]);
+
+  // All searchable items, computed once. ~38 items total (19 aartis + 19 chalisas).
+  const corpus = useMemo<SearchResult[]>(() => {
+    const items: SearchResult[] = [];
+    for (const a of getAllAppAartis()) {
+      const meta = DEITY_BY_ID[a.deity];
+      items.push({
+        type: 'aarti',
+        deity: a.deity,
+        titleEnglish: a.titleEnglish,
+        titleHindi: a.titleHindi,
+        deityLabel: meta?.name ?? a.deity,
+      });
+    }
+    for (const c of getAllAppChalisas()) {
+      const meta = DEITY_BY_ID[c.deity];
+      items.push({
+        type: 'chalisa',
+        deity: c.deity,
+        titleEnglish: c.titleEnglish,
+        titleHindi: c.titleHindi,
+        deityLabel: meta?.name ?? c.deity,
+      });
+    }
+    return items;
+  }, []);
+
+  const results = useMemo<SearchResult[]>(() => {
+    if (!debouncedQuery) return [];
+    const q = debouncedQuery.toLowerCase();
+    const matched = corpus.filter(item =>
+      item.titleEnglish.toLowerCase().includes(q) ||
+      item.titleHindi.includes(debouncedQuery) ||
+      item.deity.toLowerCase().includes(q) ||
+      item.deityLabel.toLowerCase().includes(q)
+    );
+    matched.sort((a, b) => {
+      // Stable sort: alphabetical by deity, then title; matches whose deity is
+      // in the user's selectedDeities float to the top.
+      if (a.deity !== b.deity) return a.deity.localeCompare(b.deity);
+      return a.titleEnglish.localeCompare(b.titleEnglish);
+    });
+    if (selectedDeities.length > 0) {
+      const prefer = new Set(selectedDeities);
+      matched.sort((a, b) => {
+        const aPref = prefer.has(a.deity) ? 0 : 1;
+        const bPref = prefer.has(b.deity) ? 0 : 1;
+        return aPref - bPref;
+      });
+    }
+    return matched;
+  }, [corpus, debouncedQuery, selectedDeities]);
 
   const hasQuery = query.trim().length > 0;
   const hasResults = results.length > 0;
 
   const renderItem = useCallback(({ item }: ListRenderItemInfo<SearchResult>) => {
-    const route = item.type === 'aarti' ? `/aarti/${item.id}` : item.type === 'chalisa' ? `/chalisa/${item.id}` : `/katha/${item.id}`;
+    const route = item.type === 'aarti' ? `/aarti/${item.deity}` : `/chalisa/${item.deity}`;
     return (
       <ResultCard
         item={item}
@@ -150,7 +156,7 @@ export default function SearchScreen() {
       ) : (
         <FlatList
           data={results}
-          keyExtractor={(item) => `${item.type}-${item.id}`}
+          keyExtractor={(item) => `${item.type}-${item.deity}`}
           renderItem={renderItem}
           contentContainerStyle={[styles.results, { paddingHorizontal: spacing.screenH }]}
           keyboardShouldPersistTaps="handled"
@@ -185,7 +191,7 @@ const ResultCard = memo(function ResultCard({ item, query, colors, onPress }: Re
       <DeityAvatar deity={item.deity} size={44} />
       <View style={styles.cardText}>
         <HighlightText
-          text={item.titleNative}
+          text={item.titleHindi}
           query={query}
           baseStyle={[styles.cardNative, { color: colors.textPrimary }]}
           highlightColor={colors.accent}
@@ -197,7 +203,7 @@ const ResultCard = memo(function ResultCard({ item, query, colors, onPress }: Re
           highlightColor={colors.accent}
         />
         <HighlightText
-          text={item.deity}
+          text={item.deityLabel}
           query={query}
           baseStyle={[styles.cardDeity, { color: colors.textMuted }]}
           highlightColor={colors.accent}

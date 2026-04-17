@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useCallback, useMemo, memo } from 'react';
 import {
   View,
   Image,
@@ -13,7 +13,6 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 
@@ -22,80 +21,24 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { getDeityImage } from '@/config/deityImages';
 import { DEITY_BY_ID } from '@/config/deities';
-import type { IAarti, IChalisaSection, IKatha } from '@/types';
-
-// ─── Row / Item Types ────────────────────────────────────────────────────────
-
-interface AartiRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  content: string;
-  deity: string;
-}
-
-interface ChalisaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  sections: string;
-}
-
-interface ChalisaItem {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  sections: IChalisaSection[];
-}
-
-interface KathaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  summary: string;
-}
-
-interface KathaItem {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  summary: string;
-}
+import {
+  getAartiForDeity,
+  getChalisaForDeity,
+  type Recitation,
+  type Chalisa,
+} from '@/services/content';
 
 type ListItem =
-  | { type: 'aarti'; data: IAarti }
-  | { type: 'chalisa'; data: ChalisaItem }
-  | { type: 'katha'; data: KathaItem };
+  | { type: 'aarti'; data: Recitation }
+  | { type: 'chalisa'; data: Chalisa };
 
 interface ListSection {
   title: string;
   data: ListItem[];
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function rowToAarti(row: AartiRow): IAarti {
-  return { ...row, content: JSON.parse(row.content) as string[] };
-}
-
-function rowToChalisa(row: ChalisaRow): ChalisaItem {
-  return { ...row, sections: JSON.parse(row.sections) as IChalisaSection[] };
-}
-
-function countChaupais(sections: IChalisaSection[]): number {
-  return sections.filter((s) => s.type === 'chaupai').length;
-}
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const BANNER_HEIGHT = 260;
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function GodDetailScreen() {
   const { t } = useTranslation();
@@ -104,94 +47,42 @@ export default function GodDetailScreen() {
   const favoriteIds = useStore(s => s.favoriteIds);
   const toggleFavorite = useStore(s => s.toggleFavorite);
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
   const deity = DEITY_BY_ID[id ?? ''];
 
-  const [aartis, setAartis] = useState<IAarti[]>([]);
-  const [chalisas, setChalisas] = useState<ChalisaItem[]>([]);
-  const [kathas, setKathas] = useState<KathaItem[]>([]);
-
-  useEffect(() => {
-    if (!deity) return;
-    // Batch all three queries in a single transaction for better performance
-    db.withTransactionSync(() => {
-      const aartiRows = db.getAllSync<AartiRow>(
-        'SELECT * FROM aartis WHERE deity = ? ORDER BY titleEnglish',
-        [deity.name]
-      );
-      setAartis(aartiRows.map(rowToAarti));
-
-      const chalisaRows = db.getAllSync<ChalisaRow>(
-        'SELECT * FROM chalisas WHERE deity = ? ORDER BY titleEnglish',
-        [deity.name]
-      );
-      setChalisas(chalisaRows.map(rowToChalisa));
-
-      const kathaRows = db.getAllSync<KathaRow>(
-        'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity = ? ORDER BY titleEnglish',
-        [deity.name]
-      );
-      setKathas(kathaRows);
-    });
-  }, [db, deity]);
+  const aarti = useMemo(() => (deity ? getAartiForDeity(deity.id) : undefined), [deity]);
+  const chalisa = useMemo(() => (deity ? getChalisaForDeity(deity.id) : undefined), [deity]);
 
   const sections = useMemo<ListSection[]>(() => {
     const result: ListSection[] = [];
-    if (aartis.length > 0) {
-      result.push({
-        title: t('god.aartisCount', { count: aartis.length }),
-        data: aartis.map((a) => ({ type: 'aarti' as const, data: a })),
-      });
-    }
-    if (chalisas.length > 0) {
-      result.push({
-        title: t('god.chalisasCount', { count: chalisas.length }),
-        data: chalisas.map((c) => ({ type: 'chalisa' as const, data: c })),
-      });
-    }
-    if (kathas.length > 0) {
-      result.push({
-        title: t('god.kathasCount', { count: kathas.length }),
-        data: kathas.map((k) => ({ type: 'katha' as const, data: k })),
-      });
-    }
+    if (aarti) result.push({ title: t('god.aartiBadge'), data: [{ type: 'aarti', data: aarti }] });
+    if (chalisa) result.push({ title: t('god.chalisaBadge'), data: [{ type: 'chalisa', data: chalisa }] });
     return result;
-  }, [aartis, chalisas, kathas, t]);
+  }, [aarti, chalisa, t]);
 
   const renderItem = useCallback(
     ({ item }: SectionListRenderItemInfo<ListItem, ListSection>) => {
       if (item.type === 'aarti') {
         const a = item.data;
+        const favKey = `aarti-${a.deity}`;
         return (
           <AartiCard
             item={a}
             colors={colors}
-            isFavorite={favoriteIds.includes(`aarti-${a.id}`)}
-            onToggleFavorite={() => toggleFavorite(`aarti-${a.id}`)}
-            onPress={() => router.push(`/aarti/${a.id}`)}
+            isFavorite={favoriteIds.includes(favKey)}
+            onToggleFavorite={() => toggleFavorite(favKey)}
+            onPress={() => router.push(`/aarti/${a.deity}`)}
           />
         );
       }
-      if (item.type === 'chalisa') {
-        const c = item.data;
-        return (
-          <ChalisaCard
-            item={c}
-            colors={colors}
-            isFavorite={favoriteIds.includes(`chalisa-${c.id}`)}
-            onToggleFavorite={() => toggleFavorite(`chalisa-${c.id}`)}
-            onPress={() => router.push(`/chalisa/${c.id}`)}
-          />
-        );
-      }
-      const k = item.data;
+      const c = item.data;
+      const favKey = `chalisa-${c.deity}`;
       return (
-        <KathaCard
-          item={k}
+        <ChalisaCard
+          item={c}
           colors={colors}
-          isFavorite={favoriteIds.includes(`katha-${k.id}`)}
-          onToggleFavorite={() => toggleFavorite(`katha-${k.id}`)}
-          onPress={() => router.push(`/katha/${k.id}`)}
+          isFavorite={favoriteIds.includes(favKey)}
+          onToggleFavorite={() => toggleFavorite(favKey)}
+          onPress={() => router.push(`/chalisa/${c.deity}`)}
         />
       );
     },
@@ -217,40 +108,29 @@ export default function GodDetailScreen() {
     );
   }
 
-  const deityImage = getDeityImage(deity.name);
+  const deityImage = getDeityImage(deity.id);
   const hasImage = !!deityImage;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
-      {/* ── Fixed Header ───────────────────────────────────────────── */}
       <View style={[styles.headerWrap, hasImage && { height: BANNER_HEIGHT }]}>
         {hasImage ? (
-          <>
-            {/* Banner image */}
-            <View style={styles.bannerBox}>
-              <Image
-                source={deityImage}
-                style={styles.bannerImage}
-                resizeMode="cover"
-              />
-              {/* Bottom gradient fade */}
-              <LinearGradient
-                colors={['transparent', colors.base]}
-                style={styles.bannerGradientBottom}
-              />
-              {/* Name overlay on banner */}
-              <View style={styles.bannerOverlay}>
-                <Text style={styles.bannerName}>{t(`deities.${deity.id}.displayName`)}</Text>
-                <Text style={styles.bannerDesc}>{t(`deities.${deity.id}.description`)}</Text>
-              </View>
+          <View style={styles.bannerBox}>
+            <Image source={deityImage} style={styles.bannerImage} resizeMode="cover" />
+            <LinearGradient
+              colors={['transparent', colors.base]}
+              style={styles.bannerGradientBottom}
+            />
+            <View style={styles.bannerOverlay}>
+              <Text style={styles.bannerName}>{t(`deities.${deity.id}.displayName`)}</Text>
+              <Text style={styles.bannerDesc}>{t(`deities.${deity.id}.description`)}</Text>
             </View>
-          </>
+          </View>
         ) : (
-          /* No image: simple gradient header */
           <LinearGradient colors={[deity.color + '30', colors.base]} style={styles.fallbackHeader}>
             <View style={styles.fallbackContent}>
-              <DeityAvatar deity={deity.name} size={72} />
+              <DeityAvatar deity={deity.id} size={72} />
               <Text style={[styles.fallbackName, { color: colors.textPrimary }]}>
                 {t(`deities.${deity.id}.displayName`)}
               </Text>
@@ -264,7 +144,6 @@ export default function GodDetailScreen() {
           </LinearGradient>
         )}
 
-        {/* Back button */}
         <View style={styles.bannerBackWrap}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -275,10 +154,9 @@ export default function GodDetailScreen() {
         </View>
       </View>
 
-      {/* ── List ──────────────────────────────────────────────────────── */}
       <SectionList
         sections={sections}
-        keyExtractor={(item) => `${item.type}-${item.data.id}`}
+        keyExtractor={(item) => `${item.type}-${item.data.deity}`}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
@@ -298,16 +176,12 @@ export default function GodDetailScreen() {
   );
 }
 
-// ─── List Separators ────────────────────────────────────────────────────────
-
 const ListItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
 const ListSectionSeparator = ({ leadingItem }: { leadingItem?: unknown }) =>
   leadingItem ? <View style={{ height: 8 }} /> : null;
 
-// ─── Aarti Card ──────────────────────────────────────────────────────────────
-
 interface AartiCardProps {
-  item: IAarti;
+  item: Recitation;
   colors: ColorPalette;
   isFavorite: boolean;
   onToggleFavorite: () => void;
@@ -323,7 +197,7 @@ const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFa
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.cardText}>
         <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleNative}
+          {item.titleHindi}
         </Text>
         <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
           {item.titleEnglish}
@@ -332,9 +206,7 @@ const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFa
           <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.aartiBadge')}</Text>
         </View>
       </View>
-      <TouchableOpacity
-        onPress={onToggleFavorite}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons
           name={isFavorite ? 'heart' : 'heart-outline'}
           size={22}
@@ -345,10 +217,8 @@ const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFa
   );
 });
 
-// ─── Chalisa Card ────────────────────────────────────────────────────────────
-
 interface ChalisaCardProps {
-  item: ChalisaItem;
+  item: Chalisa;
   colors: ColorPalette;
   isFavorite: boolean;
   onToggleFavorite: () => void;
@@ -357,7 +227,7 @@ interface ChalisaCardProps {
 
 const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: ChalisaCardProps) {
   const { t } = useTranslation();
-  const chaupaiCount = countChaupais(item.sections);
+  const chaupaiCount = item.chaupai.hindi.length;
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -365,7 +235,7 @@ const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onTogg
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.cardText}>
         <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleNative}
+          {item.titleHindi}
         </Text>
         <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
           {item.titleEnglish}
@@ -383,9 +253,7 @@ const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onTogg
           )}
         </View>
       </View>
-      <TouchableOpacity
-        onPress={onToggleFavorite}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons
           name={isFavorite ? 'heart' : 'heart-outline'}
           size={22}
@@ -395,57 +263,10 @@ const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onTogg
     </TouchableOpacity>
   );
 });
-
-// ─── Katha Card ─────────────────────────────────────────────────────────────
-
-interface KathaCardProps {
-  item: KathaItem;
-  colors: ColorPalette;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-  onPress: () => void;
-}
-
-const KathaCard = memo(function KathaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: KathaCardProps) {
-  const { t } = useTranslation();
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.cardText}>
-        <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleNative}
-        </Text>
-        <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
-          {item.titleEnglish}
-        </Text>
-        <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-          <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.kathaBadge')}</Text>
-        </View>
-      </View>
-      <TouchableOpacity
-        onPress={onToggleFavorite}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons
-          name={isFavorite ? 'heart' : 'heart-outline'}
-          size={22}
-          color={isFavorite ? colors.accent : colors.textMuted}
-        />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-});
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // ── Collapsible header ──
   headerWrap: { overflow: 'hidden' },
-
-  // Banner (expanded)
   bannerBox: {
     width: SCREEN_WIDTH,
     height: BANNER_HEIGHT,
@@ -502,15 +323,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // Fallback header (no image)
   fallbackHeader: { paddingBottom: 20 },
   fallbackContent: { alignItems: 'center', gap: 4, paddingTop: 52 },
   fallbackName: { fontSize: 22, fontFamily: 'Mukta_700Bold', marginTop: 8 },
   fallbackSubname: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
   fallbackDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
-
-  // Section headers
   sectionHeader: {
     paddingTop: 16,
     paddingBottom: 10,
@@ -521,8 +338,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-
-  // List
   listContent: { paddingTop: 2, paddingBottom: 32 },
   emptyText: {
     textAlign: 'center',
@@ -530,8 +345,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 48,
   },
-
-  // Card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -543,8 +356,6 @@ const styles = StyleSheet.create({
   cardText: { flex: 1 },
   cardTitleNative: { fontSize: 16, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
   cardTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginBottom: 6 },
-
-  // Badges
   badgeRow: { flexDirection: 'row', gap: 6 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.chip },
   badgeText: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.3 },

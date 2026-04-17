@@ -1,31 +1,9 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 
-import type { IAarti, IChalisa, IKatha, IRashifal } from '@/types';
+import type { IRashifal } from '@/types';
 
 // Bump this whenever seed data changes to trigger a re-seed on existing installs.
-const SEED_VERSION = 7;
-
-async function seedAartis(db: SQLiteDatabase): Promise<void> {
-  const aartiSeedData = (await import('@/data/static/aartis.json')).default;
-  const aartis = aartiSeedData as IAarti[];
-  for (const aarti of aartis) {
-    db.runSync(
-      'INSERT OR REPLACE INTO aartis (id, titleEnglish, titleNative, content, deity) VALUES (?, ?, ?, ?, ?)',
-      [aarti.id, aarti.titleEnglish, aarti.titleNative, JSON.stringify(aarti.content), aarti.deity]
-    );
-  }
-}
-
-async function seedChalisas(db: SQLiteDatabase): Promise<void> {
-  const chalisaSeedData = (await import('@/data/static/chalisas.json')).default;
-  const chalisas = chalisaSeedData as IChalisa[];
-  for (const chalisa of chalisas) {
-    db.runSync(
-      'INSERT OR REPLACE INTO chalisas (id, titleEnglish, titleNative, deity, sections) VALUES (?, ?, ?, ?, ?)',
-      [chalisa.id, chalisa.titleEnglish, chalisa.titleNative, chalisa.deity, JSON.stringify(chalisa.sections)]
-    );
-  }
-}
+const SEED_VERSION = 8;
 
 async function seedRashifal(db: SQLiteDatabase): Promise<void> {
   const rashifalSeedData = (await import('@/data/static/rashifal.json')).default;
@@ -38,70 +16,15 @@ async function seedRashifal(db: SQLiteDatabase): Promise<void> {
   }
 }
 
-async function seedKathas(db: SQLiteDatabase): Promise<void> {
-  const kathaSeedData = (await import('@/data/static/kathas.json')).default;
-  const kathas = kathaSeedData as IKatha[];
-  for (const katha of kathas) {
-    db.runSync(
-      'INSERT OR REPLACE INTO kathas (id, titleEnglish, titleNative, deity, summary, content, vrat_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [
-        katha.id,
-        katha.titleEnglish,
-        katha.titleNative,
-        katha.deity,
-        katha.summary,
-        JSON.stringify(katha.paragraphs),
-        katha.vratType ?? null,
-      ]
-    );
-  }
-}
-
 // Called via SQLiteProvider's onInit — receives the same connection
 // that will be provided to all children, so no second connection is opened.
 export async function initDatabase(db: SQLiteDatabase): Promise<void> {
-  // Aartis table
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS aartis (
-      id TEXT PRIMARY KEY NOT NULL,
-      titleEnglish TEXT NOT NULL,
-      titleNative TEXT NOT NULL,
-      content TEXT NOT NULL,
-      deity TEXT NOT NULL
-    );
-  `);
-
-  // Chalisas table
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS chalisas (
-      id TEXT PRIMARY KEY NOT NULL,
-      titleEnglish TEXT NOT NULL,
-      titleNative TEXT NOT NULL,
-      deity TEXT NOT NULL,
-      sections TEXT NOT NULL
-    );
-  `);
-
-  // Kathas table
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS kathas (
-      id TEXT PRIMARY KEY NOT NULL,
-      titleEnglish TEXT NOT NULL,
-      titleNative TEXT NOT NULL,
-      deity TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      content TEXT NOT NULL,
-      vrat_type TEXT
-    );
-  `);
-
-  // Migration: add vrat_type column for installs created before seed v6.
-  // ALTER TABLE ADD COLUMN is idempotent-unsafe in SQLite (errors if exists),
-  // so guard by checking pragma.
-  const kathaCols = db.getAllSync<{ name: string }>("PRAGMA table_info(kathas)");
-  if (!kathaCols.some(c => c.name === 'vrat_type')) {
-    db.execSync('ALTER TABLE kathas ADD COLUMN vrat_type TEXT');
-  }
+  // Aartis/chalisas/kathas were previously seeded into SQLite; they now come
+  // from the `hindu-devotional-texts` package at runtime. Kathas are removed
+  // from the app entirely. Drop the orphaned tables on existing installs.
+  db.execSync('DROP TABLE IF EXISTS aartis');
+  db.execSync('DROP TABLE IF EXISTS chalisas');
+  db.execSync('DROP TABLE IF EXISTS kathas');
 
   // Rashifal table — daily horoscope per (date, sign, language)
   db.execSync(`
@@ -145,9 +68,6 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   const currentVersion = row ? parseInt(row.value, 10) : 0;
 
   if (currentVersion < SEED_VERSION) {
-    await seedAartis(db);
-    await seedChalisas(db);
-    await seedKathas(db);
     await seedRashifal(db);
     db.runSync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', ['seedVersion', String(SEED_VERSION)]);
   }

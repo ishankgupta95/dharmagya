@@ -24,51 +24,16 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
-import { vratFestivalNameForDate } from '@/utils/vrat';
 import { signFromBirthDate } from '@/utils/rashi';
-import { DEITY_BY_NAME } from '@/config/deities';
+import { DEITY_BY_ID } from '@/config/deities';
 import { type RashiSign } from '@/types';
-import type { IPanchangDay, IPanchangElement, IAarti } from '@/types';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface AartiRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  content: string;
-  deity: string;
-}
-
-interface VratKathaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  summary: string;
-}
-
-interface ChalisaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-}
-
-interface KathaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  summary: string;
-}
-
-/** Builds a SQL `IN (?, ?, ...)` placeholder list. Returns null when the list
- *  is empty so callers can short-circuit without emitting invalid SQL. */
-function inClause(values: string[]): { sql: string; params: string[] } | null {
-  if (!values.length) return null;
-  return { sql: `(${values.map(() => '?').join(',')})`, params: values };
-}
+import type { IPanchangDay, IPanchangElement } from '@/types';
+import {
+  getAllAppAartis,
+  getAllAppChalisas,
+  type Recitation,
+  type Chalisa,
+} from '@/services/content';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -79,7 +44,7 @@ function getGreetingKey(): 'Morning' | 'Afternoon' | 'Evening' {
   return 'Evening';
 }
 
-const DATE_LOCALE_MAP: Record<string, string> = { en: 'en-IN', hi: 'hi-IN', sa: 'hi-IN' };
+const DATE_LOCALE_MAP: Record<string, string> = { en: 'en-IN', hi: 'hi-IN' };
 
 function getTodayDateString(lang: string): string {
   const locale = DATE_LOCALE_MAP[lang] ?? 'en-IN';
@@ -88,8 +53,9 @@ function getTodayDateString(lang: string): string {
     .toUpperCase();
 }
 
-function rowToAarti(row: AartiRow): IAarti {
-  return { ...row, content: JSON.parse(row.content) as string[] };
+function pickRandom<T>(arr: T[]): T | null {
+  if (!arr.length) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 /**
@@ -127,19 +93,16 @@ export default function HomeScreen() {
 
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
-  const [featuredAarti, setFeaturedAarti] = useState<IAarti | null>(null);
+  const [featuredAarti, setFeaturedAarti] = useState<Recitation | null>(null);
   const [featuredAartiFromSelected, setFeaturedAartiFromSelected] = useState(false);
-  const [featuredChalisa, setFeaturedChalisa] = useState<ChalisaRow | null>(null);
+  const [featuredChalisa, setFeaturedChalisa] = useState<Chalisa | null>(null);
   const [featuredChalisaFromSelected, setFeaturedChalisaFromSelected] = useState(false);
-  const [featuredKatha, setFeaturedKatha] = useState<KathaRow | null>(null);
-  const [featuredKathaFromSelected, setFeaturedKathaFromSelected] = useState(false);
-  const [vratKatha, setVratKatha] = useState<{ row: VratKathaRow; festivalName: string } | null>(null);
   const [rashifalExcerpt, setRashifalExcerpt] = useState<string | null>(null);
 
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
   const lastFetchRef = useRef(0);
 
-  const panchangLang = resolveLanguage(language) as 'en' | 'hi' | 'sa';
+  const panchangLang = resolveLanguage(language);
   const refreshPanchang = useCallback((showSpinner = false) => {
     const now = Date.now();
     // Throttle: don't re-fetch more than once per hour (panchang only changes daily)
@@ -193,108 +156,61 @@ export default function HomeScreen() {
     setRashifalExcerpt(row?.body ?? null);
   }, [db, userSign, lang]);
 
-  // ── Today's Vrat Katha (if today is a vrat day) ──────────────────────────
-  useEffect(() => {
-    const today = new Date();
-    const vrat = vratFestivalNameForDate(today);
-    if (!vrat) {
-      setVratKatha(null);
-      return;
-    }
-    const row = db.getFirstSync<VratKathaRow>(
-      'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE vrat_type = ? LIMIT 1',
-      [vrat.vratType]
-    );
-    setVratKatha(row ? { row, festivalName: vrat.name } : null);
-  }, [db]);
-
-  // ── Featured Aarti / Chalisa / Katha ──────────────────────────────────────
+  // ── Featured Aarti / Chalisa ─────────────────────────────────────────────
   // Ranking: explicit favorites (aarti only, existing behavior) → content where
   // deity ∈ selectedDeities → random fallback. The `*FromSelected` flag lets the
   // card show a "For your deities" label so users know the pick is personalised.
   useEffect(() => {
-    const favAartiIds = favoriteIds.filter((id) => id.startsWith('aarti-'));
-    let row: AartiRow | null = null;
+    const allAartis = getAllAppAartis();
+    const selected = new Set(selectedDeities);
+    let pick: Recitation | null = null;
     let fromSelected = false;
 
-    if (favAartiIds.length > 0) {
-      const randomPrefixed = favAartiIds[Math.floor(Math.random() * favAartiIds.length)];
-      const rawId = randomPrefixed.slice('aarti-'.length);
-      row = db.getFirstSync<AartiRow>('SELECT * FROM aartis WHERE id = ?', [rawId]);
+    const favAartiSlugs = favoriteIds
+      .filter(id => id.startsWith('aarti-'))
+      .map(id => id.slice('aarti-'.length));
+    if (favAartiSlugs.length > 0) {
+      const favPool = allAartis.filter(a => favAartiSlugs.includes(a.deity));
+      pick = pickRandom(favPool);
     }
 
-    if (!row) {
-      const ic = inClause(selectedDeities);
-      if (ic) {
-        row = db.getFirstSync<AartiRow>(
-          `SELECT * FROM aartis WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
-          ic.params
-        );
-        if (row) fromSelected = true;
-      }
+    if (!pick && selected.size > 0) {
+      const selectedPool = allAartis.filter(a => selected.has(a.deity));
+      pick = pickRandom(selectedPool);
+      if (pick) fromSelected = true;
     }
 
-    if (!row) {
-      row = db.getFirstSync<AartiRow>('SELECT * FROM aartis ORDER BY RANDOM() LIMIT 1');
-    }
+    if (!pick) pick = pickRandom(allAartis);
 
-    setFeaturedAarti(row ? rowToAarti(row) : null);
+    setFeaturedAarti(pick);
     setFeaturedAartiFromSelected(fromSelected);
-  }, [db, favoriteIds, selectedDeities]);
+  }, [favoriteIds, selectedDeities]);
 
   useEffect(() => {
-    let row: ChalisaRow | null = null;
+    const allChalisas = getAllAppChalisas();
+    const selected = new Set(selectedDeities);
+    let pick: Chalisa | null = null;
     let fromSelected = false;
 
-    const ic = inClause(selectedDeities);
-    if (ic) {
-      row = db.getFirstSync<ChalisaRow>(
-        `SELECT id, titleEnglish, titleNative, deity FROM chalisas WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
-        ic.params
-      );
-      if (row) fromSelected = true;
+    if (selected.size > 0) {
+      const selectedPool = allChalisas.filter(c => selected.has(c.deity));
+      pick = pickRandom(selectedPool);
+      if (pick) fromSelected = true;
     }
 
-    if (!row) {
-      row = db.getFirstSync<ChalisaRow>(
-        'SELECT id, titleEnglish, titleNative, deity FROM chalisas ORDER BY RANDOM() LIMIT 1'
-      );
-    }
+    if (!pick) pick = pickRandom(allChalisas);
 
-    setFeaturedChalisa(row);
+    setFeaturedChalisa(pick);
     setFeaturedChalisaFromSelected(fromSelected);
-  }, [db, selectedDeities]);
-
-  useEffect(() => {
-    let row: KathaRow | null = null;
-    let fromSelected = false;
-
-    const ic = inClause(selectedDeities);
-    if (ic) {
-      row = db.getFirstSync<KathaRow>(
-        `SELECT id, titleEnglish, titleNative, deity, summary FROM kathas WHERE deity IN ${ic.sql} ORDER BY RANDOM() LIMIT 1`,
-        ic.params
-      );
-      if (row) fromSelected = true;
-    }
-
-    if (!row) {
-      row = db.getFirstSync<KathaRow>(
-        'SELECT id, titleEnglish, titleNative, deity, summary FROM kathas ORDER BY RANDOM() LIMIT 1'
-      );
-    }
-
-    setFeaturedKatha(row);
-    setFeaturedKathaFromSelected(fromSelected);
-  }, [db, selectedDeities]);
+  }, [selectedDeities]);
 
   const greetingKey = useMemo(() => getGreetingKey(), []);
   const dateString = useMemo(() => getTodayDateString(lang), [lang]);
 
-  // Map selected deity *names* to their metadata (id/color) for the avatar
-  // strip. Unknown names (e.g. after a content cleanup) are filtered out.
+  // Map selected deity slugs to their metadata for the avatar strip. Unknown
+  // slugs (e.g. after a content cleanup) are filtered out.
   const selectedDeityMetas = useMemo(
-    () => selectedDeities.map((name) => DEITY_BY_NAME[name]).filter(Boolean),
+    () => selectedDeities.map((id) => DEITY_BY_ID[id]).filter(Boolean),
     [selectedDeities]
   );
   const panchangGradient = useMemo<readonly [string, string]>(
@@ -445,6 +361,25 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/* ── Dasha link ────────────────────────────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/dasha')}
+          style={[styles.dashaLinkCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.dashaLinkIcon, { backgroundColor: colors.borderAccent }]}>
+            <Ionicons name="time-outline" size={20} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.dashaLinkLabel, { color: colors.accent }]}>
+              {t('home.dashaLink.label')}
+            </Text>
+            <Text style={[styles.dashaLinkDesc, { color: colors.textSecondary }]} numberOfLines={1}>
+              {t('home.dashaLink.description')}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
+
         {/* ── Your Deities strip ────────────────────────────────────────── */}
         {selectedDeityMetas.length > 0 && (
           <View style={styles.yourDeitiesBlock}>
@@ -470,7 +405,7 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
                   onPress={() => router.push(`/god/${deity.id}`)}
                   style={styles.yourDeityChip}>
-                  <DeityAvatar deity={deity.name} size={52} />
+                  <DeityAvatar deity={deity.id} size={52} />
                   <Text
                     style={[styles.yourDeityName, { color: colors.textSecondary }]}
                     numberOfLines={1}>
@@ -482,44 +417,11 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Today's Vrat Katha Card ───────────────────────────────────── */}
-        {vratKatha && (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push(`/katha/${vratKatha.row.id}`)}
-            style={[
-              styles.vratCard,
-              { backgroundColor: colors.surface, borderColor: colors.borderAccent },
-            ]}>
-            <View style={styles.vratCardTopRow}>
-              <Text style={[styles.vratCardLabel, { color: colors.accent }]}>
-                {t('home.todaysVratKatha', { festival: vratKatha.festivalName })}
-              </Text>
-              <Ionicons name="book-outline" size={14} color={colors.accent} />
-            </View>
-            <View style={styles.featuredInner}>
-              <DeityAvatar deity={vratKatha.row.deity} size={52} />
-              <View style={styles.featuredText}>
-                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {vratKatha.row.titleNative}
-                </Text>
-                <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
-                  {vratKatha.row.titleEnglish}
-                </Text>
-                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
-                  {vratKatha.row.deity}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </View>
-          </TouchableOpacity>
-        )}
-
         {/* ── Featured Aarti Card ───────────────────────────────────────── */}
         {featuredAarti && (
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.push(`/aarti/${featuredAarti.id}`)}
+            onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
             style={[
               styles.featuredCard,
               { backgroundColor: colors.surface, borderColor: colors.border },
@@ -529,7 +431,7 @@ export default function HomeScreen() {
 
               <View style={styles.featuredText}>
                 <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {lang === 'en' ? featuredAarti.titleNative : featuredAarti.titleNative}
+                  {featuredAarti.titleHindi}
                 </Text>
                 {lang === 'en' && (
                   <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -537,12 +439,12 @@ export default function HomeScreen() {
                   </Text>
                 )}
                 <Text style={[styles.featuredDeity, { color: colors.accent }]}>
-                  {featuredAarti.deity}
+                  {t(`deities.${featuredAarti.deity}.displayName`)}
                 </Text>
               </View>
 
               <TouchableOpacity
-                onPress={() => router.push(`/aarti/${featuredAarti.id}`)}
+                onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
                 style={[styles.playBtn, { borderColor: colors.accent }]}>
                 <Ionicons name="play" size={14} color={colors.accent} />
               </TouchableOpacity>
@@ -562,7 +464,7 @@ export default function HomeScreen() {
         {featuredChalisa && (
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.push(`/chalisa/${featuredChalisa.id}`)}
+            onPress={() => router.push(`/chalisa/${featuredChalisa.deity}`)}
             style={[
               styles.featuredCard,
               { backgroundColor: colors.surface, borderColor: colors.border },
@@ -571,7 +473,7 @@ export default function HomeScreen() {
               <DeityAvatar deity={featuredChalisa.deity} size={52} />
               <View style={styles.featuredText}>
                 <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {featuredChalisa.titleNative}
+                  {featuredChalisa.titleHindi}
                 </Text>
                 {lang === 'en' && (
                   <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -579,45 +481,13 @@ export default function HomeScreen() {
                   </Text>
                 )}
                 <Text style={[styles.featuredDeity, { color: colors.accent }]}>
-                  {featuredChalisa.deity}
+                  {t(`deities.${featuredChalisa.deity}.displayName`)}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </View>
             <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
               {featuredChalisaFromSelected ? t('home.forYourDeities') : t('home.featuredChalisa')}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* ── Featured Katha Card ───────────────────────────────────────── */}
-        {featuredKatha && (!vratKatha || vratKatha.row.id !== featuredKatha.id) && (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push(`/katha/${featuredKatha.id}`)}
-            style={[
-              styles.featuredCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}>
-            <View style={styles.featuredInner}>
-              <DeityAvatar deity={featuredKatha.deity} size={52} />
-              <View style={styles.featuredText}>
-                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {featuredKatha.titleNative}
-                </Text>
-                {lang === 'en' && (
-                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
-                    {featuredKatha.titleEnglish}
-                  </Text>
-                )}
-                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
-                  {featuredKatha.deity}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </View>
-            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
-              {featuredKathaFromSelected ? t('home.forYourDeities') : t('home.featuredKatha')}
             </Text>
           </TouchableOpacity>
         )}
@@ -806,19 +676,26 @@ const styles = StyleSheet.create({
   rashifalTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   rashifalExcerpt: { fontSize: 14, fontFamily: 'Mukta_400Regular', lineHeight: 20 },
 
-  // Vrat katha card
-  vratCard: {
+  // Dasha link card
+  dashaLinkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     borderRadius: borderRadius.card,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
     marginBottom: 16,
   },
-  vratCardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  dashaLinkIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
   },
+  dashaLinkLabel: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1 },
+  dashaLinkDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
+
   vratCardLabel: {
     fontSize: 11,
     fontFamily: 'Mukta_500Medium',

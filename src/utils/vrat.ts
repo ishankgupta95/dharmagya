@@ -2,8 +2,9 @@ import type { VratType } from '@/types';
 import festivalsData from '@/data/static/festivals.json';
 
 // ─── Festival → VratType mapping ────────────────────────────────────────────
-// Map festival names as they appear in festivals.json to a VratType. Every
-// mapping here must have at least one seeded katha with a matching vrat_type.
+// Maps festival names from festivals.json to a VratType. Currently used by the
+// notification scheduler to label vrat-day reminders with the matching tithi
+// observance (e.g. "Ekadashi" instead of just the festival name).
 const FESTIVAL_NAME_TO_VRAT: Record<string, VratType> = {
   Ekadashi: 'ekadashi',
   'Pradosha Vrata': 'pradosha',

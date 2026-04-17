@@ -32,18 +32,18 @@ export const DeitySelectionGrid = memo(function DeitySelectionGrid({
   const isDarkMode = useStore(s => s.isDarkMode);
   const palette = colors ?? (isDarkMode ? darkColors : lightColors);
 
-  function toggle(name: string) {
-    onChange(value.includes(name) ? value.filter((d) => d !== name) : [...value, name]);
+  function toggle(id: string) {
+    onChange(value.includes(id) ? value.filter((d) => d !== id) : [...value, id]);
   }
 
   const renderDeity = ({ item }: ListRenderItemInfo<DeityMeta>) => {
-    const isSelected = value.includes(item.name);
+    const isSelected = value.includes(item.id);
     return (
       <DeityCard
         deity={item}
         isSelected={isSelected}
         colors={palette}
-        onPress={() => toggle(item.name)}
+        onPress={() => toggle(item.id)}
       />
     );
   };
@@ -84,7 +84,7 @@ const DeityCard = memo(function DeityCard({ deity, isSelected, colors, onPress }
         },
         isSelected && { backgroundColor: deity.color + '12' },
       ]}>
-      <DeityAvatar deity={deity.name} size={64} />
+      <DeityAvatar deity={deity.id} size={64} />
       <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
         {t(`deities.${deity.id}.displayName`)}
       </Text>

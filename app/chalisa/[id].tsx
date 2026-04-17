@@ -1,54 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
-import type { IChalisaSection } from '@/types';
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ChalisaRow {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  sections: string;
-}
-
-interface ChalisaDetail {
-  id: string;
-  titleEnglish: string;
-  titleNative: string;
-  deity: string;
-  sections: IChalisaSection[];
-}
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
+import { resolveLanguage } from '@/i18n';
+import {
+  getChalisaForDeity,
+  chalisaSections,
+  titleFor,
+  type ContentLang,
+} from '@/services/content';
 
 export default function ChalisaDetailScreen() {
   useInterstitialOnExit();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useTranslation();
+  const { id: deitySlug } = useLocalSearchParams<{ id: string }>();
   const isDarkMode = useStore(s => s.isDarkMode);
   const favoriteIds = useStore(s => s.favoriteIds);
   const toggleFavorite = useStore(s => s.toggleFavorite);
+  const appLanguage = useStore(s => s.language);
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
 
-  const [chalisa, setChalisa] = useState<ChalisaDetail | null>(null);
+  const chalisa = useMemo(() => (deitySlug ? getChalisaForDeity(deitySlug) : undefined), [deitySlug]);
+
+  const [lang, setLang] = useState<ContentLang>(() => resolveLanguage(appLanguage));
+
   const scrollY = useSharedValue(0);
 
   const COLLAPSE_END = 100;
@@ -65,40 +54,38 @@ export default function ChalisaDetailScreen() {
     opacity: interpolate(scrollY.value, [COLLAPSE_END * 0.5, COLLAPSE_END], [0, 1], Extrapolation.CLAMP),
   }));
 
-  useEffect(() => {
-    if (!id) return;
-    const row = db.getFirstSync<ChalisaRow>('SELECT * FROM chalisas WHERE id = ?', [id]);
-    if (row) {
-      setChalisa({ ...row, sections: JSON.parse(row.sections) as IChalisaSection[] });
-    }
-  }, [db, id]);
-
-  const favoriteKey = `chalisa-${id ?? ''}`;
+  const favoriteKey = `chalisa-${deitySlug ?? ''}`;
   const isFavorite = favoriteIds.includes(favoriteKey);
 
-  // ── Loading state ──────────────────────────────────────────────────────────
   if (!chalisa) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
-        <View style={[styles.root, { backgroundColor: colors.base, alignItems: 'center', justifyContent: 'center' }]}>
-          <ActivityIndicator color={colors.accent} />
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+        <View style={styles.notFoundWrap}>
+          <Text style={[styles.notFoundText, { color: colors.textMuted }]}>
+            {t('chalisa.notFound')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.notFoundBtn, { borderColor: colors.accent }]}>
+            <Text style={[styles.notFoundBtnText, { color: colors.accent }]}>{t('common.back') ?? 'Back'}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
   const headerGradient: readonly [string, string] = ['#2E2418', colors.base];
+  const sections = chalisaSections(chalisa, lang);
+  const compactTitle = titleFor(chalisa, lang);
 
-  // Pre-compute chaupai numbers for each verse across sections
+  // Numbered globally across all chaupai sections.
   let globalChaupaiNum = 0;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: '#2E2418' }]} edges={['top', 'bottom']}>
 
-      {/* ── Gradient Header ─────────────────────────────────────────── */}
       <LinearGradient colors={headerGradient} style={styles.header}>
 
-        {/* Nav row */}
         <View style={styles.navRow}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -107,9 +94,8 @@ export default function ChalisaDetailScreen() {
             <Ionicons name="arrow-back" size={20} color="#F0E6D3" />
           </TouchableOpacity>
 
-          {/* Compact title (visible when hero collapsed) */}
           <Animated.View style={[styles.compactTitle, compactTitleAnimatedStyle]}>
-            <Text style={styles.compactTitleText} numberOfLines={1}>{chalisa.titleNative}</Text>
+            <Text style={styles.compactTitleText} numberOfLines={1}>{compactTitle}</Text>
           </Animated.View>
 
           <TouchableOpacity
@@ -124,19 +110,21 @@ export default function ChalisaDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Hero: avatar + title (collapses on scroll) */}
         <Animated.View style={[styles.hero, heroAnimatedStyle]}>
           <DeityAvatar deity={chalisa.deity} size={72} />
-          <Text style={styles.heroTitleNative}>{chalisa.titleNative}</Text>
+          <Text style={styles.heroTitleNative}>{chalisa.titleHindi}</Text>
           <Text style={styles.heroTitleEn}>{chalisa.titleEnglish}</Text>
           <View style={styles.deityBadge}>
-            <Text style={[styles.deityBadgeText, { color: colors.accent }]}>{chalisa.deity}</Text>
+            <Text style={[styles.deityBadgeText, { color: colors.accent }]}>
+              {t(`deities.${chalisa.deity}.displayName`)}
+            </Text>
           </View>
         </Animated.View>
 
       </LinearGradient>
 
-      {/* ── Sections ────────────────────────────────────────────────── */}
+      <LangToggle lang={lang} onChange={setLang} colors={colors} t={t} />
+
       <Animated.ScrollView
         style={{ backgroundColor: colors.base }}
         contentContainerStyle={[styles.contentScroll, { paddingHorizontal: spacing.screenH }]}
@@ -144,13 +132,12 @@ export default function ChalisaDetailScreen() {
         onScroll={scrollHandler}
         scrollEventThrottle={16}>
 
-        {chalisa.sections.map((section, sectionIndex) => {
+        {sections.map((section, sectionIndex) => {
           const isChaupai = section.type === 'chaupai';
           return (
-            <View key={sectionIndex} style={styles.section}>
+            <View key={`${lang}-${sectionIndex}`} style={styles.section}>
 
-              {/* Section label header (only for doha) */}
-              {section.type === 'doha' && (
+              {!isChaupai && (
                 <View style={styles.sectionLabelRow}>
                   <View style={[styles.sectionLine, { backgroundColor: colors.divider }]} />
                   <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
@@ -160,7 +147,6 @@ export default function ChalisaDetailScreen() {
                 </View>
               )}
 
-              {/* Verses */}
               {section.verses.map((verse, verseIndex) => {
                 const num = isChaupai ? ++globalChaupaiNum : null;
                 return (
@@ -185,12 +171,48 @@ export default function ChalisaDetailScreen() {
   );
 }
 
-// ─── Verse Block ──────────────────────────────────────────────────────────────
+interface LangToggleProps {
+  lang: ContentLang;
+  onChange: (next: ContentLang) => void;
+  colors: ColorPalette;
+  t: (key: string) => string;
+}
+
+function LangToggle({ lang, onChange, colors, t }: LangToggleProps) {
+  return (
+    <View style={[styles.langToggleBar, { backgroundColor: colors.base, borderBottomColor: colors.border }]}>
+      <View style={[styles.langToggle, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+        <LangChip label={t('langToggle.english')} active={lang === 'en'} onPress={() => onChange('en')} colors={colors} />
+        <LangChip label={t('langToggle.hindi')} active={lang === 'hi'} onPress={() => onChange('hi')} colors={colors} />
+      </View>
+    </View>
+  );
+}
+
+interface LangChipProps {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: ColorPalette;
+}
+
+function LangChip({ label, active, onPress, colors }: LangChipProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={[styles.langChip, active && { backgroundColor: colors.accent }]}>
+      <Text style={[styles.langChipText, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 interface VerseBlockProps {
   verse: string;
   number: number | null;
-  type: 'doha' | 'chaupai';
+  type: 'doha' | 'soratha' | 'chaupai';
   colors: ColorPalette;
 }
 
@@ -213,12 +235,9 @@ function VerseBlock({ verse, number, type, colors }: VerseBlockProps) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  // Header
   header: { paddingBottom: 12 },
   navRow: {
     flexDirection: 'row',
@@ -268,10 +287,31 @@ const styles = StyleSheet.create({
   },
   deityBadgeText: { fontSize: 12, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
 
-  // Content
+  // Lang toggle
+  langToggleBar: {
+    paddingHorizontal: spacing.screenH,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  langToggle: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 3,
+    gap: 2,
+  },
+  langChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 17,
+    minWidth: 88,
+    alignItems: 'center',
+  },
+  langChipText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+
   contentScroll: { paddingTop: 24, paddingBottom: 32 },
 
-  // Section
   section: { marginBottom: 8 },
   sectionLabelRow: {
     flexDirection: 'row',
@@ -283,7 +323,6 @@ const styles = StyleSheet.create({
   sectionLine: { flex: 1, height: StyleSheet.hairlineWidth },
   sectionLabel: { fontSize: 13, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
 
-  // Verse blocks
   verseBlock: { marginBottom: 20, alignItems: 'center' },
   verseBlockChaupai: { marginBottom: 24 },
   verseNumber: {
@@ -303,4 +342,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontStyle: 'italic',
   },
+
+  notFoundWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 40 },
+  notFoundText: { fontSize: 15, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
+  notFoundBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
+  notFoundBtnText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
 });

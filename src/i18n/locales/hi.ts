@@ -40,19 +40,21 @@ export default {
     fromYourFavourites: 'आपके पसंदीदा से',
     featuredAarti: 'विशेष आरती',
     featuredChalisa: 'विशेष चालीसा',
-    featuredKatha: 'विशेष कथा',
     forYourDeities: 'आपके इष्ट देवताओं के लिए',
     yourDeities: 'आपके इष्ट देव',
     yourDeitiesEmpty: 'अपने इष्ट देव चुनें ताकि होम फ़ीड व्यक्तिगत हो सके।',
     yourDeitiesManage: 'प्रबंधित करें',
     favorites: 'पसंदीदा',
     festivals: 'त्योहार',
-    todaysVratKatha: 'आज की व्रत कथा  ·  {{festival}}',
     findMuhuratTitle: 'शुभ मुहूर्त खोजें',
     findMuhuratDesc: 'विवाह, गृह प्रवेश, नामकरण — शास्त्रीय मुहूर्त नियम',
     aajKaRashifal: 'आज का राशिफल  ·  {{sign}}',
     aajKaRashifalGeneric: 'आज का राशिफल  ·  राशि चुनें',
     rashifalPickSign: 'अपनी राशि का आज का फल देखने के लिए टैप करें।',
+    dashaLink: {
+      label: 'विंशोत्तरी दशा',
+      description: 'आपकी 120-वर्षीय ग्रह-समय-सारणी',
+    },
   },
 
   // ── Panchang Screen ─────────────────────────────────────────────────────
@@ -114,66 +116,58 @@ export default {
   library: {
     godsTitle: 'भगवान',
     godsTitleEn: 'भगवान',
-    kathasTitle: 'कथाएँ',
-    kathasTitleEn: 'पवित्र कथाएँ',
-    kathaSegment: 'कथाएँ',
     godsSegment: 'भगवान',
-    kathaBadge: 'कथा',
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
   god: {
-    aartisCount: 'आरती ({{count}})',
-    chalisasCount: 'चालीसा ({{count}})',
-    kathasCount: 'कथा ({{count}})',
     aartiBadge: 'आरती',
     chalisaBadge: 'चालीसा',
-    kathaBadge: 'कथा',
     chaupaiCount: '{{count}} चौपाई',
     noContent: 'अभी कोई सामग्री उपलब्ध नहीं',
     deityNotFound: 'देवता नहीं मिले',
   },
 
-  // ── Aarti Detail ────────────────────────────────────────────────────────
+  // ── Aarti / Chalisa Detail ──────────────────────────────────────────────
   aarti: {
     readAlongMode: 'साथ पढ़ें मोड',
     comingSoon: 'जल्द आ रहा है!',
     comingSoonDesc: 'साथ पढ़ें मोड जल्द उपलब्ध होगा',
+    notFound: 'इस देवता की आरती उपलब्ध नहीं है।',
   },
-
-  // ── Katha Detail ────────────────────────────────────────────────────────
-  katha: {
-    badge: 'कथा',
+  chalisa: {
+    notFound: 'इस देवता की चालीसा उपलब्ध नहीं है।',
+  },
+  langToggle: {
+    english: 'English',
+    hindi: 'हिन्दी',
   },
 
   // ── Search Screen ───────────────────────────────────────────────────────
   search: {
-    placeholder: 'आरती, चालीसा, कथा खोजें…',
+    placeholder: 'आरती, चालीसा खोजें…',
     emptyTitle: 'खोज करें',
     emptyDesc: 'शीर्षक, लिप्यंतरण, या देवता नाम से खोजें',
     noResults: 'कोई परिणाम नहीं',
     noResultsFor: '"{{query}}" के लिए कुछ नहीं मिला',
     aartisSection: 'आरती  ·  {{count}}',
     chalisasSection: 'चालीसा  ·  {{count}}',
-    kathasSection: 'कथा  ·  {{count}}',
   },
 
   // ── Favorites Screen ────────────────────────────────────────────────────
   favorites: {
     title: 'पसंदीदा',
     emptyTitle: 'अभी कोई पसंदीदा नहीं',
-    emptyDesc: 'किसी भी आरती, चालीसा, या कथा पर ♡ दबाकर यहाँ सहेजें',
+    emptyDesc: 'किसी भी आरती या चालीसा पर ♡ दबाकर यहाँ सहेजें',
     browseLibrary: 'लाइब्रेरी देखें',
     aartiBadge: 'आरती',
     chalisaBadge: 'चालीसा',
-    kathaBadge: 'कथा',
   },
 
   // ── Festivals Screen ────────────────────────────────────────────────────
   festivals: {
     title: 'त्योहार और व्रत',
     noFestivals: '{{year}} के लिए कोई त्योहार नहीं मिला',
-    readKatha: 'कथा पढ़ें',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -200,7 +194,7 @@ export default {
     manageDeitiesCount: '{{count}} चयनित',
     manageDeitiesNone: 'कोई नहीं — चुनने के लिए टैप करें',
     manageDeitiesTitle: 'आपके इष्ट देव',
-    manageDeitiesDesc: 'आपके चुने हुए देवताओं की आरती, चालीसा व कथाएँ होम व खोज में पहले दिखेंगी। इसे कभी भी बदल सकते हैं।',
+    manageDeitiesDesc: 'आपके चुने हुए देवताओं की आरती व चालीसा होम व खोज में पहले दिखेंगी। इसे कभी भी बदल सकते हैं।',
     horoscope: 'राशिफल',
     birthDate: 'जन्म तिथि',
     birthDateNotSet: 'निर्धारित नहीं — चुनने के लिए टैप करें',
@@ -288,9 +282,41 @@ export default {
     step2Title: 'विस्तृत पंचांग',
     step2Desc: 'पंचांग के पाँचों अंग, सूर्योदय/सूर्यास्त, शुभ-अशुभ समय और ग्रह स्थिति — सब एक जगह।',
     step3Title: 'देवता, आरती और बहुत कुछ',
-    step3Desc: 'देवताओं को जानें, आरती, चालीसा और कथाएँ पढ़ें। पसंदीदा को बुकमार्क करें।',
+    step3Desc: 'देवताओं को जानें, आरती व चालीसा पढ़ें। पसंदीदा को बुकमार्क करें।',
     step4Title: 'अपना अनुभव बदलें',
     step4Desc: 'भाषा, थीम, फ़ॉन्ट आकार, स्थान और सूचना प्राथमिकताएँ यहाँ से बदलें।',
+  },
+
+  // ── Vimshottari Dasha ───────────────────────────────────────────────────
+  dasha: {
+    title: 'विंशोत्तरी दशा',
+    subtitle: '120-वर्षीय ग्रह-समय-सारणी',
+    birthDateLabel: 'आपकी जन्म तिथि',
+    setBirthDate: 'जन्म तिथि सेट करें',
+    changeBirthDate: 'बदलें',
+    currentLabel: 'वर्तमान',
+    mahadashaSuffix: 'महादशा',
+    antardashaSuffix: 'अंतर्दशा',
+    untilDate: '{{date}} तक',
+    dateRangeLong: '{{start}} – {{end}}',
+    yearsOne: '{{years}} वर्ष',
+    yearsOther: '{{years}} वर्ष',
+    fullCycle: 'सम्पूर्ण 120-वर्षीय चक्र',
+    antardashasHeader: 'अंतर्दशाएँ',
+    notSetPrompt: 'अपनी 120-वर्षीय विंशोत्तरी दशा देखने के लिए जन्म तिथि सेट करें।',
+    approxNote: 'आपकी पहली महादशा आंशिक शेष है — सटीक समय के लिए जन्म समय आवश्यक है, जो दर्ज नहीं है।',
+    birthDatePickerTitle: 'अपनी जन्म तिथि चुनें',
+    planet: {
+      sun: 'सूर्य',
+      moon: 'चंद्र',
+      mars: 'मंगल',
+      mercury: 'बुध',
+      jupiter: 'बृहस्पति',
+      venus: 'शुक्र',
+      saturn: 'शनि',
+      rahu: 'राहु',
+      ketu: 'केतु',
+    },
   },
 
   // ── Location Permission ─────────────────────────────────────────────────
@@ -331,7 +357,7 @@ export default {
 
   // ── Deity Names & Descriptions ──────────────────────────────────────────
   deities: {
-    ganesh:        { displayName: 'श्री गणेश जी',            description: 'विघ्नहर्ता, प्रथम पूज्य' },
+    ganesha:       { displayName: 'श्री गणेश जी',            description: 'विघ्नहर्ता, प्रथम पूज्य' },
     shiva:         { displayName: 'भगवान शिव',               description: 'महादेव, संहारकर्ता' },
     vishnu:        { displayName: 'भगवान विष्णु',            description: 'पालनहार, जगत के रक्षक' },
     hanuman:       { displayName: 'श्री हनुमान जी',          description: 'बजरंगबली, राम भक्त' },
@@ -343,20 +369,13 @@ export default {
     parvati:       { displayName: 'माँ पार्वती',             description: 'शिव अर्धांगिनी, जगदम्बा' },
     kali:          { displayName: 'माँ काली',                description: 'महाकाली, भयहारिणी' },
     surya:         { displayName: 'सूर्य देव',               description: 'सूर्य देव, प्रकाश दाता' },
-    kartikeya:     { displayName: 'भगवान कार्तिकेय',         description: 'देवसेनापति, षडानन' },
     brahma:        { displayName: 'भगवान ब्रह्मा',           description: 'सृष्टिकर्ता, चतुर्मुख' },
     'sai-baba':    { displayName: 'श्री साईं बाबा',          description: 'शिर्डी वाले, सबका मालिक एक' },
-    jagannath:     { displayName: 'भगवान जगन्नाथ',          description: 'जगत के नाथ, पुरी धाम' },
     'santoshi-mata': { displayName: 'संतोषी माता',           description: 'संतोष और सुख की देवी' },
-    radha:         { displayName: 'श्री राधा जी',            description: 'कृष्ण प्रिया, प्रेम स्वरूपा' },
     sita:          { displayName: 'माता सीता जी',            description: 'जानकी, राम अर्धांगिनी' },
-    venkateswara:  { displayName: 'भगवान वेंकटेश्वर',        description: 'तिरुपति बालाजी, कलियुग के देव' },
     'khatu-shyam': { displayName: 'श्री खाटू श्याम जी',     description: 'बर्बरीक, हारे का सहारा' },
-    ayyappa:       { displayName: 'भगवान अय्यप्पा',          description: 'शबरीमला के स्वामी, धर्मशास्ता' },
     'vaishno-devi': { displayName: 'माँ वैष्णो देवी',        description: 'त्रिकूट पर्वत वासिनी, जगजननी' },
     narasimha:     { displayName: 'भगवान नरसिंह',            description: 'प्रह्लाद रक्षक, उग्र अवतार' },
-    dattatreya:    { displayName: 'भगवान दत्तात्रेय',         description: 'त्रिदेव स्वरूप, अवधूत' },
-    ganga:         { displayName: 'माँ गंगा',                description: 'पतित पावनी, मोक्षदायिनी' },
   },
 
   // ── Rashifal Screen ─────────────────────────────────────────────────────
@@ -371,6 +390,14 @@ export default {
     notFound: 'राशि नहीं मिली',
     unavailable: 'इस तिथि का राशिफल अभी उपलब्ध नहीं है।',
     disclaimer: 'राशिफल मार्गदर्शन है, भविष्यवाणी नहीं। संकल्प और धर्म के साथ कार्य करें।',
+    chandraBalam: {
+      title: 'चंद्र बल',
+      subtitle: 'आपकी जन्म राशि से चंद्रमा की स्थिति',
+      house: 'गोचर चंद्रमा आपकी जन्म राशि से {{house}} स्थान में है',
+      approxNote: 'समय रहित जन्म तिथि पर आधारित — एक राशि तक की त्रुटि सम्भव।',
+      setBirthDatePrompt: 'चंद्र बल देखने के लिए सेटिंग्स में अपनी जन्म तिथि सेट करें।',
+      openSettings: 'सेटिंग्स खोलें',
+    },
     sign: {
       aries:       { name: 'मेष',     traits: 'मेढ़ा · अग्नि · मंगल स्वामी' },
       taurus:      { name: 'वृषभ',    traits: 'वृष · पृथ्वी · शुक्र स्वामी' },
