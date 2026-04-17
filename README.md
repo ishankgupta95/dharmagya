@@ -1,46 +1,28 @@
-# Welcome to your Expo app 👋
+# Dharmagya
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Hindu devotional app built with Expo + React Native. Panchang, aartis, chalisas, rashifal, muhurat, and vimshottari dasha — all offline-first.
 
-## Get started
+## Development
 
-1. Install dependencies
+```bash
+npm install
+npx expo start
+```
 
-   ```bash
-   npm install
-   ```
+## Build locally
 
-2. Start the app
+Requires Android SDK (set `ANDROID_HOME`), JDK, and `eas login`.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Build APK (Android)
-
-Requires Android SDK, NDK, and an Expo account (`eas login`).
+**APK** (sideload to any device — enable "Install from unknown sources"):
 
 ```bash
 EAS_LOCAL_BUILD_SKIP_CLEANUP=1 ANDROID_HOME=$HOME/Library/Android/sdk eas build --platform android --profile preview --local
 ```
 
-The APK will be output to the project root when done. Transfer it to any Android device and install directly (enable "Install from unknown sources" on the device).
-
-## Build AAB (Android, for Play Store)
-
-Same prerequisites as APK. Uses the `production` profile, which defaults to `app-bundle` output.
+**AAB** (for Play Store upload):
 
 ```bash
 EAS_LOCAL_BUILD_SKIP_CLEANUP=1 ANDROID_HOME=$HOME/Library/Android/sdk eas build --platform android --profile production --local
 ```
 
-The `.aab` will be output to the project root. Upload it to Google Play Console.
+Artifact lands in the project root. Bump `version` + `android.versionCode` in [app.json](app.json) before each Play Store build (`appVersionSource: "local"` in [eas.json](eas.json) means EAS reads them verbatim).
