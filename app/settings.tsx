@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, StyleSheet, Alert } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type FontSize, type MasaSystem } from '@/store/useStore';
+import { useStore, type FontSize, type MasaSystem, type Region } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { LANGUAGE_OPTIONS, resolveLanguage, changeLanguage, type AppLanguage } from '@/i18n';
 import {
@@ -17,7 +17,6 @@ import {
 } from '@/services/notifications';
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
-import { signFromBirthDate } from '@/utils/rashi';
 import { ymd } from '@/utils/calendar';
 
 // ─── Font size config ─────────────────────────────────────────────────────────
@@ -54,10 +53,10 @@ export default function SettingsScreen() {
     setSunriseAlertEnabled,
     masaSystem,
     setMasaSystem,
+    region,
+    setRegion,
     userBirthDate,
     setUserBirthDate,
-    userRashi,
-    setUserRashi,
     setWalkthroughStep,
     selectedDeities,
   } = useStore();
@@ -104,16 +103,11 @@ export default function SettingsScreen() {
   }
 
   function handleDobPick(date: Date) {
-    const iso = ymd(date);
-    setUserBirthDate(iso);
-    // Derive and store the rashi automatically so it flows to the Home card
-    // and Rashifal screen without a second tap.
-    setUserRashi(signFromBirthDate(date));
+    setUserBirthDate(ymd(date));
   }
 
   function handleDobClear() {
     setUserBirthDate(null);
-    setUserRashi(null);
   }
 
   const userBirthDateObj = userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null;
@@ -124,12 +118,6 @@ export default function SettingsScreen() {
         year: 'numeric',
       })
     : t('settings.birthDateNotSet');
-
-  // Surface a drift indicator when the user has a birth date AND has manually
-  // set userRashi to something different from what the DOB would derive. This
-  // prevents silent divergence between the two stored fields.
-  const derivedRashi = userBirthDateObj ? signFromBirthDate(userBirthDateObj) : null;
-  const rashiDrifted = !!derivedRashi && !!userRashi && userRashi !== derivedRashi;
 
   async function handleSunriseAlertToggle(val: boolean) {
     if (val) {
@@ -233,25 +221,26 @@ export default function SettingsScreen() {
 
         {/* ── Location ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.location')} colors={colors} />
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => router.push('/location-permission')}
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-
-          <SettingRow
-            icon="location-outline"
-            label={t('settings.gpsLocation')}
-            sublabel={locationText}
-            colors={colors}
-            right={
-              <View style={styles.locationRight}>
-                <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
-                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-              </View>
-            }
-          />
-
-        </TouchableOpacity>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push('/location-permission')}>
+            <SettingRow
+              icon="location-outline"
+              label={t('settings.gpsLocation')}
+              sublabel={locationText}
+              colors={colors}
+              right={
+                <View style={styles.locationRight}>
+                  <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
+                  <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                </View>
+              }
+            />
+          </TouchableOpacity>
+          <Divider colors={colors} />
+          <RegionRow region={region} onChange={setRegion} colors={colors} />
+        </View>
 
         {/* ── Deities ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.deities')} colors={colors} />
@@ -285,24 +274,6 @@ export default function SettingsScreen() {
               right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
-          {rashiDrifted && derivedRashi && userRashi && (
-            <>
-              <Divider colors={colors} />
-              <View style={styles.driftRow}>
-                <Text style={[styles.driftLabel, { color: colors.textSecondary }]}>
-                  {t('settings.rashiOverrideLabel', { sign: t(`rashifal.sign.${userRashi}.name`) })}
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setUserRashi(derivedRashi)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <Text style={[styles.driftLink, { color: colors.accent }]}>
-                    {t('settings.rashiResetToDerived', { derived: t(`rashifal.sign.${derivedRashi}.name`) })}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
         </View>
 
         {/* ── Notifications ─────────────────────────────────────────── */}
@@ -530,6 +501,104 @@ function MasaSystemPicker({ value, onChange, colors }: MasaSystemPickerProps) {
   );
 }
 
+// ─── Region Row ─────────────────────────────────────────────────────────────
+
+interface RegionGroup {
+  key: 'south' | 'east' | 'west' | 'north' | 'international';
+  regions: Region[];
+}
+
+// "All India" is a standalone top entry; the other 21 states are grouped by
+// cardinal direction following the FestivalRegion ordering in panchang-ts v2.1.
+const REGION_GROUPS: RegionGroup[] = [
+  { key: 'south', regions: ['tamil-nadu', 'kerala', 'karnataka', 'andhra-pradesh', 'telangana'] },
+  { key: 'east', regions: ['west-bengal', 'odisha', 'assam', 'bihar', 'jharkhand'] },
+  { key: 'west', regions: ['gujarat', 'maharashtra', 'goa', 'rajasthan'] },
+  { key: 'north', regions: ['punjab', 'haryana', 'himachal-pradesh', 'uttarakhand', 'uttar-pradesh', 'madhya-pradesh'] },
+  { key: 'international', regions: ['nepal'] },
+];
+
+function RegionRow({
+  region, onChange, colors,
+}: { region: Region; onChange: (r: Region) => void; colors: ColorPalette }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  function tr(r: Region): string {
+    return t(`settings.regionOptions.${r}`);
+  }
+
+  function renderRegionItem(r: Region) {
+    const active = r === region;
+    return (
+      <TouchableOpacity
+        key={r}
+        activeOpacity={0.7}
+        onPress={() => { onChange(r); setOpen(false); }}
+        style={[
+          styles.regionItem,
+          { borderBottomColor: colors.divider },
+          active && { backgroundColor: colors.accent + '22' },
+        ]}>
+        <Text style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+          {tr(r)}
+        </Text>
+        {active && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <>
+      <TouchableOpacity activeOpacity={0.7} onPress={() => setOpen(true)}>
+        <SettingRow
+          icon="compass-outline"
+          label={t('settings.region')}
+          sublabel={t('settings.regionDesc')}
+          colors={colors}
+          right={
+            <View style={styles.regionRight}>
+              <Text style={[styles.regionValue, { color: colors.textPrimary }]}>{tr(region)}</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+            </View>
+          }
+        />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={styles.regionOverlay}>
+          <View style={[styles.regionSheet, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
+              {t('settings.regionPickerTitle')}
+            </Text>
+            <ScrollView
+              style={styles.regionScroll}
+              contentContainerStyle={{ paddingBottom: 8 }}
+              showsVerticalScrollIndicator={false}>
+              {/* "All India" stays at the top, ungrouped. */}
+              {renderRegionItem('all')}
+
+              {REGION_GROUPS.map(group => (
+                <View key={group.key}>
+                  <Text style={[styles.regionGroupHeader, { color: colors.textMuted }]}>
+                    {t(`settings.regionGroup.${group.key}`)}
+                  </Text>
+                  {group.regions.map(renderRegionItem)}
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              onPress={() => setOpen(false)}
+              style={[styles.pickerDoneBtn, { backgroundColor: colors.accent, marginTop: 12 }]}>
+              <Text style={[styles.pickerDoneText, { color: colors.base }]}>{t('common.done')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 interface SectionHeaderProps {
@@ -633,13 +702,37 @@ const styles = StyleSheet.create({
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
 
-  driftRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
-  driftLabel: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
-  driftLink: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
-
   // Status dot
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   locationRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // Region picker
+  regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  regionValue: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  regionSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, maxHeight: '75%' },
+  regionSheetTitle: { fontSize: 16, fontFamily: 'Mukta_500Medium', marginBottom: 14, textAlign: 'center' },
+  regionScroll: { flexShrink: 1 },
+  regionGroupHeader: {
+    fontSize: 11,
+    fontFamily: 'Mukta_500Medium',
+    letterSpacing: 1.2,
+    marginTop: 14,
+    marginBottom: 4,
+    marginLeft: 14,
+  },
+  regionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+  },
+  regionItemLabel: { fontSize: 15, fontFamily: 'Mukta_400Regular' },
+  pickerDoneBtn: { borderRadius: borderRadius.button, paddingVertical: 14, alignItems: 'center' },
+  pickerDoneText: { fontSize: 15, fontFamily: 'Mukta_700Bold' },
 
   // Version text
   versionText: { fontSize: 13, fontFamily: 'Mukta_400Regular' },

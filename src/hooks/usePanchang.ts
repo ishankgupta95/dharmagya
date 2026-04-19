@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
-import { getDailyPanchang, type Language } from 'panchang-ts';
+import { getDailyPanchang, type FestivalRegion, type Language } from 'panchang-ts';
 
 import {
   FALLBACK_COORDS,
@@ -21,6 +21,7 @@ export function usePanchang(
   date: Date,
   location: { lat: number; lon: number } | null,
   language: Language = 'en',
+  region: FestivalRegion = 'all',
 ): UsePanchangResult {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [isFullyLoaded, setIsFullyLoaded] = useState(false);
@@ -44,8 +45,13 @@ export function usePanchang(
 
     // ── Pass 1: Fast — names only (~60–100ms on budget Android) ──────────────
     try {
-      const fast = getDailyPanchang(date, loc, { timezone, computeEndTimes: false, language });
+      const fast = getDailyPanchang(date, loc, { timezone, computeEndTimes: false, language, region });
       if (!cancelled) {
+        if (!fast) {
+          setError(true);
+          setLoading(false);
+          return;
+        }
         setPanchang(mapToPanchangDay(fast));
         setLoading(false);
       }
@@ -61,7 +67,8 @@ export function usePanchang(
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
       try {
-        const full = getDailyPanchang(date, loc, { timezone, computeEndTimes: true, language });
+        const full = getDailyPanchang(date, loc, { timezone, computeEndTimes: true, language, region });
+        if (!full) return;
         if (!cancelled) {
           const mapped = mapToPanchangDay(full);
           // Planetary positions are computed separately (CPU-heavy)
@@ -82,7 +89,7 @@ export function usePanchang(
       cancelled = true;
       handle.cancel();
     };
-  }, [date, lat, lon, language, retryCount]);
+  }, [date, lat, lon, language, region, retryCount]);
 
   return { panchang, isFullyLoaded, loading, error, retry };
 }

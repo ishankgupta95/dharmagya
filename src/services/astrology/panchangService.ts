@@ -3,6 +3,7 @@ import {
   getDailyPanchang,
   computePlanetaryPositions,
   type DailyPanchangResult,
+  type FestivalRegion,
   type Language,
 } from 'panchang-ts';
 
@@ -12,6 +13,10 @@ import type {
   IQualitySlot,
   IHoraSlot,
   IGrahaPosition,
+  IFestival,
+  IEclipse,
+  IBhadra,
+  FestivalType,
 } from '@/types';
 
 export const FALLBACK_COORDS = { lat: 25.3176, lon: 83.0103 }; // Varanasi (Kashi)
@@ -25,10 +30,6 @@ const RASHI_NAMES: Record<Language, string[]> = {
   hi: [
     'मेष', 'वृषभ', 'मिथुन', 'कर्क', 'सिंह', 'कन्या',
     'तुला', 'वृश्चिक', 'धनु', 'मकर', 'कुम्भ', 'मीन',
-  ],
-  sa: [
-    'मेषः', 'वृषभः', 'मिथुनम्', 'कर्कटः', 'सिंहः', 'कन्या',
-    'तुला', 'वृश्चिकः', 'धनुः', 'मकरः', 'कुम्भः', 'मीनः',
   ],
 };
 
@@ -47,19 +48,11 @@ const NAKSHATRA_NAMES: Record<Language, string[]> = {
     'मूल', 'पूर्वाषाढ़ा', 'उत्तराषाढ़ा', 'श्रवण', 'धनिष्ठा', 'शतभिषा',
     'पूर्वा भाद्रपद', 'उत्तरा भाद्रपद', 'रेवती',
   ],
-  sa: [
-    'अश्विनी', 'भरणी', 'कृत्तिका', 'रोहिणी', 'मृगशीर्षा', 'आर्द्रा',
-    'पुनर्वसु', 'पुष्यः', 'आश्लेषा', 'मघा', 'पूर्वफल्गुनी', 'उत्तरफल्गुनी',
-    'हस्तः', 'चित्रा', 'स्वाती', 'विशाखा', 'अनुराधा', 'ज्येष्ठा',
-    'मूलम्', 'पूर्वाषाढा', 'उत्तराषाढा', 'श्रवणः', 'धनिष्ठा', 'शतभिषा',
-    'पूर्वभाद्रपदा', 'उत्तरभाद्रपदा', 'रेवती',
-  ],
 };
 
 const GRAHA_NAMES: Record<Language, Record<string, string>> = {
   en: { Sun: 'Sun', Moon: 'Moon', Mars: 'Mars', Mercury: 'Mercury', Jupiter: 'Jupiter', Venus: 'Venus', Saturn: 'Saturn', Rahu: 'Rahu', Ketu: 'Ketu' },
   hi: { Sun: 'सूर्य', Moon: 'चंद्र', Mars: 'मंगल', Mercury: 'बुध', Jupiter: 'बृहस्पति', Venus: 'शुक्र', Saturn: 'शनि', Rahu: 'राहु', Ketu: 'केतु' },
-  sa: { Sun: 'सूर्यः', Moon: 'चन्द्रः', Mars: 'मङ्गलः', Mercury: 'बुधः', Jupiter: 'बृहस्पतिः', Venus: 'शुक्रः', Saturn: 'शनिः', Rahu: 'राहुः', Ketu: 'केतुः' },
 };
 
 // Dates from panchang-ts are offset-adjusted local display dates — read via getUTC*.
@@ -102,6 +95,54 @@ function toHoraSlots(
   }));
 }
 
+function ymdOf(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function mapFestivals(list: DailyPanchangResult['festivals']): IFestival[] {
+  // Collapse triple-emission Ekadashi: drop the generic 'ekadashi' entry when a
+  // smarta_ekadashi or vaishnava_ekadashi is already present for the same day.
+  const hasSubtype = list.some(
+    f => f.type === 'smarta_ekadashi' || f.type === 'vaishnava_ekadashi'
+  );
+  return list
+    .filter(f => !(hasSubtype && f.type === 'ekadashi'))
+    .map(f => ({
+      name: f.name,
+      type: f.type as FestivalType,
+      description: f.description,
+      deferralDate: f.deferralDate ? ymdOf(f.deferralDate) : undefined,
+    }));
+}
+
+function mapEclipse(e: DailyPanchangResult['eclipse']): IEclipse | null {
+  if (!e) return null;
+  return {
+    kind: e.kind,
+    subtype: e.subtype,
+    peak: formatTime(e.peak) ?? '',
+    start: formatTime(e.start) ?? '',
+    end: formatTime(e.end) ?? '',
+    sutakStart: formatTime(e.sutakStart) ?? '',
+    sutakEnd: formatTime(e.sutakEnd) ?? '',
+    visibleFromLocation: e.visibleFromLocation,
+    magnitude: e.magnitude,
+    description: e.description,
+  };
+}
+
+function mapBhadra(b: DailyPanchangResult['bhadra']): IBhadra | null {
+  if (!b) return null;
+  return {
+    start: formatTime(b.start) ?? '',
+    end: formatTime(b.end) ?? '',
+    location: b.location,
+  };
+}
+
 export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
   return {
     date: result.date,
@@ -136,6 +177,16 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
     moonset: formatTime(result.moonset),
     brahmaMuhurtaStart: formatTime(result.brahmaMuhurta.start),
     brahmaMuhurtaEnd: formatTime(result.brahmaMuhurta.end),
+    vijayaMuhurtaStart: formatTime(result.vijayaMuhurta.start),
+    vijayaMuhurtaEnd: formatTime(result.vijayaMuhurta.end),
+    godhuliMuhurtaStart: formatTime(result.godhuliMuhurta.start),
+    godhuliMuhurtaEnd: formatTime(result.godhuliMuhurta.end),
+    nishitaMuhurtaStart: formatTime(result.nishitaMuhurta.start),
+    nishitaMuhurtaEnd: formatTime(result.nishitaMuhurta.end),
+    amritKalaStart: result.amritKala ? formatTime(result.amritKala.start) : undefined,
+    amritKalaEnd: result.amritKala ? formatTime(result.amritKala.end) : undefined,
+    bhadra: mapBhadra(result.bhadra),
+    eclipse: mapEclipse(result.eclipse),
     panchaka: result.panchaka,
     dayDurationMinutes: result.dayDurationMinutes,
     nightDurationMinutes: result.nightDurationMinutes,
@@ -152,7 +203,7 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
       night: toHoraSlots(result.hora.night),
     },
     specialYogas: result.specialYogas.map(y => ({ name: y.name, type: y.type })),
-    festivals: result.festivals.map(f => ({ name: f.name })),
+    festivals: mapFestivals(result.festivals),
   };
 }
 
@@ -202,6 +253,7 @@ export async function fetchPanchang(
   savedCoords?: { lat: number; lon: number } | null,
   computeEndTimes = true,
   language: Language = 'en',
+  region: FestivalRegion = 'all',
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
@@ -209,8 +261,9 @@ export async function fetchPanchang(
     const result = getDailyPanchang(
       date,
       { latitude: coords.lat, longitude: coords.lon },
-      { timezone, computeEndTimes, language },
+      { timezone, computeEndTimes, language, region },
     );
+    if (!result) return null;
     return mapToPanchangDay(result);
   } catch {
     return null;
@@ -220,6 +273,7 @@ export async function fetchPanchang(
 export async function fetchPanchangForToday(
   savedCoords?: { lat: number; lon: number } | null,
   language: Language = 'en',
+  region: FestivalRegion = 'all',
 ): Promise<IPanchangDay | null> {
-  return fetchPanchang(new Date(), savedCoords, true, language);
+  return fetchPanchang(new Date(), savedCoords, true, language, region);
 }

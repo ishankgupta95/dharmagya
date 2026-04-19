@@ -11,7 +11,6 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useTranslation } from 'react-i18next';
@@ -24,9 +23,7 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
-import { signFromBirthDate } from '@/utils/rashi';
 import { DEITY_BY_ID } from '@/config/deities';
-import { type RashiSign } from '@/types';
 import type { IPanchangDay, IPanchangElement } from '@/types';
 import {
   getAllAppAartis,
@@ -81,13 +78,11 @@ export default function HomeScreen() {
   const userLocation = useStore(s => s.userLocation);
   const locationName = useStore(s => s.locationName);
   const language = useStore(s => s.language);
-  const userBirthDate = useStore(s => s.userBirthDate);
-  const userRashi = useStore(s => s.userRashi);
+  const region = useStore(s => s.region);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const selectedDeities = useStore(s => s.selectedDeities);
   const colors = isDarkMode ? darkColors : lightColors;
-  const db = useSQLiteContext();
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
 
@@ -97,7 +92,6 @@ export default function HomeScreen() {
   const [featuredAartiFromSelected, setFeaturedAartiFromSelected] = useState(false);
   const [featuredChalisa, setFeaturedChalisa] = useState<Chalisa | null>(null);
   const [featuredChalisaFromSelected, setFeaturedChalisaFromSelected] = useState(false);
-  const [rashifalExcerpt, setRashifalExcerpt] = useState<string | null>(null);
 
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
   const lastFetchRef = useRef(0);
@@ -109,10 +103,10 @@ export default function HomeScreen() {
     if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
     lastFetchRef.current = now;
     if (showSpinner) setPanchangLoading(true);
-    fetchPanchangForToday(userLocation, panchangLang)
+    fetchPanchangForToday(userLocation, panchangLang, region)
       .then(p => { if (p) setPanchang(p); })
       .finally(() => setPanchangLoading(false));
-  }, [userLocation, panchangLang]);
+  }, [userLocation, panchangLang, region]);
 
   // Initial load
   useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
@@ -127,34 +121,6 @@ export default function HomeScreen() {
     });
     return () => sub.remove();
   }, [refreshPanchang]);
-
-  // ── Today's Rashifal ─────────────────────────────────────────────────────
-  const userSign: RashiSign | null = useMemo(() => {
-    if (userRashi) return userRashi;
-    if (userBirthDate) return signFromBirthDate(new Date(userBirthDate + 'T12:00:00'));
-    return null;
-  }, [userRashi, userBirthDate]);
-
-  useEffect(() => {
-    if (!userSign) {
-      setRashifalExcerpt(null);
-      return;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const preferredLang = lang === 'hi' ? 'hi' : 'en';
-    const row =
-      db.getFirstSync<{ body: string }>(
-        'SELECT body FROM rashifal WHERE date = ? AND sign = ? AND language = ? LIMIT 1',
-        [ymd, userSign, preferredLang]
-      )
-      ?? db.getFirstSync<{ body: string }>(
-        'SELECT body FROM rashifal WHERE date = ? AND sign = ? AND language = ? LIMIT 1',
-        [ymd, userSign, 'en']
-      );
-    setRashifalExcerpt(row?.body ?? null);
-  }, [db, userSign, lang]);
 
   // ── Featured Aarti / Chalisa ─────────────────────────────────────────────
   // Ranking: explicit favorites (aarti only, existing behavior) → content where
@@ -339,26 +305,6 @@ export default function HomeScreen() {
               </Text>
             )}
           </LinearGradient>
-        </TouchableOpacity>
-
-        {/* ── Today's Rashifal Card ─────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => router.push(userSign ? `/rashifal/${userSign}` : '/rashifal')}
-          style={[styles.rashifalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.rashifalTopRow}>
-            <Text style={[styles.vratCardLabel, { color: colors.accent }]}>
-              {userSign
-                ? t('home.aajKaRashifal', { sign: t(`rashifal.sign.${userSign}.name`) })
-                : t('home.aajKaRashifalGeneric')}
-            </Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-          </View>
-          <Text
-            style={[styles.rashifalExcerpt, { color: colors.textPrimary }]}
-            numberOfLines={2}>
-            {rashifalExcerpt ?? t('home.rashifalPickSign')}
-          </Text>
         </TouchableOpacity>
 
         {/* ── Dasha link ────────────────────────────────────────────────── */}
@@ -665,16 +611,6 @@ const styles = StyleSheet.create({
   sunSep: { width: 0.5, height: 20, marginHorizontal: 12 },
 
   errorText: { fontSize: 13, fontFamily: 'Mukta_400Regular', textAlign: 'center', paddingVertical: 16 },
-
-  // Rashifal card
-  rashifalCard: {
-    borderRadius: borderRadius.card,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
-  },
-  rashifalTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  rashifalExcerpt: { fontSize: 14, fontFamily: 'Mukta_400Regular', lineHeight: 20 },
 
   // Dasha link card
   dashaLinkCard: {

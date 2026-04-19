@@ -7,22 +7,30 @@ import festivalsData from '@/data/static/festivals.json';
 // observance (e.g. "Ekadashi" instead of just the festival name).
 const FESTIVAL_NAME_TO_VRAT: Record<string, VratType> = {
   Ekadashi: 'ekadashi',
+  'Smarta Ekadashi': 'ekadashi',
+  'Vaishnava Ekadashi': 'ekadashi',
   'Pradosha Vrata': 'pradosha',
   'Sharad Purnima': 'purnima',
   'Guru Purnima': 'purnima',
   'Kartika Purnima': 'purnima',
   'Mahalaya Amavasya': 'amavasya',
   'Maha Shivaratri': 'shivaratri',
+  'Masik Shivaratri': 'shivaratri',
   'Karva Chauth': 'karwa_chauth',
   'Krishna Janmashtami': 'janmashtami',
   'Sharad Navaratri': 'navratri',
   'Durga Ashtami': 'navratri',
   'Maha Navami': 'navratri',
+  'Sankashti Chaturthi': 'sankashti',
 };
 
 // Map festival TYPE (broader) as a fallback when name lookup fails.
+// panchang-ts v2 splits ekadashi into smarta_ekadashi / vaishnava_ekadashi —
+// both map back to the single 'ekadashi' vrat bucket we surface.
 const FESTIVAL_TYPE_TO_VRAT: Record<string, VratType> = {
   ekadashi: 'ekadashi',
+  smarta_ekadashi: 'ekadashi',
+  vaishnava_ekadashi: 'ekadashi',
   pradosha: 'pradosha',
 };
 

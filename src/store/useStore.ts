@@ -3,10 +3,41 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from 'expo-sqlite/kv-store';
 
 import type { AppLanguage } from '@/i18n';
-import type { RashiSign } from '@/types';
 
 export type FontSize = 'small' | 'normal' | 'large' | 'xl';
 export type MasaSystem = 'purnimanta' | 'amanta';
+
+/** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
+ *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
+ *  state-slug naming. Default 'all' emits every regional variant. */
+export type Region =
+  | 'all'
+  // South
+  | 'tamil-nadu'
+  | 'kerala'
+  | 'karnataka'
+  | 'andhra-pradesh'
+  | 'telangana'
+  // East
+  | 'west-bengal'
+  | 'odisha'
+  | 'assam'
+  | 'bihar'
+  | 'jharkhand'
+  // West
+  | 'gujarat'
+  | 'maharashtra'
+  | 'goa'
+  | 'rajasthan'
+  // North
+  | 'punjab'
+  | 'haryana'
+  | 'himachal-pradesh'
+  | 'uttarakhand'
+  | 'uttar-pradesh'
+  | 'madhya-pradesh'
+  // International
+  | 'nepal';
 
 // Tithi-based recurring reminders (1 day before, 7 PM evening).
 export type TithiReminderKey =
@@ -62,13 +93,12 @@ interface AppStore {
   fontSize: FontSize;
   language: AppLanguage;
   masaSystem: MasaSystem;
+  region: Region;
   dailyReminderEnabled: boolean;
   sunriseAlertEnabled: boolean;
   reminderPrefs: ReminderPrefs;
   /** ISO YYYY-MM-DD, or null if not set. */
   userBirthDate: string | null;
-  /** Manually-selected rashi (fallback when DOB not set). */
-  userRashi: RashiSign | null;
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
@@ -82,12 +112,12 @@ interface AppStore {
   setFontSize: (size: FontSize) => void;
   setLanguage: (lang: AppLanguage) => void;
   setMasaSystem: (system: MasaSystem) => void;
+  setRegion: (region: Region) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
   setTithiReminder: (key: TithiReminderKey, val: boolean) => void;
   setFestivalReminder: (key: FestivalReminderKey, val: boolean) => void;
   setUserBirthDate: (iso: string | null) => void;
-  setUserRashi: (sign: RashiSign | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
 }
@@ -104,11 +134,11 @@ export const useStore = create<AppStore>()(
       fontSize: 'normal',
       language: 'system' as AppLanguage,
       masaSystem: 'purnimanta' as MasaSystem,
+      region: 'all' as Region,
       dailyReminderEnabled: false,
       sunriseAlertEnabled: false,
       reminderPrefs: DEFAULT_REMINDER_PREFS,
       userBirthDate: null,
-      userRashi: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
 
@@ -125,6 +155,7 @@ export const useStore = create<AppStore>()(
       setFontSize: (size) => set({ fontSize: size }),
       setLanguage: (lang) => set({ language: lang }),
       setMasaSystem: (system) => set({ masaSystem: system }),
+      setRegion: (region) => set({ region }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
       setTithiReminder: (key, val) =>
@@ -142,14 +173,13 @@ export const useStore = create<AppStore>()(
           },
         })),
       setUserBirthDate: (iso) => set({ userBirthDate: iso }),
-      setUserRashi: (sign) => set({ userRashi: sign }),
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
     }),
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 4,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -224,6 +254,27 @@ export const useStore = create<AppStore>()(
               if (!migrated.includes(next)) migrated.push(next);
             }
             state.favoriteIds = migrated;
+          }
+        }
+
+        // v2 → v3: Rashifal feature removed. Strip persisted `userRashi` field.
+        if (version < 3) {
+          delete (state as Record<string, unknown>).userRashi;
+        }
+
+        // v3 → v4: panchang-ts v2.1 renamed regions to state-slug scheme.
+        // Map legacy values to canonical ones so the store stays in sync with
+        // the new Region union (even though the library still accepts the old
+        // strings with a deprecation warning).
+        if (version < 4) {
+          const LEGACY_REGION_MAP: Record<string, Region> = {
+            tamil: 'tamil-nadu',
+            bengal: 'west-bengal',
+            'north-india': 'all',
+          };
+          const r = state.region as string | undefined;
+          if (r && r in LEGACY_REGION_MAP) {
+            state.region = LEGACY_REGION_MAP[r];
           }
         }
 

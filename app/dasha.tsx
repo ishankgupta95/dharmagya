@@ -15,7 +15,6 @@ import {
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
-import { signFromBirthDate } from '@/utils/rashi';
 import { ymd } from '@/utils/calendar';
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
@@ -49,7 +48,6 @@ export default function DashaScreen() {
   const isDarkMode = useStore(s => s.isDarkMode);
   const userBirthDate = useStore(s => s.userBirthDate);
   const setUserBirthDate = useStore(s => s.setUserBirthDate);
-  const setUserRashi = useStore(s => s.setUserRashi);
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -75,12 +73,10 @@ export default function DashaScreen() {
 
   function handlePickDate(date: Date) {
     setUserBirthDate(ymd(date));
-    setUserRashi(signFromBirthDate(date));
   }
 
   function handleClearDate() {
     setUserBirthDate(null);
-    setUserRashi(null);
   }
 
   const birthDateLabel = birthDate

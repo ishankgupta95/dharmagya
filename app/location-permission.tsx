@@ -19,6 +19,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { INDIAN_CITIES, type City } from '@/config/cities';
+import { regionFromStateCode } from '@/utils/regionFromLocation';
 
 /** Find the nearest city within ~30 km of given coordinates. */
 function findNearestCity(lat: number, lon: number): City | null {
@@ -42,7 +43,19 @@ function findNearestCity(lat: number, lon: number): City | null {
 export default function LocationPickerScreen() {
   const { t } = useTranslation();
   const { isDarkMode, setUserLocation, userLocation, locationName } = useStore();
+  const region = useStore(s => s.region);
+  const setRegion = useStore(s => s.setRegion);
   const colors = isDarkMode ? darkColors : lightColors;
+
+  /** Auto-set the user's Region from a matched city's state code — but only
+   *  when they haven't made a deliberate Settings choice yet (region === 'all').
+   *  Respects the "region = cultural identity, not current location" semantic
+   *  so travel doesn't silently reshuffle their festivals. */
+  function maybeAutoSetRegion(city: City) {
+    if (region !== 'all') return;
+    const derived = regionFromStateCode(city.state);
+    if (derived) setRegion(derived);
+  }
 
   const [query, setQuery] = useState('');
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -67,6 +80,7 @@ export default function LocationPickerScreen() {
         const match = findNearestCity(latitude, longitude);
         const name = match ? `${match.name}, ${match.state}` : 'GPS';
         setUserLocation({ lat: latitude, lon: longitude }, name);
+        if (match) maybeAutoSetRegion(match);
         router.back();
       }
     } finally {
@@ -77,6 +91,7 @@ export default function LocationPickerScreen() {
   function handleSelectCity(city: City) {
     Keyboard.dismiss();
     setUserLocation({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
+    maybeAutoSetRegion(city);
     router.back();
   }
 

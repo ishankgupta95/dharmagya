@@ -357,7 +357,7 @@ function DatePickerOverlay({
                     <View style={[styles.miniFestivalBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
                       <Ionicons name="star" size={13} color="#F9A825" />
                       <Text style={[styles.miniFestivalText, { color: '#F57F17' }]}>
-                        {pickerPanchang.festivals.map(f => f.name).join(', ')}
+                        {pickerPanchang.festivals.map(f => f.description ?? f.name).join(', ')}
                       </Text>
                     </View>
                   )}
@@ -417,13 +417,14 @@ export default function PanchangScreen() {
   const language = useStore(s => s.language);
   const masaSystem = useStore(s => s.masaSystem);
   const setMasaSystem = useStore(s => s.setMasaSystem);
+  const region = useStore(s => s.region);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const panchangLang = resolveLanguage(language);
-  const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang);
+  const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang, region);
 
   // ── Walkthrough ref & measurement ──────────────────────────────────────
   const panchaAngaRef = useRef<View>(null);
@@ -455,7 +456,7 @@ export default function PanchangScreen() {
   async function handlePickDate(date: Date) {
     setPickerDate(date);
     setPickerLoading(true);
-    const result = await fetchPanchang(date, userLocation, true, panchangLang);
+    const result = await fetchPanchang(date, userLocation, true, panchangLang, region);
     setPickerLoading(false);
     setPickerPanchang(result);
   }
@@ -559,7 +560,9 @@ export default function PanchangScreen() {
             {panchang.festivals.length > 0 && panchang.festivals.map((f, i) => (
               <View key={i} style={[styles.panchakaBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
                 <Ionicons name="star" size={14} color="#F9A825" />
-                <Text style={[styles.panchakaText, { color: '#F57F17' }]}>{f.name}</Text>
+                <Text style={[styles.panchakaText, { color: '#F57F17' }]}>
+                  {f.description ?? f.name}
+                </Text>
               </View>
             ))}
             {panchang.specialYogas.length > 0 && panchang.specialYogas.map((y, i) => (
@@ -662,6 +665,42 @@ export default function PanchangScreen() {
                 </Text>
               </View>
             )}
+            {panchang.vijayaMuhurtaStart && panchang.vijayaMuhurtaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.vijayaMuhurta')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.vijayaMuhurtaStart} – {panchang.vijayaMuhurtaEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.godhuliMuhurtaStart && panchang.godhuliMuhurtaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.godhuliMuhurta')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.godhuliMuhurtaStart} – {panchang.godhuliMuhurtaEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.nishitaMuhurtaStart && panchang.nishitaMuhurtaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.nishitaMuhurta')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.nishitaMuhurtaStart} – {panchang.nishitaMuhurtaEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.amritKalaStart && panchang.amritKalaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.amritKala')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.amritKalaStart} – {panchang.amritKalaEnd}
+                </Text>
+              </View>
+            )}
 
             {/* ── Inauspicious Times ── */}
             <SectionHeader title={t('panchang.inauspiciousTimes')} colors={colors} />
@@ -702,6 +741,55 @@ export default function PanchangScreen() {
                 </Text>
               </View>
             ))}
+            {panchang.bhadra && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Ionicons name="warning-outline" size={16} color={panchang.bhadra.location === 'earth' ? '#F44336' : '#FF9800'} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.bhadra')}</Text>
+                  <Text style={[styles.bhadraNote, { color: colors.textSecondary }]}>
+                    {t(`panchang.bhadra${panchang.bhadra.location === 'earth' ? 'Earth' : panchang.bhadra.location === 'heaven' ? 'Heaven' : 'Paatal'}`)}
+                  </Text>
+                </View>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.bhadra.start} – {panchang.bhadra.end}
+                </Text>
+              </View>
+            )}
+
+            {/* ── Eclipse (Grahan) ── */}
+            {panchang.eclipse && (
+              <>
+                <SectionHeader title={t('panchang.eclipseSection')} colors={colors} />
+                <View style={[styles.eclipseCard, { backgroundColor: '#3A1E1E', borderColor: '#8A3A3A' }]}>
+                  <View style={styles.eclipseHeader}>
+                    <Ionicons
+                      name={panchang.eclipse.kind === 'solar' ? 'sunny' : 'moon'}
+                      size={18}
+                      color="#E8893C"
+                    />
+                    <Text style={[styles.eclipseTitle, { color: '#FFE4C4' }]}>
+                      {panchang.eclipse.kind === 'solar' ? t('panchang.eclipseSolar') : t('panchang.eclipseLunar')}
+                      {'  ·  '}
+                      {t(`panchang.eclipseSubtype.${panchang.eclipse.subtype}`)}
+                    </Text>
+                  </View>
+                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                    {t('panchang.eclipseWindow', { start: panchang.eclipse.start, end: panchang.eclipse.end })}
+                  </Text>
+                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                    {t('panchang.eclipsePeak', { time: panchang.eclipse.peak })}
+                    {'  ·  '}
+                    {t('panchang.eclipseMagnitude', { value: panchang.eclipse.magnitude.toFixed(2) })}
+                  </Text>
+                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                    {t('panchang.eclipseSutak', { start: panchang.eclipse.sutakStart, end: panchang.eclipse.sutakEnd })}
+                  </Text>
+                  <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? '#5DCAA5' : '#BFA68A' }]}>
+                    {panchang.eclipse.visibleFromLocation ? t('panchang.eclipseVisible') : t('panchang.eclipseNotVisible')}
+                  </Text>
+                </View>
+              </>
+            )}
 
             {/* ── Time Slots ── */}
             <SectionHeader title={t('panchang.timeQuality')} colors={colors} />
@@ -819,6 +907,14 @@ const styles = StyleSheet.create({
   rahuBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   rahuLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, flex: 1 },
   rahuTime: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  bhadraNote: { fontSize: 11, fontFamily: 'Mukta_400Regular', marginTop: 2 },
+
+  // Eclipse card
+  eclipseCard: { borderRadius: borderRadius.card, borderWidth: 1, padding: 14, marginBottom: 12, gap: 6 },
+  eclipseHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  eclipseTitle: { fontSize: 14, fontFamily: 'Mukta_700Bold' },
+  eclipseRow: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  eclipseVisibility: { fontSize: 12, fontFamily: 'Mukta_500Medium', marginTop: 4 },
 
   // Section header
   sectionHeader: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1.2, marginTop: 16, marginBottom: 8 },

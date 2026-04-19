@@ -1,0 +1,3 @@
+{
+  "_comment": "Manual additions merged into festivals.json at generation time. Use sparingly — prefer fixing upstream in panchang-ts. Keyed as year -> 'YYYY-MM-DD' -> [{ name, type, description? }]."
+}

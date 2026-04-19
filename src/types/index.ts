@@ -1,30 +1,3 @@
-/** Western tropical zodiac signs — used for daily Rashifal. Stored as lowercase keys in DB. */
-export type RashiSign =
-  | 'aries'
-  | 'taurus'
-  | 'gemini'
-  | 'cancer'
-  | 'leo'
-  | 'virgo'
-  | 'libra'
-  | 'scorpio'
-  | 'sagittarius'
-  | 'capricorn'
-  | 'aquarius'
-  | 'pisces';
-
-export const ALL_RASHI_SIGNS: RashiSign[] = [
-  'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
-  'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces',
-];
-
-export interface IRashifal {
-  date: string; // YYYY-MM-DD
-  sign: RashiSign;
-  language: string; // 'en' | 'hi'
-  body: string;
-}
-
 export type VratType =
   | 'ekadashi'
   | 'pradosha'
@@ -64,9 +37,48 @@ export interface ISpecialYoga {
   type: string;
 }
 
+/** Festival type — mirrors panchang-ts v2 FestivalInfo.type. */
+export type FestivalType =
+  | 'major'
+  | 'minor'
+  | 'ekadashi'
+  | 'smarta_ekadashi'
+  | 'vaishnava_ekadashi'
+  | 'pradosha'
+  | 'sankranti'
+  | 'eclipse';
+
 /** A festival or observance for the day. */
 export interface IFestival {
   name: string;
+  type: FestivalType;
+  /** Classical/specific name, e.g. "Saphala Ekadashi" for a generic Ekadashi. */
+  description?: string;
+  /** Smarta-only: when Ekadashi is Dashami-viddha, the Dwadashi fast day (ISO yyyy-mm-dd). */
+  deferralDate?: string;
+}
+
+/** Solar or lunar eclipse overlapping the Hindu day. */
+export interface IEclipse {
+  kind: 'solar' | 'lunar';
+  subtype: 'partial' | 'total' | 'annular' | 'penumbral';
+  /** Formatted "h:mm AM/PM" times. */
+  peak: string;
+  start: string;
+  end: string;
+  sutakStart: string;
+  sutakEnd: string;
+  visibleFromLocation: boolean;
+  magnitude: number;
+  description: string;
+}
+
+/** Bhadra Kala (Vishti Karana) window overlapping the Hindu day. */
+export interface IBhadra {
+  start: string;
+  end: string;
+  /** 'earth' is malefic for all work; 'heaven'/'paatal' are milder. */
+  location: 'earth' | 'heaven' | 'paatal';
 }
 
 /** Sidereal position of a graha. */
@@ -124,6 +136,16 @@ export interface IPanchangDay {
   moonset?: string;
   brahmaMuhurtaStart?: string;
   brahmaMuhurtaEnd?: string;
+  vijayaMuhurtaStart?: string;
+  vijayaMuhurtaEnd?: string;
+  godhuliMuhurtaStart?: string;
+  godhuliMuhurtaEnd?: string;
+  nishitaMuhurtaStart?: string;
+  nishitaMuhurtaEnd?: string;
+  amritKalaStart?: string;
+  amritKalaEnd?: string;
+  bhadra?: IBhadra | null;
+  eclipse?: IEclipse | null;
   panchaka: boolean;
   dayDurationMinutes: number;
   nightDurationMinutes: number;

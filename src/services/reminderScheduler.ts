@@ -38,13 +38,25 @@ const FESTIVAL_REMINDER_HOUR = 20;
 
 type FestivalEntry = { name: string; type: string };
 
+function isEkadashi(f: FestivalEntry): boolean {
+  return (
+    f.type === 'ekadashi' ||
+    f.type === 'smarta_ekadashi' ||
+    f.type === 'vaishnava_ekadashi'
+  );
+}
+
 const TITHI_MATCHES: Record<TithiReminderKey, (f: FestivalEntry) => boolean> = {
-  ekadashi: (f) => f.type === 'ekadashi',
+  ekadashi: isEkadashi,
   pradosha: (f) => f.type === 'pradosha',
   purnima: (f) => f.name.toLowerCase().includes('purnima'),
   amavasya: (f) => f.name.toLowerCase().includes('amavasya'),
   sankashti: (f) => f.name.toLowerCase().includes('sankashti') || f.name.toLowerCase().includes('ganesh chaturthi'),
-  shivaratri: (f) => f.name.toLowerCase().includes('shivaratri') || f.name.toLowerCase().includes('shivratri'),
+  shivaratri: (f) =>
+    f.name.toLowerCase().includes('shivaratri') ||
+    f.name.toLowerCase().includes('shivratri') ||
+    // v2 emits "Masik Shivaratri" for monthly observance
+    f.name.toLowerCase().includes('masik shivaratri'),
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,8 +139,16 @@ export function enumerateReminders(
         }
 
         // ── Festival-category reminders ────────────────────────────────────
-        const festivalKey = f.type as FestivalReminderKey;
-        if (prefs.festival[festivalKey]) {
+        // Normalize v2 subtypes (smarta_ekadashi, vaishnava_ekadashi) into the
+        // single user-facing 'ekadashi' bucket. 'eclipse' is always notified
+        // under 'major' (can't turn off — rare and high-signal).
+        const festivalKey: FestivalReminderKey | null =
+          f.type === 'smarta_ekadashi' || f.type === 'vaishnava_ekadashi'
+            ? 'ekadashi'
+            : f.type === 'eclipse'
+              ? 'major'
+              : (f.type as FestivalReminderKey);
+        if (festivalKey && prefs.festival[festivalKey]) {
           const fireAt = eveningBefore(observance, FESTIVAL_REMINDER_HOUR);
           if (fireAt.getTime() >= nowMs && fireAt.getTime() <= cutoffMs) {
             out.push({
