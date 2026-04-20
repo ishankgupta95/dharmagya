@@ -157,9 +157,6 @@ export default {
 
   // ── Aarti / Chalisa Detail ──────────────────────────────────────────────
   aarti: {
-    readAlongMode: 'साथ पढ़ें मोड',
-    comingSoon: 'जल्द आ रहा है!',
-    comingSoonDesc: 'साथ पढ़ें मोड जल्द उपलब्ध होगा',
     notFound: 'इस देवता की आरती उपलब्ध नहीं है।',
   },
   chalisa: {
@@ -170,7 +167,6 @@ export default {
     chalisaLabel: 'चालीसा',
     verseLabel: 'पद {{num}}',
     refrainTag: 'टेक',
-    playerMeta: 'साथ पढ़ें · जल्द आ रहा है',
   },
   langToggle: {
     english: 'English',

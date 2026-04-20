@@ -434,9 +434,7 @@ export default function HomeScreen() {
                     {t(`deities.${featuredAarti.deity}.displayName`)}
                   </Text>
                 </View>
-                <View style={styles.playBtn}>
-                  <Icon name="play" size={14} color={palette.parchmentBright} />
-                </View>
+                <Icon name="chevron-right" size={18} color={colors.textMuted} />
               </View>
               {aartiVersePeek && (
                 <>
@@ -817,19 +815,6 @@ const styles = StyleSheet.create({
   featHiTitle: { fontSize: 18 },
   featEnTitle: { fontSize: 12.5, marginTop: 2 },
   featMeta: { fontSize: 9, marginTop: 6 },
-  playBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: palette.sindoor,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: palette.sindoor,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
-  },
   versePeekRule: { marginTop: 14, marginBottom: 10 },
   versePeek: {
     fontSize: 13.5,

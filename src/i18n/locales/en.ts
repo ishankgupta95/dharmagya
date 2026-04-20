@@ -157,9 +157,6 @@ export default {
 
   // ── Aarti / Chalisa Detail ──────────────────────────────────────────────
   aarti: {
-    readAlongMode: 'Read Along Mode',
-    comingSoon: 'Coming Soon!',
-    comingSoonDesc: 'Read Along Mode is on the way',
     notFound: 'Aarti not available for this deity.',
   },
   chalisa: {
@@ -170,7 +167,6 @@ export default {
     chalisaLabel: 'Chalisa',
     verseLabel: 'Verse {{num}}',
     refrainTag: 'refrain',
-    playerMeta: 'Read along · Coming soon',
   },
   langToggle: {
     english: 'English',
