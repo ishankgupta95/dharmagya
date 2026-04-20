@@ -7,28 +7,37 @@ import { HapticTab } from '@/components/haptic-tab';
 import { AppText } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { palette } from '@/config/theme';
+import { useStore } from '@/store/useStore';
 
-const ACTIVE_COLOR = palette.goldLeaf;
-const INACTIVE_COLOR = 'rgba(243,229,200,0.55)';
+const ACTIVE_DARK = palette.goldLeaf;
+const INACTIVE_DARK = 'rgba(243,229,200,0.55)';
+const ACTIVE_LIGHT = palette.sindoor;
+const INACTIVE_LIGHT = palette.inkQuiet;
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const isDark = useStore((s) => s.isDarkMode);
+
+  const activeColor = isDark ? ACTIVE_DARK : ACTIVE_LIGHT;
+  const inactiveColor = isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
+  const barBg = isDark ? 'rgba(43,26,15,0.94)' : 'rgba(251,243,222,0.96)';
+  const barBorder = isDark ? 'rgba(201,155,58,0.22)' : 'rgba(156,118,35,0.22)';
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarActiveTintColor: ACTIVE_COLOR,
-        tabBarInactiveTintColor: INACTIVE_COLOR,
+        tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: inactiveColor,
         tabBarStyle: {
-          // Floating dark pill. Solid dark at 94% opacity — RN can't do
+          // Floating pill. Solid at 94–96% opacity — RN can't do
           // backdrop-filter, so the bg is just near-opaque.
-          backgroundColor: 'rgba(43,26,15,0.94)',
+          backgroundColor: barBg,
           borderTopWidth: 0,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(201,155,58,0.22)',
+          borderColor: barBorder,
           borderRadius: 22,
           height: 60,
           marginHorizontal: 18,
@@ -38,7 +47,7 @@ export default function TabLayout() {
           // Soft shadow — iOS reads this; Android uses elevation.
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.28,
+          shadowOpacity: isDark ? 0.28 : 0.16,
           shadowRadius: 14,
           elevation: 10,
           // Intentionally not absolute — keeps screens' bottom insets correct
@@ -63,21 +72,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: t('tabs.home'),
-          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} name="home" />,
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="home" />,
         }}
       />
       <Tabs.Screen
         name="panchang"
         options={{
           title: t('tabs.panchang'),
-          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} name="calendar" />,
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="calendar" />,
         }}
       />
       <Tabs.Screen
         name="library"
         options={{
           title: t('tabs.gods'),
-          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} name="people" />,
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="people" />,
         }}
       />
     </Tabs>
@@ -87,15 +96,17 @@ export default function TabLayout() {
 function TabIcon({
   focused,
   color,
+  emberColor,
   name,
 }: {
   focused: boolean;
   color: string;
+  emberColor: string;
   name: IconName;
 }) {
   return (
     <View style={styles.iconSlot}>
-      {focused && <View style={styles.ember} />}
+      {focused && <View style={[styles.ember, { backgroundColor: emberColor, shadowColor: emberColor }]} />}
       <Icon name={name} size={22} color={color} />
     </View>
   );
@@ -119,8 +130,6 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: palette.goldLeaf,
-    shadowColor: palette.goldLeaf,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 4,

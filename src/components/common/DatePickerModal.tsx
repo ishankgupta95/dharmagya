@@ -11,6 +11,12 @@ import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from './AppText';
 import { buildCalendarCells, isSameDay } from '@/utils/calendar';
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 import { borderRadius, type ColorPalette } from '@/config/theme';
 
 /**
@@ -277,39 +283,48 @@ export function DatePickerModal({
                 ))}
               </View>
 
-              {/* Calendar cells */}
+              {/* Calendar cells — rendered as rows of 7 with flex:1 cells so
+                  iOS percentage rounding can't push the 7th cell to a new row. */}
               <View style={styles.calGrid}>
-                {cells.map((cell, idx) => {
-                  if (cell === null) return <View key={`blank-${idx}`} style={styles.cell} />;
-                  const cellDate = new Date(year, month, cell);
-                  const isSelected = value ? isSameDay(cellDate, value) : false;
-                  const col = idx % 7;
-                  const isWeekend = col === 0 || col === 6;
-                  const isFuture = !!maxDate && cellDate > maxDate;
-                  const textColor = isSelected
-                    ? colors.base
-                    : isFuture ? colors.textDisabled
-                    : isWeekend ? colors.textDisabled : colors.textSecondary;
-
-                  return (
-                    <TouchableOpacity
-                      key={cell}
-                      style={styles.cell}
-                      disabled={isFuture}
-                      onPress={() => handlePick(cellDate)}
-                      accessibilityRole="button"
-                      accessibilityLabel={cellDate.toDateString()}
-                      accessibilityState={{ selected: isSelected, disabled: isFuture }}>
-                      <View style={[
-                        styles.cellInner,
-                        isSelected && { backgroundColor: colors.accent },
-                        isFuture && { opacity: 0.35 },
-                      ]}>
-                        <Text style={[styles.dayNum, { color: textColor }]}>{cell}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                {chunk(cells, 7).map((row, ri) => (
+                  <View key={ri} style={styles.calRowGrid}>
+                    {row.map((cell, ci) => {
+                      const idx = ri * 7 + ci;
+                      if (cell === null) {
+                        return <View key={`blank-${idx}`} style={styles.cell} />;
+                      }
+                      const cellDate = new Date(year, month, cell);
+                      const isSelected = value ? isSameDay(cellDate, value) : false;
+                      const isWeekend = ci === 0 || ci === 6;
+                      const isFuture = !!maxDate && cellDate > maxDate;
+                      const textColor = isSelected
+                        ? colors.base
+                        : isFuture ? colors.textDisabled
+                        : isWeekend ? colors.textDisabled : colors.textSecondary;
+                      return (
+                        <TouchableOpacity
+                          key={cell}
+                          style={styles.cell}
+                          disabled={isFuture}
+                          onPress={() => handlePick(cellDate)}
+                          accessibilityRole="button"
+                          accessibilityLabel={cellDate.toDateString()}
+                          accessibilityState={{ selected: isSelected, disabled: isFuture }}>
+                          <View style={[
+                            styles.cellInner,
+                            isSelected && { backgroundColor: colors.accent },
+                            isFuture && { opacity: 0.35 },
+                          ]}>
+                            <Text style={[styles.dayNum, { color: textColor }]}>{cell}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {row.length < 7 && Array.from({ length: 7 - row.length }, (_, i) => (
+                      <View key={`pad-${ri}-${i}`} style={styles.cell} />
+                    ))}
+                  </View>
+                ))}
               </View>
 
               <View style={styles.bottomRow}>
@@ -379,8 +394,9 @@ const styles = StyleSheet.create({
   calRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   dayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 0.5 },
 
-  calGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
-  cell: { width: `${100 / 7}%`, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
+  calGrid: { marginBottom: 16 },
+  calRowGrid: { flexDirection: 'row' },
+  cell: { flex: 1, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
   cellInner: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   dayNum: { fontSize: 14, fontFamily: 'JetBrainsMono_500Medium' },
 

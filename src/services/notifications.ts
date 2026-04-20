@@ -1,6 +1,13 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import i18n from '@/i18n';
 import { vratFestivalNameForDate } from '@/utils/vrat';
+import { applyQuietHoursShift } from '@/utils/format';
+
+export interface QuietHours {
+  enabled: boolean;
+  startHHmm: string;
+  endHHmm: string;
+}
 
 // expo-notifications Android push support was removed from Expo Go in SDK 53.
 // Skip the require entirely in Expo Go to prevent the native error overlay.
@@ -42,7 +49,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return status === 'granted';
 }
 
-// ─── Daily Reminder (7:00 AM) ─────────────────────────────────────────────────
+// ─── Daily Reminder (user-configurable time) ─────────────────────────────────
 //
 // We schedule one DATE-triggered notification per day for the next
 // DAILY_REMINDER_HORIZON_DAYS days, instead of a single recurring DAILY trigger.
@@ -75,7 +82,18 @@ function dailyReminderBody(triggerDate: Date): string {
   return i18n.t('notifications.dailyReminderBody');
 }
 
-export async function scheduleDailyReminder(): Promise<boolean> {
+function parseHHmm(timeHHmm: string): { hour: number; minute: number } {
+  const [h, m] = timeHHmm.split(':').map((n) => parseInt(n, 10));
+  return {
+    hour: Number.isFinite(h) && h >= 0 && h < 24 ? h : 7,
+    minute: Number.isFinite(m) && m >= 0 && m < 60 ? m : 0,
+  };
+}
+
+export async function scheduleDailyReminder(
+  timeHHmm: string = '07:00',
+  quietHours?: QuietHours,
+): Promise<boolean> {
   if (!Notifications) return false;
   const granted = await requestNotificationPermission();
   if (!granted) return false;
@@ -83,13 +101,22 @@ export async function scheduleDailyReminder(): Promise<boolean> {
   // Clear the legacy single-shot recurring notification from earlier builds.
   await Notifications.cancelScheduledNotificationAsync(LEGACY_DAILY_REMINDER_ID).catch(() => {});
 
+  const { hour, minute } = parseHHmm(timeHHmm);
   const now = new Date();
   for (let i = 0; i < DAILY_REMINDER_HORIZON_DAYS; i++) {
-    const triggerDate = new Date(now);
+    let triggerDate = new Date(now);
     triggerDate.setDate(triggerDate.getDate() + i);
-    triggerDate.setHours(7, 0, 0, 0);
+    triggerDate.setHours(hour, minute, 0, 0);
 
-    // Skip if this 7 AM has already passed for today.
+    if (quietHours?.enabled) {
+      triggerDate = applyQuietHoursShift(triggerDate, {
+        enabled: true,
+        startHHmm: quietHours.startHHmm,
+        endHHmm: quietHours.endHHmm,
+      });
+    }
+
+    // Skip if this trigger has already passed today.
     if (triggerDate.getTime() <= now.getTime()) continue;
 
     const id = dailyReminderIdFor(triggerDate);
@@ -125,16 +152,27 @@ export async function cancelDailyReminder(): Promise<void> {
 // ─── Sunrise Alert ────────────────────────────────────────────────────────────
 
 /**
- * Schedule a daily notification at the given sunrise hour:minute.
- * sunriseTime is a formatted string like "06:12 AM".
+ * Schedule a daily notification at the given sunrise hour:minute, optionally
+ * fired `offsetMin` minutes BEFORE sunrise so users have time to prepare.
+ * `sunriseTime` is a formatted string like "06:12 AM".
  */
-export async function scheduleSunriseAlert(sunriseTime: string): Promise<boolean> {
+export async function scheduleSunriseAlert(
+  sunriseTime: string,
+  offsetMin: number = 0,
+): Promise<boolean> {
   if (!Notifications) return false;
   const granted = await requestNotificationPermission();
   if (!granted) return false;
 
   const parsed = parseSunriseTime(sunriseTime);
   if (!parsed) return false;
+
+  // Apply the user's "minutes before sunrise" offset.
+  let totalMinutes = parsed.hour * 60 + parsed.minute - Math.max(0, offsetMin);
+  // Wrap around to previous day if the offset pushes us before midnight.
+  if (totalMinutes < 0) totalMinutes += 24 * 60;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
 
   await Notifications.cancelScheduledNotificationAsync(SUNRISE_ALERT_ID).catch(() => {});
 
@@ -146,8 +184,8 @@ export async function scheduleSunriseAlert(sunriseTime: string): Promise<boolean
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: parsed.hour,
-      minute: parsed.minute,
+      hour,
+      minute,
     },
   });
   return true;

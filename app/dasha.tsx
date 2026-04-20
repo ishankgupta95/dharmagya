@@ -17,7 +17,7 @@ import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPale
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
-import { NightCard } from '@/components/common/NightCard';
+import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { ymd } from '@/utils/calendar';
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
@@ -50,15 +50,21 @@ export default function DashaScreen() {
   const { t, i18n } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const userBirthDate = useStore(s => s.userBirthDate);
+  const userBirthTime = useStore(s => s.userBirthTime);
   const setUserBirthDate = useStore(s => s.setUserBirthDate);
   const colors = isDarkMode ? darkColors : lightColors;
+  const plinth = usePlinthColors();
 
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const birthDate = useMemo<Date | null>(
-    () => (userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null),
-    [userBirthDate]
-  );
+  const birthDate = useMemo<Date | null>(() => {
+    if (!userBirthDate) return null;
+    // Use birth time if available so the moon longitude (and thus the
+    // starting nakshatra/dasha balance) is calculated accurately. Without a
+    // time we fall back to noon, which can shift the dasha by hours.
+    const timePart = userBirthTime ? `${userBirthTime}:00` : '12:00:00';
+    return new Date(`${userBirthDate}T${timePart}`);
+  }, [userBirthDate, userBirthTime]);
 
   const dasha = useMemo(() => {
     if (!birthDate) return null;
@@ -169,16 +175,16 @@ export default function DashaScreen() {
             {/* Current mahadasha summary — night plinth card */}
             <View style={styles.currentWrap}>
               <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
-                <Kicker color={palette.goldLeaf} size={10}>
+                <Kicker color={plinth.accent} size={10}>
                   {t('dasha.currentLabel')}
                 </Kicker>
-                <Text variant="display-italic" style={styles.currentMahaLord}>
+                <Text variant="display-italic" style={[styles.currentMahaLord, { color: plinth.text }]}>
                   {t(`dasha.planet.${DASHA_LORD_TO_KEY[dasha.currentMahaDashaLord]}`)} {t('dasha.mahadashaSuffix')}
                 </Text>
                 {(() => {
                   const md = dasha.mahaDashas[dasha.currentIndex];
                   return md ? (
-                    <Text variant="mono" style={styles.currentUntil}>
+                    <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
                       {t('dasha.untilDate', { date: formatRangeDate(md.endDate, i18n.language) })}
                     </Text>
                   ) : null;
@@ -186,11 +192,11 @@ export default function DashaScreen() {
 
                 {currentAntardasha && (
                   <>
-                    <View style={styles.currentDivider} />
-                    <Text variant="body-italic" style={styles.currentAntardasha}>
+                    <View style={[styles.currentDivider, { backgroundColor: plinth.divider }]} />
+                    <Text variant="body-italic" style={[styles.currentAntardasha, { color: plinth.text }]}>
                       {t(`dasha.planet.${DASHA_LORD_TO_KEY[currentAntardasha.lord]}`)} {t('dasha.antardashaSuffix')}
                     </Text>
-                    <Text variant="mono" style={styles.currentUntil}>
+                    <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
                       {t('dasha.untilDate', { date: formatRangeDate(currentAntardasha.endDate, i18n.language) })}
                     </Text>
                   </>
@@ -386,20 +392,17 @@ const styles = StyleSheet.create({
   currentMahaLord: {
     fontSize: 26,
     lineHeight: 32,
-    color: palette.boneWhite,
     marginTop: 10,
     marginBottom: 4,
   },
-  currentUntil: { fontSize: 11, color: 'rgba(243,229,200,0.62)', letterSpacing: 0.2 },
+  currentUntil: { fontSize: 11, letterSpacing: 0.2 },
   currentDivider: {
     height: StyleSheet.hairlineWidth,
     marginVertical: 14,
-    backgroundColor: 'rgba(201,155,58,0.25)',
   },
   currentAntardasha: {
     fontSize: 16,
     lineHeight: 22,
-    color: palette.boneWhite,
     marginBottom: 4,
   },
 

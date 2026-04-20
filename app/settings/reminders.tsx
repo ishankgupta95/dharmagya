@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ import {
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
+import { TimePickerModal } from '@/components/common/TimePickerModal';
+import { useLocaleFormatters } from '@/utils/format';
 
 const TITHI_KEYS: TithiReminderKey[] = ['ekadashi', 'pradosha', 'purnima', 'amavasya', 'sankashti', 'shivaratri'];
 const FESTIVAL_KEYS: FestivalReminderKey[] = ['major', 'minor', 'ekadashi', 'pradosha', 'sankranti'];
@@ -42,14 +44,23 @@ export default function RemindersScreen() {
   const prefs = useStore(s => s.reminderPrefs);
   const setTithi = useStore(s => s.setTithiReminder);
   const setFestival = useStore(s => s.setFestivalReminder);
+  const tithiReminderTime = useStore(s => s.tithiReminderTime);
+  const festivalReminderTime = useStore(s => s.festivalReminderTime);
+  const setTithiReminderTime = useStore(s => s.setTithiReminderTime);
+  const setFestivalReminderTime = useStore(s => s.setFestivalReminderTime);
+  const { formatTime: formatDisplayTime } = useLocaleFormatters();
 
-  // Debounce: reschedule after the user stops tapping toggles for 300ms.
+  const [tithiTimePickerOpen, setTithiTimePickerOpen] = useState(false);
+  const [festivalTimePickerOpen, setFestivalTimePickerOpen] = useState(false);
+
+  // Debounce: reschedule after the user stops tapping toggles or changing
+  // times for 300ms.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (hasAnyReminderEnabled(prefs)) {
-        void rescheduleReminders(prefs);
+        void rescheduleReminders(prefs, { tithi: tithiReminderTime, festival: festivalReminderTime });
       } else {
         void cancelAllReminders();
       }
@@ -57,7 +68,7 @@ export default function RemindersScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [prefs]);
+  }, [prefs, tithiReminderTime, festivalReminderTime]);
 
   async function handleTithiToggle(key: TithiReminderKey, val: boolean) {
     if (val && !hasAnyReminderEnabled(prefs)) {
@@ -113,9 +124,16 @@ export default function RemindersScreen() {
               value={prefs.tithi[key]}
               onChange={(v) => handleTithiToggle(key, v)}
               colors={colors}
-              showDivider={i < TITHI_KEYS.length - 1}
+              showDivider
             />
           ))}
+          <TimeRow
+            icon="clock"
+            label={t('reminders.tithiTimeLabel')}
+            value={formatDisplayTime(tithiReminderTime)}
+            onPress={() => setTithiTimePickerOpen(true)}
+            colors={colors}
+          />
         </View>
 
         {/* ── Festival Category Reminders ─────────────────────────────── */}
@@ -130,9 +148,16 @@ export default function RemindersScreen() {
               value={prefs.festival[key]}
               onChange={(v) => handleFestivalToggle(key, v)}
               colors={colors}
-              showDivider={i < FESTIVAL_KEYS.length - 1}
+              showDivider
             />
           ))}
+          <TimeRow
+            icon="clock"
+            label={t('reminders.festivalTimeLabel')}
+            value={formatDisplayTime(festivalReminderTime)}
+            onPress={() => setFestivalTimePickerOpen(true)}
+            colors={colors}
+          />
         </View>
 
         <Text variant="body-italic" style={[styles.footer, { color: colors.textMuted }]}>
@@ -141,7 +166,54 @@ export default function RemindersScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <TimePickerModal
+        visible={tithiTimePickerOpen}
+        onClose={() => setTithiTimePickerOpen(false)}
+        value={tithiReminderTime}
+        onPick={setTithiReminderTime}
+        title={t('reminders.tithiTimePickerTitle')}
+      />
+
+      <TimePickerModal
+        visible={festivalTimePickerOpen}
+        onClose={() => setFestivalTimePickerOpen(false)}
+        value={festivalReminderTime}
+        onPick={setFestivalReminderTime}
+        title={t('reminders.festivalTimePickerTitle')}
+      />
     </SafeAreaView>
+  );
+}
+
+interface TimeRowProps {
+  icon: IconName;
+  label: string;
+  value: string;
+  onPress: () => void;
+  colors: ColorPalette;
+}
+
+function TimeRow({ icon, label, value, onPress, colors }: TimeRowProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}>
+      <View style={styles.row}>
+        <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
+          <Icon name={icon} size={16} color={colors.accent} />
+        </View>
+        <View style={styles.rowText}>
+          <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
+        </View>
+        <Text variant="body-italic" style={{ color: colors.textPrimary, fontSize: 13, marginRight: 6 }}>
+          {value}
+        </Text>
+        <Icon name="chevron-right" size={14} color={colors.textMuted} />
+      </View>
+    </TouchableOpacity>
   );
 }
 

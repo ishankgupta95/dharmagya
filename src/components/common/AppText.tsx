@@ -6,10 +6,12 @@ import type { FontSize } from '@/store/useStore';
 import { typeScale } from '@/config/theme';
 
 export const FONT_SCALE: Record<FontSize, number> = {
-  small: 0.82,
+  small: 0.85,
   normal: 1.0,
-  large: 1.5,
-  xl: 1.9,
+  medium: 1.15,
+  large: 1.3,
+  xl: 1.5,
+  xxl: 1.75,
 };
 
 const fontSizeSelector = (s: { fontSize: FontSize }) => s.fontSize;

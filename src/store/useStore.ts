@@ -4,8 +4,9 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 
 import type { AppLanguage } from '@/i18n';
 
-export type FontSize = 'small' | 'normal' | 'large' | 'xl';
+export type FontSize = 'small' | 'normal' | 'medium' | 'large' | 'xl' | 'xxl';
 export type MasaSystem = 'purnimanta' | 'amanta';
+export type TimeFormat = 'auto' | '12h' | '24h';
 
 /** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
  *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
@@ -95,10 +96,34 @@ interface AppStore {
   masaSystem: MasaSystem;
   region: Region;
   dailyReminderEnabled: boolean;
+  /** HH:mm in 24h. */
+  dailyReminderTime: string;
   sunriseAlertEnabled: boolean;
+  /** Minutes BEFORE sunrise the alert should fire. */
+  sunriseAlertOffsetMin: number;
   reminderPrefs: ReminderPrefs;
+  /** HH:mm in 24h — when tithi reminders fire on the evening before. */
+  tithiReminderTime: string;
+  /** HH:mm in 24h — when festival reminders fire on the evening before. */
+  festivalReminderTime: string;
+  /** Render numbers (dates, times, counts) in Devanagari (०-९). */
+  useDevanagariNumerals: boolean;
+  /** 'auto' = let device locale decide; otherwise force 12h/24h. */
+  timeFormat: TimeFormat;
+  /** When true, suppress notifications during the configured quiet window. */
+  quietHoursEnabled: boolean;
+  /** HH:mm 24h — quiet window start. */
+  quietHoursStart: string;
+  /** HH:mm 24h — quiet window end. */
+  quietHoursEnd: string;
+  /** Show the Vikram Samvat year in panchang headers. */
+  showVikramSamvat: boolean;
   /** ISO YYYY-MM-DD, or null if not set. */
   userBirthDate: string | null;
+  /** HH:mm in 24h, or null if not set. Used to refine Vimshottari dasha balance. */
+  userBirthTime: string | null;
+  /** Birth coordinates + label, or null if not set. */
+  userBirthPlace: { lat: number; lon: number; name: string } | null;
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
@@ -114,10 +139,22 @@ interface AppStore {
   setMasaSystem: (system: MasaSystem) => void;
   setRegion: (region: Region) => void;
   setDailyReminderEnabled: (val: boolean) => void;
+  setDailyReminderTime: (timeHHmm: string) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
+  setSunriseAlertOffsetMin: (min: number) => void;
   setTithiReminder: (key: TithiReminderKey, val: boolean) => void;
   setFestivalReminder: (key: FestivalReminderKey, val: boolean) => void;
+  setTithiReminderTime: (timeHHmm: string) => void;
+  setFestivalReminderTime: (timeHHmm: string) => void;
+  setUseDevanagariNumerals: (val: boolean) => void;
+  setTimeFormat: (fmt: TimeFormat) => void;
+  setQuietHoursEnabled: (val: boolean) => void;
+  setQuietHoursStart: (timeHHmm: string) => void;
+  setQuietHoursEnd: (timeHHmm: string) => void;
+  setShowVikramSamvat: (val: boolean) => void;
   setUserBirthDate: (iso: string | null) => void;
+  setUserBirthTime: (hhmm: string | null) => void;
+  setUserBirthPlace: (place: { lat: number; lon: number; name: string } | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
 }
@@ -136,9 +173,21 @@ export const useStore = create<AppStore>()(
       masaSystem: 'purnimanta' as MasaSystem,
       region: 'all' as Region,
       dailyReminderEnabled: false,
+      dailyReminderTime: '07:00',
       sunriseAlertEnabled: false,
+      sunriseAlertOffsetMin: 0,
       reminderPrefs: DEFAULT_REMINDER_PREFS,
+      tithiReminderTime: '19:00',
+      festivalReminderTime: '20:00',
+      useDevanagariNumerals: false,
+      timeFormat: 'auto' as TimeFormat,
+      quietHoursEnabled: false,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '06:00',
+      showVikramSamvat: true,
       userBirthDate: null,
+      userBirthTime: null,
+      userBirthPlace: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
 
@@ -157,7 +206,17 @@ export const useStore = create<AppStore>()(
       setMasaSystem: (system) => set({ masaSystem: system }),
       setRegion: (region) => set({ region }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
+      setDailyReminderTime: (timeHHmm) => set({ dailyReminderTime: timeHHmm }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
+      setSunriseAlertOffsetMin: (min) => set({ sunriseAlertOffsetMin: min }),
+      setTithiReminderTime: (timeHHmm) => set({ tithiReminderTime: timeHHmm }),
+      setFestivalReminderTime: (timeHHmm) => set({ festivalReminderTime: timeHHmm }),
+      setUseDevanagariNumerals: (val) => set({ useDevanagariNumerals: val }),
+      setTimeFormat: (fmt) => set({ timeFormat: fmt }),
+      setQuietHoursEnabled: (val) => set({ quietHoursEnabled: val }),
+      setQuietHoursStart: (timeHHmm) => set({ quietHoursStart: timeHHmm }),
+      setQuietHoursEnd: (timeHHmm) => set({ quietHoursEnd: timeHHmm }),
+      setShowVikramSamvat: (val) => set({ showVikramSamvat: val }),
       setTithiReminder: (key, val) =>
         set((s) => ({
           reminderPrefs: {
@@ -173,13 +232,15 @@ export const useStore = create<AppStore>()(
           },
         })),
       setUserBirthDate: (iso) => set({ userBirthDate: iso }),
+      setUserBirthTime: (hhmm) => set({ userBirthTime: hhmm }),
+      setUserBirthPlace: (place) => set({ userBirthPlace: place }),
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
     }),
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -276,6 +337,14 @@ export const useStore = create<AppStore>()(
           if (r && r in LEGACY_REGION_MAP) {
             state.region = LEGACY_REGION_MAP[r];
           }
+        }
+
+        // v4 → v5: font size scale was re-graded with finer mid-steps. The old
+        // 'large' (1.5) is now 'xl', and old 'xl' (1.9) is closest to new 'xxl' (1.75).
+        if (version < 5) {
+          const f = state.fontSize as string | undefined;
+          if (f === 'large') state.fontSize = 'xl';
+          else if (f === 'xl') state.fontSize = 'xxl';
         }
 
         return state as AppStore;

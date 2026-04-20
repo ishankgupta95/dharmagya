@@ -76,7 +76,9 @@ export type IconName =
   | 'stop-circle'
   | 'swap-horizontal'
   | 'walk'
-  | 'warning';
+  | 'warning'
+  | 'chat'
+  | 'shield';
 
 interface IconProps extends Omit<SvgProps, 'color'> {
   name: IconName;
@@ -617,6 +619,23 @@ function Glyph({ name, color }: GlyphProps) {
           <Line x1={12} y1={10} x2={12} y2={14.5} />
           <Line x1={12} y1={17} x2={12} y2={17.5} />
         </G>
+      );
+    case 'chat':
+      // Speech bubble with a tail at the bottom-left.
+      return (
+        <G fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round">
+          <Path d="M4 5 H20 V16 H10 L5.5 20 V16 H4 Z" />
+        </G>
+      );
+    case 'shield':
+      return (
+        <Path
+          d="M12 3 L20 6 V12 C20 16.5 16.5 19.5 12 21 C7.5 19.5 4 16.5 4 12 V6 Z"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.4}
+          strokeLinejoin="round"
+        />
       );
     default:
       return null;

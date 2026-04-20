@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, semanticColors, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
-import { NightCard } from '@/components/common/NightCard';
+import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import {
   ALL_OCCASIONS,
   scanAuspiciousDays,
@@ -385,6 +385,7 @@ function DayRow({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  const plinth = usePlinthColors();
   const weekday = match.date.toLocaleDateString('en-IN', { weekday: 'short' });
   const dayNum = match.date.getDate();
   const month = MONTH_NAMES[match.date.getMonth()];
@@ -462,8 +463,8 @@ function DayRow({
             <NightCard padding={12} showMandala={false} bracketInset={6} style={styles.slotsPlinth}>
               {bestSlots.map((s, i) => (
                 <View key={i} style={styles.slotRow}>
-                  <Text variant="body-italic" style={styles.slotName}>{s.label}</Text>
-                  <Text variant="mono" style={styles.slotTime}>
+                  <Text variant="body-italic" style={[styles.slotName, { color: plinth.text }]}>{s.label}</Text>
+                  <Text variant="mono" style={[styles.slotTime, { color: plinth.accent }]}>
                     {s.start} – {s.end}
                   </Text>
                 </View>
@@ -608,8 +609,8 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 12, marginBottom: 4 },
   slotsPlinth: { marginTop: 2 },
   slotRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  slotName: { fontSize: 13, lineHeight: 18, color: palette.boneWhite },
-  slotTime: { fontSize: 12, lineHeight: 16, color: palette.goldLeaf },
+  slotName: { fontSize: 13, lineHeight: 18 },
+  slotTime: { fontSize: 12, lineHeight: 16 },
 
   rahuRow: {
     flexDirection: 'row',

@@ -28,7 +28,7 @@ import {
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
-import { NightCard } from '@/components/common/NightCard';
+import { NightCard, usePlinthColors, type PlinthColors } from '@/components/common/NightCard';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { Ornament } from '@/components/common/Ornament';
@@ -261,6 +261,8 @@ export default function HomeScreen() {
 
   const skipWalkthrough = useCallback(() => setWalkthroughStep(0), [setWalkthroughStep]);
 
+  const plinth = usePlinthColors();
+
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
       <ScrollView
@@ -317,16 +319,16 @@ export default function HomeScreen() {
           <NightCard padding={20} mandalaSize={220} mandalaOpacity={0.09}>
             <View style={styles.phHead}>
               <View>
-                <Kicker color={palette.goldLeaf} size={9.5}>
+                <Kicker color={plinth.accent} size={9.5}>
                   {t('home.panchangKicker')}
                 </Kicker>
-                <Text variant="deva-bold" style={styles.phTitle}>
+                <Text variant="deva-bold" style={[styles.phTitle, { color: plinth.text }]}>
                   {t('home.panchangTitleDeva')}
                 </Text>
               </View>
-              <View style={styles.locBadge}>
-                <Icon name="location" size={10} color="rgba(243,229,200,0.7)" />
-                <Text variant="mono-caps" style={styles.locText} numberOfLines={1}>
+              <View style={[styles.locBadge, { backgroundColor: plinth.badgeBg, borderColor: plinth.badgeBorder }]}>
+                <Icon name="location" size={10} color={plinth.badgeText} />
+                <Text variant="mono-caps" style={[styles.locText, { color: plinth.badgeText }]} numberOfLines={1}>
                   {locationName ?? (userLocation ? 'GPS' : 'Varanasi')}
                 </Text>
               </View>
@@ -337,30 +339,32 @@ export default function HomeScreen() {
             ) : panchang ? (
               <>
                 <View style={styles.phRows}>
-                  <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)} />
-                  <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} />
-                  <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} />
-                  <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} last />
+                  <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)} plinth={plinth} />
+                  <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} plinth={plinth} />
+                  <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} plinth={plinth} />
+                  <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} plinth={plinth} last />
                 </View>
 
-                <Ornament variant="diamond" tone="dark" style={styles.phDivider} />
+                <Ornament variant="diamond" tone={isDarkMode ? 'dark' : 'light'} style={styles.phDivider} />
 
                 <View style={styles.phSun}>
                   <SunItem
                     icon="sun"
                     label={t('home.sunrise')}
                     value={panchang.sunrise}
+                    plinth={plinth}
                   />
-                  <View style={styles.phSunSep} />
+                  <View style={[styles.phSunSep, { backgroundColor: plinth.divider }]} />
                   <SunItem
                     icon="moon"
                     label={t('home.sunset')}
                     value={panchang.sunset}
+                    plinth={plinth}
                   />
                 </View>
               </>
             ) : (
-              <Text variant="body-italic" style={styles.errorText}>
+              <Text variant="body-italic" style={[styles.errorText, { color: plinth.textMuted }]}>
                 {t('home.couldNotLoadPanchang')}
               </Text>
             )}
@@ -595,24 +599,25 @@ export default function HomeScreen() {
 interface PanchangRowProps {
   label: string;
   el: IPanchangElement | undefined;
+  plinth: PlinthColors;
   last?: boolean;
 }
 
-const PanchangRow = memo(function PanchangRow({ label, el, last }: PanchangRowProps) {
+const PanchangRow = memo(function PanchangRow({ label, el, plinth, last }: PanchangRowProps) {
   const { t } = useTranslation();
   if (!el) return null;
   const isDeva = DEVA_RE.test(el.name);
   return (
-    <View style={[styles.phRow, last && styles.phRowLast]}>
-      <Text variant="mono-caps" style={styles.phLbl}>{label}</Text>
+    <View style={[styles.phRow, { borderBottomColor: plinth.divider }, last && styles.phRowLast]}>
+      <Text variant="mono-caps" style={[styles.phLbl, { color: plinth.textMuted }]}>{label}</Text>
       <Text
         variant={isDeva ? 'deva' : 'body-italic'}
-        style={styles.phVal}
+        style={[styles.phVal, { color: plinth.text }]}
         numberOfLines={1}>
         {el.name}
       </Text>
       {el.endTime ? (
-        <Text variant="mono" style={styles.phTime}>
+        <Text variant="mono" style={[styles.phTime, { color: plinth.accent }]}>
           {t('home.untilTime', { time: el.endTime })}
         </Text>
       ) : (
@@ -626,17 +631,18 @@ interface SunItemProps {
   icon: IconName;
   label: string;
   value: string;
+  plinth: PlinthColors;
 }
 
-const SunItem = memo(function SunItem({ icon, label, value }: SunItemProps) {
+const SunItem = memo(function SunItem({ icon, label, value, plinth }: SunItemProps) {
   return (
     <View style={styles.phSunItem}>
-      <View style={styles.phSunIc}>
-        <Icon name={icon} size={13} color={palette.goldLeaf} />
+      <View style={[styles.phSunIc, { backgroundColor: plinth.iconBg }]}>
+        <Icon name={icon} size={13} color={plinth.accent} />
       </View>
       <View>
-        <Text variant="mono-caps" style={styles.phSunK}>{label}</Text>
-        <Text variant="mono" style={styles.phSunV}>{value}</Text>
+        <Text variant="mono-caps" style={[styles.phSunK, { color: plinth.textMuted }]}>{label}</Text>
+        <Text variant="mono" style={[styles.phSunV, { color: plinth.text }]}>{value}</Text>
       </View>
     </View>
   );
@@ -666,8 +672,6 @@ const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: Quic
 });
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
-const DARK_BONE_TEXT = 'rgba(243,229,200,0.72)';
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -719,7 +723,6 @@ const styles = StyleSheet.create({
   },
   phTitle: {
     fontSize: 18,
-    color: palette.boneWhite,
     marginTop: 4,
   },
   locBadge: {
@@ -727,7 +730,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     borderWidth: 1,
-    borderColor: 'rgba(201,155,58,0.5)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
@@ -735,7 +737,6 @@ const styles = StyleSheet.create({
   },
   locText: {
     fontSize: 10,
-    color: 'rgba(243,229,200,0.88)',
   },
   phRows: { marginTop: 2 },
   phRow: {
@@ -743,22 +744,18 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(201,155,58,0.16)',
   },
   phRowLast: { borderBottomWidth: 0 },
   phLbl: {
     width: 78,
     fontSize: 9.5,
-    color: DARK_BONE_TEXT,
   },
   phVal: {
     flex: 1,
     fontSize: 15,
-    color: palette.boneWhite,
   },
   phTime: {
     fontSize: 11,
-    color: palette.goldLeaf,
     marginLeft: 8,
   },
   phDivider: { marginVertical: 10 },
@@ -777,21 +774,18 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(217,106,40,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  phSunK: { fontSize: 9, color: DARK_BONE_TEXT },
-  phSunV: { fontSize: 13, color: palette.boneWhite, marginTop: 2 },
+  phSunK: { fontSize: 9 },
+  phSunV: { fontSize: 13, marginTop: 2 },
   phSunSep: {
     width: StyleSheet.hairlineWidth,
     height: 28,
-    backgroundColor: 'rgba(201,155,58,0.28)',
     marginHorizontal: 12,
   },
   errorText: {
     fontSize: 13,
-    color: DARK_BONE_TEXT,
     textAlign: 'center',
     paddingVertical: 16,
   },

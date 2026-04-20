@@ -12,6 +12,7 @@ import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
+import { useLocaleFormatters } from '@/utils/format';
 import {
   darkColors,
   lightColors,
@@ -180,8 +181,10 @@ export default function PanchangScreen() {
   const masaSystem = useStore(s => s.masaSystem);
   const setMasaSystem = useStore(s => s.setMasaSystem);
   const region = useStore(s => s.region);
+  const showVikramSamvat = useStore(s => s.showVikramSamvat);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
+  const { digits } = useLocaleFormatters();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const today = useMemo(() => new Date(), []);
@@ -402,9 +405,9 @@ export default function PanchangScreen() {
           <Text variant="mono-caps" style={[styles.selectedKicker, { color: colors.accent }]}>
             {isViewingToday ? t('panchang.todayChip') : selectedGregorian}
           </Text>
-          {panchang?.vikramSamvat && (
+          {panchang?.vikramSamvat && showVikramSamvat && (
             <Text variant="body-italic" style={[styles.selectedSamvat, { color: colors.textTertiary }]}>
-              {t('panchang.vsSamvat', { year: panchang.vikramSamvat })}
+              {t('panchang.vsSamvat', { year: digits(String(panchang.vikramSamvat)) })}
             </Text>
           )}
         </View>

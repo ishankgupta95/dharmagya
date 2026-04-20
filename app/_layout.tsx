@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -35,7 +35,24 @@ import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isDarkMode, hasOnboarded, language, initFirstOpen, dailyReminderEnabled, reminderPrefs } = useStore();
+  const {
+    isDarkMode,
+    hasOnboarded,
+    language,
+    initFirstOpen,
+    dailyReminderEnabled,
+    dailyReminderTime,
+    reminderPrefs,
+    tithiReminderTime,
+    festivalReminderTime,
+    quietHoursEnabled,
+    quietHoursStart,
+    quietHoursEnd,
+  } = useStore();
+  const quietHours = useMemo(
+    () => ({ enabled: quietHoursEnabled, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }),
+    [quietHoursEnabled, quietHoursStart, quietHoursEnd],
+  );
   const [storeHydrated, setStoreHydrated] = useState(
     () => useStore.persist.hasHydrated()
   );
@@ -104,23 +121,33 @@ export default function RootLayout() {
         // Roll the daily-reminder 14-day horizon forward so tomorrow's vrat
         // stays accurate. Safe no-op when disabled.
         if (dailyReminderEnabled) {
-          void scheduleDailyReminder();
+          void scheduleDailyReminder(dailyReminderTime, quietHours);
         }
         // Roll the reminder horizon (next 30 days of tithi + festival reminders).
         if (hasAnyReminderEnabled(reminderPrefs)) {
-          void rescheduleReminders(reminderPrefs);
+          void rescheduleReminders(
+            reminderPrefs,
+            { tithi: tithiReminderTime, festival: festivalReminderTime },
+            quietHours,
+          );
         }
       }
     });
     return () => sub.remove();
-  }, [appReady, hasOnboarded, dailyReminderEnabled, reminderPrefs]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours]);
 
   // Roll reminder horizons once on each cold start too.
   useEffect(() => {
     if (!appReady || !hasOnboarded) return;
-    if (dailyReminderEnabled) void scheduleDailyReminder();
-    if (hasAnyReminderEnabled(reminderPrefs)) void rescheduleReminders(reminderPrefs);
-  }, [appReady, hasOnboarded, dailyReminderEnabled, reminderPrefs]);
+    if (dailyReminderEnabled) void scheduleDailyReminder(dailyReminderTime, quietHours);
+    if (hasAnyReminderEnabled(reminderPrefs)) {
+      void rescheduleReminders(
+        reminderPrefs,
+        { tithi: tithiReminderTime, festival: festivalReminderTime },
+        quietHours,
+      );
+    }
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours]);
 
   if (!appReady) return null;
 
