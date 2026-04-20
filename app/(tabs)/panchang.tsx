@@ -16,6 +16,7 @@ import {
   darkColors,
   lightColors,
   palette,
+  semanticColors,
   borderRadius,
   spacing,
   type ColorPalette,
@@ -283,14 +284,21 @@ export default function PanchangScreen() {
 
         {/* ── Month strip ──────────────────────────────────────────────────── */}
         <View style={styles.monthStrip}>
-          <TouchableOpacity onPress={goPrevMonth} hitSlop={12} style={styles.monthBtn}>
+          <TouchableOpacity
+            onPress={goPrevMonth}
+            hitSlop={12}
+            style={styles.monthBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.previousMonth')}>
             <Icon name="chevron-left" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setPickerOpen(true)}
             activeOpacity={0.7}
             hitSlop={8}
-            style={styles.monthLabelRow}>
+            style={styles.monthLabelRow}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.openDatePicker')}>
             <Text variant="display-italic" style={[styles.monthName, { color: colors.textPrimary }]}>
               {monthNames[calMonthIdx]}
             </Text>
@@ -301,7 +309,12 @@ export default function PanchangScreen() {
               <Icon name="chevron-down" size={11} color={palette.gold} />
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={goNextMonth} hitSlop={12} style={styles.monthBtn}>
+          <TouchableOpacity
+            onPress={goNextMonth}
+            hitSlop={12}
+            style={styles.monthBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.nextMonth')}>
             <Icon name="chevron-right" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
@@ -311,7 +324,9 @@ export default function PanchangScreen() {
             <TouchableOpacity
               onPress={goToday}
               activeOpacity={0.7}
-              style={[styles.todayChip, { borderColor: colors.accent }]}>
+              style={[styles.todayChip, { borderColor: colors.accent }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.today')}>
               <Icon name="return-back" size={12} color={colors.accent} />
               <Text variant="mono-caps" style={[styles.todayChipText, { color: colors.accent }]}>
                 {t('panchang.todayChip')}
@@ -357,7 +372,11 @@ export default function PanchangScreen() {
                 key={idx}
                 activeOpacity={0.7}
                 onPress={() => handlePickDay(cellDate)}
-                style={styles.calCell}>
+                style={styles.calCell}
+                accessibilityRole="button"
+                accessibilityLabel={cellDate.toDateString()}
+                accessibilityState={{ selected: isSelected }}>
+
                 <View
                   style={[
                     styles.calCellInner,
@@ -395,7 +414,7 @@ export default function PanchangScreen() {
         ) : error ? (
           <View style={styles.errorContainer}>
             <View style={[styles.errorIconCircle, { backgroundColor: colors.surfaceRecessed }]}>
-              <Icon name="alert-circle" size={28} color="#E24B4A" />
+              <Icon name="alert-circle" size={28} color={semanticColors.error} />
             </View>
             <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>{t('panchang.calculationFailed')}</Text>
             <Text style={[styles.errorDesc, { color: colors.textTertiary }]}>
@@ -403,7 +422,9 @@ export default function PanchangScreen() {
             </Text>
             <TouchableOpacity
               onPress={retry}
-              style={[styles.retryBtn, { backgroundColor: colors.accent }]}>
+              style={[styles.retryBtn, { backgroundColor: colors.accent }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}>
               <Text style={[styles.retryText, { color: colors.base }]}>{t('common.retry')}</Text>
             </TouchableOpacity>
             <Text style={[styles.fallbackNote, { color: colors.textMuted }]}>
@@ -416,7 +437,9 @@ export default function PanchangScreen() {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => router.push('/muhurat')}
-              style={[styles.muhuratEntry, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+              style={[styles.muhuratEntry, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.openMuhuratFinder')}>
               <Icon name="calendar" size={16} color={colors.accent} />
               <Text style={[styles.muhuratEntryText, { color: colors.accent }]}>
                 {t('panchang.findAuspiciousDate')}
@@ -473,7 +496,9 @@ export default function PanchangScreen() {
                     <TouchableOpacity
                       onPress={() => setMasaSystem(masaSystem === 'purnimanta' ? 'amanta' : 'purnimanta')}
                       activeOpacity={0.7}
-                      style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}>
+                      style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={masaSystem === 'purnimanta' ? t('panchang.amanta') : t('panchang.purnimanta')}>
                       <Text style={[styles.masaChipText, { color: colors.accent }]}>
                         {masaSystem === 'purnimanta' ? t('panchang.purnimanta') : t('panchang.amanta')}
                       </Text>
@@ -518,7 +543,7 @@ export default function PanchangScreen() {
 
             {panchang.brahmaMuhurtaStart && panchang.brahmaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.brahmaMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.brahmaMuhurtaStart} – {panchang.brahmaMuhurtaEnd}
@@ -527,7 +552,7 @@ export default function PanchangScreen() {
             )}
             {panchang.abhijitMuhurtaStart && panchang.abhijitMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.abhijitMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.abhijitMuhurtaStart} – {panchang.abhijitMuhurtaEnd}
@@ -536,7 +561,7 @@ export default function PanchangScreen() {
             )}
             {panchang.vijayaMuhurtaStart && panchang.vijayaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.vijayaMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.vijayaMuhurtaStart} – {panchang.vijayaMuhurtaEnd}
@@ -545,7 +570,7 @@ export default function PanchangScreen() {
             )}
             {panchang.godhuliMuhurtaStart && panchang.godhuliMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.godhuliMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.godhuliMuhurtaStart} – {panchang.godhuliMuhurtaEnd}
@@ -554,7 +579,7 @@ export default function PanchangScreen() {
             )}
             {panchang.nishitaMuhurtaStart && panchang.nishitaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.nishitaMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.nishitaMuhurtaStart} – {panchang.nishitaMuhurtaEnd}
@@ -563,7 +588,7 @@ export default function PanchangScreen() {
             )}
             {panchang.amritKalaStart && panchang.amritKalaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.amritKala')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.amritKalaStart} – {panchang.amritKalaEnd}
@@ -576,7 +601,7 @@ export default function PanchangScreen() {
 
             {panchang.rahuKalamStart && panchang.rahuKalamEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="warning" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.rahuKalam')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.rahuKalamStart} – {panchang.rahuKalamEnd}
@@ -585,7 +610,7 @@ export default function PanchangScreen() {
             )}
             {panchang.yamagandaStart && panchang.yamagandaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="warning" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.yamaganda')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.yamagandaStart} – {panchang.yamagandaEnd}
@@ -594,7 +619,7 @@ export default function PanchangScreen() {
             )}
             {panchang.gulikaKalamStart && panchang.gulikaKalamEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="warning" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.gulikaKalam')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.gulikaKalamStart} – {panchang.gulikaKalamEnd}
@@ -603,7 +628,7 @@ export default function PanchangScreen() {
             )}
             {panchang.durMuhurta.map((dm, i) => (
               <View key={i} style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="warning" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.durMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {dm.start} – {dm.end}
@@ -612,7 +637,7 @@ export default function PanchangScreen() {
             ))}
             {panchang.bhadra && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Icon name="warning" size={16} color={panchang.bhadra.location === 'earth' ? '#F44336' : '#FF9800'} />
+                <Icon name="warning" size={16} color={panchang.bhadra.location === 'earth' ? semanticColors.error : palette.goldLeaf} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.bhadra')}</Text>
                   <Text style={[styles.bhadraNote, { color: colors.textSecondary }]}>
@@ -629,31 +654,31 @@ export default function PanchangScreen() {
             {panchang.eclipse && (
               <>
                 <SectionLabel style={styles.sectionLabel}>{t('panchang.eclipseSection')}</SectionLabel>
-                <View style={[styles.eclipseCard, { backgroundColor: '#3A1E1E', borderColor: '#8A3A3A' }]}>
+                <View style={[styles.eclipseCard, { backgroundColor: semanticColors.error + '1E', borderColor: semanticColors.error + '66' }]}>
                   <View style={styles.eclipseHeader}>
                     <Icon
                       name={panchang.eclipse.kind === 'solar' ? 'sun' : 'moon'}
                       size={18}
-                      color="#E8893C"
+                      color={semanticColors.error}
                     />
-                    <Text style={[styles.eclipseTitle, { color: '#FFE4C4' }]}>
+                    <Text style={[styles.eclipseTitle, { color: colors.textPrimary }]}>
                       {panchang.eclipse.kind === 'solar' ? t('panchang.eclipseSolar') : t('panchang.eclipseLunar')}
                       {'  ·  '}
                       {t(`panchang.eclipseSubtype.${panchang.eclipse.subtype}`)}
                     </Text>
                   </View>
-                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                  <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                     {t('panchang.eclipseWindow', { start: panchang.eclipse.start, end: panchang.eclipse.end })}
                   </Text>
-                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                  <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                     {t('panchang.eclipsePeak', { time: panchang.eclipse.peak })}
                     {'  ·  '}
                     {t('panchang.eclipseMagnitude', { value: panchang.eclipse.magnitude.toFixed(2) })}
                   </Text>
-                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                  <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                     {t('panchang.eclipseSutak', { start: panchang.eclipse.sutakStart, end: panchang.eclipse.sutakEnd })}
                   </Text>
-                  <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? '#5DCAA5' : '#BFA68A' }]}>
+                  <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? semanticColors.success : colors.textMuted }]}>
                     {panchang.eclipse.visibleFromLocation ? t('panchang.eclipseVisible') : t('panchang.eclipseNotVisible')}
                   </Text>
                 </View>

@@ -58,7 +58,9 @@ export default function OnboardingStep1() {
         <TouchableOpacity
           onPress={() => router.push('/onboarding/step2')}
           activeOpacity={0.85}
-          style={styles.cta}>
+          style={styles.cta}
+          accessibilityRole="button"
+          accessibilityLabel={t('onboarding.beginJourney')}>
           <Text variant="mono-caps" style={styles.ctaText}>
             {t('onboarding.beginJourney')}
           </Text>

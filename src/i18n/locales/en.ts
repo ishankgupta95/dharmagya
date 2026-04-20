@@ -13,6 +13,36 @@ export default {
     save: 'Save',
   },
 
+  // ── Accessibility labels for icon-only buttons and screen-reader hints ──
+  a11y: {
+    back: 'Go back',
+    close: 'Close',
+    clearSearch: 'Clear search',
+    addFavorite: 'Add to favorites',
+    removeFavorite: 'Remove from favorites',
+    previousDay: 'Previous day',
+    nextDay: 'Next day',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    today: 'Jump to today',
+    openDatePicker: 'Open date picker',
+    openLocationPicker: 'Change location',
+    play: 'Play audio',
+    pause: 'Pause audio',
+    openSearch: 'Open search',
+    openSettings: 'Open settings',
+    openFestivals: 'Open festivals',
+    openFavorites: 'Open favorites',
+    openDasha: 'Open Vimshottari Dasha',
+    openPanchang: 'Open Panchang',
+    openMuhuratFinder: 'Find an auspicious date',
+    selectDeity: 'Select {{name}}',
+    openDeity: 'Open {{name}}',
+    openAarti: 'Open Aarti',
+    openChalisa: 'Open Chalisa',
+    selected: 'selected',
+  },
+
   // ── Tabs ────────────────────────────────────────────────────────────────
   tabs: {
     home: 'Home',

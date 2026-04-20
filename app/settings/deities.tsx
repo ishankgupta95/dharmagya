@@ -31,7 +31,9 @@ export default function ManageDeitiesScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -60,7 +62,9 @@ export default function ManageDeitiesScreen() {
         <TouchableOpacity
           onPress={handleSave}
           activeOpacity={0.85}
-          style={[styles.saveBtn, { backgroundColor: palette.sindoor }]}>
+          style={[styles.saveBtn, { backgroundColor: palette.sindoor }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.save')}>
           <Text variant="mono-caps" style={styles.saveText}>{t('common.save')}</Text>
         </TouchableOpacity>
       </View>

@@ -132,7 +132,9 @@ export default function SettingsScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -211,7 +213,9 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.push('/location-permission')}>
+            onPress={() => router.push('/location-permission')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.myLocation')}>
             <SettingRow
               icon="location"
               label={t('settings.gpsLocation')}
@@ -234,7 +238,9 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => router.push('/settings/deities')}>
+            onPress={() => router.push('/settings/deities')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.manageDeities')}>
             <SettingRow
               icon="flower"
               label={t('settings.manageDeities')}
@@ -252,7 +258,11 @@ export default function SettingsScreen() {
         {/* ── Horoscope ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.horoscope')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setDobPickerOpen(true)}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setDobPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.birthDate')}>
             <SettingRow
               icon="gift"
               label={t('settings.birthDate')}
@@ -303,7 +313,9 @@ export default function SettingsScreen() {
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => router.push('/settings/reminders')}>
+            onPress={() => router.push('/settings/reminders')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.festivalTithiReminders')}>
             <SettingRow
               icon="alarm"
               label={t('settings.festivalTithiReminders')}
@@ -321,6 +333,8 @@ export default function SettingsScreen() {
 
           <TouchableOpacity
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.replayWalkthrough')}
             onPress={() => {
               setWalkthroughStep(1);
               router.back();
@@ -404,7 +418,10 @@ function FontSizePicker({ value, onChange, colors }: FontSizePickerProps) {
               i < sizes.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
               active && { backgroundColor: colors.accent },
             ]}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={key}
+            accessibilityState={{ selected: active }}>
             <RNText style={[styles.fontPickerLabel, { fontSize, color: active ? '#FFFFFF' : colors.textSecondary }]}>
               A
             </RNText>
@@ -438,7 +455,10 @@ function LanguagePicker({ value, onChange, colors }: LanguagePickerProps) {
               i < LANGUAGE_OPTIONS.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
               active && { backgroundColor: colors.accent },
             ]}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={nativeLabel}
+            accessibilityState={{ selected: active }}>
             <RNText style={[styles.langPickerLabel, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
               {label}
             </RNText>
@@ -477,7 +497,10 @@ function MasaSystemPicker({ value, onChange, colors }: MasaSystemPickerProps) {
               i < MASA_OPTIONS.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
               active && { backgroundColor: colors.accent },
             ]}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={t(tKey)}
+            accessibilityState={{ selected: active }}>
             <RNText style={[styles.langPickerLabel, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
               {t(tKey)}
             </RNText>
@@ -526,7 +549,10 @@ function RegionRow({
           styles.regionItem,
           { borderBottomColor: colors.divider },
           active && { backgroundColor: colors.accent + '18' },
-        ]}>
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={tr(r)}
+        accessibilityState={{ selected: active }}>
         <Text variant="body" style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
           {tr(r)}
         </Text>
@@ -537,7 +563,11 @@ function RegionRow({
 
   return (
     <>
-      <TouchableOpacity activeOpacity={0.7} onPress={() => setOpen(true)}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings.region')}>
         <SettingRow
           icon="compass"
           label={t('settings.region')}
@@ -576,7 +606,9 @@ function RegionRow({
             </ScrollView>
             <TouchableOpacity
               onPress={() => setOpen(false)}
-              style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 12 }]}>
+              style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 12 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}>
               <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
                 {t('common.done')}
               </Text>

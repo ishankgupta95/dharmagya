@@ -108,6 +108,9 @@ export default function LocationPickerScreen() {
       <TouchableOpacity
         onPress={() => handleSelectCity(item)}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.state}`}
+        accessibilityState={{ selected: !!isActive }}
         style={[
           styles.cityRow,
           { borderBottomColor: colors.divider },
@@ -143,7 +146,9 @@ export default function LocationPickerScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -167,7 +172,10 @@ export default function LocationPickerScreen() {
           onPress={handleUseGPS}
           activeOpacity={0.85}
           disabled={gpsLoading}
-          style={[styles.gpsBtn, { backgroundColor: palette.sindoor, opacity: gpsLoading ? 0.7 : 1 }]}>
+          style={[styles.gpsBtn, { backgroundColor: palette.sindoor, opacity: gpsLoading ? 0.7 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('locationPermission.useGps')}
+          accessibilityState={{ disabled: gpsLoading, busy: gpsLoading }}>
           {gpsLoading ? (
             <ActivityIndicator color={palette.parchmentBright} size="small" />
           ) : (
@@ -204,7 +212,11 @@ export default function LocationPickerScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}

@@ -13,6 +13,36 @@ export default {
     save: 'सहेजें',
   },
 
+  // ── Accessibility labels for icon-only buttons and screen-reader hints ──
+  a11y: {
+    back: 'वापस जाएँ',
+    close: 'बंद करें',
+    clearSearch: 'खोज हटाएँ',
+    addFavorite: 'पसंदीदा में जोड़ें',
+    removeFavorite: 'पसंदीदा से हटाएँ',
+    previousDay: 'पिछला दिन',
+    nextDay: 'अगला दिन',
+    previousMonth: 'पिछला महीना',
+    nextMonth: 'अगला महीना',
+    today: 'आज पर जाएँ',
+    openDatePicker: 'तिथि चयन खोलें',
+    openLocationPicker: 'स्थान बदलें',
+    play: 'ऑडियो चलाएँ',
+    pause: 'ऑडियो रोकें',
+    openSearch: 'खोज खोलें',
+    openSettings: 'सेटिंग्स खोलें',
+    openFestivals: 'त्योहार खोलें',
+    openFavorites: 'पसंदीदा खोलें',
+    openDasha: 'विंशोत्तरी दशा खोलें',
+    openPanchang: 'पंचांग खोलें',
+    openMuhuratFinder: 'शुभ मुहूर्त खोजें',
+    selectDeity: '{{name}} चुनें',
+    openDeity: '{{name}} खोलें',
+    openAarti: 'आरती खोलें',
+    openChalisa: 'चालीसा खोलें',
+    selected: 'चयनित',
+  },
+
   // ── Tabs ────────────────────────────────────────────────────────────────
   tabs: {
     home: 'होम',

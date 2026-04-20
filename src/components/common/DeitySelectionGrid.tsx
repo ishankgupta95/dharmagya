@@ -83,7 +83,10 @@ const DeityCard = memo(function DeityCard({ deity, isSelected, colors, onPress }
           width: CARD_WIDTH,
         },
         isSelected && { backgroundColor: deity.color + '12' },
-      ]}>
+      ]}
+      accessibilityRole="checkbox"
+      accessibilityLabel={t(`deities.${deity.id}.displayName`)}
+      accessibilityState={{ checked: isSelected }}>
       <DeityAvatar deity={deity.id} size={64} />
       <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
         {t(`deities.${deity.id}.displayName`)}

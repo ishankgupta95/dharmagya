@@ -289,7 +289,9 @@ export default function HomeScreen() {
             ref={settingsBtnRef}
             onPress={() => router.push('/settings')}
             style={[styles.gear, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.openSettings')}>
             <Icon name="gear" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -309,7 +311,9 @@ export default function HomeScreen() {
           ref={panchangCardRef}
           activeOpacity={0.88}
           onPress={() => router.push('/(tabs)/panchang')}
-          style={styles.panchangWrap}>
+          style={styles.panchangWrap}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.openPanchang')}>
           <NightCard padding={20} mandalaSize={220} mandalaOpacity={0.09}>
             <View style={styles.phHead}>
               <View>
@@ -370,7 +374,9 @@ export default function HomeScreen() {
               <SectionLabel>{t('home.yourDeities')}</SectionLabel>
               <TouchableOpacity
                 onPress={() => router.push('/settings/deities')}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('home.yourDeitiesManage')}>
                 <Text variant="body-italic" style={[styles.sectionAction, { color: colors.emphasis }]}>
                   {t('home.yourDeitiesManage')}  →
                 </Text>
@@ -385,7 +391,9 @@ export default function HomeScreen() {
                   key={deity.id}
                   activeOpacity={0.85}
                   onPress={() => router.push(`/god/${deity.id}`)}
-                  style={styles.deityChip}>
+                  style={styles.deityChip}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.openDeity', { name: t(`deities.${deity.id}.displayName`) })}>
                   <DeityAvatar deity={deity.id} size={54} />
                   <Text
                     variant="body-italic"
@@ -415,7 +423,9 @@ export default function HomeScreen() {
             <TouchableOpacity
               activeOpacity={0.88}
               onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
-              style={[styles.featCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              style={[styles.featCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${featuredAarti.titleEnglish} — ${t('a11y.openAarti')}`}>
               <View style={styles.cornerMark}>
                 <Kicker color={palette.gold} size={8.5}>
                   Aarti № {padTwo(featuredAartiIndex)}
@@ -453,7 +463,9 @@ export default function HomeScreen() {
           <TouchableOpacity
             activeOpacity={0.88}
             onPress={() => router.push(`/chalisa/${featuredChalisa.deity}`)}
-            style={[styles.featCard, styles.featCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            style={[styles.featCard, styles.featCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${featuredChalisa.titleEnglish} — ${t('a11y.openChalisa')}`}>
             <View style={styles.cornerMark}>
               <Kicker color={palette.gold} size={8.5}>
                 Chalisa № {padTwo(featuredChalisaIndex)}
@@ -481,7 +493,9 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={() => router.push('/dasha')}
-          style={styles.calloutWrap}>
+          style={styles.calloutWrap}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.openDasha')}>
           <LinearGradient
             colors={['rgba(165,48,28,0.10)', 'rgba(156,118,35,0.10)']}
             start={{ x: 0, y: 0 }}
@@ -519,7 +533,9 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={() => router.push('/muhurat')}
-          style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.openMuhuratFinder')}>
           <View style={[styles.muhuratIc, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
             <Icon name="calendar" size={18} color={colors.accent} />
           </View>
@@ -638,7 +654,9 @@ const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: Quic
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
-      style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={label}>
       <Icon name={icon} size={20} color={colors.accent} />
       <Text variant="body-italic" style={[styles.quickLabel, { color: colors.textSecondary }]}>
         {label}

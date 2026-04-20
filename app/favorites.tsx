@@ -89,7 +89,9 @@ export default function FavoritesScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -131,7 +133,9 @@ const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemov
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.titleEnglish} — ${typeLabel}`}>
       <DeityAvatar deity={item.deity} size={46} />
       <View style={styles.cardText}>
         <Text variant="deva-bold" style={[styles.cardNative, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -150,7 +154,11 @@ const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemov
           </Text>
         </View>
       </View>
-      <TouchableOpacity onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity
+        onPress={onRemove}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={t('a11y.removeFavorite')}>
         <Icon name="heart" size={20} color={colors.accent} />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -170,7 +178,9 @@ function EmptyState({ colors }: { colors: ColorPalette }) {
       </Text>
       <TouchableOpacity
         onPress={() => router.push('/(tabs)/library')}
-        style={[styles.browseBtn, { borderColor: colors.accent }]}>
+        style={[styles.browseBtn, { borderColor: colors.accent }]}
+        accessibilityRole="button"
+        accessibilityLabel={t('favorites.browseLibrary')}>
         <Text variant="mono-caps" style={[styles.browseBtnText, { color: colors.accent }]}>
           {t('favorites.browseLibrary')}
         </Text>

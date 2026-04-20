@@ -32,7 +32,9 @@ export default function OnboardingStep2() {
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="mono-caps" style={[styles.headerStep, { color: palette.inkQuiet }]}>
@@ -68,10 +70,16 @@ export default function OnboardingStep2() {
         <TouchableOpacity
           onPress={handleContinue}
           activeOpacity={0.85}
-          style={styles.cta}>
+          style={styles.cta}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.continue')}>
           <Text variant="mono-caps" style={styles.ctaText}>{t('common.continue')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleContinue} hitSlop={10}>
+        <TouchableOpacity
+          onPress={handleContinue}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.skip')}>
           <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
             {t('common.skip')}
           </Text>

@@ -137,7 +137,11 @@ export function DatePickerModal({
             <>
               {/* Year selector */}
               <View style={styles.monthRow}>
-                <TouchableOpacity onPress={() => setJumperYear(Math.max(minYear, jumperYear - 1))} hitSlop={12}>
+                <TouchableOpacity
+                  onPress={() => setJumperYear(Math.max(minYear, jumperYear - 1))}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${jumperYear - 1}`}>
                   <Icon name="chevron-left" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
                 <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
@@ -148,7 +152,9 @@ export function DatePickerModal({
                     const cap = maxDate ? Math.min(maxYear, maxDate.getFullYear()) : maxYear;
                     setJumperYear(Math.min(cap, jumperYear + 1));
                   }}
-                  hitSlop={12}>
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${jumperYear + 1}`}>
                   <Icon name="chevron-right" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -167,7 +173,10 @@ export function DatePickerModal({
                         isCurrent && { backgroundColor: colors.accent },
                         disabled && { opacity: 0.35 },
                       ]}
-                      onPress={() => pickMonthYear(i)}>
+                      onPress={() => pickMonthYear(i)}
+                      accessibilityRole="button"
+                      accessibilityLabel={name}
+                      accessibilityState={{ selected: isCurrent, disabled }}>
                       <Text
                         style={[
                           styles.monthCellText,
@@ -196,7 +205,10 @@ export function DatePickerModal({
                       styles.yearChip,
                       { borderColor: y === jumperYear ? colors.accent : colors.border },
                       y === jumperYear && { backgroundColor: colors.accent + '22' },
-                    ]}>
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${y}`}
+                    accessibilityState={{ selected: y === jumperYear }}>
                     <Text
                       style={[
                         styles.yearChipText,
@@ -210,7 +222,9 @@ export function DatePickerModal({
 
               <TouchableOpacity
                 onPress={() => setShowJumper(false)}
-                style={[styles.doneBtn, { backgroundColor: colors.accent, marginTop: 16 }]}>
+                style={[styles.doneBtn, { backgroundColor: colors.accent, marginTop: 16 }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}>
                 <Text style={[styles.doneText, { color: colors.base }]}>{t('common.back')}</Text>
               </TouchableOpacity>
             </>
@@ -218,16 +232,33 @@ export function DatePickerModal({
             <>
               {/* Month nav */}
               <View style={styles.monthRow}>
-                <TouchableOpacity onPress={prevMonth} hitSlop={12} disabled={!canPrev}>
+                <TouchableOpacity
+                  onPress={prevMonth}
+                  hitSlop={12}
+                  disabled={!canPrev}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.previousMonth')}
+                  accessibilityState={{ disabled: !canPrev }}>
                   <Icon name="chevron-left" size={20} color={canPrev ? colors.textSecondary : colors.textDisabled} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={openJumper} hitSlop={8} style={styles.monthLabelRow}>
+                <TouchableOpacity
+                  onPress={openJumper}
+                  hitSlop={8}
+                  style={styles.monthLabelRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.openDatePicker')}>
                   <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
                     {(t('panchang.monthNames', { returnObjects: true }) as string[])[month]} {year}
                   </Text>
                   <Icon name="caret-down" size={12} color={colors.textMuted} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={nextMonth} hitSlop={12} disabled={!canNext}>
+                <TouchableOpacity
+                  onPress={nextMonth}
+                  hitSlop={12}
+                  disabled={!canNext}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.nextMonth')}
+                  accessibilityState={{ disabled: !canNext }}>
                   <Icon name="chevron-right" size={20} color={canNext ? colors.textSecondary : colors.textDisabled} />
                 </TouchableOpacity>
               </View>
@@ -265,7 +296,10 @@ export function DatePickerModal({
                       key={cell}
                       style={styles.cell}
                       disabled={isFuture}
-                      onPress={() => handlePick(cellDate)}>
+                      onPress={() => handlePick(cellDate)}
+                      accessibilityRole="button"
+                      accessibilityLabel={cellDate.toDateString()}
+                      accessibilityState={{ selected: isSelected, disabled: isFuture }}>
                       <View style={[
                         styles.cellInner,
                         isSelected && { backgroundColor: colors.accent },
@@ -282,13 +316,17 @@ export function DatePickerModal({
                 {onClear && (
                   <TouchableOpacity
                     onPress={() => { onClear(); onClose(); }}
-                    style={[styles.bottomBtn, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                    style={[styles.bottomBtn, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}>
                     <Text style={[styles.bottomBtnText, { color: colors.textSecondary }]}>{t('common.clear', { defaultValue: 'Clear' })}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
                   onPress={onClose}
-                  style={[styles.bottomBtn, styles.bottomBtnPrimary, { backgroundColor: colors.accent }]}>
+                  style={[styles.bottomBtn, styles.bottomBtnPrimary, { backgroundColor: colors.accent }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.done')}>
                   <Text style={[styles.bottomBtnText, { color: colors.base }]}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>

@@ -221,7 +221,11 @@ export function WalkthroughSpotlight({
 
         {/* Action row */}
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={onSkip} hitSlop={10}>
+          <TouchableOpacity
+            onPress={onSkip}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('walkthrough.skip')}>
             <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
               {t('walkthrough.skip')}
             </Text>
@@ -232,6 +236,8 @@ export function WalkthroughSpotlight({
               onPress={onNext}
               style={[styles.nextBtn, { backgroundColor: palette.sindoor }]}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={nextLabel ?? t('walkthrough.next')}
             >
               <Text variant="mono-caps" style={styles.nextText}>
                 {nextLabel ?? t('walkthrough.next')}

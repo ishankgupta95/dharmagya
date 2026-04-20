@@ -181,7 +181,11 @@ export default function LibraryScreen() {
                 autoCorrect={false}
               />
               {query.length > 0 && (
-                <TouchableOpacity onPress={() => setQuery('')} hitSlop={10}>
+                <TouchableOpacity
+                  onPress={() => setQuery('')}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.clearSearch')}>
                   <Icon name="close-circle" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
@@ -264,7 +268,9 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
       style={[
         styles.card,
         { backgroundColor: colors.surface, borderColor: colors.borderAccent },
-      ]}>
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={t('a11y.openDeity', { name: t(`deities.${deity.id}.displayName`) })}>
 
       <View style={[styles.portrait, !image && { backgroundColor: deity.color + '22' }]}>
         {image && (

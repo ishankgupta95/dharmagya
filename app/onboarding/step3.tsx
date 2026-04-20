@@ -47,7 +47,9 @@ export default function OnboardingStep3() {
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="mono-caps" style={[styles.headerStep, { color: colors.textMuted }]}>
@@ -119,7 +121,9 @@ export default function OnboardingStep3() {
         <TouchableOpacity
           onPress={handleFinish}
           activeOpacity={0.85}
-          style={[styles.cta, { backgroundColor: palette.sindoor }]}>
+          style={[styles.cta, { backgroundColor: palette.sindoor }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('onboarding.startExploring')}>
           <Text variant="mono-caps" style={styles.ctaText}>
             {t('onboarding.startExploring')}
           </Text>
@@ -156,7 +160,10 @@ function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
       style={[
         styles.themeCard,
         { backgroundColor: bg, borderColor, borderWidth: isSelected ? 2 : 1 },
-      ]}>
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={dark ? t('onboarding.dark') : t('onboarding.light')}
+      accessibilityState={{ selected: isSelected }}>
 
       {/* Mini UI preview */}
       <View style={[styles.miniCard, { backgroundColor: surface }]}>
@@ -191,7 +198,13 @@ interface RadioRowProps {
 
 function RadioRow({ label, sublabel, icon, selected, onPress, colors }: RadioRowProps) {
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.radioRow}>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={styles.radioRow}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}>
       <View style={[styles.radioIconWrap, { backgroundColor: colors.surfaceRecessed }]}>
         <Icon name={icon} size={16} color={palette.sindoor} />
       </View>

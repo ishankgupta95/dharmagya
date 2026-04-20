@@ -82,7 +82,9 @@ export default function RemindersScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={12}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>

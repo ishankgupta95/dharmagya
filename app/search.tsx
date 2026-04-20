@@ -142,7 +142,9 @@ export default function SearchScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
 
@@ -160,7 +162,11 @@ export default function SearchScreen() {
             autoCorrect={false}
           />
           {hasQuery && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
@@ -219,7 +225,9 @@ const ResultCard = memo(function ResultCard({ item, query, colors, onPress }: Re
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.titleEnglish} — ${item.deityLabel}`}>
       <DeityAvatar deity={item.deity} size={44} />
       <View style={styles.cardText}>
         <HighlightText

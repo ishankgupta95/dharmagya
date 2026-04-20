@@ -33,7 +33,10 @@ export function HoraCard({ slots, colors }: Props) {
             <TouchableOpacity
               key={key}
               onPress={() => setTab(key)}
-              style={[styles.tab, tab === key && { backgroundColor: colors.accent }]}>
+              style={[styles.tab, tab === key && { backgroundColor: colors.accent }]}
+              accessibilityRole="tab"
+              accessibilityLabel={key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
+              accessibilityState={{ selected: tab === key }}>
               <Text style={[styles.tabText, { color: tab === key ? colors.base : colors.textMuted }]}>
                 {key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
               </Text>

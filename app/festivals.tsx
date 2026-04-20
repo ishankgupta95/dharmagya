@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore, type Region } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, semanticColors, spacing, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
 import { AdBanner } from '@/components/common/AdBanner';
 
@@ -53,7 +53,7 @@ const TYPE_ICON: Record<string, { icon: IconName; color: string | null }> = {
   vaishnava_ekadashi: { icon: 'moon', color: '#7AA8C8' },
   pradosha: { icon: 'moon', color: '#9575CD' },
   sankranti: { icon: 'sun', color: '#E8893C' },
-  eclipse: { icon: 'contrast', color: '#E24B4A' },
+  eclipse: { icon: 'contrast', color: semanticColors.error },
 };
 
 /** Window used to flag upcoming items with a "Soon" badge + accent border. */
@@ -234,7 +234,9 @@ export default function FestivalsScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={12}>
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.screenTitle, { color: colors.textPrimary }]}>
@@ -245,13 +247,25 @@ export default function FestivalsScreen() {
 
       {/* ── Year selector ──────────────────────────────────────────── */}
       <View style={[styles.yearRow, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity onPress={() => setYear(y => y - 1)} hitSlop={12} disabled={!canGoBack}>
+        <TouchableOpacity
+          onPress={() => setYear(y => y - 1)}
+          hitSlop={12}
+          disabled={!canGoBack}
+          accessibilityRole="button"
+          accessibilityLabel={`${year - 1}`}
+          accessibilityState={{ disabled: !canGoBack }}>
           <Icon name="chevron-left" size={20} color={canGoBack ? colors.textSecondary : colors.textMuted} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.yearLabel, { color: colors.textPrimary }]}>
           {year}
         </Text>
-        <TouchableOpacity onPress={() => setYear(y => y + 1)} hitSlop={12} disabled={!canGoForward}>
+        <TouchableOpacity
+          onPress={() => setYear(y => y + 1)}
+          hitSlop={12}
+          disabled={!canGoForward}
+          accessibilityRole="button"
+          accessibilityLabel={`${year + 1}`}
+          accessibilityState={{ disabled: !canGoForward }}>
           <Icon name="chevron-right" size={20} color={canGoForward ? colors.textSecondary : colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -271,7 +285,11 @@ export default function FestivalsScreen() {
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={10}>
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}

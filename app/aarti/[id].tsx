@@ -66,7 +66,9 @@ export default function AartiDetailScreen() {
           </Text>
           <TouchableOpacity
             onPress={() => router.back()}
-            style={[styles.notFoundBtn, { borderColor: colors.accent }]}>
+            style={[styles.notFoundBtn, { borderColor: colors.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.back')}>
             <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
               {t('common.back') ?? 'Back'}
             </Text>
@@ -89,7 +91,9 @@ export default function AartiDetailScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
 
@@ -102,7 +106,10 @@ export default function AartiDetailScreen() {
         <TouchableOpacity
           onPress={() => toggleFavorite(favoriteKey)}
           style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+          accessibilityState={{ selected: isFavorite }}>
           <Icon
             name={isFavorite ? 'heart' : 'heart-outline'}
             size={16}
@@ -197,7 +204,10 @@ function LangChip({ label, active, onPress, colors }: LangChipProps) {
       style={[
         styles.langChip,
         active && { backgroundColor: palette.ink },
-      ]}>
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}>
       <Text
         variant="mono-caps"
         style={[

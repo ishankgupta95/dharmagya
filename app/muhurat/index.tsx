@@ -31,7 +31,9 @@ export default function MuhuratIndexScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={12}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -54,7 +56,9 @@ export default function MuhuratIndexScreen() {
               key={occ}
               activeOpacity={0.85}
               onPress={() => router.push(`/muhurat/${occ}`)}
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={t(`muhurat.occasion.${occ}.name`)}>
               <View style={[styles.iconCircle, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
                 <Icon name={OCCASION_ICON[occ]} size={22} color={colors.accent} />
               </View>

@@ -38,7 +38,10 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
               key={key}
               onPress={() => setTab(key)}
               hitSlop={6}
-              style={[styles.tab, i === 0 && { marginRight: 10 }]}>
+              style={[styles.tab, i === 0 && { marginRight: 10 }]}
+              accessibilityRole="tab"
+              accessibilityLabel={key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
+              accessibilityState={{ selected: tab === key }}>
               <Text
                 variant="mono-caps"
                 style={[

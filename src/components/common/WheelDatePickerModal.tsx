@@ -102,13 +102,19 @@ function IosWheelPicker({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity
+        style={styles.overlay}
+        activeOpacity={1}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel={t('a11y.close')}>
         {/* Inner view swallows taps so backdrop dismiss doesn't fire while
             the user scrubs the wheel. */}
         <TouchableOpacity
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
-          style={[styles.sheet, { backgroundColor: palette.parchmentBright, borderColor: palette.paperEdge }]}>
+          style={[styles.sheet, { backgroundColor: palette.parchmentBright, borderColor: palette.paperEdge }]}
+          accessible={false}>
 
           <Text variant="display-italic" style={[styles.title, { color: palette.ink }]}>
             {title ?? t('common.pickDate', { defaultValue: 'Pick a date' })}
@@ -134,7 +140,9 @@ function IosWheelPicker({
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleDone}
-            style={[styles.doneBtn, { backgroundColor: palette.sindoor }]}>
+            style={[styles.doneBtn, { backgroundColor: palette.sindoor }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.done')}>
             <Text variant="mono-caps" style={styles.doneText}>
               {t('common.done')}
             </Text>

@@ -105,7 +105,9 @@ export default function DashaScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={12}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -130,7 +132,9 @@ export default function DashaScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPickerOpen(true)}
-            style={[styles.birthRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            style={[styles.birthRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('dasha.changeBirthDate')}>
             <Icon name="calendar" size={18} color={colors.accent} />
             <Text variant="body" style={[styles.birthDateText, { color: colors.textPrimary }]}>
               {birthDateLabel}
@@ -143,7 +147,9 @@ export default function DashaScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPickerOpen(true)}
-            style={[styles.setBirthBtn, { backgroundColor: palette.sindoor }]}>
+            style={[styles.setBirthBtn, { backgroundColor: palette.sindoor }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('dasha.setBirthDate')}>
             <Icon name="calendar" size={18} color={palette.parchmentBright} />
             <Text variant="mono-caps" style={styles.setBirthText}>
               {t('dasha.setBirthDate')}
@@ -258,7 +264,13 @@ function MahadashaRow({ md, expanded, isActive, lang, onToggle, colors, t }: Mah
           borderWidth: isActive ? 1.5 : 1,
         },
       ]}>
-      <TouchableOpacity activeOpacity={0.85} onPress={onToggle} style={styles.mahaRowHeader}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onToggle}
+        style={styles.mahaRowHeader}
+        accessibilityRole="button"
+        accessibilityLabel={`${lordLabel} ${t('dasha.mahadashaSuffix')}`}
+        accessibilityState={{ expanded }}>
         {/* Active timeline spine — accent in light (sindoor), gold in dark for contrast */}
         <View style={[styles.spine, { backgroundColor: isActive ? colors.accent : palette.rule }]} />
         <View style={{ flex: 1 }}>

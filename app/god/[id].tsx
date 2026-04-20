@@ -174,6 +174,7 @@ interface HeroBlockProps {
 }
 
 function HeroBlock({ deityId, deityColor, displayName, subname, description, image, colors, onBack }: HeroBlockProps) {
+  const { t } = useTranslation();
   const meta = DEITY_BY_ID[deityId];
   const initial = meta?.initial ?? 'ॐ';
 
@@ -211,7 +212,9 @@ function HeroBlock({ deityId, deityColor, displayName, subname, description, ima
       <TouchableOpacity
         onPress={onBack}
         style={styles.heroBackBtn}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={t('a11y.back')}>
         <Icon name="chevron-left" size={18} color={palette.parchmentBright} />
       </TouchableOpacity>
 
@@ -256,11 +259,14 @@ const ContentCard = memo(function ContentCard({
   onToggleFavorite,
   onPress,
 }: ContentCardProps) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${titleEnglish} — ${badge}`}>
       <View style={styles.cardText}>
         <Text variant="deva-bold" style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
           {titleHindi}
@@ -282,7 +288,12 @@ const ContentCard = memo(function ContentCard({
           )}
         </View>
       </View>
-      <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity
+        onPress={onToggleFavorite}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+        accessibilityState={{ selected: isFavorite }}>
         <Icon
           name={isFavorite ? 'heart' : 'heart-outline'}
           size={20}

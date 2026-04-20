@@ -208,7 +208,9 @@ export default function OccasionDetailScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={12}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -218,7 +220,9 @@ export default function OccasionDetailScreen() {
           <TouchableOpacity
             onPress={handleRefresh}
             hitSlop={12}
-            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}>
             <Icon name="refresh" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : (
@@ -250,7 +254,11 @@ export default function OccasionDetailScreen() {
             <View style={[styles.progressBar, { backgroundColor: colors.surfaceRecessed }]}>
               <View style={[styles.progressFill, { backgroundColor: colors.accent, width: `${progressPct}%` }]} />
             </View>
-            <TouchableOpacity onPress={handleCancel} style={styles.progressAction}>
+            <TouchableOpacity
+              onPress={handleCancel}
+              style={styles.progressAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('muhurat.cancelScan')}>
               <Icon name="stop-circle" size={16} color={semanticColors.error} />
               <Text variant="mono-caps" style={[styles.progressActionText, { color: semanticColors.error }]}>
                 {t('muhurat.cancelScan')}
@@ -264,7 +272,11 @@ export default function OccasionDetailScreen() {
             <Text variant="body" style={[styles.progressText, { color: colors.textPrimary }]}>
               {t('muhurat.scanPaused', { current: scannedCount, total: totalDays })}
             </Text>
-            <TouchableOpacity onPress={handleResume} style={styles.progressAction}>
+            <TouchableOpacity
+              onPress={handleResume}
+              style={styles.progressAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('muhurat.resumeScan')}>
               <Icon name="play-circle" size={16} color={colors.accent} />
               <Text variant="mono-caps" style={[styles.progressActionText, { color: colors.accent }]}>
                 {t('muhurat.resumeScan')}
@@ -278,7 +290,11 @@ export default function OccasionDetailScreen() {
             <Text variant="body" style={[styles.errorText, { color: colors.textPrimary }]}>
               {t('muhurat.scanFailed')}
             </Text>
-            <TouchableOpacity onPress={handleResume} style={styles.progressAction}>
+            <TouchableOpacity
+              onPress={handleResume}
+              style={styles.progressAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('muhurat.retryScan')}>
               <Icon name="refresh" size={16} color={colors.accent} />
               <Text variant="mono-caps" style={[styles.progressActionText, { color: colors.accent }]}>
                 {t('muhurat.retryScan')}
@@ -387,7 +403,10 @@ function DayRow({
           borderColor: isUpcoming ? colors.accent : colors.border,
           borderWidth: isUpcoming ? 1.5 : 1,
         },
-      ]}>
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${weekday} ${dayNum} ${month} ${year}`}
+      accessibilityState={{ expanded }}>
       <View style={styles.dayRowHead}>
         <View
           style={[
