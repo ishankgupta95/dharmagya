@@ -4,10 +4,12 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { SectionLabel } from '@/components/common/SectionLabel';
+import { ProgressDots } from './_progressDots';
 
 type LocationChoice = 'gps' | 'default';
 
@@ -42,11 +44,16 @@ export default function OnboardingStep3() {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerStep, { color: colors.textMuted }]}>{t('onboarding.step3of3')}</Text>
-        <View style={{ width: 20 }} />
+        <Text variant="mono-caps" style={[styles.headerStep, { color: colors.textMuted }]}>
+          {t('onboarding.step3of3')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
       <ScrollView
@@ -54,11 +61,14 @@ export default function OnboardingStep3() {
         showsVerticalScrollIndicator={false}>
 
         {/* ── Title ─────────────────────────────────────────────────── */}
-        <Text style={[styles.titleHindi, { color: colors.textPrimary }]}>{t('onboarding.preferencesHi')}</Text>
-        <Text style={[styles.title, { color: colors.textSecondary }]}>{t('onboarding.preferences')}</Text>
+        <Text variant="display-italic" style={[styles.title, { color: colors.textPrimary }]}>
+          {t('onboarding.preferences')}
+        </Text>
 
         {/* ── Theme Section ─────────────────────────────────────────── */}
-        <SectionLabel label={t('settings.appearance')} colors={colors} />
+        <SectionLabel style={styles.sectionLabelSpacing}>
+          {t('settings.appearance')}
+        </SectionLabel>
         <View style={styles.themeRow}>
           <ThemeCard
             dark
@@ -73,13 +83,15 @@ export default function OnboardingStep3() {
         </View>
 
         {/* ── Location Section ──────────────────────────────────────── */}
-        <SectionLabel label={t('settings.location')} colors={colors} />
+        <SectionLabel style={styles.sectionLabelSpacing}>
+          {t('settings.location')}
+        </SectionLabel>
         <View style={[styles.radioGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <RadioRow
             label={t('onboarding.useGpsLocation')}
             sublabel={t('onboarding.gpsDesc')}
-            icon="location-outline"
+            icon="location"
             selected={locationChoice === 'gps'}
             onPress={() => setLocationChoice('gps')}
             colors={colors}
@@ -90,7 +102,7 @@ export default function OnboardingStep3() {
           <RadioRow
             label={t('onboarding.usePuneDefault')}
             sublabel={t('onboarding.puneDesc')}
-            icon="map-outline"
+            icon="map"
             selected={locationChoice === 'default'}
             onPress={() => setLocationChoice('default')}
             colors={colors}
@@ -103,12 +115,14 @@ export default function OnboardingStep3() {
 
       {/* ── Bottom ────────────────────────────────────────────────────── */}
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH, borderTopColor: colors.divider }]}>
-        <ProgressDots current={3} total={3} accent={colors.accent} />
+        <ProgressDots current={3} total={3} />
         <TouchableOpacity
           onPress={handleFinish}
           activeOpacity={0.85}
-          style={[styles.cta, { backgroundColor: colors.accent }]}>
-          <Text style={styles.ctaText}>{t('onboarding.startExploring')}</Text>
+          style={[styles.cta, { backgroundColor: palette.sindoor }]}>
+          <Text variant="mono-caps" style={styles.ctaText}>
+            {t('onboarding.startExploring')}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -126,12 +140,14 @@ interface ThemeCardProps {
 
 function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
   const { t } = useTranslation();
-  const bg = dark ? '#1A1A1F' : '#FAF6F0';
-  const surface = dark ? '#222228' : '#FFFFFF';
-  const textPrimary = dark ? '#F0E6D3' : '#2A2218';
-  const textMuted = dark ? '#6A6560' : '#9A8A7A';
-  const accent = dark ? '#E8893C' : '#C06A20';
-  const borderColor = isSelected ? accent : dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  // Preview chrome colours match the P6 editorial palette — parchment vs.
+  // night-plinth so the preview reads as what the user is about to choose.
+  const bg = dark ? palette.nightPlinth : palette.parchment;
+  const surface = dark ? palette.nightPlinthDeep : palette.parchmentBright;
+  const textPrimary = dark ? palette.boneWhite : palette.ink;
+  const textMuted = dark ? 'rgba(243,229,200,0.45)' : palette.inkMuted;
+  const accent = dark ? palette.goldLeaf : palette.sindoor;
+  const borderColor = isSelected ? palette.sindoor : dark ? 'rgba(243,229,200,0.12)' : palette.paperEdge;
 
   return (
     <TouchableOpacity
@@ -145,17 +161,17 @@ function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
       {/* Mini UI preview */}
       <View style={[styles.miniCard, { backgroundColor: surface }]}>
         <View style={[styles.miniBar, { backgroundColor: accent, width: '60%' }]} />
-        <View style={[styles.miniBar, { backgroundColor: textMuted + '60', width: '80%', height: 4 }]} />
-        <View style={[styles.miniBar, { backgroundColor: textMuted + '40', width: '50%', height: 4 }]} />
+        <View style={[styles.miniBar, { backgroundColor: textMuted, opacity: 0.6, width: '80%', height: 4 }]} />
+        <View style={[styles.miniBar, { backgroundColor: textMuted, opacity: 0.4, width: '50%', height: 4 }]} />
       </View>
 
-      <Text style={[styles.themeLabel, { color: textPrimary }]}>
-        {dark ? `🌙  ${t('onboarding.dark')}` : `☀️  ${t('onboarding.light')}`}
+      <Text variant="display-italic" style={[styles.themeLabel, { color: textPrimary }]}>
+        {dark ? t('onboarding.dark') : t('onboarding.light')}
       </Text>
 
       {isSelected && (
-        <View style={[styles.themeCheck, { backgroundColor: accent }]}>
-          <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+        <View style={[styles.themeCheck, { backgroundColor: palette.sindoor }]}>
+          <Icon name="check" size={12} color={palette.parchmentBright} />
         </View>
       )}
     </TouchableOpacity>
@@ -167,7 +183,7 @@ function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
 interface RadioRowProps {
   label: string;
   sublabel: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: IconName;
   selected: boolean;
   onPress: () => void;
   colors: ColorPalette;
@@ -177,53 +193,18 @@ function RadioRow({ label, sublabel, icon, selected, onPress, colors }: RadioRow
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.radioRow}>
       <View style={[styles.radioIconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-        <Ionicons name={icon} size={17} color={colors.accent} />
+        <Icon name={icon} size={16} color={palette.sindoor} />
       </View>
       <View style={styles.radioText}>
-        <Text style={[styles.radioLabel, { color: colors.textPrimary }]}>{label}</Text>
-        <Text style={[styles.radioSublabel, { color: colors.textSecondary }]}>{sublabel}</Text>
+        <Text variant="body" style={[styles.radioLabel, { color: colors.textPrimary }]}>{label}</Text>
+        <Text variant="body-italic" style={[styles.radioSublabel, { color: colors.textTertiary }]}>{sublabel}</Text>
       </View>
-      <View style={[styles.radioCircle, { borderColor: selected ? colors.accent : colors.border }]}>
-        {selected && <View style={[styles.radioFill, { backgroundColor: colors.accent }]} />}
+      <View style={[styles.radioCircle, { borderColor: selected ? palette.sindoor : colors.border }]}>
+        {selected && <View style={[styles.radioFill, { backgroundColor: palette.sindoor }]} />}
       </View>
     </TouchableOpacity>
   );
 }
-
-// ─── Section Label ────────────────────────────────────────────────────────────
-
-function SectionLabel({ label, colors }: { label: string; colors: ColorPalette }) {
-  return (
-    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
-  );
-}
-
-// ─── Progress Dots ────────────────────────────────────────────────────────────
-
-function ProgressDots({ current, total, accent }: { current: number; total: number; accent: string }) {
-  return (
-    <View style={dotsStyles.row}>
-      {Array.from({ length: total }, (_item, index) => (
-        <View
-          key={index}
-          style={[
-            dotsStyles.dot,
-            index + 1 === current
-              ? { backgroundColor: accent, width: 20 }
-              : index + 1 < current
-              ? { backgroundColor: accent + '60' }
-              : { backgroundColor: 'rgba(128,128,128,0.2)' },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const dotsStyles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  dot: { height: 6, width: 6, borderRadius: 3 },
-});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -235,26 +216,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerStep: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
-
-  scroll: { paddingBottom: 16 },
-
-  titleHindi: { fontSize: 26, fontFamily: 'Mukta_700Bold', marginBottom: 4 },
-  title: { fontSize: 15, fontFamily: 'Mukta_400Regular', marginBottom: 24 },
-
-  sectionLabel: {
-    fontSize: 11,
-    fontFamily: 'Mukta_400Regular',
-    letterSpacing: 1,
-    marginBottom: 10,
-    marginLeft: 4,
-    marginTop: 8,
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  headerStep: { fontSize: 10 },
+
+  scroll: { paddingTop: 16, paddingBottom: 16 },
+
+  title: { fontSize: 30, lineHeight: 36, marginTop: 8, marginBottom: 4 },
+
+  sectionLabelSpacing: { marginTop: 24, marginBottom: 12, marginLeft: 2 },
 
   // Theme cards
-  themeRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  themeRow: { flexDirection: 'row', gap: 12 },
   themeCard: {
     flex: 1,
     borderRadius: borderRadius.card,
@@ -270,7 +252,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   miniBar: { height: 6, borderRadius: 3 },
-  themeLabel: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
+  themeLabel: { fontSize: 18, lineHeight: 22 },
   themeCheck: {
     position: 'absolute',
     top: 8,
@@ -303,8 +285,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   radioText: { flex: 1 },
-  radioLabel: { fontSize: 15, fontFamily: 'Mukta_400Regular' },
-  radioSublabel: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 1 },
+  radioLabel: { fontSize: 15, lineHeight: 20 },
+  radioSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
   radioCircle: {
     width: 20,
     height: 20,
@@ -319,16 +301,16 @@ const styles = StyleSheet.create({
   // Bottom
   bottom: {
     paddingTop: 14,
-    paddingBottom: 8,
+    paddingBottom: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: 14,
     alignItems: 'center',
   },
   cta: {
     width: '100%',
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
-  ctaText: { fontSize: 16, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
+  ctaText: { fontSize: 12, color: palette.parchmentBright },
 });

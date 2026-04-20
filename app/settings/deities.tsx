@@ -3,11 +3,11 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
 
 export default function ManageDeitiesScreen() {
@@ -30,18 +30,18 @@ export default function ManageDeitiesScreen() {
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.backBtn}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('settings.manageDeitiesTitle')}
         </Text>
-        <View style={styles.backBtn} />
+        <View style={styles.backPill} />
       </View>
 
       <View style={[styles.intro, { paddingHorizontal: spacing.screenH }]}>
-        <Text style={[styles.introText, { color: colors.textSecondary }]}>
+        <Text variant="body-italic" style={[styles.introText, { color: colors.textTertiary }]}>
           {t('settings.manageDeitiesDesc')}
         </Text>
       </View>
@@ -54,14 +54,14 @@ export default function ManageDeitiesScreen() {
       />
 
       <View style={[styles.footer, { paddingHorizontal: spacing.screenH, backgroundColor: colors.base, borderTopColor: colors.divider }]}>
-        <Text style={[styles.countLabel, { color: colors.textMuted }]}>
+        <Text variant="mono-caps" style={[styles.countLabel, { color: colors.textMuted }]}>
           {t('onboarding.selectedCount', { count: local.length })}
         </Text>
         <TouchableOpacity
           onPress={handleSave}
           activeOpacity={0.85}
-          style={[styles.saveBtn, { backgroundColor: colors.accent }]}>
-          <Text style={styles.saveText}>{t('common.save')}</Text>
+          style={[styles.saveBtn, { backgroundColor: palette.sindoor }]}>
+          <Text variant="mono-caps" style={styles.saveText}>{t('common.save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -77,14 +77,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22, flex: 1, textAlign: 'center' },
 
-  intro: { paddingTop: 12, paddingBottom: 12 },
-  introText: { fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 19 },
+  intro: { paddingTop: 14, paddingBottom: 14 },
+  introText: { fontSize: 14, lineHeight: 20 },
 
   footer: {
     flexDirection: 'row',
@@ -94,11 +101,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  countLabel: { flex: 1, fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  countLabel: { flex: 1, fontSize: 10 },
   saveBtn: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 26,
     paddingVertical: 12,
     borderRadius: borderRadius.button,
   },
-  saveText: { fontSize: 15, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
+  saveText: { fontSize: 11, color: palette.parchmentBright },
 });

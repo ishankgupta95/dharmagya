@@ -2,14 +2,14 @@ import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
 import { ALL_OCCASIONS, type Occasion } from '@/services/astrology/muhurat';
 
-const OCCASION_ICON: Record<Occasion, React.ComponentProps<typeof Ionicons>['name']> = {
+const OCCASION_ICON: Record<Occasion, IconName> = {
   vivah: 'heart',
   'griha-pravesh': 'home',
   namkaran: 'person',
@@ -28,18 +28,25 @@ export default function MuhuratIndexScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('muhurat.title')}</Text>
-        <View style={styles.backBtn} />
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {t('muhurat.title')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
-        <Text style={[styles.intro, { color: colors.textSecondary }]}>{t('muhurat.intro')}</Text>
+        <Text variant="body-italic" style={[styles.intro, { color: colors.textTertiary }]}>
+          {t('muhurat.intro')}
+        </Text>
 
         <View style={styles.grid}>
           {ALL_OCCASIONS.map(occ => (
@@ -48,18 +55,22 @@ export default function MuhuratIndexScreen() {
               activeOpacity={0.85}
               onPress={() => router.push(`/muhurat/${occ}`)}
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.iconCircle, { backgroundColor: colors.borderAccent }]}>
-                <Ionicons name={OCCASION_ICON[occ]} size={22} color={colors.accent} />
+              <View style={[styles.iconCircle, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
+                <Icon name={OCCASION_ICON[occ]} size={22} color={colors.accent} />
               </View>
-              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{t(`muhurat.occasion.${occ}.name`)}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textMuted }]} numberOfLines={2}>
+              <Text variant="display-italic" style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                {t(`muhurat.occasion.${occ}.name`)}
+              </Text>
+              <Text variant="body-italic" style={[styles.cardDesc, { color: colors.textTertiary }]} numberOfLines={2}>
                 {t(`muhurat.occasion.${occ}.desc`)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={[styles.footer, { color: colors.textMuted }]}>{t('muhurat.footer')}</Text>
+        <Text variant="body-italic" style={[styles.footer, { color: colors.textMuted }]}>
+          {t('muhurat.footer')}
+        </Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -74,14 +85,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22 },
 
-  scroll: { paddingTop: 12, paddingBottom: 32 },
-  intro: { fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 19, marginBottom: 20 },
+  scroll: { paddingTop: 16, paddingBottom: 32 },
+  intro: { fontSize: 14, lineHeight: 21, marginBottom: 22, textAlign: 'center', paddingHorizontal: 4 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: {
@@ -95,12 +113,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  cardTitle: { fontSize: 15, fontFamily: 'Mukta_500Medium', marginBottom: 4 },
-  cardDesc: { fontSize: 11, fontFamily: 'Mukta_400Regular', lineHeight: 15 },
+  cardTitle: { fontSize: 18, lineHeight: 22, marginBottom: 4 },
+  cardDesc: { fontSize: 12, lineHeight: 16 },
 
-  footer: { fontSize: 11, fontFamily: 'Mukta_400Regular', marginTop: 24, textAlign: 'center', lineHeight: 16 },
+  footer: { fontSize: 12, lineHeight: 17, marginTop: 24, textAlign: 'center', paddingHorizontal: 16 },
 });

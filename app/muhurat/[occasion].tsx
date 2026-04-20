@@ -10,11 +10,13 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, semanticColors, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing, semanticColors, type ColorPalette } from '@/config/theme';
+import { Kicker } from '@/components/common/Kicker';
+import { NightCard } from '@/components/common/NightCard';
 import {
   ALL_OCCASIONS,
   scanAuspiciousDays,
@@ -53,9 +55,6 @@ export default function OccasionDetailScreen() {
   const [totalDays, setTotalDays] = useState(SCAN_DAYS);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  // Threshold for the "upcoming" highlight — matches dated on/before this
-  // cutoff get an accent border + badge. Computed once per mount; stable
-  // even as midnight ticks past because the difference is visually tiny.
   const upcomingCutoff = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -63,8 +62,6 @@ export default function OccasionDetailScreen() {
     return d.getTime();
   }, []);
 
-  // Group matches by (year, month) for sectioned rendering. Scan order is
-  // chronological so groups come out in order without re-sorting.
   const monthGroups = useMemo(() => {
     const groups = new Map<string, MuhuratMatch[]>();
     for (const m of matches) {
@@ -81,18 +78,11 @@ export default function OccasionDetailScreen() {
     }));
   }, [matches, i18n.language]);
 
-  // Keep the latest matches + scannedThrough in refs so the unmount cleanup
-  // can persist them without stale-closure issues. `abortRef` is the active
-  // scan's AbortController; `runIdRef` lets us ignore late callbacks from a
-  // previous scan after Refresh is tapped.
   const matchesRef = useRef<MuhuratMatch[]>([]);
   const scannedThroughRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef(0);
 
-  // ── Scan driver ────────────────────────────────────────────────────────────
-  // mode 'auto': read cache and scan forward from scannedThrough (or today).
-  // mode 'refresh': wipe cache, scan full 365 from today.
   function startScan(mode: 'auto' | 'refresh') {
     if (!occasion) return;
     const myRun = ++runIdRef.current;
@@ -125,7 +115,6 @@ export default function OccasionDetailScreen() {
       }
     }
 
-    // Nothing left to scan: we're already complete.
     if (scanFrom.getTime() > targetEnd.getTime()) {
       setMatches(existing);
       matchesRef.current = existing;
@@ -135,7 +124,6 @@ export default function OccasionDetailScreen() {
       return;
     }
 
-    // Show whatever we have from cache immediately; the scan will append.
     matchesRef.current = existing;
     setMatches(existing);
     setScannedCount(0);
@@ -158,8 +146,6 @@ export default function OccasionDetailScreen() {
         if (runIdRef.current !== myRun) return;
         scannedThroughRef.current = p.day;
         setScannedCount(p.scannedCount);
-        // Flush partial scan to cache every N days so a cancel or crash
-        // doesn't lose work.
         if (p.scannedCount % PERSIST_EVERY === 0) {
           writeMuhuratCache(db, occasion, userLocation, matchesRef.current, p.day);
         }
@@ -176,7 +162,6 @@ export default function OccasionDetailScreen() {
       })
       .catch(() => {
         if (runIdRef.current !== myRun) return;
-        // Persist partial progress so Resume still works.
         writeMuhuratCache(db, occasion, userLocation, matchesRef.current, scannedThroughRef.current);
         setStatus('error');
       });
@@ -186,9 +171,6 @@ export default function OccasionDetailScreen() {
     if (!occasion) return;
     startScan('auto');
     return () => {
-      // Persist on unmount so back-navigation mid-scan doesn't waste work.
-      // Bumping runIdRef invalidates any in-flight scan callbacks so they
-      // can't setState after we've been torn down.
       abortRef.current?.abort();
       runIdRef.current += 1;
       if (occasion && scannedThroughRef.current) {
@@ -213,7 +195,7 @@ export default function OccasionDetailScreen() {
   if (!occasion) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-        <Text style={{ color: colors.textPrimary, padding: 24 }}>{t('muhurat.notFound')}</Text>
+        <Text variant="body-italic" style={{ color: colors.textPrimary, padding: 24 }}>{t('muhurat.notFound')}</Text>
       </SafeAreaView>
     );
   }
@@ -223,18 +205,24 @@ export default function OccasionDetailScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {t(`muhurat.occasion.${occasion}.name`)}
         </Text>
         {status === 'complete' ? (
-          <TouchableOpacity onPress={handleRefresh} hitSlop={12} style={styles.backBtn}>
-            <Ionicons name="refresh-outline" size={20} color={colors.textSecondary} />
+          <TouchableOpacity
+            onPress={handleRefresh}
+            hitSlop={12}
+            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Icon name="refresh" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : (
-          <View style={styles.backBtn} />
+          <View style={styles.backPill} />
         )}
       </View>
 
@@ -242,11 +230,11 @@ export default function OccasionDetailScreen() {
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+        <Text variant="body-italic" style={[styles.subtitle, { color: colors.textTertiary }]}>
           {t(`muhurat.occasion.${occasion}.desc`)}
         </Text>
 
-        <Text style={[styles.rangeLabel, { color: colors.textMuted }]}>
+        <Text variant="mono-caps" style={[styles.rangeLabel, { color: colors.textMuted }]}>
           {t('muhurat.scanRange', { days: SCAN_DAYS })}
         </Text>
 
@@ -255,7 +243,7 @@ export default function OccasionDetailScreen() {
           <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.progressHead}>
               <ActivityIndicator color={colors.accent} size="small" />
-              <Text style={[styles.progressText, { color: colors.textPrimary }]}>
+              <Text variant="body" style={[styles.progressText, { color: colors.textPrimary }]}>
                 {t('muhurat.progressCalculating', { current: scannedCount, total: totalDays })}
               </Text>
             </View>
@@ -263,8 +251,8 @@ export default function OccasionDetailScreen() {
               <View style={[styles.progressFill, { backgroundColor: colors.accent, width: `${progressPct}%` }]} />
             </View>
             <TouchableOpacity onPress={handleCancel} style={styles.progressAction}>
-              <Ionicons name="stop-circle-outline" size={16} color={semanticColors.error} />
-              <Text style={[styles.progressActionText, { color: semanticColors.error }]}>
+              <Icon name="stop-circle" size={16} color={semanticColors.error} />
+              <Text variant="mono-caps" style={[styles.progressActionText, { color: semanticColors.error }]}>
                 {t('muhurat.cancelScan')}
               </Text>
             </TouchableOpacity>
@@ -273,12 +261,12 @@ export default function OccasionDetailScreen() {
 
         {status === 'cancelled' && (
           <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.progressText, { color: colors.textPrimary }]}>
+            <Text variant="body" style={[styles.progressText, { color: colors.textPrimary }]}>
               {t('muhurat.scanPaused', { current: scannedCount, total: totalDays })}
             </Text>
             <TouchableOpacity onPress={handleResume} style={styles.progressAction}>
-              <Ionicons name="play-circle-outline" size={16} color={colors.accent} />
-              <Text style={[styles.progressActionText, { color: colors.accent }]}>
+              <Icon name="play-circle" size={16} color={colors.accent} />
+              <Text variant="mono-caps" style={[styles.progressActionText, { color: colors.accent }]}>
                 {t('muhurat.resumeScan')}
               </Text>
             </TouchableOpacity>
@@ -287,10 +275,12 @@ export default function OccasionDetailScreen() {
 
         {status === 'error' && (
           <View style={[styles.errorBox, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-            <Text style={[styles.errorText, { color: colors.textPrimary }]}>{t('muhurat.scanFailed')}</Text>
+            <Text variant="body" style={[styles.errorText, { color: colors.textPrimary }]}>
+              {t('muhurat.scanFailed')}
+            </Text>
             <TouchableOpacity onPress={handleResume} style={styles.progressAction}>
-              <Ionicons name="refresh-outline" size={16} color={colors.accent} />
-              <Text style={[styles.progressActionText, { color: colors.accent }]}>
+              <Icon name="refresh" size={16} color={colors.accent} />
+              <Text variant="mono-caps" style={[styles.progressActionText, { color: colors.accent }]}>
                 {t('muhurat.retryScan')}
               </Text>
             </TouchableOpacity>
@@ -300,24 +290,28 @@ export default function OccasionDetailScreen() {
         {/* ── Results ──────────────────────────────────────────────────── */}
         {status === 'complete' && matches.length === 0 && (
           <View style={[styles.errorBox, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-            <Ionicons name="information-circle-outline" size={22} color={colors.textMuted} />
-            <Text style={[styles.errorText, { color: colors.textPrimary }]}>{t('muhurat.noMatches')}</Text>
-            <Text style={[styles.errorSub, { color: colors.textMuted }]}>{t('muhurat.noMatchesDesc')}</Text>
+            <Icon name="info-circle" size={22} color={colors.textMuted} />
+            <Text variant="body" style={[styles.errorText, { color: colors.textPrimary }]}>{t('muhurat.noMatches')}</Text>
+            <Text variant="body-italic" style={[styles.errorSub, { color: colors.textMuted }]}>{t('muhurat.noMatchesDesc')}</Text>
           </View>
         )}
 
         {matches.length > 0 && (
           <>
-            <Text style={[styles.countLabel, { color: colors.accent }]}>
+            <Text variant="mono-caps" style={[styles.countLabel, { color: colors.accent }]}>
               {t('muhurat.resultsCount', { count: matches.length })}
             </Text>
             {monthGroups.map(group => (
               <View key={group.key} style={styles.monthBlock}>
                 <View style={styles.monthHeader}>
-                  <Text style={[styles.monthHeaderLabel, { color: colors.textPrimary }]}>
+                  <Kicker
+                    color={colors.accent}
+                    size={10}
+                    withTrailingRule
+                    ruleColor={colors.divider}>
                     {group.label}
-                  </Text>
-                  <Text style={[styles.monthHeaderCount, { color: colors.textMuted }]}>
+                  </Kicker>
+                  <Text variant="mono" style={[styles.monthHeaderCount, { color: colors.textMuted }]}>
                     {group.items.length}
                   </Text>
                 </View>
@@ -339,7 +333,7 @@ export default function OccasionDetailScreen() {
           </>
         )}
 
-        <Text style={[styles.disclaimer, { color: colors.textMuted }]}>
+        <Text variant="body-italic" style={[styles.disclaimer, { color: colors.textMuted }]}>
           {t('muhurat.disclaimer')}
         </Text>
 
@@ -395,50 +389,72 @@ function DayRow({
         },
       ]}>
       <View style={styles.dayRowHead}>
-        <View style={[styles.dateCol, { backgroundColor: colors.borderAccent }]}>
-          <Text style={[styles.dateWeek, { color: colors.accent }]}>{weekday}</Text>
-          <Text style={[styles.dateNum, { color: colors.accent }]}>{dayNum}</Text>
-          <Text style={[styles.dateMonth, { color: colors.accent }]}>{month.slice(0, 3)} {year}</Text>
+        <View
+          style={[
+            styles.dateCol,
+            { backgroundColor: isUpcoming ? palette.sindoor : colors.surfaceRecessed },
+          ]}>
+          <Text
+            variant="mono-caps"
+            style={[styles.dateWeek, { color: isUpcoming ? palette.parchmentBright : colors.textMuted }]}>
+            {weekday}
+          </Text>
+          <Text
+            variant="display-italic"
+            style={[styles.dateNum, { color: isUpcoming ? palette.parchmentBright : colors.textPrimary }]}>
+            {dayNum}
+          </Text>
+          <Text
+            variant="mono-caps"
+            style={[styles.dateMonth, { color: isUpcoming ? palette.parchmentBright : colors.textMuted }]}>
+            {month.slice(0, 3)} {year}
+          </Text>
         </View>
         <View style={styles.dayInfo}>
           <View style={styles.dayTitleRow}>
-            <Text style={[styles.dayTithi, { color: colors.textPrimary }]} numberOfLines={1}>
+            <Text variant="body" style={[styles.dayTithi, { color: colors.textPrimary }]} numberOfLines={1}>
               {match.tithi}
             </Text>
             {isUpcoming && (
-              <View style={[styles.upcomingBadge, { backgroundColor: colors.accent }]}>
-                <Text style={[styles.upcomingBadgeText, { color: colors.base }]}>
+              <View style={[styles.upcomingBadge, { borderColor: colors.accent }]}>
+                <Text variant="mono-caps" style={[styles.upcomingBadgeText, { color: colors.accent }]}>
                   {t('muhurat.upcomingBadge')}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={[styles.dayMeta, { color: colors.textMuted }]} numberOfLines={1}>
+          <Text variant="body-italic" style={[styles.dayMeta, { color: colors.textTertiary }]} numberOfLines={1}>
             {match.nakshatra} · {match.yoga} · {match.vara}
           </Text>
         </View>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
       </View>
 
       {expanded && (
         <View style={[styles.detail, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.detailHeading, { color: colors.accent }]}>{t('muhurat.bestSlots')}</Text>
+          <Kicker color={palette.gold} size={9} style={styles.detailHeading}>
+            {t('muhurat.bestSlots')}
+          </Kicker>
           {bestSlots.length === 0 ? (
-            <Text style={[styles.detailText, { color: colors.textMuted }]}>{t('muhurat.noSlots')}</Text>
+            <Text variant="body-italic" style={[styles.detailText, { color: colors.textMuted }]}>
+              {t('muhurat.noSlots')}
+            </Text>
           ) : (
-            bestSlots.map((s, i) => (
-              <View key={i} style={styles.slotRow}>
-                <Text style={[styles.slotName, { color: colors.textPrimary }]}>{s.label}</Text>
-                <Text style={[styles.slotTime, { color: colors.textSecondary }]}>
-                  {s.start} – {s.end}
-                </Text>
-              </View>
-            ))
+            <NightCard padding={12} showMandala={false} bracketInset={6} style={styles.slotsPlinth}>
+              {bestSlots.map((s, i) => (
+                <View key={i} style={styles.slotRow}>
+                  <Text variant="body-italic" style={styles.slotName}>{s.label}</Text>
+                  <Text variant="mono" style={styles.slotTime}>
+                    {s.start} – {s.end}
+                  </Text>
+                </View>
+              ))}
+            </NightCard>
           )}
 
           <View style={styles.rahuRow}>
-            <Ionicons name="warning-outline" size={12} color={semanticColors.error} />
-            <Text style={[styles.rahuText, { color: colors.textMuted }]}>
+            <Icon name="warning" size={12} color={semanticColors.error} />
+            <Text variant="mono" style={[styles.rahuText, { color: colors.textMuted }]}>
               {t('muhurat.avoidRahu', {
                 start: match.panchang.rahuKalamStart ?? '—',
                 end: match.panchang.rahuKalamEnd ?? '—',
@@ -468,7 +484,6 @@ function getBestSlots(match: MuhuratMatch): DisplaySlot[] {
   if (p.brahmaMuhurtaStart && p.brahmaMuhurtaEnd) {
     out.push({ label: 'Brahma Muhurta', start: p.brahmaMuhurtaStart, end: p.brahmaMuhurtaEnd });
   }
-  // Top 3 auspicious choghadiya slots (day period) by arrival order.
   const auspiciousChoghadiya = p.choghadiya?.day?.filter(s => s.quality === 'auspicious') ?? [];
   for (const s of auspiciousChoghadiya.slice(0, 3)) {
     out.push({ label: `Choghadiya · ${s.name}`, start: s.start, end: s.end });
@@ -485,16 +500,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium', flex: 1, textAlign: 'center' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 20, flex: 1, textAlign: 'center' },
 
   scroll: { paddingTop: 14, paddingBottom: 32 },
-  subtitle: { fontSize: 13, fontFamily: 'Mukta_400Regular', lineHeight: 19, marginBottom: 6 },
-  rangeLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginBottom: 16 },
-  countLabel: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1, marginBottom: 12 },
+  subtitle: { fontSize: 14, lineHeight: 20, marginBottom: 10, textAlign: 'center' },
+  rangeLabel: { fontSize: 9, marginBottom: 16, textAlign: 'center' },
+  countLabel: { fontSize: 10, marginBottom: 14 },
 
   progressCard: {
     borderRadius: borderRadius.cardInner,
@@ -504,11 +527,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   progressHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  progressText: { flex: 1, fontSize: 13, fontFamily: 'Mukta_500Medium' },
-  progressBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  progressText: { flex: 1, fontSize: 13 },
+  progressBar: { height: 3, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },
   progressAction: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
-  progressActionText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  progressActionText: { fontSize: 10 },
 
   errorBox: {
     alignItems: 'center',
@@ -518,20 +541,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
-  errorText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  errorSub: { fontSize: 12, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
+  errorText: { fontSize: 14 },
+  errorSub: { fontSize: 12, textAlign: 'center' },
 
   monthBlock: { marginBottom: 8 },
   monthHeader: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop: 4,
-    marginBottom: 8,
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 2,
+    marginTop: 6,
+    marginBottom: 10,
   },
-  monthHeaderLabel: { fontSize: 14, fontFamily: 'Mukta_500Medium', letterSpacing: 0.5 },
-  monthHeaderCount: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  monthHeaderCount: { fontSize: 10 },
 
   dayRow: {
     borderRadius: borderRadius.cardInner,
@@ -543,34 +565,32 @@ const styles = StyleSheet.create({
   upcomingBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 3,
+    borderWidth: 1,
   },
-  upcomingBadgeText: {
-    fontSize: 9,
-    fontFamily: 'Mukta_500Medium',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
+  upcomingBadgeText: { fontSize: 8 },
   dayRowHead: { flexDirection: 'row', alignItems: 'center', padding: 10, gap: 12 },
   dateCol: {
-    width: 60,
+    width: 62,
     borderRadius: 10,
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
+    gap: 1,
   },
-  dateWeek: { fontSize: 10, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  dateNum: { fontSize: 22, fontFamily: 'Mukta_700Bold', lineHeight: 26 },
-  dateMonth: { fontSize: 9, fontFamily: 'Mukta_400Regular' },
+  dateWeek: { fontSize: 8 },
+  dateNum: { fontSize: 22, lineHeight: 26 },
+  dateMonth: { fontSize: 7 },
   dayInfo: { flex: 1 },
-  dayTithi: { flexShrink: 1, fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  dayMeta: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  dayTithi: { flexShrink: 1, fontSize: 14, lineHeight: 19 },
+  dayMeta: { fontSize: 12, lineHeight: 16 },
 
   detail: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  detailHeading: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1, marginBottom: 6 },
-  detailText: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginBottom: 4 },
-  slotRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  slotName: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
-  slotTime: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  detailHeading: { marginBottom: 10 },
+  detailText: { fontSize: 12, marginBottom: 4 },
+  slotsPlinth: { marginTop: 2 },
+  slotRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  slotName: { fontSize: 13, lineHeight: 18, color: palette.boneWhite },
+  slotTime: { fontSize: 12, lineHeight: 16, color: palette.goldLeaf },
 
   rahuRow: {
     flexDirection: 'row',
@@ -581,14 +601,12 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'transparent',
   },
-  rahuText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  rahuText: { fontSize: 10, lineHeight: 14 },
 
   disclaimer: {
     fontSize: 11,
-    fontFamily: 'Mukta_400Regular',
     marginTop: 20,
     lineHeight: 16,
     textAlign: 'center',
-    fontStyle: 'italic',
   },
 });

@@ -25,10 +25,12 @@ export default {
     greetingMorning: 'Good Morning',
     greetingAfternoon: 'Good Afternoon',
     greetingEvening: 'Good Evening',
-    greetingMorningHi: 'Good Morning',
-    greetingAfternoonHi: 'Good Afternoon',
-    greetingEveningHi: 'Good Evening',
     todaysPanchang: "TODAY'S PANCHANG",
+    panchangKicker: 'The Five Limbs',
+    panchangTitleDeva: 'आज का पंचांग',
+    featuredKicker: 'For your deities · Today',
+    dashaCurrentBody: 'You are in {{planet}} mahādaśā',
+    setDashaPrompt: 'Set your birth date to unlock your 120-year timeline',
     tithi: 'TITHI',
     nakshatra: 'NAKSHATRA',
     yoga: 'YOGA',
@@ -57,6 +59,9 @@ export default {
   // ── Panchang Screen ─────────────────────────────────────────────────────
   panchang: {
     title: 'Panchang',
+    headerTitle: 'Panchāng',
+    datePickerTitle: 'Pick a date',
+    todayChip: 'Today',
     jumpToToday: 'Jump to Today',
     vsSamvat: 'VS SAMVAT {{year}}',
     calculationFailed: 'Calculation failed',
@@ -132,6 +137,13 @@ export default {
     godsTitle: 'Gods',
     godsTitleEn: 'Gods',
     godsSegment: 'Gods',
+    searchPlaceholder: 'Search gods, aartis, chalisas…',
+    countAartis_one: '{{count}} aarti',
+    countAartis_other: '{{count}} aartis',
+    countChalisas_one: '{{count}} chālīsā',
+    countChalisas_other: '{{count}} chālīsās',
+    countNone: 'Coming soon',
+    emptyForQuery: 'Nothing found for "{{query}}".',
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
@@ -152,6 +164,13 @@ export default {
   },
   chalisa: {
     notFound: 'Chalisa not available for this deity.',
+  },
+  reader: {
+    aartiLabel: 'Aarti',
+    chalisaLabel: 'Chalisa',
+    verseLabel: 'Verse {{num}}',
+    refrainTag: 'refrain',
+    playerMeta: 'Read along · Coming soon',
   },
   langToggle: {
     english: 'English',
@@ -185,6 +204,7 @@ export default {
     noFestivals: 'No festivals found for {{year}}',
     searchPlaceholder: 'Search festivals…',
     noSearchResults: 'No matches for "{{query}}" in {{year}}',
+    soonBadge: 'Soon',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -326,6 +346,7 @@ export default {
     next: 'Next',
     done: 'Done!',
     tapHighlighted: 'Tap the highlighted area',
+    stepCounter: 'Step {{current}} · of {{total}}',
     // Step 1 – Home: spotlight on panchang card
     step1Title: "Today's Panchang",
     step1Desc: 'This card shows the current tithi, nakshatra, and today\'s highlights. Tap it to see the full daily panchang.',
@@ -386,7 +407,7 @@ export default {
   onboarding: {
     // Step 1
     tagline: 'Your daily bridge to the divine',
-    beginJourney: 'Begin Journey  →',
+    beginJourney: 'Begin Journey',
     takesSeconds: 'Takes just 30 seconds',
     // Step 2
     step2of3: 'Step 2 of 3',

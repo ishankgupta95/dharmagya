@@ -25,10 +25,12 @@ export default {
     greetingMorning: 'शुभ प्रभात',
     greetingAfternoon: 'शुभ दोपहर',
     greetingEvening: 'शुभ संध्या',
-    greetingMorningHi: 'शुभ प्रभात',
-    greetingAfternoonHi: 'शुभ दोपहर',
-    greetingEveningHi: 'शुभ संध्या',
     todaysPanchang: 'आज का पंचांग',
+    panchangKicker: 'पंच अंग',
+    panchangTitleDeva: 'आज का पंचांग',
+    featuredKicker: 'आपके इष्ट देवों के लिए · आज',
+    dashaCurrentBody: 'आप {{planet}} महादशा में हैं',
+    setDashaPrompt: 'अपनी जन्म तिथि सेट करें और 120-वर्षीय समय-सारणी देखें',
     tithi: 'तिथि',
     nakshatra: 'नक्षत्र',
     yoga: 'योग',
@@ -57,6 +59,9 @@ export default {
   // ── Panchang Screen ─────────────────────────────────────────────────────
   panchang: {
     title: 'पंचांग',
+    headerTitle: 'पंचांग',
+    datePickerTitle: 'दिनांक चुनें',
+    todayChip: 'आज',
     jumpToToday: 'आज पर जाएँ',
     vsSamvat: 'वि.सं. {{year}}',
     calculationFailed: 'गणना विफल',
@@ -132,6 +137,13 @@ export default {
     godsTitle: 'भगवान',
     godsTitleEn: 'भगवान',
     godsSegment: 'भगवान',
+    searchPlaceholder: 'देवता, आरती, चालीसा खोजें…',
+    countAartis_one: '{{count}} आरती',
+    countAartis_other: '{{count}} आरतियाँ',
+    countChalisas_one: '{{count}} चालीसा',
+    countChalisas_other: '{{count}} चालीसा',
+    countNone: 'जल्द आ रहा है',
+    emptyForQuery: '"{{query}}" के लिए कुछ नहीं मिला।',
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
@@ -152,6 +164,13 @@ export default {
   },
   chalisa: {
     notFound: 'इस देवता की चालीसा उपलब्ध नहीं है।',
+  },
+  reader: {
+    aartiLabel: 'आरती',
+    chalisaLabel: 'चालीसा',
+    verseLabel: 'पद {{num}}',
+    refrainTag: 'टेक',
+    playerMeta: 'साथ पढ़ें · जल्द आ रहा है',
   },
   langToggle: {
     english: 'English',
@@ -185,6 +204,7 @@ export default {
     noFestivals: '{{year}} के लिए कोई त्योहार नहीं मिला',
     searchPlaceholder: 'त्यौहार खोजें…',
     noSearchResults: '{{year}} में "{{query}}" के लिए कोई परिणाम नहीं',
+    soonBadge: 'शीघ्र',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -326,6 +346,7 @@ export default {
     next: 'आगे',
     done: 'पूर्ण!',
     tapHighlighted: 'हाइलाइट किए गए हिस्से पर टैप करें',
+    stepCounter: 'चरण {{current}} · कुल {{total}}',
     step1Title: 'आज का पंचांग',
     step1Desc: 'यह कार्ड वर्तमान तिथि, नक्षत्र और आज की मुख्य बातें दिखाता है। पूरा पंचांग देखने के लिए टैप करें।',
     step2Title: 'विस्तृत पंचांग',
@@ -382,7 +403,7 @@ export default {
   onboarding: {
     // Step 1
     tagline: 'आपका दैनिक ईश्वरीय सेतु',
-    beginJourney: 'यात्रा शुरू करें  →',
+    beginJourney: 'यात्रा शुरू करें',
     takesSeconds: 'बस 30 सेकंड लगेंगे',
     // Step 2
     step2of3: 'चरण 2 / 3',

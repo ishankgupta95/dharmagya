@@ -6,7 +6,7 @@ import {
   StyleSheet,
   FlatList,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from './AppText';
@@ -138,7 +138,7 @@ export function DatePickerModal({
               {/* Year selector */}
               <View style={styles.monthRow}>
                 <TouchableOpacity onPress={() => setJumperYear(Math.max(minYear, jumperYear - 1))} hitSlop={12}>
-                  <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+                  <Icon name="chevron-left" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
                 <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
                   {jumperYear}
@@ -149,7 +149,7 @@ export function DatePickerModal({
                     setJumperYear(Math.min(cap, jumperYear + 1));
                   }}
                   hitSlop={12}>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                  <Icon name="chevron-right" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -219,15 +219,16 @@ export function DatePickerModal({
               {/* Month nav */}
               <View style={styles.monthRow}>
                 <TouchableOpacity onPress={prevMonth} hitSlop={12} disabled={!canPrev}>
-                  <Ionicons name="chevron-back" size={20} color={canPrev ? colors.textSecondary : colors.textDisabled} />
+                  <Icon name="chevron-left" size={20} color={canPrev ? colors.textSecondary : colors.textDisabled} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={openJumper} hitSlop={8}>
+                <TouchableOpacity onPress={openJumper} hitSlop={8} style={styles.monthLabelRow}>
                   <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
-                    {(t('panchang.monthNames', { returnObjects: true }) as string[])[month]} {year}  <Ionicons name="caret-down" size={12} color={colors.textMuted} />
+                    {(t('panchang.monthNames', { returnObjects: true }) as string[])[month]} {year}
                   </Text>
+                  <Icon name="caret-down" size={12} color={colors.textMuted} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={nextMonth} hitSlop={12} disabled={!canNext}>
-                  <Ionicons name="chevron-forward" size={20} color={canNext ? colors.textSecondary : colors.textDisabled} />
+                  <Icon name="chevron-right" size={20} color={canNext ? colors.textSecondary : colors.textDisabled} />
                 </TouchableOpacity>
               </View>
 
@@ -309,10 +310,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 20,
   },
-  title: { fontSize: 16, fontFamily: 'Mukta_500Medium', marginBottom: 12, textAlign: 'center' },
+  title: { fontSize: 16, fontFamily: 'NotoSerifDevanagari_500Medium', marginBottom: 12, textAlign: 'center' },
 
   monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  monthLabel: { fontSize: 16, fontFamily: 'Mukta_500Medium' },
+  monthLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  monthLabel: { fontSize: 16, fontFamily: 'NotoSerifDevanagari_500Medium' },
 
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   monthCell: {
@@ -322,7 +324,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
-  monthCellText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  monthCellText: { fontSize: 13, fontFamily: 'NotoSerifDevanagari_500Medium' },
 
   yearList: { paddingVertical: 4, gap: 8 },
   yearChip: {
@@ -334,15 +336,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 8,
   },
-  yearChipText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  yearChipText: { fontSize: 13, fontFamily: 'JetBrainsMono_500Medium' },
 
   calRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  dayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 0.5 },
+  dayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 0.5 },
 
   calGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
   cellInner: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  dayNum: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
+  dayNum: { fontSize: 14, fontFamily: 'JetBrainsMono_500Medium' },
 
   bottomRow: { flexDirection: 'row', gap: 12 },
   bottomBtn: {
@@ -353,12 +355,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottomBtnPrimary: { borderWidth: 0 },
-  bottomBtnText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
+  bottomBtnText: { fontSize: 14, fontFamily: 'NotoSerifDevanagari_500Medium' },
 
   doneBtn: {
     paddingVertical: 14,
     borderRadius: borderRadius.cardInner,
     alignItems: 'center',
   },
-  doneText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
+  doneText: { fontSize: 14, fontFamily: 'NotoSerifDevanagari_500Medium' },
 });

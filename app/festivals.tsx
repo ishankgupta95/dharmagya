@@ -8,12 +8,13 @@ import {
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore, type Region } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { Kicker } from '@/components/common/Kicker';
 import { AdBanner } from '@/components/common/AdBanner';
 
 import festivalsData from '@/data/static/festivals.json';
@@ -42,16 +43,21 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const TYPE_ICON: Record<string, { icon: string; color: string }> = {
-  major: { icon: 'star', color: '#F9A825' },
-  minor: { icon: 'star-half', color: '#9E9E9E' },
+// Color string is resolved at render-time so type 'major' can pick up the
+// theme-responsive accent (sindoor in light, goldLeaf in dark) for WCAG contrast.
+const TYPE_ICON: Record<string, { icon: IconName; color: string | null }> = {
+  major: { icon: 'star', color: null },
+  minor: { icon: 'star-half', color: palette.gold },
   ekadashi: { icon: 'moon', color: '#7AA8C8' },
   smarta_ekadashi: { icon: 'moon', color: '#7AA8C8' },
   vaishnava_ekadashi: { icon: 'moon', color: '#7AA8C8' },
-  pradosha: { icon: 'moon-outline', color: '#9575CD' },
-  sankranti: { icon: 'sunny', color: '#E8893C' },
+  pradosha: { icon: 'moon', color: '#9575CD' },
+  sankranti: { icon: 'sun', color: '#E8893C' },
   eclipse: { icon: 'contrast', color: '#E24B4A' },
 };
+
+/** Window used to flag upcoming items with a "Soon" badge + accent border. */
+const SOON_WINDOW_DAYS = 14;
 
 /**
  * Regional Sankranti variants → the Region they belong to. Used only to promote
@@ -80,15 +86,6 @@ const REGIONAL_SANKRANTI: Record<string, Region> = {
   'Sair': 'himachal-pradesh',
 };
 
-/**
- * Collapse same-day Sankranti entries into a single row with regional names as
- * a subtitle. Picks a primary name using this priority:
- *   1. User's region-specific variant (e.g. "Pongal" for region='tamil')
- *   2. A compound pan-Indian name like "Makar Sankranti" / "Dakshinayana"
- *   3. The generic "Sankranti" fused with its description rashi
- *      (e.g. "Sankranti (Mesha)")
- *   4. First entry as-is (fallback)
- */
 function collapseSankrantiVariants(list: FestivalEntry[], region: Region): FestivalEntry[] {
   const sankrantis = list.filter(f => f.type === 'sankranti');
   if (sankrantis.length <= 1) return list;
@@ -97,15 +94,12 @@ function collapseSankrantiVariants(list: FestivalEntry[], region: Region): Festi
 
   let primary: FestivalEntry | undefined;
 
-  // 1. Try user's regional preference.
   if (region !== 'all') {
     const regionalMatch = sankrantis.find(
       f => REGIONAL_SANKRANTI[f.name] === region,
     );
     if (regionalMatch) primary = regionalMatch;
   }
-  // 2. Compound pan-Indian (e.g. "Makar Sankranti", "Dakshinayana"). Exclude
-  //    regional compounds like "Singh Sankranti" via the regional map.
   if (!primary) {
     primary = sankrantis.find(
       f =>
@@ -114,7 +108,6 @@ function collapseSankrantiVariants(list: FestivalEntry[], region: Region): Festi
         /sankranti|uttarayana|dakshinayana/i.test(f.name),
     );
   }
-  // 3. Generic "Sankranti" + rashi.
   if (!primary) {
     const generic = sankrantis.find(f => f.name === 'Sankranti');
     if (generic?.description) {
@@ -124,11 +117,8 @@ function collapseSankrantiVariants(list: FestivalEntry[], region: Region): Festi
       };
     }
   }
-  // 4. Fallback.
   if (!primary) primary = sankrantis[0];
 
-  // Collect regional variants (everything except the chosen primary and the
-  // generic "Sankranti" umbrella, which is implicit).
   const variants = names.filter(
     n => n !== primary!.name && n !== 'Sankranti',
   );
@@ -141,11 +131,6 @@ function collapseSankrantiVariants(list: FestivalEntry[], region: Region): Festi
   return [...list.filter(f => f.type !== 'sankranti'), merged];
 }
 
-/**
- * Collapse same-day Ekadashi sub-variants. When smarta and vaishnava share the
- * same description (no Dashami-viddha split), show one combined entry using
- * the classical name from description. When they split, show both.
- */
 function collapseEkadashiPair(list: FestivalEntry[]): FestivalEntry[] {
   const smarta = list.find(f => f.type === 'smarta_ekadashi');
   const vaishnava = list.find(f => f.type === 'vaishnava_ekadashi');
@@ -154,7 +139,6 @@ function collapseEkadashiPair(list: FestivalEntry[]): FestivalEntry[] {
     smarta.description && smarta.description === vaishnava.description;
   const smartaDeferred = !!smarta.deferralDate;
   if (sameClassicalName && !smartaDeferred) {
-    // Merge into a single canonical Ekadashi row
     const merged: FestivalEntry = {
       name: smarta.description!,
       type: 'ekadashi',
@@ -187,8 +171,6 @@ function parseFestivalDays(year: number, region: Region): FestivalDay[] {
   }));
 }
 
-/** True when the festival's name, description, or any regional variant matches
- *  the query (case-insensitive substring). */
 function festivalMatches(f: FestivalEntry, q: string): boolean {
   if (f.name.toLowerCase().includes(q)) return true;
   if (f.description?.toLowerCase().includes(q)) return true;
@@ -207,9 +189,6 @@ export default function FestivalsScreen() {
 
   const festivalDays = useMemo(() => parseFestivalDays(year, region), [year, region]);
 
-  /** Festivals filtered by search query. When a day has at least one match,
-   *  its festival list is trimmed to only matching entries so the row shows
-   *  just the relevant hit instead of the full day. */
   const visibleDays = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return festivalDays;
@@ -234,56 +213,66 @@ export default function FestivalsScreen() {
   }, [visibleDays, year]);
 
   const today = new Date();
+  const soonCutoff = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + SOON_WINDOW_DAYS);
+    return d.getTime();
+  }, []);
+  const nowStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
   const canGoBack = year > MIN_YEAR;
   const canGoForward = year < MAX_YEAR;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          hitSlop={12}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>{t('festivals.title')}</Text>
-        <View style={{ width: 22 }} />
+        <Text variant="display-italic" style={[styles.screenTitle, { color: colors.textPrimary }]}>
+          {t('festivals.title')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
-      {/* Year selector */}
+      {/* ── Year selector ──────────────────────────────────────────── */}
       <View style={[styles.yearRow, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity
-          onPress={() => setYear(y => y - 1)}
-          hitSlop={12}
-          disabled={!canGoBack}
-        >
-          <Ionicons name="chevron-back" size={20} color={canGoBack ? colors.textSecondary : colors.textMuted} />
+        <TouchableOpacity onPress={() => setYear(y => y - 1)} hitSlop={12} disabled={!canGoBack}>
+          <Icon name="chevron-left" size={20} color={canGoBack ? colors.textSecondary : colors.textMuted} />
         </TouchableOpacity>
-        <Text style={[styles.yearLabel, { color: colors.textPrimary }]}>{year}</Text>
-        <TouchableOpacity
-          onPress={() => setYear(y => y + 1)}
-          hitSlop={12}
-          disabled={!canGoForward}
-        >
-          <Ionicons name="chevron-forward" size={20} color={canGoForward ? colors.textSecondary : colors.textMuted} />
+        <Text variant="display-italic" style={[styles.yearLabel, { color: colors.textPrimary }]}>
+          {year}
+        </Text>
+        <TouchableOpacity onPress={() => setYear(y => y + 1)} hitSlop={12} disabled={!canGoForward}>
+          <Icon name="chevron-right" size={20} color={canGoForward ? colors.textSecondary : colors.textMuted} />
         </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
+      {/* ── Search bar ─────────────────────────────────────────────── */}
       <View style={[styles.searchBar, { paddingHorizontal: spacing.screenH }]}>
-        <View style={[styles.searchInputWrap, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-          <Ionicons name="search" size={16} color={colors.textMuted} />
+        <View style={[styles.searchInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder={t('festivals.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.textPrimary }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={10}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              <Icon name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -300,19 +289,29 @@ export default function FestivalsScreen() {
         windowSize={5}
         renderSectionHeader={({ section }) => (
           <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
-            <Text style={[styles.sectionTitle, { color: colors.accent }]}>{section.title}</Text>
+            <Kicker
+              color={colors.accent}
+              size={10}
+              withTrailingRule
+              ruleColor={colors.divider}>
+              {section.title}
+            </Kicker>
           </View>
         )}
-        renderItem={({ item }) => (
-          <FestivalRow
-            item={item}
-            colors={colors}
-            isToday={isSameDay(item.date, today)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const t0 = item.date.getTime();
+          return (
+            <FestivalRow
+              item={item}
+              colors={colors}
+              isToday={isSameDay(item.date, today)}
+              isSoon={t0 >= nowStart && t0 <= soonCutoff && !isSameDay(item.date, today)}
+            />
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+            <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
               {searchQuery.trim()
                 ? t('festivals.noSearchResults', { query: searchQuery.trim(), year })
                 : t('festivals.noFestivals', { year })}
@@ -330,33 +329,61 @@ function FestivalRow({
   item,
   colors,
   isToday,
+  isSoon,
 }: {
   item: FestivalDay;
   colors: ColorPalette;
   isToday: boolean;
+  isSoon: boolean;
 }) {
+  const { t } = useTranslation();
   const dayName = item.date.toLocaleDateString('en-IN', { weekday: 'short' });
   const dayNum = item.date.getDate();
+  const highlighted = isToday || isSoon;
 
   return (
-    <View style={[styles.festivalRow, { borderColor: colors.divider }, isToday && { borderColor: colors.accent, borderWidth: 1.5 }]}>
-      <View style={[styles.dateCol, { backgroundColor: isToday ? colors.accent : colors.surfaceRecessed }]}>
-        <Text style={[styles.dateDayName, { color: isToday ? colors.base : colors.textMuted }]}>{dayName}</Text>
-        <Text style={[styles.dateDayNum, { color: isToday ? colors.base : colors.textPrimary }]}>{dayNum}</Text>
+    <View
+      style={[
+        styles.festivalRow,
+        { borderColor: colors.divider, backgroundColor: colors.surface },
+        highlighted && {
+          borderColor: colors.accent,
+          borderWidth: isToday ? 1.5 : 1,
+        },
+      ]}>
+      <View
+        style={[
+          styles.dateCol,
+          { backgroundColor: isToday ? palette.sindoor : colors.surfaceRecessed },
+        ]}>
+        <Text
+          variant="mono-caps"
+          style={[
+            styles.dateDayName,
+            { color: isToday ? palette.parchmentBright : colors.textMuted },
+          ]}>
+          {dayName}
+        </Text>
+        <Text
+          variant="display-italic"
+          style={[
+            styles.dateDayNum,
+            { color: isToday ? palette.parchmentBright : colors.textPrimary },
+          ]}>
+          {dayNum}
+        </Text>
       </View>
 
       <View style={styles.festivalCol}>
+        {isSoon && !isToday && (
+          <View style={[styles.soonBadge, { borderColor: colors.accent }]}>
+            <Text variant="mono-caps" style={[styles.soonBadgeText, { color: colors.accent }]}>
+              {t('festivals.soonBadge')}
+            </Text>
+          </View>
+        )}
         {item.festivals.map((f, i) => {
           const typeInfo = TYPE_ICON[f.type] ?? TYPE_ICON.minor;
-          // Description-vs-name rule:
-          //   - Smarta/Vaishnava Ekadashi sub-variants (Dashami-viddha split):
-          //       name = "Smarta Ekadashi" (sect label), description = classical name.
-          //       Show description as primary, sect + deferral as secondary.
-          //   - Merged generic Ekadashi (from collapseEkadashiPair):
-          //       name is already the classical name; description absent.
-          //   - Everything else (sankranti, major, minor, pradosha, eclipse):
-          //       name is the specific festival ("Pongal", "Diwali"); description
-          //       carries metadata (rashi, paksha) — keep as secondary note.
           const isSubvariant =
             f.type === 'smarta_ekadashi' || f.type === 'vaishnava_ekadashi';
           const primary = isSubvariant && f.description ? f.description : f.name;
@@ -369,19 +396,21 @@ function FestivalRow({
           } else if (
             f.description &&
             f.description !== f.name &&
-            // Sankranti description is just the rashi name (e.g. "Makara") — redundant
-            // and repeats across every regional variant for the day.
             f.type !== 'sankranti'
           ) {
             secondary = f.description;
           }
           return (
             <View key={i} style={styles.festivalItem}>
-              <Ionicons name={typeInfo.icon as any} size={14} color={typeInfo.color} />
+              <View style={{ marginTop: 3 }}>
+                <Icon name={typeInfo.icon} size={14} color={typeInfo.color ?? colors.accent} />
+              </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.festivalName, { color: colors.textPrimary }]}>{primary}</Text>
+                <Text variant="body" style={[styles.festivalName, { color: colors.textPrimary }]}>
+                  {primary}
+                </Text>
                 {secondary && (
-                  <Text style={[styles.festivalSecondary, { color: colors.textMuted }]}>
+                  <Text variant="body-italic" style={[styles.festivalSecondary, { color: colors.textMuted }]}>
                     {secondary}
                   </Text>
                 )}
@@ -397,56 +426,87 @@ function FestivalRow({
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
-  screenTitle: { fontSize: 18, fontFamily: 'Mukta_500Medium' },
+  // Header
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  screenTitle: { fontSize: 22 },
 
-  yearRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24, paddingBottom: 12 },
-  yearLabel: { fontSize: 20, fontFamily: 'Mukta_700Bold' },
+  yearRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+  yearLabel: { fontSize: 30, lineHeight: 36 },
 
   searchBar: { paddingBottom: 12 },
   searchInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: borderRadius.cardInner,
+    borderRadius: borderRadius.button,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    fontFamily: 'Mukta_400Regular',
     padding: 0,
   },
 
-  sectionHeader: { paddingTop: 16, paddingBottom: 8 },
-  sectionTitle: { fontSize: 12, fontFamily: 'Mukta_500Medium', letterSpacing: 1 },
+  sectionHeader: { paddingTop: 18, paddingBottom: 10 },
 
   festivalRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 12,
     marginBottom: 8,
     borderRadius: borderRadius.cardInner,
-    borderWidth: 0.5,
+    borderWidth: 1,
     overflow: 'hidden',
   },
 
   dateCol: {
-    width: 52,
+    width: 56,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+    gap: 2,
   },
-  dateDayName: { fontSize: 10, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  dateDayNum: { fontSize: 20, fontFamily: 'Mukta_700Bold', lineHeight: 24 },
+  dateDayName: { fontSize: 9 },
+  dateDayNum: { fontSize: 26, lineHeight: 30 },
 
-  festivalCol: { flex: 1, paddingVertical: 10, paddingRight: 12, gap: 4 },
-  festivalItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  festivalName: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  festivalSecondary: { fontSize: 11, fontFamily: 'Mukta_400Regular', marginTop: 1 },
+  festivalCol: { flex: 1, paddingVertical: 10, paddingRight: 12, gap: 6 },
+  festivalItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  festivalName: { fontSize: 14, lineHeight: 19 },
+  festivalSecondary: { fontSize: 11, lineHeight: 15, marginTop: 1 },
+
+  soonBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  soonBadgeText: { fontSize: 8 },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
-  emptyText: { fontSize: 14, fontFamily: 'Mukta_400Regular' },
+  emptyText: { fontSize: 14 },
 });

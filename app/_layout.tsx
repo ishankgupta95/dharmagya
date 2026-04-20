@@ -7,10 +7,21 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import {
   useFonts,
-  Mukta_400Regular,
-  Mukta_500Medium,
-  Mukta_700Bold,
-} from '@expo-google-fonts/mukta';
+  Fraunces_300Light,
+  Fraunces_400Regular,
+  Fraunces_500Medium,
+  Fraunces_300Light_Italic,
+  Fraunces_400Regular_Italic,
+} from '@expo-google-fonts/fraunces';
+import {
+  NotoSerifDevanagari_400Regular,
+  NotoSerifDevanagari_500Medium,
+  NotoSerifDevanagari_700Bold,
+} from '@expo-google-fonts/noto-serif-devanagari';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+} from '@expo-google-fonts/jetbrains-mono';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
@@ -30,9 +41,19 @@ export default function RootLayout() {
   );
 
   const [fontsLoaded, fontError] = useFonts({
-    Mukta_400Regular,
-    Mukta_500Medium,
-    Mukta_700Bold,
+    // Sacred Editorial — Fraunces (display + body serif, italic pairs).
+    Fraunces_300Light,
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_300Light_Italic,
+    Fraunces_400Regular_Italic,
+    // Sacred Editorial — Noto Serif Devanagari (hi-titles, mantras).
+    NotoSerifDevanagari_400Regular,
+    NotoSerifDevanagari_500Medium,
+    NotoSerifDevanagari_700Bold,
+    // Sacred Editorial — JetBrains Mono (kickers, timestamps).
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
   });
 
   // Wait for Zustand persistence to rehydrate from AsyncStorage

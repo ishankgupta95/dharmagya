@@ -1,19 +1,18 @@
 import { View, StyleSheet } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
-import { borderRadius, type ColorPalette } from '@/config/theme';
+import { borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import type { IGrahaPosition } from '@/types';
 
-const PLANET_COLOR: Record<string, string> = {
-  Sun: '#E8893C',
-  Moon: '#9E9E9E',
-  Mars: '#F44336',
-  Mercury: '#4CAF50',
-  Jupiter: '#FFC107',
-  Venus: '#E91E63',
-  Saturn: '#607D8B',
-  Rahu: '#78909C',
-  Ketu: '#A1887F',
+const PLANET_GLYPH: Record<string, string> = {
+  Sun: '\u2609',      // ☉
+  Moon: '\u263D',     // ☽
+  Mars: '\u2642',     // ♂
+  Mercury: '\u263F',  // ☿
+  Jupiter: '\u2643',  // ♃
+  Venus: '\u2640',    // ♀
+  Saturn: '\u2644',   // ♄
+  Rahu: '\u260A',     // ☊
+  Ketu: '\u260B',     // ☋
 };
 
 interface Props {
@@ -22,47 +21,59 @@ interface Props {
 }
 
 export function PlanetaryPositionsCard({ positions, colors }: Props) {
-  const { t } = useTranslation();
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.label, { color: colors.accent }]}>{t('panchang.grahaSthiti')}</Text>
-      {positions.map((p, i) => (
-        <View
-          key={p.planet}
-          style={[
-            styles.row,
-            i < positions.length - 1 && { borderBottomWidth: 0.5, borderBottomColor: colors.divider },
-          ]}>
-          <View style={styles.planetCol}>
-            <View style={[styles.dot, { backgroundColor: PLANET_COLOR[p.planet] ?? colors.textMuted }]} />
-            <Text style={[styles.planetName, { color: colors.textPrimary }]}>
+    <View style={styles.grid}>
+      {positions.map((p) => {
+        const glyph = PLANET_GLYPH[p.planet] ?? '\u2736';
+        return (
+          <View
+            key={p.planet}
+            style={[styles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.glyph, { color: colors.emphasis }]}>{glyph}</Text>
+            <Text variant="mono-caps" style={[styles.name, { color: colors.textTertiary }]} numberOfLines={1}>
               {p.planet}
-              {p.isRetrograde && <Text style={styles.retroBadge}> ℞</Text>}
+              {p.isRetrograde ? ' \u211E' : ''}
+            </Text>
+            <Text
+              variant="body-italic"
+              style={[styles.sign, { color: colors.textPrimary }]}
+              numberOfLines={1}>
+              {p.rashi}
             </Text>
           </View>
-          <View style={styles.detailCol}>
-            <Text style={[styles.rashi, { color: colors.textPrimary }]}>
-              {p.rashi} {p.degreeInRashi}°
-            </Text>
-            <Text style={[styles.nakshatra, { color: colors.textMuted }]}>
-              {p.nakshatra} ({t('panchang.pada', { number: p.nakshatraPada })})
-            </Text>
-          </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: borderRadius.card, borderWidth: 1, padding: 16, marginBottom: 16 },
-  label: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, marginBottom: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  planetCol: { flexDirection: 'row', alignItems: 'center', width: 100, gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  planetName: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  retroBadge: { fontSize: 13, color: '#F44336', fontFamily: 'Mukta_700Bold' },
-  detailCol: { flex: 1 },
-  rashi: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  nakshatra: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: spacing.cardGap,
+  },
+  tile: {
+    width: '31.5%',
+    borderWidth: 1,
+    borderRadius: borderRadius.cardInner,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 3,
+  },
+  glyph: {
+    fontFamily: 'Fraunces_400Regular',
+    fontSize: 22,
+    lineHeight: 24,
+  },
+  name: {
+    fontSize: 8.5,
+    marginTop: 4,
+  },
+  sign: {
+    fontSize: 11,
+    marginTop: 1,
+  },
 });

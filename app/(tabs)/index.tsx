@@ -11,15 +11,27 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
+import { computeVimshottariDashaFromBirth, type DashaLord } from 'panchang-ts';
 
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import {
+  darkColors,
+  lightColors,
+  palette,
+  spacing,
+  borderRadius,
+  type ColorPalette,
+} from '@/config/theme';
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import { NightCard } from '@/components/common/NightCard';
+import { Kicker } from '@/components/common/Kicker';
+import { SectionLabel } from '@/components/common/SectionLabel';
+import { Ornament } from '@/components/common/Ornament';
 import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
@@ -28,6 +40,7 @@ import type { IPanchangDay, IPanchangElement } from '@/types';
 import {
   getAllAppAartis,
   getAllAppChalisas,
+  aartiVerses,
   type Recitation,
   type Chalisa,
 } from '@/services/content';
@@ -41,13 +54,31 @@ function getGreetingKey(): 'Morning' | 'Afternoon' | 'Evening' {
   return 'Evening';
 }
 
-const DATE_LOCALE_MAP: Record<string, string> = { en: 'en-IN', hi: 'hi-IN' };
+// Devanāgarī echo is a design element, not a translation — always renders in
+// Devanāgarī regardless of UI language, so it's hardcoded rather than pulled
+// from the locale files.
+const GREETING_DEVA: Record<'Morning' | 'Afternoon' | 'Evening', string> = {
+  Morning: 'शुभ प्रभात',
+  Afternoon: 'शुभ दोपहर',
+  Evening: 'शुभ संध्या',
+};
 
-function getTodayDateString(lang: string): string {
-  const locale = DATE_LOCALE_MAP[lang] ?? 'en-IN';
-  return new Date()
-    .toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
-    .toUpperCase();
+interface DateParts {
+  weekday: string;
+  day: string;
+  month: string;
+  year: string;
+}
+
+function getDateParts(lang: string): DateParts {
+  const locale = lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const now = new Date();
+  return {
+    weekday: now.toLocaleDateString(locale, { weekday: 'long' }).toUpperCase(),
+    day: now.toLocaleDateString(locale, { day: 'numeric' }),
+    month: now.toLocaleDateString(locale, { month: 'long' }),
+    year: now.getFullYear().toString(),
+  };
 }
 
 function pickRandom<T>(arr: T[]): T | null {
@@ -55,19 +86,24 @@ function pickRandom<T>(arr: T[]): T | null {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/**
- * From an element array (tithi/nakshatra/etc.), returns the one that is
- * currently active based on wall-clock time. Falls back to the last element
- * if all end-times have passed (shouldn't happen in practice).
- */
 function getActiveElement(elements: IPanchangElement[]): IPanchangElement | undefined {
   if (!elements.length) return undefined;
   const nowMs = Date.now();
   for (const el of elements) {
-    // endTimeMs is in the same reference frame as Date.now() (see panchangService)
     if (!el.endTimeMs || el.endTimeMs > nowMs) return el;
   }
   return elements[elements.length - 1];
+}
+
+const DEVA_RE = /[\u0900-\u097F]/;
+
+const DASHA_LORD_KEY: Record<DashaLord, string> = {
+  Sun: 'sun', Moon: 'moon', Mars: 'mars', Mercury: 'mercury', Jupiter: 'jupiter',
+  Venus: 'venus', Saturn: 'saturn', Rahu: 'rahu', Ketu: 'ketu',
+};
+
+function padTwo(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -79,6 +115,7 @@ export default function HomeScreen() {
   const locationName = useStore(s => s.locationName);
   const language = useStore(s => s.language);
   const region = useStore(s => s.region);
+  const userBirthDate = useStore(s => s.userBirthDate);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const selectedDeities = useStore(s => s.selectedDeities);
@@ -89,8 +126,10 @@ export default function HomeScreen() {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
   const [featuredAarti, setFeaturedAarti] = useState<Recitation | null>(null);
+  const [featuredAartiIndex, setFeaturedAartiIndex] = useState<number>(0);
   const [featuredAartiFromSelected, setFeaturedAartiFromSelected] = useState(false);
   const [featuredChalisa, setFeaturedChalisa] = useState<Chalisa | null>(null);
+  const [featuredChalisaIndex, setFeaturedChalisaIndex] = useState<number>(0);
   const [featuredChalisaFromSelected, setFeaturedChalisaFromSelected] = useState(false);
 
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
@@ -99,7 +138,6 @@ export default function HomeScreen() {
   const panchangLang = resolveLanguage(language);
   const refreshPanchang = useCallback((showSpinner = false) => {
     const now = Date.now();
-    // Throttle: don't re-fetch more than once per hour (panchang only changes daily)
     if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
     lastFetchRef.current = now;
     if (showSpinner) setPanchangLoading(true);
@@ -108,13 +146,9 @@ export default function HomeScreen() {
       .finally(() => setPanchangLoading(false));
   }, [userLocation, panchangLang, region]);
 
-  // Initial load
   useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
-
-  // Refresh when this tab gains focus (user switches back from another tab)
   useFocusEffect(useCallback(() => { refreshPanchang(); }, [refreshPanchang]));
 
-  // Refresh when app comes back to foreground (mid-day element transitions)
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') refreshPanchang();
@@ -123,9 +157,6 @@ export default function HomeScreen() {
   }, [refreshPanchang]);
 
   // ── Featured Aarti / Chalisa ─────────────────────────────────────────────
-  // Ranking: explicit favorites (aarti only, existing behavior) → content where
-  // deity ∈ selectedDeities → random fallback. The `*FromSelected` flag lets the
-  // card show a "For your deities" label so users know the pick is personalised.
   useEffect(() => {
     const allAartis = getAllAppAartis();
     const selected = new Set(selectedDeities);
@@ -149,6 +180,7 @@ export default function HomeScreen() {
     if (!pick) pick = pickRandom(allAartis);
 
     setFeaturedAarti(pick);
+    setFeaturedAartiIndex(pick ? allAartis.findIndex(a => a.deity === pick!.deity) + 1 : 0);
     setFeaturedAartiFromSelected(fromSelected);
   }, [favoriteIds, selectedDeities]);
 
@@ -167,22 +199,35 @@ export default function HomeScreen() {
     if (!pick) pick = pickRandom(allChalisas);
 
     setFeaturedChalisa(pick);
+    setFeaturedChalisaIndex(pick ? allChalisas.findIndex(c => c.deity === pick!.deity) + 1 : 0);
     setFeaturedChalisaFromSelected(fromSelected);
   }, [selectedDeities]);
 
   const greetingKey = useMemo(() => getGreetingKey(), []);
-  const dateString = useMemo(() => getTodayDateString(lang), [lang]);
+  const dateParts = useMemo(() => getDateParts(lang), [lang]);
 
-  // Map selected deity slugs to their metadata for the avatar strip. Unknown
-  // slugs (e.g. after a content cleanup) are filtered out.
   const selectedDeityMetas = useMemo(
     () => selectedDeities.map((id) => DEITY_BY_ID[id]).filter(Boolean),
     [selectedDeities]
   );
-  const panchangGradient = useMemo<readonly [string, string]>(
-    () => isDarkMode ? ['#2E2418', '#1E1E24'] : ['#FFF8F0', '#FFF0E4'],
-    [isDarkMode]
-  );
+
+  // First verse of the featured aarti, for the card's verse-peek.
+  const aartiVersePeek = useMemo(() => {
+    if (!featuredAarti) return null;
+    const lines = aartiVerses(featuredAarti, 'hi');
+    return lines[0] ?? null;
+  }, [featuredAarti]);
+
+  // ── Dasha (Vimshottari) — current mahādaśā lord, if birth date set ────────
+  const dashaLord = useMemo<DashaLord | null>(() => {
+    if (!userBirthDate) return null;
+    try {
+      const birth = new Date(userBirthDate + 'T12:00:00');
+      return computeVimshottariDashaFromBirth(birth, 'lahiri').currentMahaDashaLord;
+    } catch {
+      return null;
+    }
+  }, [userBirthDate]);
 
   // ── Walkthrough refs & measurement ────────────────────────────────────────
   const panchangCardRef = useRef<View>(null);
@@ -202,7 +247,6 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Measure targets when this tab is focused and walkthrough is active
   useFocusEffect(
     useCallback(() => {
       if (walkthroughStep === 1 || walkthroughStep === 4) {
@@ -225,46 +269,62 @@ export default function HomeScreen() {
 
         {/* ── Header ───────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <Text style={[styles.dateLabel, { color: colors.textMuted }]}>
-            {dateString}
-          </Text>
+          <View style={styles.dateStack}>
+            <Text variant="mono-caps" style={[styles.weekday, { color: colors.textMuted }]}>
+              {dateParts.weekday}
+            </Text>
+            <View style={styles.dateMainRow}>
+              <Text style={[styles.dateNum, { color: colors.emphasis }]}>
+                {dateParts.day}
+              </Text>
+              <Text variant="display-italic" style={[styles.dateMonth, { color: colors.textPrimary }]}>
+                {' '}{dateParts.month}{' '}
+              </Text>
+              <Text style={[styles.dateNum, { color: colors.emphasis }]}>
+                {dateParts.year}
+              </Text>
+            </View>
+          </View>
           <TouchableOpacity
             ref={settingsBtnRef}
             onPress={() => router.push('/settings')}
-            style={[styles.settingsBtn, { backgroundColor: colors.surfaceRecessed }]}>
-            <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+            style={[styles.gear, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <Icon name="gear" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* ── Greeting ─────────────────────────────────────────────────── */}
-        <Text style={[styles.greeting, { color: colors.textPrimary }]}>
-          {t(`home.greeting${greetingKey}`)}
-        </Text>
+        <View style={styles.greetingBlock}>
+          <Text variant="display-italic" style={[styles.greeting, { color: colors.textPrimary }]}>
+            {t(`home.greeting${greetingKey}`)}
+          </Text>
+          <Text variant="deva" style={[styles.greetingSub, { color: colors.textTertiary }]}>
+            {GREETING_DEVA[greetingKey]}
+          </Text>
+        </View>
 
-        {/* ── Panchang Card ─────────────────────────────────────────────── */}
+        {/* ── Panchang Hero ────────────────────────────────────────────── */}
         <TouchableOpacity
           ref={panchangCardRef}
-          activeOpacity={0.85}
-          onPress={() => router.push('/(tabs)/panchang')}>
-          <LinearGradient
-            colors={panchangGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.panchangCard, { borderColor: colors.borderAccent }]}>
-
-            {/* Card header row */}
-            <View style={styles.panchangCardHeader}>
-              <Text style={[styles.sectionLabel, { color: colors.accent }]}>
-                {t('home.todaysPanchang')}
-              </Text>
-              <View style={styles.panchangCardHeaderRight}>
-                <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
-                  <Ionicons name="location-outline" size={10} color={colors.textMuted} />
-                  <Text style={[styles.locationText, { color: colors.textMuted }]}>
-                    {'  '}{locationName ?? (userLocation ? 'GPS' : 'Varanasi, UP')}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: 6 }} />
+          activeOpacity={0.88}
+          onPress={() => router.push('/(tabs)/panchang')}
+          style={styles.panchangWrap}>
+          <NightCard padding={20} mandalaSize={220} mandalaOpacity={0.09}>
+            <View style={styles.phHead}>
+              <View>
+                <Kicker color={palette.goldLeaf} size={9.5}>
+                  {t('home.panchangKicker')}
+                </Kicker>
+                <Text variant="deva-bold" style={styles.phTitle}>
+                  {t('home.panchangTitleDeva')}
+                </Text>
+              </View>
+              <View style={styles.locBadge}>
+                <Icon name="location" size={10} color="rgba(243,229,200,0.7)" />
+                <Text variant="mono-caps" style={styles.locText} numberOfLines={1}>
+                  {locationName ?? (userLocation ? 'GPS' : 'Varanasi')}
+                </Text>
               </View>
             </View>
 
@@ -272,88 +332,64 @@ export default function HomeScreen() {
               <HomePanchangSkeleton colors={colors} />
             ) : panchang ? (
               <>
-                {/* Single-column element rows showing currently-active element */}
-                <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)}     colors={colors} />
-                <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} colors={colors} />
-                <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)}      colors={colors} />
-                <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)}    colors={colors} />
+                <View style={styles.phRows}>
+                  <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)} />
+                  <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} />
+                  <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} />
+                  <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} last />
+                </View>
 
-                <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+                <Ornament variant="diamond" tone="dark" style={styles.phDivider} />
 
-                {/* Sunrise / Sunset */}
-                <View style={styles.sunRow}>
-                  <View style={styles.sunItem}>
-                    <Ionicons name="sunny-outline" size={14} color={colors.accent} />
-                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> {t('home.sunrise')}</Text>
-                    <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
-                      {panchang.sunrise}
-                    </Text>
-                  </View>
-                  <View style={[styles.sunSep, { backgroundColor: colors.divider }]} />
-                  <View style={styles.sunItem}>
-                    <Ionicons name="moon-outline" size={14} color={colors.textMuted} />
-                    <Text style={[styles.sunLabel, { color: colors.textMuted }]}> {t('home.sunset')}</Text>
-                    <Text style={[styles.sunValue, { color: colors.textPrimary }]}>
-                      {panchang.sunset}
-                    </Text>
-                  </View>
+                <View style={styles.phSun}>
+                  <SunItem
+                    icon="sun"
+                    label={t('home.sunrise')}
+                    value={panchang.sunrise}
+                  />
+                  <View style={styles.phSunSep} />
+                  <SunItem
+                    icon="moon"
+                    label={t('home.sunset')}
+                    value={panchang.sunset}
+                  />
                 </View>
               </>
             ) : (
-              <Text style={[styles.errorText, { color: colors.textMuted }]}>
+              <Text variant="body-italic" style={styles.errorText}>
                 {t('home.couldNotLoadPanchang')}
               </Text>
             )}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* ── Dasha link ────────────────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => router.push('/dasha')}
-          style={[styles.dashaLinkCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.dashaLinkIcon, { backgroundColor: colors.borderAccent }]}>
-            <Ionicons name="time-outline" size={20} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.dashaLinkLabel, { color: colors.accent }]}>
-              {t('home.dashaLink.label')}
-            </Text>
-            <Text style={[styles.dashaLinkDesc, { color: colors.textSecondary }]} numberOfLines={1}>
-              {t('home.dashaLink.description')}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </NightCard>
         </TouchableOpacity>
 
         {/* ── Your Deities strip ────────────────────────────────────────── */}
         {selectedDeityMetas.length > 0 && (
-          <View style={styles.yourDeitiesBlock}>
-            <View style={styles.yourDeitiesHeader}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                {t('home.yourDeities')}
-              </Text>
+          <View style={styles.block}>
+            <View style={styles.sectionHeader}>
+              <SectionLabel>{t('home.yourDeities')}</SectionLabel>
               <TouchableOpacity
                 onPress={() => router.push('/settings/deities')}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Text style={[styles.yourDeitiesManage, { color: colors.accent }]}>
-                  {t('home.yourDeitiesManage')}
+                <Text variant="body-italic" style={[styles.sectionAction, { color: colors.emphasis }]}>
+                  {t('home.yourDeitiesManage')}  →
                 </Text>
               </TouchableOpacity>
             </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.yourDeitiesScroll}>
+              contentContainerStyle={styles.deitiesScroll}>
               {selectedDeityMetas.map((deity) => (
                 <TouchableOpacity
                   key={deity.id}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                   onPress={() => router.push(`/god/${deity.id}`)}
-                  style={styles.yourDeityChip}>
-                  <DeityAvatar deity={deity.id} size={52} />
+                  style={styles.deityChip}>
+                  <DeityAvatar deity={deity.id} size={54} />
                   <Text
-                    style={[styles.yourDeityName, { color: colors.textSecondary }]}
+                    variant="body-italic"
+                    style={[styles.deityName, { color: colors.textSecondary }]}
                     numberOfLines={1}>
                     {t(`deities.${deity.id}.displayName`)}
                   </Text>
@@ -363,127 +399,147 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Featured Aarti Card ───────────────────────────────────────── */}
+        {/* ── Featured Aarti ────────────────────────────────────────────── */}
         {featuredAarti && (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
-            style={[
-              styles.featuredCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}>
-            <View style={styles.featuredInner}>
-              <DeityAvatar deity={featuredAarti.deity} size={52} />
+          <View style={styles.block}>
+            <View style={styles.sectionHeader}>
+              <SectionLabel>
+                {favoriteIds.some((id) => id.startsWith('aarti-'))
+                  ? t('home.fromYourFavourites')
+                  : featuredAartiFromSelected
+                    ? t('home.forYourDeities')
+                    : t('home.featuredKicker')}
+              </SectionLabel>
+            </View>
 
-              <View style={styles.featuredText}>
-                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {featuredAarti.titleHindi}
-                </Text>
-                {lang === 'en' && (
-                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
+              style={[styles.featCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.cornerMark}>
+                <Kicker color={palette.gold} size={8.5}>
+                  Aarti № {padTwo(featuredAartiIndex)}
+                </Kicker>
+              </View>
+              <View style={styles.featRow}>
+                <DeityAvatar deity={featuredAarti.deity} size={58} />
+                <View style={styles.featBody}>
+                  <Text variant="deva-bold" style={[styles.featHiTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {featuredAarti.titleHindi}
+                  </Text>
+                  <Text variant="body-italic" style={[styles.featEnTitle, { color: colors.textTertiary }]} numberOfLines={1}>
                     {featuredAarti.titleEnglish}
                   </Text>
-                )}
-                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
-                  {t(`deities.${featuredAarti.deity}.displayName`)}
-                </Text>
+                  <Text variant="mono-caps" style={[styles.featMeta, { color: colors.accent }]} numberOfLines={1}>
+                    {t(`deities.${featuredAarti.deity}.displayName`)}
+                  </Text>
+                </View>
+                <View style={styles.playBtn}>
+                  <Icon name="play" size={14} color={palette.parchmentBright} />
+                </View>
               </View>
-
-              <TouchableOpacity
-                onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
-                style={[styles.playBtn, { borderColor: colors.accent }]}>
-                <Ionicons name="play" size={14} color={colors.accent} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
-              {favoriteIds.some((id) => id.startsWith('aarti-'))
-                ? t('home.fromYourFavourites')
-                : featuredAartiFromSelected
-                  ? t('home.forYourDeities')
-                  : t('home.featuredAarti')}
-            </Text>
-          </TouchableOpacity>
+              {aartiVersePeek && (
+                <>
+                  <Ornament variant="double-rule" style={styles.versePeekRule} />
+                  <Text variant="deva" style={[styles.versePeek, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {aartiVersePeek}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* ── Featured Chalisa Card ─────────────────────────────────────── */}
+        {/* ── Featured Chalisa ─────────────────────────────────────────── */}
         {featuredChalisa && (
           <TouchableOpacity
-            activeOpacity={0.85}
+            activeOpacity={0.88}
             onPress={() => router.push(`/chalisa/${featuredChalisa.deity}`)}
-            style={[
-              styles.featuredCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}>
-            <View style={styles.featuredInner}>
-              <DeityAvatar deity={featuredChalisa.deity} size={52} />
-              <View style={styles.featuredText}>
-                <Text style={[styles.featuredTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+            style={[styles.featCard, styles.featCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.cornerMark}>
+              <Kicker color={palette.gold} size={8.5}>
+                Chalisa № {padTwo(featuredChalisaIndex)}
+              </Kicker>
+            </View>
+            <View style={styles.featRow}>
+              <DeityAvatar deity={featuredChalisa.deity} size={58} />
+              <View style={styles.featBody}>
+                <Text variant="deva-bold" style={[styles.featHiTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                   {featuredChalisa.titleHindi}
                 </Text>
-                {lang === 'en' && (
-                  <Text style={[styles.featuredTranslit, { color: colors.textTertiary }]} numberOfLines={1}>
-                    {featuredChalisa.titleEnglish}
-                  </Text>
-                )}
-                <Text style={[styles.featuredDeity, { color: colors.accent }]}>
-                  {t(`deities.${featuredChalisa.deity}.displayName`)}
+                <Text variant="body-italic" style={[styles.featEnTitle, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {featuredChalisa.titleEnglish}
+                </Text>
+                <Text variant="mono-caps" style={[styles.featMeta, { color: colors.accent }]}>
+                  {featuredChalisaFromSelected ? t('home.forYourDeities') : t('home.featuredChalisa')}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Icon name="chevron-right" size={18} color={colors.textMuted} />
             </View>
-            <Text style={[styles.featuredCardLabel, { color: colors.textMuted }]}>
-              {featuredChalisaFromSelected ? t('home.forYourDeities') : t('home.featuredChalisa')}
-            </Text>
           </TouchableOpacity>
         )}
 
-        {/* ── Quick Access Row ──────────────────────────────────────────── */}
+        {/* ── Dasha Callout ─────────────────────────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={() => router.push('/dasha')}
+          style={styles.calloutWrap}>
+          <LinearGradient
+            colors={['rgba(165,48,28,0.10)', 'rgba(156,118,35,0.10)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.callout}>
+            <View style={[styles.calloutIcon, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+              <Icon name="clock" size={18} color={colors.accent} />
+            </View>
+            <View style={styles.calloutStack}>
+              <Text variant="mono-caps" style={[styles.calloutKicker, { color: colors.accent }]}>
+                {t('dasha.title')}
+              </Text>
+              {dashaLord ? (
+                <Text variant="body-italic" style={[styles.calloutBody, { color: colors.textPrimary }]}>
+                  {t('home.dashaCurrentBody', { planet: t(`dasha.planet.${DASHA_LORD_KEY[dashaLord]}`) })}
+                </Text>
+              ) : (
+                <Text variant="body-italic" style={[styles.calloutBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {t('home.setDashaPrompt')}
+                </Text>
+              )}
+            </View>
+            <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* ── Quick Row ─────────────────────────────────────────────────── */}
         <View style={styles.quickRow}>
-          <QuickCard
-            emoji="❤️"
-            label={t('home.favorites')}
-            onPress={() => router.push('/favorites')}
-            colors={colors}
-          />
-          <QuickCard
-            emoji="🪔"
-            label={t('home.festivals')}
-            onPress={() => router.push('/festivals')}
-            colors={colors}
-          />
-          <QuickCard
-            emoji="🔍"
-            label={t('common.search')}
-            onPress={() => router.push('/search')}
-            colors={colors}
-          />
+          <QuickCard icon="heart-outline" label={t('home.favorites')}  onPress={() => router.push('/favorites')} colors={colors} />
+          <QuickCard icon="flame" label={t('home.festivals')} onPress={() => router.push('/festivals')} colors={colors} />
+          <QuickCard icon="search" label={t('common.search')} onPress={() => router.push('/search')} colors={colors} />
         </View>
 
-        {/* ── Find Auspicious Date Card ─────────────────────────────────── */}
+        {/* ── Find Auspicious Date ──────────────────────────────────────── */}
         <TouchableOpacity
-          activeOpacity={0.85}
+          activeOpacity={0.88}
           onPress={() => router.push('/muhurat')}
           style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.muhuratIconWrap, { backgroundColor: colors.borderAccent }]}>
-            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
+          <View style={[styles.muhuratIc, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
+            <Icon name="calendar" size={18} color={colors.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.muhuratTitle, { color: colors.textPrimary }]}>
+            <Text variant="mono-caps" style={[styles.muhuratKicker, { color: colors.accent }]}>
               {t('home.findMuhuratTitle')}
             </Text>
-            <Text style={[styles.muhuratDesc, { color: colors.textMuted }]} numberOfLines={2}>
+            <Text variant="body-italic" style={[styles.muhuratDesc, { color: colors.textTertiary }]} numberOfLines={2}>
               {t('home.findMuhuratDesc')}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          <Icon name="chevron-right" size={16} color={colors.textMuted} />
         </TouchableOpacity>
 
       </ScrollView>
 
       <AdBanner colors={colors} placement="home" />
 
-      {/* ── Walkthrough Step 1: Spotlight panchang card ── */}
       {walkthroughStep === 1 && panchangRect && (
         <WalkthroughSpotlight
           spotlight={panchangRect}
@@ -497,11 +553,9 @@ export default function HomeScreen() {
             router.push('/(tabs)/panchang');
           }}
           onSkip={skipWalkthrough}
-          colors={colors}
         />
       )}
 
-      {/* ── Walkthrough Step 4: Spotlight settings gear ── */}
       {walkthroughStep === 4 && settingsRect && (
         <WalkthroughSpotlight
           spotlight={settingsRect}
@@ -515,7 +569,6 @@ export default function HomeScreen() {
             router.push('/settings');
           }}
           onSkip={skipWalkthrough}
-          colors={colors}
         />
       )}
 
@@ -528,182 +581,314 @@ export default function HomeScreen() {
 interface PanchangRowProps {
   label: string;
   el: IPanchangElement | undefined;
-  colors: ColorPalette;
+  last?: boolean;
 }
 
-const PanchangRow = memo(function PanchangRow({ label, el, colors }: PanchangRowProps) {
+const PanchangRow = memo(function PanchangRow({ label, el, last }: PanchangRowProps) {
   const { t } = useTranslation();
   if (!el) return null;
+  const isDeva = DEVA_RE.test(el.name);
   return (
-    <View style={styles.panchangRow}>
-      <Text style={[styles.panchangLabel, { color: colors.textMuted }]}>{label}</Text>
-      <View style={styles.panchangRowRight}>
-        <Text style={[styles.panchangValue, { color: colors.textPrimary }]}>{el.name}</Text>
-        {el.endTime && (
-          <Text style={[styles.panchangEndTime, { color: colors.textMuted }]}>{t('home.untilTime', { time: el.endTime })}</Text>
-        )}
+    <View style={[styles.phRow, last && styles.phRowLast]}>
+      <Text variant="mono-caps" style={styles.phLbl}>{label}</Text>
+      <Text
+        variant={isDeva ? 'deva' : 'body-italic'}
+        style={styles.phVal}
+        numberOfLines={1}>
+        {el.name}
+      </Text>
+      {el.endTime ? (
+        <Text variant="mono" style={styles.phTime}>
+          {t('home.untilTime', { time: el.endTime })}
+        </Text>
+      ) : (
+        <View />
+      )}
+    </View>
+  );
+});
+
+interface SunItemProps {
+  icon: IconName;
+  label: string;
+  value: string;
+}
+
+const SunItem = memo(function SunItem({ icon, label, value }: SunItemProps) {
+  return (
+    <View style={styles.phSunItem}>
+      <View style={styles.phSunIc}>
+        <Icon name={icon} size={13} color={palette.goldLeaf} />
+      </View>
+      <View>
+        <Text variant="mono-caps" style={styles.phSunK}>{label}</Text>
+        <Text variant="mono" style={styles.phSunV}>{value}</Text>
       </View>
     </View>
   );
 });
 
 interface QuickCardProps {
-  emoji: string;
+  icon: IconName;
   label: string;
   onPress: () => void;
   colors: ColorPalette;
 }
 
-const QuickCard = memo(function QuickCard({ emoji, label, onPress, colors }: QuickCardProps) {
+const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: QuickCardProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.8}
-      style={[
-        styles.quickCard,
-        { backgroundColor: colors.surfaceRecessed, borderColor: colors.border },
-      ]}>
-      <Text style={styles.quickEmoji}>{emoji}</Text>
-      <Text style={[styles.quickLabel, { color: colors.textSecondary }]}>{label}</Text>
+      activeOpacity={0.85}
+      style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Icon name={icon} size={20} color={colors.accent} />
+      <Text variant="body-italic" style={[styles.quickLabel, { color: colors.textSecondary }]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 });
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const DARK_BONE_TEXT = 'rgba(243,229,200,0.72)';
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { paddingBottom: 32, paddingTop: 12 },
+  scroll: { paddingBottom: 32, paddingTop: 10 },
 
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  dateLabel: { fontSize: 13, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  settingsBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  dateStack: { flex: 1 },
+  weekday: { fontSize: 10 },
+  dateMainRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 4,
+  },
+  dateNum: {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: 22,
+    letterSpacing: 0.2,
+  },
+  dateMonth: {
+    fontSize: 22,
+  },
+  gear: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // Greeting
-  greeting: { fontSize: 26, fontFamily: 'Mukta_500Medium', marginBottom: 20 },
+  greetingBlock: { marginTop: 8, marginBottom: 20 },
+  greeting: { fontSize: 34, lineHeight: 38 },
+  greetingSub: { fontSize: 15, marginTop: 6 },
 
-  // Panchang card
-  panchangCard: {
-    borderRadius: borderRadius.card,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  panchangCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  panchangCardHeaderRight: { flexDirection: 'row', alignItems: 'center' },
-  sectionLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1 },
-  locationBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: borderRadius.chip },
-  locationText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
-
-  panchangRow: { flexDirection: 'row', alignItems: 'baseline', paddingVertical: 5 },
-  panchangLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, width: 86 },
-  panchangRowRight: { flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 },
-  panchangValue: { fontSize: 15, fontFamily: 'Mukta_500Medium' },
-  panchangEndTime: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
-
-  divider: { height: 0.5, marginVertical: 12 },
-
-  sunRow: { flexDirection: 'row', alignItems: 'center' },
-  sunItem: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
-  sunLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  sunValue: { fontSize: 13, fontFamily: 'Mukta_500Medium', marginLeft: 4 },
-  sunSep: { width: 0.5, height: 20, marginHorizontal: 12 },
-
-  errorText: { fontSize: 13, fontFamily: 'Mukta_400Regular', textAlign: 'center', paddingVertical: 16 },
-
-  // Dasha link card
-  dashaLinkCard: {
+  // Panchang hero
+  panchangWrap: { marginBottom: 18 },
+  phHead: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: borderRadius.card,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 16,
-  },
-  dashaLinkIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dashaLinkLabel: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1 },
-  dashaLinkDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
-
-  vratCardLabel: {
-    fontSize: 11,
-    fontFamily: 'Mukta_500Medium',
-    letterSpacing: 1,
-    flex: 1,
-  },
-
-  // Your deities strip
-  yourDeitiesBlock: { marginBottom: 16 },
-  yourDeitiesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  yourDeitiesManage: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
-  yourDeitiesScroll: { gap: 14, paddingRight: 4 },
-  yourDeityChip: { alignItems: 'center', width: 64, gap: 6 },
-  yourDeityName: { fontSize: 11, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
+  phTitle: {
+    fontSize: 18,
+    color: palette.boneWhite,
+    marginTop: 4,
+  },
+  locBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(201,155,58,0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    maxWidth: 140,
+  },
+  locText: {
+    fontSize: 10,
+    color: 'rgba(243,229,200,0.88)',
+  },
+  phRows: { marginTop: 2 },
+  phRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(201,155,58,0.16)',
+  },
+  phRowLast: { borderBottomWidth: 0 },
+  phLbl: {
+    width: 78,
+    fontSize: 9.5,
+    color: DARK_BONE_TEXT,
+  },
+  phVal: {
+    flex: 1,
+    fontSize: 15,
+    color: palette.boneWhite,
+  },
+  phTime: {
+    fontSize: 11,
+    color: palette.goldLeaf,
+    marginLeft: 8,
+  },
+  phDivider: { marginVertical: 10 },
+  phSun: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  phSunItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  phSunIc: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(217,106,40,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phSunK: { fontSize: 9, color: DARK_BONE_TEXT },
+  phSunV: { fontSize: 13, color: palette.boneWhite, marginTop: 2 },
+  phSunSep: {
+    width: StyleSheet.hairlineWidth,
+    height: 28,
+    backgroundColor: 'rgba(201,155,58,0.28)',
+    marginHorizontal: 12,
+  },
+  errorText: {
+    fontSize: 13,
+    color: DARK_BONE_TEXT,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
 
-  // Featured aarti
-  featuredCard: {
-    borderRadius: borderRadius.card,
+  // Generic block + section header
+  block: { marginBottom: 18 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionAction: { fontSize: 12 },
+
+  // Deities strip
+  deitiesScroll: { gap: 14, paddingRight: 4, paddingBottom: 4 },
+  deityChip: { alignItems: 'center', width: 64, gap: 7 },
+  deityName: { fontSize: 11, textAlign: 'center' },
+
+  // Featured card
+  featCard: {
+    borderRadius: 18,
     borderWidth: 1,
     padding: 16,
-    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  featuredInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  featuredText: { flex: 1 },
-  featuredTitle: { fontSize: 16, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
-  featuredTranslit: { fontSize: 13, fontFamily: 'Mukta_400Regular', marginBottom: 2 },
-  featuredDeity: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  featuredCardLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, marginTop: 12 },
+  featCardSecondary: {
+    marginBottom: 18,
+  },
+  cornerMark: {
+    position: 'absolute',
+    top: 10,
+    right: 14,
+    zIndex: 2,
+  },
+  featRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  featBody: { flex: 1, minWidth: 0 },
+  featHiTitle: { fontSize: 18 },
+  featEnTitle: { fontSize: 12.5, marginTop: 2 },
+  featMeta: { fontSize: 9, marginTop: 6 },
   playBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    justifyContent: 'center',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: palette.sindoor,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: palette.sindoor,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
   },
+  versePeekRule: { marginTop: 14, marginBottom: 10 },
+  versePeek: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+
+  // Callout
+  calloutWrap: { marginBottom: 16 },
+  callout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(165,48,28,0.22)',
+  },
+  calloutIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  calloutStack: { flex: 1 },
+  calloutKicker: { fontSize: 9.5, marginBottom: 3 },
+  calloutBody: { fontSize: 14 },
+
+  // Quick row
+  quickRow: { flexDirection: 'row', gap: spacing.gridGap, marginBottom: 16 },
+  quickCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickLabel: { fontSize: 12 },
 
   // Muhurat card
   muhuratCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
     borderRadius: borderRadius.card,
     borderWidth: 1,
     padding: 14,
-    marginTop: 16,
   },
-  muhuratIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  muhuratTitle: { fontSize: 14, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
-  muhuratDesc: { fontSize: 11, fontFamily: 'Mukta_400Regular', lineHeight: 15 },
-
-  // Quick access
-  quickRow: { flexDirection: 'row', gap: spacing.gridGap },
-  quickCard: {
-    flex: 1,
-    borderRadius: borderRadius.iconContainer,
+  muhuratIc: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    paddingVertical: 16,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
   },
-  quickEmoji: { fontSize: 22 },
-  quickLabel: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  muhuratKicker: { fontSize: 9.5, marginBottom: 3 },
+  muhuratDesc: { fontSize: 12.5, lineHeight: 17 },
 });

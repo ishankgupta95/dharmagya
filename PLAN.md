@@ -1231,7 +1231,135 @@ Listed in rough priority order for when we do revisit:
 
 ---
 
-## 14. Out-of-Scope / Explicitly Not Doing
+## 14. Phase 6 — Visual Redesign: "Sacred Editorial"
+
+**Goal:** Replace the current flat beige + saffron system with a cohesive, premium devotional aesthetic inspired by illuminated-manuscript typography and editorial magazine design. Parchment ground, temple sindoor + aged gold-leaf accents, Fraunces serif paired with Noto Serif Devanāgarī, JetBrains Mono for astronomical data. Devanāgarī leads every hierarchy; Latin script plays support.
+
+**Design study reference:** [`design/redesign-preview.html`](design/redesign-preview.html) (2026-04-20). Open in a browser to see the full concept: masthead, four screen studies (Home, Panchang, Library, Aarti reader), type specimen, palette, and ornament vocabulary.
+
+**Scheduling:** Execute **after P3.3 (shipped) and before P4 native extensions**. Reason: widgets, Kundli, and mantra counter inherit the new component vocabulary — redesigning those screens twice is waste. Can run **in parallel** with P3.2 (content expansion) and P3.1 (language expansion), but the redesign PR must land before content work resumes to avoid re-skinning new content. Every sub-phase below is independently shippable and revertable.
+
+### Step P6.1: Typography & Theme Tokens (foundation)
+
+**Why:** Every subsequent screen inherits from these tokens. Landing the palette + fonts first means each screen redesign is a pure layout/composition change, not a mixed concern.
+
+**Implementation:**
+- Font swap: add `Fraunces` (variable, opsz + SOFT axes), `Noto Serif Devanagari` (400/500/700), `JetBrains Mono` (400/500) via `@expo-google-fonts`. Retire `Mukta` once all screens are ported (keep loaded during transition for safety — drop in final P6.9 cleanup).
+- Extend [`src/config/theme.ts`](src/config/theme.ts):
+  - Add parchment palette: `parchment`, `parchmentDeep`, `parchmentBright`, `paperEdge`.
+  - Add ornament palette: `sindoor`, `sindoorDeep`, `goldLeaf`, `gold`, `nightPlinth`, `nightPlinthDeep`.
+  - Add semantic rule tokens: `rule`, `ruleSoft`.
+  - Keep existing `lightColors` / `darkColors` keys; change their values to the new palette so no screen mass-rename is needed.
+- Add `typeScale` helper exporting `displaySerif`, `displayItalic`, `bodySerif`, `deva`, `devaBold`, `mono`, `monoCaps` — each returns the exact `fontFamily` + `fontVariant` + `letterSpacing` tuple. All screens call this instead of hard-coding font names.
+- **No layout changes in this step.** Ship it, open every screen, verify the app still functions (will look transitional — that's expected).
+
+### Step P6.2: Shared component vocabulary
+
+**Why:** Ten screens rendering the same decorative motifs independently will diverge within three weeks. Build the primitives once.
+
+**Implementation:** Add to [`src/components/common/`](src/components/common/):
+- `<SectionLabel>` — small-caps mono label with leading 20px sindoor rule.
+- `<Kicker>` — mono uppercase kicker text (used above every hero block).
+- `<Ornament variant="lotus" | "diamond" | "double-rule">` — chapter-break dividers.
+- `<CornerBrackets>` — four gold-leaf L-shaped brackets absolutely positioned inside dark cards.
+- `<MandalaWatermark>` — `react-native-svg` yantra/mandala component with configurable size + opacity for background placement.
+- `<NightCard>` — dark-plinth card with built-in corner brackets + mandala watermark prop (wraps Panchang hero, audio player, etc.).
+- Update existing [`<DeityAvatar>`](src/components/common/DeityAvatar.tsx) — bone-white ring on parchment outer ring, gradient fallback keyed by deity, Devanāgarī initial overlay when image missing.
+- Update [`<AppText>`](src/components/common/AppText.tsx) with new variants: `display`, `display-italic`, `body-italic`, `deva`, `deva-bold`, `mono`, `mono-caps`.
+- Update tab bar in [`app/(tabs)/_layout.tsx`](app/(tabs)/_layout.tsx): floating dark pill (absolute-positioned, `backdrop-filter` not available in RN — use solid dark bg with 92% opacity), gold-leaf ember dot above active icon.
+
+### Step P6.3: Home screen redesign
+
+**Why:** Highest-traffic screen; biggest perceived lift from redesign. Also the most complex composition — worth doing once tokens and primitives are stable.
+
+**Implementation:** Refactor [`app/(tabs)/index.tsx`](app/(tabs)/index.tsx) to match the mockup's home screen:
+- Header: weekday in mono small-caps + italic-serif date with monospace day number.
+- Greeting: 34px italic-serif ("Good morning, *Ishank*") with Devanāgarī sub-line ("शुभ प्रभात").
+- Panchang hero: `<NightCard>` with corner brackets, mandala watermark, four tithi/nakshatra/yoga/karana rows (mono "until HH:MM" on the right), gold-leaf divider with diamond ornament, sunrise/sunset row with small circular icon backdrops.
+- "Your Deities" strip: 54px medallions with Devanāgarī initial, bone-white double ring, italic-serif name below.
+- Featured aarti card: on parchment-bright, corner mark "Aarti № XX" in gold mono, devanāgarī title + italic-serif transliteration, circular sindoor play button, dashed rule above a 1-line verse peek.
+- Dasha callout: warm gradient card with icon well, mono kicker + italic-serif body ("You are in *Venus* mahādaśā").
+- Quick row: three small-icon cards with italic-serif labels.
+- **Walkthrough compatibility:** Panchang card and settings gear refs must still return correct `measureInWindow` rects. Retest the spotlight overlay after reflow.
+
+### Step P6.4: Panchang screen redesign
+
+**Implementation:** Refactor [`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx):
+- Header: editorial kicker "The Almanac" + italic-serif "Panchāng" title.
+- Month strip: italic-serif month name with mono year.
+- Calendar grid: keep 7-column structure; add a Devanāgarī tithi abbreviation sub-label (9px) under each day number. Festival days dot in sindoor; selected day inverts to sindoor background.
+- Quality windows (`QualitySlotsCard`): keep component, restyle — mono key labels, colored values only (good = muted green, bad = sindoor). Row backgrounds remain neutral.
+- Planetary positions (`PlanetaryPositionsCard`): 3-column grid of planet tiles — glyph in serif, Devanāgarī name in mono small-caps, italic-serif sign name.
+- Retain existing data flow + `usePanchang` hook unchanged.
+
+### Step P6.5: Library (Gods) screen redesign
+
+**Implementation:** Refactor [`app/(tabs)/library.tsx`](app/(tabs)/library.tsx):
+- Hero: editorial kicker "The Pantheon" + large italic-serif title ("Thirty-three *koṭi*").
+- Search bar: italic-serif placeholder in muted ink.
+- Filter chips: mono small-caps, active chip inverts to deep ink.
+- Deity card grid (2-column): portrait header block with deity-colored gradient background, dashed halo ring, Devanāgarī initial in large display weight. Below: serif name (italicized last syllable), muted italic English tagline, gold-mono content count pill ("7 aartis · 1 chālīsā").
+
+### Step P6.6: Aarti + Chalisa reader redesign
+
+**Implementation:** Refactor [`app/aarti/[id].tsx`](app/aarti/[id].tsx) and [`app/chalisa/[id].tsx`](app/chalisa/[id].tsx):
+- Header: back button + action cluster (text-size, favorite, overflow) as small parchment-bright pills.
+- Title block: sindoor kicker "Aarti · Śrī Gaṇeśa Jī" + large Devanāgarī title + italic-serif transliteration below + lotus-ornament centered rule.
+- Verse structure: mono kicker "Verse I" with trailing hairline; Devanāgarī lines at 18.5px with refrain lines in sindoor red + semibold; italic-serif English translation underneath.
+- Floating audio player: dark `<NightCard>` docked to bottom inset, 40px sindoor play button, italic-serif title, gold-leaf progress thread, mono time-remaining + autoplay line.
+- Keep existing text-size setting and favorite logic — reuse both state paths.
+
+### Step P6.7: Supporting screens (Settings, Favorites, Search, Festivals, Dasha, Muhurat, God detail)
+
+**Why:** Without this sweep, the app fractures — redesigned tabs + unchanged deep screens feel broken.
+
+**Implementation:** Apply the shared component vocabulary (P6.2) to every non-tab screen. Functionality stays identical.
+- [`app/settings.tsx`](app/settings.tsx) + [`app/settings/`](app/settings/): editorial list style — section labels in mono small-caps, rows with italic-serif labels, supporting text in muted italic, mono values on the right.
+- [`app/favorites.tsx`](app/favorites.tsx): same card treatment as featured aarti on home; empty state uses centered lotus ornament + italic-serif copy.
+- [`app/search.tsx`](app/search.tsx): large italic-serif input field on parchment; filter chips as in Library; grouped results with mono section headers.
+- [`app/festivals.tsx`](app/festivals.tsx): apply "group by month" convention (per `feedback_list_presentation.md`) — month as italic-serif drop heading, festival rows with sindoor left rule for near-term items.
+- [`app/dasha.tsx`](app/dasha.tsx): timeline treatment — vertical gold-leaf spine with tithi-style date markers, current mahādaśā period emphasized in `<NightCard>`.
+- [`app/muhurat/`](app/muhurat/): form treatment as an almanac — labeled mono fields, result card in `<NightCard>` with quality windows listed like Panchang quality rows.
+- [`app/god/[id].tsx`](app/god/): hero portrait block (full-width deity gradient with halo), mono section labels for "Aartis", "Chalisas", "Stotras" — each a list with content-type pills.
+
+### Step P6.8: Onboarding + walkthrough polish
+
+**Implementation:**
+- Refactor [`app/onboarding/`](app/onboarding/): three-step flow in Sacred Editorial language — italic-serif step titles, mono progress indicator, editorial welcome copy. Deity-selection grid reuses P6.5 card style.
+- [`app/location-permission.tsx`](app/location-permission.tsx): centered mandala watermark behind italic-serif copy; sindoor primary CTA; "Skip" as ghost link.
+- Walkthrough overlay ([`WalkthroughSpotlight`](src/components/common/WalkthroughOverlay.tsx)): restyle tooltip as parchment-bright card with corner brackets + gold kicker; retest spotlight rect measurement on home and panchang after P6.3/P6.4 reflow.
+
+### Step P6.9: Platform polish + dark mode + QA
+
+**Implementation:**
+- **Dark mode variant:** invert parchment to deep ink (`#1B140A` → base, `#2B1A0F` → surface). Keep sindoor + gold unchanged; desaturate slightly for dark backgrounds. Verify all `isDarkMode` branches in screens render correctly.
+- **Icon set migration:** replace Ionicons usage in tab bar, headers, and quick-access cards with the custom SVG set shown in the mockup (build a `<Icon name="...">` component backed by `react-native-svg` symbols — ~15 glyphs total). Keep Ionicons loaded during transition; drop dependency once no `import { Ionicons }` remains.
+- **Android status-bar + edge-to-edge:** with `react-native-edge-to-edge` already installed, verify light/dark status-bar contrast on parchment hero and night plinth. Nav bar: re-verify per `feedback_android_navigation.md` (inspector first).
+- **Font loading perf:** Fraunces variable is ~90 KB — preload via `expo-font`; verify no FOIT on cold start. Measure TTI on a Pixel 3a (low-budget Android target).
+- **Screenshot regression:** hand-capture the 21 designed screens/states (Section 5.3) in both themes before and after; diff manually for unintended breakage.
+- **Accessibility pass:** new palette contrast check (parchment + deep ink passes WCAG AA; verify sindoor on parchment for body text — may need to restrict sindoor to accent usage only where contrast is borderline).
+
+### Step P6.10: Release gate
+
+- Fresh Play Store screenshots (8 screens, both languages).
+- Updated feature graphic + app icon if the icon still feels off against the new palette.
+- `app.json` version bump + `android.versionCode` increment.
+- Local AAB build via EAS (per README).
+- Staged Play Store rollout: 20% → 50% → 100% over 5 days.
+- Monitor: crash-free rate (font-loading and SVG paths are highest-risk regression surfaces), session length, onboarding completion. Halt rollout if crash-free rate drops > 0.5% from baseline.
+
+### Phase 6 Exit Criteria
+
+- All 21 designed screens/states (Section 5) ported to the Sacred Editorial system in both themes.
+- Fraunces, Noto Serif Devanagari, JetBrains Mono loaded; Mukta removed.
+- Ionicons dependency removed in favor of the custom SVG icon set (tabs, headers, quick access).
+- Walkthrough spotlight geometry verified against redesigned home + panchang.
+- Dark-mode variant shipped and verified on Android + iOS.
+- Updated Play Store listing (screenshots + feature graphic) and a monitored staged rollout completed.
+
+---
+
+## 15. Out-of-Scope / Explicitly Not Doing
 
 - Paid subscription tier (we stay ad-supported until ad revenue clearly plateaus; no rush to introduce paywall friction).
 - Live streaming temple darshan (requires partnerships and 24/7 stream infra — revisit alongside P5.2).
@@ -1240,17 +1368,19 @@ Listed in rough priority order for when we do revisit:
 
 ---
 
-## 15. Phase Dependencies Summary
+## 16. Phase Dependencies Summary
 
 ```
 Phase 1 ✅
     ↓
-Phase 2 (Daily habit drivers)  ──┐
-    ↓                             │
-Phase 3 (Reach + content depth)  ─┤
-    ↓                             │   (P4.1 Kundli can proceed in parallel
-Phase 4 (Native extensions)     ──┘    with P3 once P2 ships)
-    ↓
+Phase 2 (Daily habit drivers) ✅ ──┐
+    ↓                               │
+Phase 3 (Reach + content depth)  ──┤
+    ↓                               │
+Phase 6 (Visual redesign)  ←────────┤   (redesign can run in parallel with
+    ↓                               │    P3.1/P3.2 content work, but must
+Phase 4 (Native extensions)     ────┘    land before P4 so widgets/mantra
+    ↓                                    counter inherit the new vocabulary)
 Phase 5 (Far-future — on hold)
 ```
 

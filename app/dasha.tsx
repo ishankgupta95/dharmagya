@@ -3,7 +3,7 @@ import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 import {
   computeVimshottariDashaFromBirth,
@@ -13,8 +13,11 @@ import {
 } from 'panchang-ts';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
+import { Kicker } from '@/components/common/Kicker';
+import { SectionLabel } from '@/components/common/SectionLabel';
+import { NightCard } from '@/components/common/NightCard';
 import { ymd } from '@/utils/calendar';
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
@@ -99,34 +102,40 @@ export default function DashaScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('dasha.title')}</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>{t('dasha.subtitle')}</Text>
-        </View>
-        <View style={styles.backBtn} />
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {t('dasha.title')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
-        {/* ── Birth date ────────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-          {t('dasha.birthDateLabel')}
+        <Text variant="body-italic" style={[styles.subtitle, { color: colors.textTertiary }]}>
+          {t('dasha.subtitle')}
         </Text>
+
+        {/* ── Birth date ────────────────────────────────────────────────── */}
+        <SectionLabel style={styles.sectionLabelSpacing}>
+          {t('dasha.birthDateLabel')}
+        </SectionLabel>
         {birthDateLabel ? (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPickerOpen(true)}
             style={[styles.birthRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="calendar-outline" size={18} color={colors.accent} />
-            <Text style={[styles.birthDateText, { color: colors.textPrimary }]}>
+            <Icon name="calendar" size={18} color={colors.accent} />
+            <Text variant="body" style={[styles.birthDateText, { color: colors.textPrimary }]}>
               {birthDateLabel}
             </Text>
-            <Text style={[styles.birthChangeText, { color: colors.accent }]}>
+            <Text variant="mono-caps" style={[styles.birthChangeText, { color: colors.accent }]}>
               {t('dasha.changeBirthDate')}
             </Text>
           </TouchableOpacity>
@@ -134,57 +143,59 @@ export default function DashaScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPickerOpen(true)}
-            style={[styles.setBirthBtn, { backgroundColor: colors.accent }]}>
-            <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.setBirthText}>{t('dasha.setBirthDate')}</Text>
+            style={[styles.setBirthBtn, { backgroundColor: palette.sindoor }]}>
+            <Icon name="calendar" size={18} color={palette.parchmentBright} />
+            <Text variant="mono-caps" style={styles.setBirthText}>
+              {t('dasha.setBirthDate')}
+            </Text>
           </TouchableOpacity>
         )}
 
         {/* ── Body ─────────────────────────────────────────────────────── */}
         {!birthDate && (
-          <Text style={[styles.prompt, { color: colors.textMuted }]}>
+          <Text variant="body-italic" style={[styles.prompt, { color: colors.textMuted }]}>
             {t('dasha.notSetPrompt')}
           </Text>
         )}
 
         {birthDate && dasha && (
           <>
-            {/* Current mahadasha summary */}
-            <View style={[styles.currentCard, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
-              <Text style={[styles.currentLabel, { color: colors.accent }]}>
-                {t('dasha.currentLabel')}
-              </Text>
-              <Text style={[styles.currentMahaLord, { color: colors.textPrimary }]}>
-                {t(`dasha.planet.${DASHA_LORD_TO_KEY[dasha.currentMahaDashaLord]}`)} {t('dasha.mahadashaSuffix')}
-              </Text>
-              {(() => {
-                const md = dasha.mahaDashas[dasha.currentIndex];
-                return md ? (
-                  <Text style={[styles.currentUntil, { color: colors.textMuted }]}>
-                    {t('dasha.untilDate', { date: formatRangeDate(md.endDate, i18n.language) })}
-                  </Text>
-                ) : null;
-              })()}
+            {/* Current mahadasha summary — night plinth card */}
+            <View style={styles.currentWrap}>
+              <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+                <Kicker color={palette.goldLeaf} size={10}>
+                  {t('dasha.currentLabel')}
+                </Kicker>
+                <Text variant="display-italic" style={styles.currentMahaLord}>
+                  {t(`dasha.planet.${DASHA_LORD_TO_KEY[dasha.currentMahaDashaLord]}`)} {t('dasha.mahadashaSuffix')}
+                </Text>
+                {(() => {
+                  const md = dasha.mahaDashas[dasha.currentIndex];
+                  return md ? (
+                    <Text variant="mono" style={styles.currentUntil}>
+                      {t('dasha.untilDate', { date: formatRangeDate(md.endDate, i18n.language) })}
+                    </Text>
+                  ) : null;
+                })()}
 
-              {currentAntardasha && (
-                <View style={[styles.currentDivider, { backgroundColor: colors.divider }]} />
-              )}
-              {currentAntardasha && (
-                <>
-                  <Text style={[styles.currentAntardasha, { color: colors.textPrimary }]}>
-                    {t(`dasha.planet.${DASHA_LORD_TO_KEY[currentAntardasha.lord]}`)} {t('dasha.antardashaSuffix')}
-                  </Text>
-                  <Text style={[styles.currentUntil, { color: colors.textMuted }]}>
-                    {t('dasha.untilDate', { date: formatRangeDate(currentAntardasha.endDate, i18n.language) })}
-                  </Text>
-                </>
-              )}
+                {currentAntardasha && (
+                  <>
+                    <View style={styles.currentDivider} />
+                    <Text variant="body-italic" style={styles.currentAntardasha}>
+                      {t(`dasha.planet.${DASHA_LORD_TO_KEY[currentAntardasha.lord]}`)} {t('dasha.antardashaSuffix')}
+                    </Text>
+                    <Text variant="mono" style={styles.currentUntil}>
+                      {t('dasha.untilDate', { date: formatRangeDate(currentAntardasha.endDate, i18n.language) })}
+                    </Text>
+                  </>
+                )}
+              </NightCard>
             </View>
 
             {/* Full cycle */}
-            <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 24 }]}>
+            <SectionLabel style={styles.sectionLabelSpacing}>
               {t('dasha.fullCycle')}
-            </Text>
+            </SectionLabel>
             {dasha.mahaDashas.map((md, i) => (
               <MahadashaRow
                 key={i}
@@ -198,7 +209,7 @@ export default function DashaScreen() {
               />
             ))}
 
-            <Text style={[styles.approxNote, { color: colors.textMuted }]}>
+            <Text variant="body-italic" style={[styles.approxNote, { color: colors.textMuted }]}>
               {t('dasha.approxNote')}
             </Text>
           </>
@@ -248,20 +259,22 @@ function MahadashaRow({ md, expanded, isActive, lang, onToggle, colors, t }: Mah
         },
       ]}>
       <TouchableOpacity activeOpacity={0.85} onPress={onToggle} style={styles.mahaRowHeader}>
+        {/* Active timeline spine — accent in light (sindoor), gold in dark for contrast */}
+        <View style={[styles.spine, { backgroundColor: isActive ? colors.accent : palette.rule }]} />
         <View style={{ flex: 1 }}>
           <View style={styles.mahaTitleRow}>
-            <Text style={[styles.mahaLord, { color: colors.textPrimary }]}>
-              {lordLabel} {t('dasha.mahadashaSuffix')}
+            <Text variant="body" style={[styles.mahaLord, { color: colors.textPrimary }]}>
+              {lordLabel} <Text variant="body-italic" style={{ color: colors.textTertiary }}>{t('dasha.mahadashaSuffix')}</Text>
             </Text>
             {isActive && (
               <View style={[styles.activeChip, { backgroundColor: colors.accent }]} />
             )}
           </View>
-          <Text style={[styles.mahaMeta, { color: colors.textMuted }]}>
+          <Text variant="mono" style={[styles.mahaMeta, { color: colors.textMuted }]}>
             {range}  ·  {formatYears(md.years, t)}
           </Text>
         </View>
-        <Ionicons
+        <Icon
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={16}
           color={colors.textMuted}
@@ -270,9 +283,9 @@ function MahadashaRow({ md, expanded, isActive, lang, onToggle, colors, t }: Mah
 
       {expanded && (
         <View style={[styles.antarWrap, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.antarHeader, { color: colors.textMuted }]}>
+          <Kicker color={palette.gold} size={9} style={styles.antarHeader}>
             {t('dasha.antardashasHeader')}
-          </Text>
+          </Kicker>
           {md.antarDashas.map((ad, j) => {
             const now = Date.now();
             const adActive = ad.startDate.getTime() <= now && ad.endDate.getTime() > now;
@@ -285,13 +298,14 @@ function MahadashaRow({ md, expanded, isActive, lang, onToggle, colors, t }: Mah
                   ]}
                 />
                 <Text
+                  variant="body"
                   style={[
                     styles.antarLord,
                     { color: adActive ? colors.textPrimary : colors.textSecondary },
                   ]}>
                   {t(`dasha.planet.${DASHA_LORD_TO_KEY[ad.lord]}`)}
                 </Text>
-                <Text style={[styles.antarRange, { color: colors.textMuted }]}>
+                <Text variant="mono" style={[styles.antarRange, { color: colors.textMuted }]}>
                   {t('dasha.dateRangeLong', {
                     start: formatRangeDate(ad.startDate, lang),
                     end: formatRangeDate(ad.endDate, lang),
@@ -313,16 +327,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium', textAlign: 'center' },
-  headerSubtitle: { fontSize: 11, fontFamily: 'Mukta_400Regular', textAlign: 'center' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22 },
 
-  scroll: { paddingTop: 16, paddingBottom: 32 },
+  scroll: { paddingTop: 12, paddingBottom: 32 },
 
-  sectionLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, marginBottom: 10 },
+  subtitle: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 10 },
+
+  sectionLabelSpacing: { marginTop: 24, marginBottom: 10 },
 
   birthRow: {
     flexDirection: 'row',
@@ -333,8 +355,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  birthDateText: { flex: 1, fontSize: 15, fontFamily: 'Mukta_500Medium' },
-  birthChangeText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  birthDateText: { flex: 1, fontSize: 15, lineHeight: 20 },
+  birthChangeText: { fontSize: 10 },
 
   setBirthBtn: {
     flexDirection: 'row',
@@ -342,23 +364,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 14,
-    borderRadius: borderRadius.card,
+    borderRadius: borderRadius.button,
   },
-  setBirthText: { color: '#FFFFFF', fontSize: 15, fontFamily: 'Mukta_500Medium' },
+  setBirthText: { color: palette.parchmentBright, fontSize: 11 },
 
-  prompt: { fontSize: 14, fontFamily: 'Mukta_400Regular', lineHeight: 22, textAlign: 'center', marginTop: 24 },
+  prompt: { fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 24 },
 
-  currentCard: {
-    borderRadius: borderRadius.card,
-    borderWidth: 1,
-    padding: 18,
-    marginTop: 24,
+  currentWrap: { marginTop: 24 },
+  currentMahaLord: {
+    fontSize: 26,
+    lineHeight: 32,
+    color: palette.boneWhite,
+    marginTop: 10,
+    marginBottom: 4,
   },
-  currentLabel: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1, marginBottom: 6 },
-  currentMahaLord: { fontSize: 22, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
-  currentUntil: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
-  currentDivider: { height: StyleSheet.hairlineWidth, marginVertical: 14 },
-  currentAntardasha: { fontSize: 16, fontFamily: 'Mukta_500Medium', marginBottom: 2 },
+  currentUntil: { fontSize: 11, color: 'rgba(243,229,200,0.62)', letterSpacing: 0.2 },
+  currentDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 14,
+    backgroundColor: 'rgba(201,155,58,0.25)',
+  },
+  currentAntardasha: {
+    fontSize: 16,
+    lineHeight: 22,
+    color: palette.boneWhite,
+    marginBottom: 4,
+  },
 
   mahaCard: {
     borderRadius: borderRadius.card,
@@ -367,12 +398,13 @@ const styles = StyleSheet.create({
   mahaRowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     padding: 14,
   },
+  spine: { width: 2, alignSelf: 'stretch', borderRadius: 1 },
   mahaTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mahaLord: { fontSize: 15, fontFamily: 'Mukta_500Medium' },
-  mahaMeta: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
+  mahaLord: { fontSize: 15, lineHeight: 21 },
+  mahaMeta: { fontSize: 11, marginTop: 3, letterSpacing: 0.2 },
 
   activeChip: {
     width: 8,
@@ -386,13 +418,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 14,
   },
-  antarHeader: {
-    fontSize: 10,
-    fontFamily: 'Mukta_500Medium',
-    letterSpacing: 1,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
+  antarHeader: { marginBottom: 8 },
   antarRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -400,13 +426,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   antarDot: { width: 6, height: 6, borderRadius: 3 },
-  antarLord: { width: 84, fontSize: 13, fontFamily: 'Mukta_500Medium' },
-  antarRange: { flex: 1, fontSize: 12, fontFamily: 'Mukta_400Regular', textAlign: 'right' },
+  antarLord: { width: 84, fontSize: 13, lineHeight: 18 },
+  antarRange: { flex: 1, fontSize: 11, textAlign: 'right', letterSpacing: 0.2 },
 
   approxNote: {
     fontSize: 11,
-    fontFamily: 'Mukta_400Regular',
-    fontStyle: 'italic',
+    lineHeight: 16,
     textAlign: 'center',
     marginTop: 18,
     paddingHorizontal: 8,

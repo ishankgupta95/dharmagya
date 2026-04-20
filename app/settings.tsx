@@ -3,11 +3,12 @@ import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, Styl
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore, type FontSize, type MasaSystem, type Region } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { SectionLabel } from '@/components/common/SectionLabel';
 import { LANGUAGE_OPTIONS, resolveLanguage, changeLanguage, type AppLanguage } from '@/i18n';
 import {
   scheduleDailyReminder,
@@ -18,22 +19,6 @@ import {
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { ymd } from '@/utils/calendar';
-
-// ─── Font size config ─────────────────────────────────────────────────────────
-
-const FONT_SIZE_OPTIONS: { key: FontSize; label: string }[] = [
-  { key: 'small', label: 'A' },
-  { key: 'normal', label: 'A' },
-  { key: 'large', label: 'A' },
-  { key: 'xl', label: 'A' },
-];
-
-const FONT_SIZE_LABELS: Record<FontSize, string> = {
-  small: 'Small',
-  normal: 'Normal',
-  large: 'Large',
-  xl: 'Extra Large',
-};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -146,12 +131,14 @@ export default function SettingsScreen() {
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.backBtn}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('settings.title')}</Text>
-        <View style={styles.backBtn} />
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {t('settings.title')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
       <ScrollView
@@ -162,7 +149,7 @@ export default function SettingsScreen() {
         <SectionHeader label={t('settings.language')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingRow
-            icon="language-outline"
+            icon="globe"
             label={t('settings.appLanguage')}
             sublabel={LANGUAGE_OPTIONS.find(o => o.key === language)?.nativeLabel ?? t('settings.systemDefault')}
             colors={colors}
@@ -177,7 +164,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
-            icon="moon-outline"
+            icon="moon"
             label={t('settings.darkMode')}
             colors={colors}
             right={
@@ -194,7 +181,7 @@ export default function SettingsScreen() {
 
           {/* Font Size — inline segmented picker */}
           <SettingRow
-            icon="text-outline"
+            icon="text"
             label={t('settings.fontSize')}
             sublabel={t(`settings.fontSize${fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}` as any)}
             colors={colors}
@@ -209,7 +196,7 @@ export default function SettingsScreen() {
         <SectionHeader label={t('settings.calendar')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingRow
-            icon="calendar-outline"
+            icon="calendar"
             label={t('settings.masaSystem')}
             sublabel={t('settings.masaSystemDesc')}
             colors={colors}
@@ -226,14 +213,14 @@ export default function SettingsScreen() {
             activeOpacity={0.85}
             onPress={() => router.push('/location-permission')}>
             <SettingRow
-              icon="location-outline"
+              icon="location"
               label={t('settings.gpsLocation')}
               sublabel={locationText}
               colors={colors}
               right={
                 <View style={styles.locationRight}>
                   <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
-                  <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
                 </View>
               }
             />
@@ -249,7 +236,7 @@ export default function SettingsScreen() {
             activeOpacity={0.7}
             onPress={() => router.push('/settings/deities')}>
             <SettingRow
-              icon="flower-outline"
+              icon="flower"
               label={t('settings.manageDeities')}
               sublabel={
                 selectedDeities.length > 0
@@ -257,7 +244,7 @@ export default function SettingsScreen() {
                   : t('settings.manageDeitiesNone')
               }
               colors={colors}
-              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
         </View>
@@ -267,11 +254,11 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TouchableOpacity activeOpacity={0.7} onPress={() => setDobPickerOpen(true)}>
             <SettingRow
-              icon="gift-outline"
+              icon="gift"
               label={t('settings.birthDate')}
               sublabel={birthDateLabel}
               colors={colors}
-              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
         </View>
@@ -281,7 +268,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
-            icon="notifications-outline"
+            icon="bell"
             label={t('settings.dailyReminder')}
             sublabel={t('settings.dailyReminderDesc')}
             colors={colors}
@@ -298,7 +285,7 @@ export default function SettingsScreen() {
           <Divider colors={colors} />
 
           <SettingRow
-            icon="sunny-outline"
+            icon="sun"
             label={t('settings.sunriseAlert')}
             sublabel={sunriseTime ? t('settings.sunriseAlertAt', { time: sunriseTime }) : t('settings.sunriseAlertGeneric')}
             colors={colors}
@@ -318,11 +305,11 @@ export default function SettingsScreen() {
             activeOpacity={0.7}
             onPress={() => router.push('/settings/reminders')}>
             <SettingRow
-              icon="alarm-outline"
+              icon="alarm"
               label={t('settings.festivalTithiReminders')}
               sublabel={t('settings.festivalTithiRemindersDesc')}
               colors={colors}
-              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
 
@@ -339,22 +326,22 @@ export default function SettingsScreen() {
               router.back();
             }}>
             <SettingRow
-              icon="walk-outline"
+              icon="walk"
               label={t('settings.replayWalkthrough')}
               sublabel={t('settings.replayWalkthroughDesc')}
               colors={colors}
-              right={<Ionicons name="arrow-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
 
           <Divider colors={colors} />
 
           <SettingRow
-            icon="apps-outline"
+            icon="apps"
             label={t('settings.appVersion')}
             sublabel={t('common.appNameHindi')}
             colors={colors}
-            right={<Text style={[styles.versionText, { color: colors.textMuted }]}>v1.0.0</Text>}
+            right={<Text variant="mono" style={[styles.versionText, { color: colors.textMuted }]}>v1.0.0</Text>}
           />
 
           <Divider colors={colors} />
@@ -538,12 +525,12 @@ function RegionRow({
         style={[
           styles.regionItem,
           { borderBottomColor: colors.divider },
-          active && { backgroundColor: colors.accent + '22' },
+          active && { backgroundColor: colors.accent + '18' },
         ]}>
-        <Text style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+        <Text variant="body" style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
           {tr(r)}
         </Text>
-        {active && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+        {active && <Icon name="check" size={18} color={colors.accent} />}
       </TouchableOpacity>
     );
   }
@@ -552,14 +539,14 @@ function RegionRow({
     <>
       <TouchableOpacity activeOpacity={0.7} onPress={() => setOpen(true)}>
         <SettingRow
-          icon="compass-outline"
+          icon="compass"
           label={t('settings.region')}
           sublabel={t('settings.regionDesc')}
           colors={colors}
           right={
             <View style={styles.regionRight}>
-              <Text style={[styles.regionValue, { color: colors.textPrimary }]}>{tr(region)}</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              <Text variant="body-italic" style={[styles.regionValue, { color: colors.textPrimary }]}>{tr(region)}</Text>
+              <Icon name="chevron-right" size={14} color={colors.textMuted} />
             </View>
           }
         />
@@ -568,7 +555,7 @@ function RegionRow({
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={styles.regionOverlay}>
           <View style={[styles.regionSheet, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
+            <Text variant="display-italic" style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
               {t('settings.regionPickerTitle')}
             </Text>
             <ScrollView
@@ -580,7 +567,7 @@ function RegionRow({
 
               {REGION_GROUPS.map(group => (
                 <View key={group.key}>
-                  <Text style={[styles.regionGroupHeader, { color: colors.textMuted }]}>
+                  <Text variant="mono-caps" style={[styles.regionGroupHeader, { color: colors.textMuted }]}>
                     {t(`settings.regionGroup.${group.key}`)}
                   </Text>
                   {group.regions.map(renderRegionItem)}
@@ -589,8 +576,10 @@ function RegionRow({
             </ScrollView>
             <TouchableOpacity
               onPress={() => setOpen(false)}
-              style={[styles.pickerDoneBtn, { backgroundColor: colors.accent, marginTop: 12 }]}>
-              <Text style={[styles.pickerDoneText, { color: colors.base }]}>{t('common.done')}</Text>
+              style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 12 }]}>
+              <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+                {t('common.done')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -606,14 +595,12 @@ interface SectionHeaderProps {
   colors: ColorPalette;
 }
 
-function SectionHeader({ label, colors }: SectionHeaderProps) {
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>{label}</Text>
-  );
+function SectionHeader({ label }: SectionHeaderProps) {
+  return <SectionLabel style={styles.sectionHeader}>{label}</SectionLabel>;
 }
 
 interface SettingRowProps {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: IconName;
   label: string;
   sublabel?: string;
   colors: ColorPalette;
@@ -624,12 +611,12 @@ function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
   return (
     <View style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-        <Ionicons name={icon} size={17} color={colors.accent} />
+        <Icon name={icon} size={16} color={colors.accent} />
       </View>
       <View style={styles.rowText}>
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
+        <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
         {sublabel && (
-          <Text style={[styles.rowSublabel, { color: colors.textSecondary }]} numberOfLines={1}>
+          <Text variant="body-italic" style={[styles.rowSublabel, { color: colors.textTertiary }]} numberOfLines={1}>
             {sublabel}
           </Text>
         )}
@@ -654,22 +641,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22 },
 
   // Scroll
   scroll: { paddingTop: 8, paddingBottom: 32 },
 
   // Section label
   sectionHeader: {
-    fontSize: 11,
-    fontFamily: 'Mukta_400Regular',
-    letterSpacing: 1,
     marginTop: 24,
-    marginBottom: 8,
+    marginBottom: 10,
     marginLeft: 4,
   },
 
@@ -696,8 +687,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rowText: { flex: 1 },
-  rowLabel: { fontSize: 15, fontFamily: 'Mukta_400Regular' },
-  rowSublabel: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 1 },
+  rowLabel: { fontSize: 15, lineHeight: 20 },
+  rowSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
   rowRight: { alignItems: 'flex-end' },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
@@ -708,16 +699,14 @@ const styles = StyleSheet.create({
 
   // Region picker
   regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  regionValue: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  regionValue: { fontSize: 13 },
   regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   regionSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, maxHeight: '75%' },
-  regionSheetTitle: { fontSize: 16, fontFamily: 'Mukta_500Medium', marginBottom: 14, textAlign: 'center' },
+  regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
   regionScroll: { flexShrink: 1 },
   regionGroupHeader: {
-    fontSize: 11,
-    fontFamily: 'Mukta_500Medium',
-    letterSpacing: 1.2,
-    marginTop: 14,
+    fontSize: 10,
+    marginTop: 16,
     marginBottom: 4,
     marginLeft: 14,
   },
@@ -730,12 +719,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
   },
-  regionItemLabel: { fontSize: 15, fontFamily: 'Mukta_400Regular' },
+  regionItemLabel: { fontSize: 15 },
   pickerDoneBtn: { borderRadius: borderRadius.button, paddingVertical: 14, alignItems: 'center' },
-  pickerDoneText: { fontSize: 15, fontFamily: 'Mukta_700Bold' },
+  pickerDoneText: { fontSize: 11 },
 
   // Version text
-  versionText: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
+  versionText: { fontSize: 12 },
 
   // Font size picker
   fontPicker: {
@@ -751,7 +740,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fontPickerLabel: {
-    fontFamily: 'Mukta_500Medium',
+    fontFamily: 'Fraunces_500Medium',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
@@ -765,7 +754,7 @@ const styles = StyleSheet.create({
   },
   langPickerLabel: {
     fontSize: 13,
-    fontFamily: 'Mukta_500Medium',
+    fontFamily: 'NotoSerifDevanagari_500Medium',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
