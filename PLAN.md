@@ -14,8 +14,9 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 - Location Services: `expo-location` (To feed coordinates into the Panchang engine).
 - Local Database: `expo-sqlite` (For storing the user's "Favorites" list and querying Aarti text).
 - UI Library: `react-native-paper` (Material Design 3 — for UI components like Cards, Buttons, Surfaces only).
-- Animations: `react-native-reanimated` (v4 — already installed at v4.1.1, do NOT reinstall).
-- Typography: `@expo-google-fonts/mukta` (Crucial for proper Devanagari/Hindi/Marathi script rendering).
+- Animations: `react-native-reanimated` (v4 — already installed at v4.1.1, do NOT reinstall). `react-native-gesture-handler` v2.28 also installed.
+- Typography (post-P6.9.1, Sacred Editorial stack): `@expo-google-fonts/fraunces` (display serif — headlines + italic accents), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body, 400/500/700), `@expo-google-fonts/jetbrains-mono` (mono small-caps + numeric — 400/500). **Mukta was removed in P6.9.1**; do not reinstall.
+- Icons (post-P6.9.2): custom `<Icon>` component in `src/components/common/Icon.tsx` (react-native-svg, 60 glyphs). `@expo/vector-icons` is no longer a direct dep.
 - App Loading: `expo-splash-screen` (already installed).
 
 ## 3. Architectural Rules & Conventions
@@ -1494,7 +1495,138 @@ P6.10 expanded well beyond a "release gate" sub-phase — it became a **second c
 
 ---
 
-## 15. Out-of-Scope / Explicitly Not Doing
+## 15. Phase 7 — Motion & Interaction Polish — 📐 PLANNED (scoped 2026-04-22)
+
+**Why:** Phase 6 established the Sacred Editorial visual language (type, color, surfaces, icons). With those final, motion is the missing layer between "well-designed app" and "premium devotional artefact." Static layouts feel inert next to the typographic richness; the right motion makes the app feel considered and alive without ever crossing into performance. Phase 7 runs **after P6 code is complete but does not block P6.10 rollout** — motion lands in a follow-up release.
+
+**Relation to P6:** Pure additive. Phase 7 must not regress any P6 visual spec, any existing screen behavior, any i18n string, or the ≤7-warning lint baseline.
+
+**Non-negotiable performance constraint:** Every Phase 7 animation must hold **60 fps on a Pixel 3a (4GB RAM, Android 12)** — the P6.9 perf target carried forward. Low-end Android is the gate. This dictates technique, and the technique choices in this plan are not optional.
+
+### Motion principles (carried forward into every sub-phase)
+
+1. **Driven properties only:** `transform` (translateX / translateY / scale / rotate) and `opacity`. These are compositor-only on Fabric — zero layout / paint cost. **Never animate** `width`, `height`, `borderRadius`, `shadow*`, raw `color` (use `interpolateColor` on a worklet instead), `left`/`top`, `padding`, or `margin`. Those trigger layout and instantly drop frames on 3a-class devices.
+2. **UI-thread worklets always:** `useSharedValue` + `useAnimatedStyle` + `withTiming` / `withRepeat` / `interpolate` / `interpolateColor` from `react-native-reanimated` 4.1. Never the legacy `Animated` API. Never `setInterval`/`setTimeout`-driven animation.
+3. **Snappy, not spring-y:** default duration **220ms**, `Easing.out(Easing.cubic)`. Max duration for any interaction feedback is **320ms**. Ambient loops (mandala drift, ember breath) run at 2–90s but at very low magnitudes. **No overshooting springs** — they read "playful," wrong register for devotional.
+4. **Stagger cap:** when staggering N items, cap total stagger time at **400ms** (e.g. 6 items × 60ms). Longer feels sluggish; the last item should never feel forgotten.
+5. **Concurrency budget:** max **6 simultaneous animations per screen**. Navigating away cancels orphans (`cancelAnimation` in effect cleanup).
+6. **Reduced Motion honored:** single hook `useReducedMotion()` wraps `AccessibilityInfo.isReduceMotionEnabled` + change listener. When true: durations collapse to 0 (instant), loops disabled, staggers skipped. Functionality unchanged.
+7. **Haptics pair discreetly:** `Selection` on state change (tab, date, chip), `Light` on action confirmation (favorite toggle). **Never `Heavy`.** Already-installed `expo-haptics`.
+8. **Gesture rules:** Gesture Handler worklets only; never conflict with vertical scroll (require either clear directional intent via velocity/displacement thresholds or non-overlapping gesture surfaces).
+
+### Step P7.1: Motion foundation
+
+**Scope:** the shared primitives every subsequent sub-phase depends on. No user-visible animation yet.
+
+- **`src/config/motion.ts`** — central tokens (import everywhere; magic numbers banned in new animated code):
+  - `durations = { instant: 120, fast: 180, base: 220, slow: 320 }`
+  - `easings = { standard: Easing.out(Easing.cubic), emphasized: Easing.out(Easing.quad), sine: Easing.inOut(Easing.sin) }`
+  - `stagger = { tight: 40, base: 60, loose: 80 }`
+  - `loop = { breath: 2200, drift: 90000 }`
+- **`src/hooks/useReducedMotion.ts`** — subscribes to `AccessibilityInfo` change events; returns `{ reduced: boolean, dur: (d: number) => number }` where `dur` collapses to 0 when reduced.
+- **`src/hooks/useAnimatedMount.ts`** — common entrance (`opacity 0→1 + translateY 8→0` over `durations.base`, `easings.standard`, respects reduced motion). Used by screen roots.
+- **`src/hooks/useEntranceStagger.ts`** — takes `index`, returns animated style with `delay = Math.min(index × stagger.base, 400)` and the shared entrance transform.
+- **`src/components/common/MotionPressable.tsx`** — Pressable wrapper: scale 1 → 0.985 on press-in over `durations.instant`, back to 1 over `durations.fast`. Replaces raw Pressable wherever a NightCard / button is tapped.
+- **Perf harness:** document a `npm run perf:motion` recipe in README (Hermes sampling profile + React Native Perf Monitor for frame timing, with Pixel 3a as the target). Not a lint gate — a manual checklist for P7.6.
+
+**Exit:** tokens in use in ≥1 component, `useReducedMotion` verified to collapse durations to 0 under Android's "Remove animations" system setting, `MotionPressable` swapped at ≥3 smoke-test sites.
+
+### Step P7.2: System-wide micro-interactions
+
+**Scope:** the low-ambition, high-reach layer. Every screen inherits these; this is where the app starts to feel different.
+
+- **Tab bar ember** — [`app/(tabs)/_layout.tsx`](app/(tabs)/_layout.tsx). Focused tab's 4×4 dot gets a slow `scale 1.0 ↔ 1.25 + opacity 0.85 ↔ 1` loop on `withRepeat(withTiming(…, { duration: loop.breath, easing: easings.sine }), -1, true)`. On tab change: departing ember `scale 1→0.6 + opacity 1→0` in 180ms; arriving ember does the inverse in 260ms with a 60ms delay. Haptic `Selection` on tap.
+- **NightCard press-in** — [`src/components/common/NightCard.tsx`](src/components/common/NightCard.tsx). Pressable variants wrapped in `MotionPressable`. Non-pressable variants untouched.
+- **Heart / favorite toggle** — used in aarti reader, chalisa reader, favorites list, god detail, search results. On toggle: three-keyframe scale `1 → 1.12 → 1` over 280ms; color interpolates `inkQuiet → accent` via `interpolateColor`. Haptic `Light` on activation.
+- **Chip / filter select** — library sectarian chips, festival filters, settings segmented pickers. `backgroundColor` + `borderColor` interpolate over 220ms. Selected state's visual weight bump uses `scale` on a 1.5px-border layer View sitting behind — never animates `borderWidth` directly.
+- **Skeleton → content crossfade** — [`src/components/common/SkeletonLoader.tsx`](src/components/common/SkeletonLoader.tsx). Extend API with `onDataReady`. When content arrives: skeleton `opacity 1 → 0` (300ms) while real content mounts at `opacity 0 → 1` in parallel. Pre-measured heights prevent any layout jump.
+- **Screen entrance** — every `(tabs)/*` screen and every detail screen root uses `useAnimatedMount`. Fires once on mount; returning to a tab does NOT re-fire (lazy-mounted child stays mounted).
+
+**Exit:** ember visibly breathes on device; heart toggle verified at 4+ call sites; rapid tab-switching holds 60fps on Pixel 3a (perf harness).
+
+### Step P7.3: Editorial reveal patterns
+
+**Scope:** the "typographic settling" moments that make the app feel printed rather than rendered.
+
+- **Verse stagger inking** — [`app/aarti/[id].tsx`](app/aarti/[id].tsx), [`app/chalisa/[id].tsx`](app/chalisa/[id].tsx). On first reader mount, first 6 visible verses fade up (`translateY 8→0 + opacity 0→1`) with `stagger.base = 60ms` between each. Verses scrolled in later do NOT animate — only the initial visible set. Scroll handler stays idle during entrance.
+- **Verse refrain quiet highlight** (stateless, no audio dep) — after verse stagger completes (~400ms), refrain lines fade `opacity 0.55 → 1.0` over 600ms, once. Pulls the eye to the refrain structure on first read. **Does not loop** (audio support isn't in scope; this is a one-shot on-mount cue only). Never re-runs for the same reader instance.
+- **SectionLabel settling** — only major instances (home hero section titles, not chip labels). On first enter: `opacity 0 → 1` + a tight `scaleX 0.96 → 1` over 500ms. **Note:** true letter-spacing animation is non-trivial in RN and costs a relayout per frame — we explicitly **do not** animate letter-spacing. The scaleX approximation reads as "settling" without the perf cost.
+- **CornerBrackets draw-in** — [`src/components/common/CornerBrackets.tsx`](src/components/common/CornerBrackets.tsx). Four corners animate `scale 0 → 1` in a stagger (40ms between corners, 240ms total). Runs only on NightCard's first appearance per screen — a `hasAnimated` ref on the parent prevents re-runs on re-render.
+
+**Exit:** reader opens with observable staggered ink on Pixel 3a; SectionLabel settle visible on home; time-to-first-interaction unchanged ± 50ms from pre-P7 baseline.
+
+### Step P7.4: Screen-level transitions
+
+**Scope:** inter-screen and intra-screen state transitions. Sacred Editorial demands **crossfades over slides** — context swaps with held type.
+
+- **Panchang date change** — [`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx). Tapping a date cell: content area (not the calendar grid itself) `opacity 1 → 0` over 140ms, new content mounts and fades `opacity 0 → 1 + translateY 4 → 0` over 220ms. Calendar cells use P7.2 chip interpolation for selected-state change. Haptic `Selection` on cell tap.
+- **Panchang horizontal swipe** — Pan gesture on the calendar hero changes day (previous / next). Commit if `|displacement| > 80px` OR `|velocity| > 400px/s`; spring back otherwise. Uses `useAnimatedGestureHandler` worklet. **Activation offset** set so vertical scroll in the screen body wins when gesture starts on a scrollable area (directional precedence via `activeOffsetX` on the Pan config).
+- **Muhurat occasion card → detail delayed fade** — [`app/muhurat/index.tsx`](app/muhurat/index.tsx) → [`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx). Detail screen's title + icon mount at opacity 0, fade in over 220ms after route mount completes (simple `useEffect` + shared value). **Explicitly NOT a true shared-element transition** — those crash on Android + Fabric in RN 0.81; we keep the illusion without the risk.
+- **God detail hero image fade** — [`app/god/[id].tsx`](app/god/[id].tsx). Hero photo starts at `opacity 0`, fades in over 320ms once loaded. Deity-gradient scrim stays at full opacity underneath — prevents the hard "pop" when a network / bundled image resolves.
+
+**Exit:** panchang date changes feel cohesive (no hard flash); swipe gesture does not hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a.
+
+### Step P7.5: Signature moments
+
+**Scope:** the few animations that define the app's character. Restrained, sacred, memorable.
+
+- **DeityAvatar "Pranam" arrival** — [`src/components/common/DeityAvatar.tsx`](src/components/common/DeityAvatar.tsx) + god detail hero avatar. When the avatar first appears on a route-level surface (NOT in scrollable lists):
+  1. Outer parchment ring: `scale 0.92 → 1 + opacity 0 → 1` over 320ms, `easings.emphasized`.
+  2. Inner gold ring: same transform, delayed +120ms.
+  3. Portrait: `opacity 0 → 1` at delay +240ms, 280ms duration.
+  4. Total ~700ms. In library grid, the cheaper `useAnimatedMount` fade is used instead — reserving Pranam for single-focus screens.
+- **Mandala watermark slow drift** — [`src/components/common/MandalaWatermark.tsx`](src/components/common/MandalaWatermark.tsx). `withRepeat(withTiming('360deg', { duration: loop.drift, easing: Easing.linear }), -1)` on the UI thread. Opacity unchanged. **Pauses when off-screen** — component subscribes to `useIsFocused` (or equivalent) and cancels the animation on blur to avoid ambient battery cost. Disabled entirely under reduced motion.
+- **Muhurat result card verdict** — [`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx). When results compute, the result `NightCard` `translateY 16 → 0 + opacity 0 → 1` over 320ms. P7.3 CornerBrackets draw-in fires immediately after (stacked). Feels like a ruling settling into place.
+
+**Exit:** Pranam arrival reads as intentional on a Pixel 3a screen capture (not jittery, not staggered-too-long); mandala drift is invisible at first glance, noticeable only on second look; reduced-motion toggle instantly stills every Phase 7 animation.
+
+### Step P7.6: Perf QA + low-end Android gate (no new code)
+
+**Device matrix:**
+- **Pixel 3a (Android 12, 4GB RAM) — primary gate.** All P7 animations must hold 60 fps.
+- **Samsung A14 or equivalent budget Android** — secondary gate.
+- **Pixel 7 / modern iPhone** — reference only (passing on flagship proves nothing).
+
+**Profile per screen:** React Native Performance Monitor + Hermes CPU sampling. Capture the 5 most-animated interactions: reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
+
+**Acceptance thresholds:**
+- **UI FPS ≥ 58 avg, ≥ 55 p95** during any animation on Pixel 3a.
+- **JS FPS ≥ 55 avg** (worklets run on UI — if JS drops, something isn't on a worklet and must be fixed).
+- **No single dropped-frame event > 50ms** during any interaction.
+- **Cold-start to tab-bar-visible** unchanged from pre-P7 baseline ± 50ms.
+
+**Regression rule:** if any screen fails the gate, the offending animation is **removed**, not "optimized later." Motion is non-essential; frame rate is essential. This is the hard line.
+
+**Reduced-motion end-to-end:** toggle Android's "Remove animations" system setting; verify every Phase 7 animation collapses to instant. Nothing should still run. Recorded on device video.
+
+**Battery check:** mandala drift is the only continuous animation. Measure 30-min foreground drain on Pixel 3a against pre-P7 baseline. If > 2% delta, verify the off-screen pause is firing (the plan already specifies it — this is implementation verification).
+
+**Artifact:** `motion-perf.md` capturing per-screen FPS numbers + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
+
+### Phase 7 Exit Criteria
+
+- Motion tokens + hooks shipped (`motion.ts`, `useReducedMotion`, `useAnimatedMount`, `useEntranceStagger`, `MotionPressable`).
+- P7.2 system micro-interactions landed across every screen — zero regressions to P6 visual spec.
+- P7.3 editorial reveals observable on reader + home without delaying first interaction.
+- P7.4 panchang date crossfade + swipe gesture working on device without conflicting with vertical scroll.
+- P7.5 signature moments (Pranam, drift, verdict) record well on a 60fps screen capture.
+- P7.6 Pixel 3a perf gate passed — all animations hold ≥ 58 UI FPS; no frame drop > 50ms.
+- Reduced-motion system setting fully respected end-to-end.
+- `tsc --noEmit` clean; `npx expo lint` ≤ current baseline (7 warnings).
+- App Store / Play Store: no metadata changes needed; ship as a minor version bump (`1.4.x`).
+
+**Phase 7 conventions (forward-applicable into Phase 4):**
+- **Transform + opacity only** for every new animation unless documented otherwise.
+- **Worklets always**; JS-driven animation banned in new code.
+- **220ms default** interaction duration — deviations must be justified inline.
+- **Reduced motion in every new animated component** — no exceptions.
+- **Motion tokens over magic numbers** — always import from `src/config/motion.ts`.
+- **Haptics are paired, not scattered** — `Selection` on state change, `Light` on confirmation, never `Heavy`.
+- **Ambient loops (>2s) must pause off-screen** — measurable battery impact otherwise.
+
+---
+
+## 16. Out-of-Scope / Explicitly Not Doing
 
 - Paid subscription tier (we stay ad-supported until ad revenue clearly plateaus; no rush to introduce paywall friction).
 - Live streaming temple darshan (requires partnerships and 24/7 stream infra — revisit alongside P5.2).
@@ -1503,7 +1635,7 @@ P6.10 expanded well beyond a "release gate" sub-phase — it became a **second c
 
 ---
 
-## 16. Phase Dependencies Summary
+## 17. Phase Dependencies Summary
 
 ```
 Phase 1 ✅
@@ -1512,10 +1644,12 @@ Phase 2 (Daily habit drivers) ✅ ──┐
     ↓                               │
 Phase 3 (Reach + content depth)  ──┤
     ↓                               │
-Phase 6 (Visual redesign)  ←────────┤   (redesign can run in parallel with
-    ↓                               │    P3.1/P3.2 content work, but must
-Phase 4 (Native extensions)     ────┘    land before P4 so widgets/mantra
-    ↓                                    counter inherit the new vocabulary)
+Phase 6 (Visual redesign) ✅  ←─────┤   (P6 redesign ran in parallel with
+    ↓                               │    P3 content work. P7 layers motion
+Phase 7 (Motion & interaction) ────┤    on top of the finished visual
+    ↓                               │    vocabulary BEFORE P4 extensions,
+Phase 4 (Native extensions)    ────┘    so widgets / mantra counter inherit
+    ↓                                    both the surface and the cadence.)
 Phase 5 (Far-future — on hold)
 ```
 
