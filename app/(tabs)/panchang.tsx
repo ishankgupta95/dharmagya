@@ -33,7 +33,7 @@ import { WheelDatePickerModal } from '@/components/common/WheelDatePickerModal';
 import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
 import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
-import { useCalendarMonth, calendarDayKey } from '@/services/astrology/calendarMonth';
+import { getFestivalDaysInMonth } from '@/services/astrology/calendarMonth';
 import type { IPanchangElement } from '@/types';
 
 // Auspicious-yoga banner accent. Mid-green chosen to clear ~4.5:1 on both
@@ -204,7 +204,10 @@ export default function PanchangScreen() {
     () => buildCalendarCells(calYear, calMonthIdx),
     [calYear, calMonthIdx],
   );
-  const calDayInfo = useCalendarMonth(calYear, calMonthIdx, userLocation, panchangLang, region);
+  const festivalDays = useMemo(
+    () => getFestivalDaysInMonth(calYear, calMonthIdx),
+    [calYear, calMonthIdx],
+  );
 
   // Walkthrough ref & measurement
   const panchaAngaRef = useRef<View>(null);
@@ -357,10 +360,7 @@ export default function PanchangScreen() {
             const inCurrentMonth = cellDate.getMonth() === calMonthIdx;
             const isTodayCell = isSameDay(cellDate, today);
             const isSelected = isSameDay(cellDate, selectedDate);
-            const info = inCurrentMonth
-              ? calDayInfo.get(calendarDayKey(calYear, calMonthIdx, cellDate.getDate()))
-              : undefined;
-            const hasFestival = info?.hasFestival ?? false;
+            const hasFestival = inCurrentMonth && festivalDays.has(cellDate.getDate());
 
             const baseNumColor = isSelected
               ? palette.parchmentBright
