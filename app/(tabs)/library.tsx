@@ -31,38 +31,6 @@ import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 import { getDeityImage } from '@/config/deityImages';
 import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
 
-// ─── Per-deity name split ───────────────────────────────────────────────────
-// Local to this screen — keeps deities.ts free of presentation concerns.
-// Diacritized romanization split into a base + emphasis tail so the card name
-// can italicize the final syllable in sindoor-deep.
-
-interface DeityNameSplit {
-  base: string;
-  emphasis: string;
-}
-
-const NAME_SPLIT: Record<string, DeityNameSplit> = {
-  ganesha:        { base: 'Gaṇe',    emphasis: 'śa' },
-  shiva:          { base: 'Śi',      emphasis: 'va' },
-  vishnu:         { base: 'Viṣ',     emphasis: 'ṇu' },
-  hanuman:        { base: 'Hanu',    emphasis: 'mān' },
-  lakshmi:        { base: 'Lak',     emphasis: 'ṣmī' },
-  krishna:        { base: 'Kṛ',      emphasis: 'ṣṇa' },
-  rama:           { base: 'Rā',      emphasis: 'ma' },
-  durga:          { base: 'Dur',     emphasis: 'gā' },
-  saraswati:      { base: 'Sara',    emphasis: 'svatī' },
-  parvati:        { base: 'Pār',     emphasis: 'vatī' },
-  kali:           { base: 'Kā',      emphasis: 'lī' },
-  surya:          { base: 'Sūr',     emphasis: 'ya' },
-  brahma:         { base: 'Brah',    emphasis: 'mā' },
-  'sai-baba':     { base: 'Sāī',     emphasis: ' Bābā' },
-  'santoshi-mata':{ base: 'Santo',   emphasis: 'ṣī' },
-  sita:           { base: 'Sī',      emphasis: 'tā' },
-  'khatu-shyam':  { base: 'Khāṭū',   emphasis: ' Śyām' },
-  'vaishno-devi': { base: 'Vaiṣṇo',  emphasis: ' Devī' },
-  narasimha:      { base: 'Nara',    emphasis: 'siṃha' },
-};
-
 // ─── Content counts (computed once at module load) ──────────────────────────
 // Cards show "X aartis · Y chālīsā" — costs nothing to precompute since both
 // listings are already filtered to the in-app roster.
@@ -127,14 +95,11 @@ export default function LibraryScreen() {
   }, [query, t]);
 
   const renderDeity = useCallback(
-    ({ item, index }: ListRenderItemInfo<DeityMeta>) => {
-      const isLeftColumn = index % 2 === 0;
-      return (
-        <View style={[styles.cardCell, { marginLeft: isLeftColumn ? 0 : COLUMN_GAP }]}>
-          <DeityCard deity={item} colors={colors} />
-        </View>
-      );
-    },
+    ({ item }: ListRenderItemInfo<DeityMeta>) => (
+      <View style={styles.cardCell}>
+        <DeityCard deity={item} colors={colors} />
+      </View>
+    ),
     [colors]
   );
 
@@ -236,7 +201,6 @@ interface DeityCardProps {
 const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
   const { t, i18n } = useTranslation();
   const counts = COUNTS[deity.id] ?? { aartis: 0, chalisas: 0 };
-  const nameSplit = NAME_SPLIT[deity.id];
   const image = getDeityImage(deity.id);
 
   // Solid-fill gradient is the fallback when no image is available; with an
@@ -294,16 +258,7 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
 
       <View style={styles.info}>
         <Text style={[styles.name, { color: colors.textPrimary }]} numberOfLines={1}>
-          {nameSplit ? (
-            <>
-              {nameSplit.base}
-              <Text style={[styles.nameEm, { color: colors.emphasis }]}>
-                {nameSplit.emphasis}
-              </Text>
-            </>
-          ) : (
-            deity.name
-          )}
+          {t(`deities.${deity.id}.displayName`)}
         </Text>
         <Text
           variant={isHindi ? 'deva' : 'body-italic'}
@@ -326,7 +281,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
 
   listContent: { paddingTop: 4, paddingBottom: 32 },
-  columnWrapper: { marginBottom: COLUMN_GAP },
+  columnWrapper: { gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
 
   // Hero
   hero: {
@@ -356,7 +311,7 @@ const styles = StyleSheet.create({
   },
 
   // Cards
-  cardCell: { flex: 1 },
+  cardCell: { flex: 1, maxWidth: '50%' },
   card: {
     flex: 1,
     borderRadius: 16,
@@ -412,11 +367,6 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typeScale.bodySerif,
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  nameEm: {
-    ...typeScale.bodyItalic,
     fontSize: 16,
     lineHeight: 20,
   },

@@ -2,11 +2,12 @@ import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomTabBar } from '@react-navigation/bottom-tabs';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { AppText } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
-import { palette } from '@/config/theme';
+import { darkColors, lightColors, palette } from '@/config/theme';
 import { useStore } from '@/store/useStore';
 
 const ACTIVE_DARK = palette.goldLeaf;
@@ -23,14 +24,21 @@ export default function TabLayout() {
   const inactiveColor = isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
   const barBg = isDark ? 'rgba(43,26,15,0.94)' : 'rgba(251,243,222,0.96)';
   const barBorder = isDark ? 'rgba(201,155,58,0.22)' : 'rgba(156,118,35,0.22)';
+  const sceneBg = isDark ? darkColors.base : lightColors.base;
 
   return (
     <Tabs
+      tabBar={(props) => (
+        <View style={{ backgroundColor: sceneBg }}>
+          <BottomTabBar {...props} />
+        </View>
+      )}
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
+        sceneStyle: { backgroundColor: sceneBg },
         tabBarStyle: {
           // Floating pill. Solid at 94–96% opacity — RN can't do
           // backdrop-filter, so the bg is just near-opaque.
