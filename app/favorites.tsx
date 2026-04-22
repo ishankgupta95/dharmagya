@@ -16,6 +16,8 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
+import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
 import { getAartiForDeity, getChalisaForDeity } from '@/services/content';
 
@@ -83,6 +85,7 @@ export default function FavoritesScreen() {
   }, [colors, toggleFavorite]);
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
@@ -114,6 +117,7 @@ export default function FavoritesScreen() {
       )}
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 
@@ -154,13 +158,14 @@ const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemov
           </Text>
         </View>
       </View>
-      <TouchableOpacity
+      <FavoriteHeart
+        active
         onPress={onRemove}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={t('a11y.removeFavorite')}>
-        <Icon name="heart" size={20} color={colors.accent} />
-      </TouchableOpacity>
+        size={20}
+        inactiveColor={colors.textMuted}
+        activeColor={colors.accent}
+        accessibilityLabel={t('a11y.removeFavorite')}
+      />
     </TouchableOpacity>
   );
 });

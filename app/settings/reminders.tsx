@@ -13,6 +13,7 @@ import {
 } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useLocaleFormatters } from '@/utils/format';
@@ -87,6 +88,7 @@ export default function RemindersScreen() {
   }
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
@@ -183,6 +185,7 @@ export default function RemindersScreen() {
         title={t('reminders.festivalTimePickerTitle')}
       />
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore, type FontSize, type MasaSystem, type Region, type TimeFormat } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { LANGUAGE_OPTIONS, resolveLanguage, changeLanguage, type AppLanguage } from '@/i18n';
 import {
   scheduleDailyReminder,
@@ -200,6 +201,7 @@ export default function SettingsScreen() {
   }
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
@@ -709,6 +711,7 @@ export default function SettingsScreen() {
       />
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

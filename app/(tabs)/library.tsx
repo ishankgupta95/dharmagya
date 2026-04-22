@@ -25,6 +25,7 @@ import {
   type ColorPalette,
 } from '@/config/theme';
 import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
@@ -104,6 +105,7 @@ export default function LibraryScreen() {
   );
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
       <FlatList
@@ -188,6 +190,7 @@ export default function LibraryScreen() {
         />
       )}
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

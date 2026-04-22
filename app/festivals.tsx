@@ -16,6 +16,7 @@ import { useStore, type Region } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, semanticColors, spacing, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
 import { AdBanner } from '@/components/common/AdBanner';
+import { ScreenMount } from '@/components/common/ScreenMount';
 
 import festivalsData from '@/data/static/festivals.json';
 
@@ -228,6 +229,7 @@ export default function FestivalsScreen() {
   const canGoForward = year < MAX_YEAR;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* ── Header ─────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
@@ -340,6 +342,7 @@ export default function FestivalsScreen() {
 
       <AdBanner colors={colors} placement="festivals" />
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
+import { ScreenMount } from '@/components/common/ScreenMount';
 
 export default function ManageDeitiesScreen() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export default function ManageDeitiesScreen() {
   }
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
@@ -70,6 +72,7 @@ export default function ManageDeitiesScreen() {
       </View>
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

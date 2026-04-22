@@ -24,7 +24,8 @@ import {
 } from '@/config/theme';
 import { usePanchang } from '@/hooks/usePanchang';
 import { resolveLanguage } from '@/i18n';
-import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
+import { PanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { SectionLabel } from '@/components/common/SectionLabel';
@@ -264,6 +265,7 @@ export default function PanchangScreen() {
   );
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
       {/* ── Editorial Header ──────────────────────────────────────────────── */}
@@ -412,9 +414,10 @@ export default function PanchangScreen() {
           )}
         </View>
 
-        {loading ? (
-          <PanchangSkeleton colors={colors} />
-        ) : error ? (
+        <SkeletonCrossfade
+          ready={!loading}
+          skeleton={<PanchangSkeleton colors={colors} />}>
+          {error ? (
           <View style={styles.errorContainer}>
             <View style={[styles.errorIconCircle, { backgroundColor: colors.surfaceRecessed }]}>
               <Icon name="alert-circle" size={28} color={semanticColors.error} />
@@ -704,6 +707,7 @@ export default function PanchangScreen() {
             )}
           </>
         ) : null}
+        </SkeletonCrossfade>
 
       </ScrollView>
 
@@ -734,6 +738,7 @@ export default function PanchangScreen() {
         title={t('panchang.datePickerTitle', { defaultValue: 'Pick a date' })}
       />
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

@@ -18,6 +18,7 @@ import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { ymd } from '@/utils/calendar';
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
@@ -106,6 +107,7 @@ export default function DashaScreen() {
   }, [dasha]);
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
@@ -241,6 +243,7 @@ export default function DashaScreen() {
         title={t('dasha.birthDatePickerTitle')}
       />
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

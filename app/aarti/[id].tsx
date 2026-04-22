@@ -16,9 +16,16 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
+import { FavoriteHeart } from '@/components/common/FavoriteHeart';
+import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
+import { useEntranceStagger } from '@/hooks/useEntranceStagger';
+import { useRefrainHighlight } from '@/hooks/useRefrainHighlight';
 import { resolveLanguage } from '@/i18n';
 import { getAartiForDeity, aartiVerses, titleFor, type ContentLang } from '@/services/content';
+
+const VERSE_STAGGER_MAX = 6;
 
 export default function AartiDetailScreen() {
   useInterstitialOnExit();
@@ -84,6 +91,7 @@ export default function AartiDetailScreen() {
   const kickerText = `${t('reader.aartiLabel')} · ${deityDisplay}`;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header: back + compact-on-scroll title + favorite ───────────────── */}
@@ -103,19 +111,15 @@ export default function AartiDetailScreen() {
           </Text>
         </Animated.View>
 
-        <TouchableOpacity
+        <FavoriteHeart
+          active={isFavorite}
           onPress={() => toggleFavorite(favoriteKey)}
-          style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
+          size={16}
+          inactiveColor={colors.textSecondary}
+          activeColor={colors.accent}
           accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
-          accessibilityState={{ selected: isFavorite }}>
-          <Icon
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={16}
-            color={isFavorite ? colors.accent : colors.textSecondary}
-          />
-        </TouchableOpacity>
+          style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        />
       </View>
 
       <Animated.ScrollView
@@ -143,7 +147,7 @@ export default function AartiDetailScreen() {
         {/* ── Verses ────────────────────────────────────────────────────────── */}
         {verses.map((verse, index) => (
           <VerseBlock
-            key={`${lang}-${index}`}
+            key={index}
             verse={verse}
             verseNumber={romanNumeral(index + 1)}
             isFirstVerse={index === 0}
@@ -151,6 +155,8 @@ export default function AartiDetailScreen() {
             lang={lang}
             colors={colors}
             t={t}
+            entranceIndex={index}
+            animateEntrance={index < VERSE_STAGGER_MAX}
           />
         ))}
 
@@ -158,6 +164,7 @@ export default function AartiDetailScreen() {
       </Animated.ScrollView>
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 
@@ -198,16 +205,13 @@ interface LangChipProps {
 
 function LangChip({ label, active, onPress, colors }: LangChipProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <SegmentedChip
+      active={active}
       onPress={onPress}
-      style={[
-        styles.langChip,
-        active && { backgroundColor: palette.ink },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}>
+      inactiveBg="transparent"
+      activeBg={palette.ink}
+      style={styles.langChip}
+      accessibilityLabel={label}>
       <Text
         variant="mono-caps"
         style={[
@@ -216,7 +220,7 @@ function LangChip({ label, active, onPress, colors }: LangChipProps) {
         ]}>
         {label}
       </Text>
-    </TouchableOpacity>
+    </SegmentedChip>
   );
 }
 
@@ -228,12 +232,19 @@ interface VerseBlockProps {
   lang: ContentLang;
   colors: ColorPalette;
   t: (key: string, opts?: Record<string, unknown>) => string;
+  entranceIndex: number;
+  animateEntrance: boolean;
 }
 
-function VerseBlock({ verse, verseNumber, isFirstVerse, refrainLines, lang, colors, t }: VerseBlockProps) {
+function VerseBlock({
+  verse, verseNumber, isFirstVerse, refrainLines, lang, colors, t,
+  entranceIndex, animateEntrance,
+}: VerseBlockProps) {
+  const staggerStyle = useEntranceStagger(entranceIndex, animateEntrance);
+  const refrainStyle = useRefrainHighlight();
   const lines = verse.split('\n').filter(l => l.trim().length > 0);
   return (
-    <View style={styles.verseBlock}>
+    <Animated.View style={[styles.verseBlock, staggerStyle]}>
       <Kicker
         color={palette.gold}
         size={9}
@@ -246,23 +257,18 @@ function VerseBlock({ verse, verseNumber, isFirstVerse, refrainLines, lang, colo
       </Kicker>
       {lines.map((line, idx) => {
         const isRefrain = refrainLines.has(normalize(line));
-        if (lang === 'hi') {
-          return (
-            <Text
-              key={idx}
-              variant={isRefrain ? 'deva-bold' : 'deva'}
-              style={[
-                styles.verseDeva,
-                { color: isRefrain ? colors.emphasis : colors.textPrimary },
-                isRefrain && styles.verseDevaRefrain,
-              ]}>
-              {line}
-            </Text>
-          );
-        }
-        return (
+        const textNode = lang === 'hi' ? (
           <Text
-            key={idx}
+            variant={isRefrain ? 'deva-bold' : 'deva'}
+            style={[
+              styles.verseDeva,
+              { color: isRefrain ? colors.emphasis : colors.textPrimary },
+              isRefrain && styles.verseDevaRefrain,
+            ]}>
+            {line}
+          </Text>
+        ) : (
+          <Text
             variant="body-italic"
             style={[
               styles.verseTranslit,
@@ -272,8 +278,16 @@ function VerseBlock({ verse, verseNumber, isFirstVerse, refrainLines, lang, colo
             {line}
           </Text>
         );
+        if (isRefrain) {
+          return (
+            <Animated.View key={idx} style={refrainStyle}>
+              {textNode}
+            </Animated.View>
+          );
+        }
+        return <View key={idx}>{textNode}</View>;
       })}
-    </View>
+    </Animated.View>
   );
 }
 

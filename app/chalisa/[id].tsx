@@ -15,8 +15,12 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { SectionLabel } from '@/components/common/SectionLabel';
+import { FavoriteHeart } from '@/components/common/FavoriteHeart';
+import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
+import { useEntranceStagger } from '@/hooks/useEntranceStagger';
 import { resolveLanguage } from '@/i18n';
 import {
   getChalisaForDeity,
@@ -24,6 +28,8 @@ import {
   titleFor,
   type ContentLang,
 } from '@/services/content';
+
+const VERSE_STAGGER_MAX = 6;
 
 export default function ChalisaDetailScreen() {
   useInterstitialOnExit();
@@ -84,10 +90,13 @@ export default function ChalisaDetailScreen() {
   const deityDisplay = t(`deities.${chalisa.deity}.displayName`);
   const kickerText = `${t('reader.chalisaLabel')} · ${deityDisplay}`;
 
-  // Numbered globally across all chaupai sections.
+  // Numbered globally across all chaupai sections; visible index tracks verse
+  // order across every section so the stagger budget spans the whole reader.
   let globalChaupaiNum = 0;
+  let visibleVerseIndex = 0;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
@@ -107,19 +116,15 @@ export default function ChalisaDetailScreen() {
           </Text>
         </Animated.View>
 
-        <TouchableOpacity
+        <FavoriteHeart
+          active={isFavorite}
           onPress={() => toggleFavorite(favoriteKey)}
-          style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
+          size={16}
+          inactiveColor={colors.textSecondary}
+          activeColor={colors.accent}
           accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
-          accessibilityState={{ selected: isFavorite }}>
-          <Icon
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={16}
-            color={isFavorite ? colors.accent : colors.textSecondary}
-          />
-        </TouchableOpacity>
+          style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        />
       </View>
 
       <Animated.ScrollView
@@ -148,7 +153,7 @@ export default function ChalisaDetailScreen() {
         {sections.map((section, sectionIndex) => {
           const isChaupai = section.type === 'chaupai';
           return (
-            <View key={`${lang}-${sectionIndex}`} style={styles.section}>
+            <View key={sectionIndex} style={styles.section}>
 
               <View style={styles.sectionHeader}>
                 <SectionLabel>{section.label}</SectionLabel>
@@ -156,6 +161,7 @@ export default function ChalisaDetailScreen() {
 
               {section.verses.map((verse, verseIndex) => {
                 const num = isChaupai ? ++globalChaupaiNum : null;
+                const thisVisibleIndex = visibleVerseIndex++;
                 return (
                   <VerseBlock
                     key={verseIndex}
@@ -165,6 +171,8 @@ export default function ChalisaDetailScreen() {
                     lang={lang}
                     colors={colors}
                     t={t}
+                    entranceIndex={thisVisibleIndex}
+                    animateEntrance={thisVisibleIndex < VERSE_STAGGER_MAX}
                   />
                 );
               })}
@@ -184,6 +192,7 @@ export default function ChalisaDetailScreen() {
       </Animated.ScrollView>
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 
@@ -214,19 +223,19 @@ interface LangChipProps {
 
 function LangChip({ label, active, onPress, colors }: LangChipProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <SegmentedChip
+      active={active}
       onPress={onPress}
-      style={[styles.langChip, active && { backgroundColor: palette.ink }]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}>
+      inactiveBg="transparent"
+      activeBg={palette.ink}
+      style={styles.langChip}
+      accessibilityLabel={label}>
       <Text
         variant="mono-caps"
         style={[styles.langChipText, { color: active ? palette.parchmentBright : colors.textTertiary }]}>
         {label}
       </Text>
-    </TouchableOpacity>
+    </SegmentedChip>
   );
 }
 
@@ -237,16 +246,21 @@ interface VerseBlockProps {
   lang: ContentLang;
   colors: ColorPalette;
   t: (key: string, opts?: Record<string, unknown>) => string;
+  entranceIndex: number;
+  animateEntrance: boolean;
 }
 
-function VerseBlock({ verse, number, type, lang, colors, t }: VerseBlockProps) {
+function VerseBlock({
+  verse, number, type, lang, colors, t, entranceIndex, animateEntrance,
+}: VerseBlockProps) {
+  const staggerStyle = useEntranceStagger(entranceIndex, animateEntrance);
   const isChaupai = type === 'chaupai';
   const lines = verse.split('\n').filter(l => l.trim().length > 0);
 
   if (!isChaupai) {
     // Doha / Soratha — centered italic couplet, sindoor-deep for emphasis.
     return (
-      <View style={styles.dohaBlock}>
+      <Animated.View style={[styles.dohaBlock, staggerStyle]}>
         {lines.map((line, idx) => (
           <Text
             key={idx}
@@ -259,13 +273,13 @@ function VerseBlock({ verse, number, type, lang, colors, t }: VerseBlockProps) {
             {line}
           </Text>
         ))}
-      </View>
+      </Animated.View>
     );
   }
 
   // Chaupai — numbered verse, Devanāgarī 18.5px or italic body for Latin.
   return (
-    <View style={styles.chaupaiBlock}>
+    <Animated.View style={[styles.chaupaiBlock, staggerStyle]}>
       {number !== null && (
         <Kicker
           color={palette.gold}
@@ -287,7 +301,7 @@ function VerseBlock({ verse, number, type, lang, colors, t }: VerseBlockProps) {
           {line}
         </Text>
       ))}
-    </View>
+    </Animated.View>
   );
 }
 

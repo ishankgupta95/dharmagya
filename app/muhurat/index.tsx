@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
 import { ALL_OCCASIONS, type Occasion } from '@/services/astrology/muhurat';
+import { ScreenMount } from '@/components/common/ScreenMount';
 
 const OCCASION_ICON: Record<Occasion, IconName> = {
   vivah: 'heart',
@@ -25,6 +26,7 @@ export default function MuhuratIndexScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
@@ -79,6 +81,7 @@ export default function MuhuratIndexScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

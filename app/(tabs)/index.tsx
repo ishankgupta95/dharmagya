@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import { computeVimshottariDashaFromBirth, type DashaLord } from 'panchang-ts';
 
 import { useTranslation } from 'react-i18next';
@@ -29,10 +30,11 @@ import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { NightCard, usePlinthColors, type PlinthColors } from '@/components/common/NightCard';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { Ornament } from '@/components/common/Ornament';
-import { HomePanchangSkeleton } from '@/components/common/SkeletonLoader';
+import { HomePanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { DEITY_BY_ID } from '@/config/deities';
@@ -264,6 +266,7 @@ export default function HomeScreen() {
   const plinth = usePlinthColors();
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
@@ -309,9 +312,8 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Panchang Hero ────────────────────────────────────────────── */}
-        <TouchableOpacity
+        <MotionPressable
           ref={panchangCardRef}
-          activeOpacity={0.88}
           onPress={() => router.push('/(tabs)/panchang')}
           style={styles.panchangWrap}
           accessibilityRole="button"
@@ -334,48 +336,50 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {panchangLoading ? (
-              <HomePanchangSkeleton colors={colors} />
-            ) : panchang ? (
-              <>
-                <View style={styles.phRows}>
-                  <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)} plinth={plinth} />
-                  <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} plinth={plinth} />
-                  <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} plinth={plinth} />
-                  <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} plinth={plinth} last />
-                </View>
+            <SkeletonCrossfade
+              ready={!panchangLoading}
+              skeleton={<HomePanchangSkeleton colors={colors} />}>
+              {panchang ? (
+                <>
+                  <View style={styles.phRows}>
+                    <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)} plinth={plinth} />
+                    <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} plinth={plinth} />
+                    <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} plinth={plinth} />
+                    <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} plinth={plinth} last />
+                  </View>
 
-                <Ornament variant="diamond" tone={isDarkMode ? 'dark' : 'light'} style={styles.phDivider} />
+                  <Ornament variant="diamond" tone={isDarkMode ? 'dark' : 'light'} style={styles.phDivider} />
 
-                <View style={styles.phSun}>
-                  <SunItem
-                    icon="sun"
-                    label={t('home.sunrise')}
-                    value={panchang.sunrise}
-                    plinth={plinth}
-                  />
-                  <View style={[styles.phSunSep, { backgroundColor: plinth.divider }]} />
-                  <SunItem
-                    icon="moon"
-                    label={t('home.sunset')}
-                    value={panchang.sunset}
-                    plinth={plinth}
-                  />
-                </View>
-              </>
-            ) : (
-              <Text variant="body-italic" style={[styles.errorText, { color: plinth.textMuted }]}>
-                {t('home.couldNotLoadPanchang')}
-              </Text>
-            )}
+                  <View style={styles.phSun}>
+                    <SunItem
+                      icon="sun"
+                      label={t('home.sunrise')}
+                      value={panchang.sunrise}
+                      plinth={plinth}
+                    />
+                    <View style={[styles.phSunSep, { backgroundColor: plinth.divider }]} />
+                    <SunItem
+                      icon="moon"
+                      label={t('home.sunset')}
+                      value={panchang.sunset}
+                      plinth={plinth}
+                    />
+                  </View>
+                </>
+              ) : (
+                <Text variant="body-italic" style={[styles.errorText, { color: plinth.textMuted }]}>
+                  {t('home.couldNotLoadPanchang')}
+                </Text>
+              )}
+            </SkeletonCrossfade>
           </NightCard>
-        </TouchableOpacity>
+        </MotionPressable>
 
         {/* ── Your Deities strip ────────────────────────────────────────── */}
         {selectedDeityMetas.length > 0 && (
           <View style={styles.block}>
             <View style={styles.sectionHeader}>
-              <SectionLabel>{t('home.yourDeities')}</SectionLabel>
+              <SectionLabel settle>{t('home.yourDeities')}</SectionLabel>
               <TouchableOpacity
                 onPress={() => router.push('/settings/deities')}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -415,7 +419,7 @@ export default function HomeScreen() {
         {featuredAarti && (
           <View style={styles.block}>
             <View style={styles.sectionHeader}>
-              <SectionLabel>
+              <SectionLabel settle>
                 {favoriteIds.some((id) => id.startsWith('aarti-'))
                   ? t('home.fromYourFavourites')
                   : featuredAartiFromSelected
@@ -424,8 +428,7 @@ export default function HomeScreen() {
               </SectionLabel>
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.88}
+            <MotionPressable
               onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
               style={[styles.featCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
@@ -458,7 +461,7 @@ export default function HomeScreen() {
                   </Text>
                 </>
               )}
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         )}
 
@@ -534,8 +537,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Find Auspicious Date ──────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.88}
+        <MotionPressable
           onPress={() => router.push('/muhurat')}
           style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
@@ -552,7 +554,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <Icon name="chevron-right" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
+        </MotionPressable>
 
       </ScrollView>
 
@@ -591,6 +593,7 @@ export default function HomeScreen() {
       )}
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

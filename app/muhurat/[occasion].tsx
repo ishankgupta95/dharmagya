@@ -17,6 +17,7 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, semanticColors, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import {
   ALL_OCCASIONS,
   scanAuspiciousDays,
@@ -203,6 +204,7 @@ export default function OccasionDetailScreen() {
   const progressPct = totalDays > 0 ? Math.min(100, Math.round((scannedCount / totalDays) * 100)) : 0;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
@@ -356,6 +358,7 @@ export default function OccasionDetailScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

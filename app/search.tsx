@@ -17,6 +17,7 @@ import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPale
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { DEITY_BY_ID } from '@/config/deities';
 import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
 
@@ -135,6 +136,7 @@ export default function SearchScreen() {
   }, [query, colors]);
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ───────────────────────────────────────────────────── */}
@@ -208,6 +210,7 @@ export default function SearchScreen() {
       )}
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

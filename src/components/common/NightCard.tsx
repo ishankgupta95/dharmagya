@@ -3,6 +3,7 @@ import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { CornerBrackets } from './CornerBrackets';
 import { MandalaWatermark } from './MandalaWatermark';
+import { MotionPressable } from './MotionPressable';
 import { borderRadius, palette, spacing } from '@/config/theme';
 import { useStore } from '@/store/useStore';
 
@@ -28,6 +29,12 @@ interface NightCardProps {
   mandalaSize?: number;
   mandalaOpacity?: number;
   bracketInset?: number;
+  /**
+   * When provided, renders the card as a MotionPressable so press-in scale
+   * animation runs on the UI thread. Leave undefined for display-only cards.
+   */
+  onPress?: () => void;
+  accessibilityLabel?: string;
 }
 
 export interface PlinthColors {
@@ -93,10 +100,15 @@ export const NightCard = memo(function NightCard({
   mandalaSize,
   mandalaOpacity = 0.07,
   bracketInset = 10,
+  onPress,
+  accessibilityLabel,
 }: NightCardProps) {
   const plinth = usePlinthColors();
-  return (
-    <View style={[styles.card, { backgroundColor: plinth.bg, borderColor: plinth.border }, style]}>
+  // P7.3 draw-in is handled inside CornerBrackets — it snapshots its
+  // `animateEntrance` prop on first render, so NightCard re-renders (theme,
+  // state churn) never retrigger the animation without any ref plumbing here.
+  const body = (
+    <>
       {showMandala && (
         <MandalaWatermark
           size={mandalaSize}
@@ -105,10 +117,29 @@ export const NightCard = memo(function NightCard({
           position="center"
         />
       )}
-      {showBrackets && <CornerBrackets color={plinth.bracket} inset={bracketInset} />}
+      {showBrackets && (
+        <CornerBrackets
+          color={plinth.bracket}
+          inset={bracketInset}
+          animateEntrance
+        />
+      )}
       <View style={[{ padding }, innerStyle]}>{children}</View>
-    </View>
+    </>
   );
+  const surfaceStyle = [styles.card, { backgroundColor: plinth.bg, borderColor: plinth.border }, style];
+  if (onPress) {
+    return (
+      <MotionPressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        style={surfaceStyle}>
+        {body}
+      </MotionPressable>
+    );
+  }
+  return <View style={surfaceStyle}>{body}</View>;
 });
 
 const styles = StyleSheet.create({

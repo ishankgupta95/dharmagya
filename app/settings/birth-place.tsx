@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/common/Icon';
+import { ScreenMount } from '@/components/common/ScreenMount';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
@@ -94,6 +95,7 @@ export default function BirthPlacePickerScreen() {
   }
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
@@ -201,6 +203,7 @@ export default function BirthPlacePickerScreen() {
       />
 
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 

@@ -20,6 +20,8 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
+import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
 import { getDeityImage } from '@/config/deityImages';
 import {
@@ -126,6 +128,7 @@ export default function GodDetailScreen() {
   const deityColor = deity.color;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       <SectionList
@@ -159,6 +162,7 @@ export default function GodDetailScreen() {
         }
       />
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 
@@ -288,18 +292,14 @@ const ContentCard = memo(function ContentCard({
           )}
         </View>
       </View>
-      <TouchableOpacity
+      <FavoriteHeart
+        active={isFavorite}
         onPress={onToggleFavorite}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
+        size={20}
+        inactiveColor={colors.textMuted}
+        activeColor={colors.accent}
         accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
-        accessibilityState={{ selected: isFavorite }}>
-        <Icon
-          name={isFavorite ? 'heart' : 'heart-outline'}
-          size={20}
-          color={isFavorite ? colors.accent : colors.textMuted}
-        />
-      </TouchableOpacity>
+      />
     </TouchableOpacity>
   );
 });
