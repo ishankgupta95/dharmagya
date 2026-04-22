@@ -14,8 +14,9 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 - Location Services: `expo-location` (To feed coordinates into the Panchang engine).
 - Local Database: `expo-sqlite` (For storing the user's "Favorites" list and querying Aarti text).
 - UI Library: `react-native-paper` (Material Design 3 — for UI components like Cards, Buttons, Surfaces only).
-- Animations: `react-native-reanimated` (v4 — already installed at v4.1.1, do NOT reinstall).
-- Typography: `@expo-google-fonts/mukta` (Crucial for proper Devanagari/Hindi/Marathi script rendering).
+- Animations: `react-native-reanimated` (v4 — already installed at v4.1.1, do NOT reinstall). `react-native-gesture-handler` v2.28 also installed.
+- Typography (post-P6.9.1, Sacred Editorial stack): `@expo-google-fonts/fraunces` (display serif — headlines + italic accents), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body, 400/500/700), `@expo-google-fonts/jetbrains-mono` (mono small-caps + numeric — 400/500). **Mukta was removed in P6.9.1**; do not reinstall.
+- Icons (post-P6.9.2): custom `<Icon>` component in `src/components/common/Icon.tsx` (react-native-svg, 60 glyphs). `@expo/vector-icons` is no longer a direct dep.
 - App Loading: `expo-splash-screen` (already installed).
 
 ## 3. Architectural Rules & Conventions
@@ -1231,7 +1232,401 @@ Listed in rough priority order for when we do revisit:
 
 ---
 
-## 14. Out-of-Scope / Explicitly Not Doing
+## 14. Phase 6 — Visual Redesign: "Sacred Editorial"
+
+**Goal:** Replace the current flat beige + saffron system with a cohesive, premium devotional aesthetic inspired by illuminated-manuscript typography and editorial magazine design. Parchment ground, temple sindoor + aged gold-leaf accents, Fraunces serif paired with Noto Serif Devanāgarī, JetBrains Mono for astronomical data. Devanāgarī leads every hierarchy; Latin script plays support.
+
+**Design study reference:** [`design/redesign-preview.html`](design/redesign-preview.html) (2026-04-20). Open in a browser to see the full concept: masthead, four screen studies (Home, Panchang, Library, Aarti reader), type specimen, palette, and ornament vocabulary.
+
+**Scheduling:** Execute **after P3.3 (shipped) and before P4 native extensions**. Reason: widgets, Kundli, and mantra counter inherit the new component vocabulary — redesigning those screens twice is waste. Can run **in parallel** with P3.2 (content expansion) and P3.1 (language expansion), but the redesign PR must land before content work resumes to avoid re-skinning new content. Every sub-phase below is independently shippable and revertable.
+
+### Step P6.1: Typography & Theme Tokens (foundation)
+
+**Why:** Every subsequent screen inherits from these tokens. Landing the palette + fonts first means each screen redesign is a pure layout/composition change, not a mixed concern.
+
+**Implementation:**
+- Font swap: add `Fraunces` (variable, opsz + SOFT axes), `Noto Serif Devanagari` (400/500/700), `JetBrains Mono` (400/500) via `@expo-google-fonts`. Retire `Mukta` once all screens are ported (keep loaded during transition for safety — drop in final P6.9 cleanup).
+- Extend [`src/config/theme.ts`](src/config/theme.ts):
+  - Add parchment palette: `parchment`, `parchmentDeep`, `parchmentBright`, `paperEdge`.
+  - Add ornament palette: `sindoor`, `sindoorDeep`, `goldLeaf`, `gold`, `nightPlinth`, `nightPlinthDeep`.
+  - Add semantic rule tokens: `rule`, `ruleSoft`.
+  - Keep existing `lightColors` / `darkColors` keys; change their values to the new palette so no screen mass-rename is needed.
+- Add `typeScale` helper exporting `displaySerif`, `displayItalic`, `bodySerif`, `deva`, `devaBold`, `mono`, `monoCaps` — each returns the exact `fontFamily` + `fontVariant` + `letterSpacing` tuple. All screens call this instead of hard-coding font names.
+- **No layout changes in this step.** Ship it, open every screen, verify the app still functions (will look transitional — that's expected).
+
+**Decisions / deviations during P6.1:**
+- **Fraunces variable axes (`opsz` + `SOFT`) NOT wired** — React Native has no `fontVariationSettings`. We ship Fraunces as static weights (300/400/500 + italic pairs) loaded individually via `@expo-google-fonts/fraunces`. The variable-font benefits in the design study don't transfer.
+- **`bodyItalic` token added** to typeScale beyond what was originally listed (the plan listed `body-italic` as an AppText variant only). It became necessary as a typeScale token because TextInput placeholders and inline italic body text are widely used.
+- **Mukta retained through P6.8**, dropped in **P6.9.1** (a follow-up sub-phase added after P6.9 — see below). Originally planned as final P6.9 cleanup, but the cleanup needed enough audit + per-style decisions that it warranted its own sub-phase.
+- **Semantic `colors.emphasis` token added in P6.9** (not P6.1) — sindoor in light, goldLeaf in dark — to fix dark-mode contrast on refrain lines / italicised tail syllables / "see all" links / planet glyphs. Six call sites refactored.
+- **`palette.boneWhite` and `palette.inkSoft` / `palette.inkMuted` ramps added** beyond the originally-listed parchment + ornament tokens — needed for the on-night-plinth text colors and for 4-step ink ramps respectively.
+
+### Step P6.2: Shared component vocabulary
+
+**Why:** Ten screens rendering the same decorative motifs independently will diverge within three weeks. Build the primitives once.
+
+**Implementation:** Add to [`src/components/common/`](src/components/common/):
+- `<SectionLabel>` — small-caps mono label with leading 20px sindoor rule.
+- `<Kicker>` — mono uppercase kicker text (used above every hero block).
+- `<Ornament variant="lotus" | "diamond" | "double-rule">` — chapter-break dividers.
+- `<CornerBrackets>` — four gold-leaf L-shaped brackets absolutely positioned inside dark cards.
+- `<MandalaWatermark>` — `react-native-svg` yantra/mandala component with configurable size + opacity for background placement.
+- `<NightCard>` — dark-plinth card with built-in corner brackets + mandala watermark prop (wraps Panchang hero, audio player, etc.).
+- Update existing [`<DeityAvatar>`](src/components/common/DeityAvatar.tsx) — bone-white ring on parchment outer ring, gradient fallback keyed by deity, Devanāgarī initial overlay when image missing.
+- Update [`<AppText>`](src/components/common/AppText.tsx) with new variants: `display`, `display-italic`, `body-italic`, `deva`, `deva-bold`, `mono`, `mono-caps`.
+- Update tab bar in [`app/(tabs)/_layout.tsx`](app/(tabs)/_layout.tsx): floating dark pill (absolute-positioned, `backdrop-filter` not available in RN — use solid dark bg with 92% opacity), gold-leaf ember dot above active icon.
+
+**Decisions / deviations during P6.2:**
+- **Tab bar is NOT `position: 'absolute'`.** The plan called for absolute floating, but that requires every tab screen to reserve bottom padding via `useBottomTabBarHeight()`. Deferred — the floating-pill look still comes through via `marginHorizontal` + `borderRadius` + shadow + `marginBottom: Math.max(insets.bottom, 10)` (the `Math.max` ensures min 10px clearance on Android per `feedback_android_navigation.md`).
+- **Tab bar is theme-agnostic dark plinth** — same dark plinth in both light + dark app themes (the plinth look is intentional, not theme-responsive).
+- **`AppText` `variant` prop is additive** — non-variant calls keep working unchanged. This let screens port at their own pace through P6.3–P6.8 without a forced migration.
+- **`DeityAvatar` API stayed additive** — bone-white-ring-on-gold-rule is now `ring="editorial"` (the new default); the prior solid ring is still available. All 10 existing call sites continued working unchanged.
+- **`<NightCard>` has a `showMandala={false}` escape hatch** — used by the floating audio player on the aarti reader so the watermark doesn't compete with the play button.
+- **`react-native-svg@15.12.1` installed** (needed for `<Ornament>` + `<MandalaWatermark>`) — this carries forward to enable the custom `<Icon>` SVG set in P6.9.
+
+### Step P6.3: Home screen redesign
+
+**Why:** Highest-traffic screen; biggest perceived lift from redesign. Also the most complex composition — worth doing once tokens and primitives are stable.
+
+**Implementation:** Refactor [`app/(tabs)/index.tsx`](app/(tabs)/index.tsx) to match the mockup's home screen:
+- Header: weekday in mono small-caps + italic-serif date with monospace day number.
+- Greeting: 34px italic-serif ("Good morning, *Ishank*") with Devanāgarī sub-line ("शुभ प्रभात").
+- Panchang hero: `<NightCard>` with corner brackets, mandala watermark, four tithi/nakshatra/yoga/karana rows (mono "until HH:MM" on the right), gold-leaf divider with diamond ornament, sunrise/sunset row with small circular icon backdrops.
+- "Your Deities" strip: 54px medallions with Devanāgarī initial, bone-white double ring, italic-serif name below.
+- Featured aarti card: on parchment-bright, corner mark "Aarti № XX" in gold mono, devanāgarī title + italic-serif transliteration, circular sindoor play button, dashed rule above a 1-line verse peek.
+- Dasha callout: warm gradient card with icon well, mono kicker + italic-serif body ("You are in *Venus* mahādaśā").
+- Quick row: three small-icon cards with italic-serif labels.
+- **Walkthrough compatibility:** Panchang card and settings gear refs must still return correct `measureInWindow` rects. Retest the spotlight overlay after reflow.
+
+**Decisions / deviations during P6.3:**
+- **Featured aarti / featured chalisa / quick row / muhurat callout cards initially shipped with hardcoded `palette.parchmentBright` backgrounds regardless of theme** — treating "card always reads on parchment" as intentional editorial. **Reversed in P6.10** after dark-mode QA showed those cards reading as bright light surfaces in a dark app. Now all use `colors.surface` + `colors.border` and follow the theme.
+- **Greeting includes Devanāgarī echo** (शुभ प्रभात / शुभ दोपहर / शुभ संध्या) hardcoded in the source (not from i18n) since it's a typographic element rendered regardless of UI language.
+- **Play button stays sindoor in both themes** — it's a CTA with `palette.parchmentBright` play glyph on top, contrast is fine in both themes.
+
+### Step P6.4: Panchang screen redesign
+
+**Implementation:** Refactor [`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx):
+- Header: editorial kicker "The Almanac" + italic-serif "Panchāng" title.
+- Month strip: italic-serif month name with mono year.
+- Calendar grid: keep 7-column structure; add a Devanāgarī tithi abbreviation sub-label (9px) under each day number. Festival days dot in sindoor; selected day inverts to sindoor background.
+- Quality windows (`QualitySlotsCard`): keep component, restyle — mono key labels, colored values only (good = muted green, bad = sindoor). Row backgrounds remain neutral.
+- Planetary positions (`PlanetaryPositionsCard`): 3-column grid of planet tiles — glyph in serif, Devanāgarī name in mono small-caps, italic-serif sign name.
+- Retain existing data flow + `usePanchang` hook unchanged.
+
+**Decisions / deviations during P6.4:**
+- **No "The Almanac" kicker shipped** — per the no-decorative-taglines feedback (see P6.5), the editorial header uses just "Panchāng" / "पंचांग" as the screen title in `display-italic`. The original plan had decorative kickers; we use plain screen names except where copy carries real info (location pill, active month, count).
+- **Inline calendar hero shipped** — the panchang screen now leads with a 6-week calendar grid with festival dots, today-cell highlighting, selected-cell sindoor fill. This was a P6.4 design addition beyond the original "month strip" line in the plan.
+- **Festival/yoga/panchaka alert banners initially shipped with Material Design hardcoded colors** (`#FFF8E1` / `#E8F5E9` / `#FFF3E0`). **Reworked in P6.10** to alpha-tinted semantic colors that compose on both grounds: festival = `palette.goldLeaf`, yoga = new `AUSPICIOUS_GREEN = '#5DA85D'` module const, panchaka = `palette.sindoorWarm`. Pattern: bg `+ '1E'` (12% alpha), border `+ '66'` (40% alpha), foreground full-color.
+- **Eclipse card (when present) intentionally hardcoded** to `#3A1E1E` warm-dark plinth + `#8A3A3A` border + cream text — content-semantic darkness (evokes eclipse), reads correctly in both themes. Not generic chrome, deliberately exempt from theme-responsive treatment.
+
+### Step P6.5: Library (Gods) screen redesign
+
+**Implementation:** Refactor [`app/(tabs)/library.tsx`](app/(tabs)/library.tsx):
+- Hero: editorial kicker "The Pantheon" + large italic-serif title ("Thirty-three *koṭi*").
+- Search bar: italic-serif placeholder in muted ink.
+- Filter chips: mono small-caps, active chip inverts to deep ink.
+- Deity card grid (2-column): portrait header block with deity-colored gradient background, dashed halo ring, Devanāgarī initial in large display weight. Below: serif name (italicized last syllable), muted italic English tagline, gold-mono content count pill ("7 aartis · 1 chālīsā").
+
+**Decisions / deviations during P6.5:**
+- **"The Pantheon" / "Thirty-three *koṭi*" kicker REJECTED.** The plan's hero copy was lifted verbatim from the design study but turned out to be insider Vedic taxonomy ("33 koṭi" = 33 classes of devas, often misread as 33 crore). User rejected it as both nonsensical and decorative. **Replaced with plain screen name** "Gods" / "भगवान" in `display-italic`. **Codified as a feedback rule:** treat editorial hero copy in [design/redesign-preview.html](design/redesign-preview.html) as typographic demo text, not final strings — only ship copy when it carries real information (location pill, active month, count).
+- **`PRESENTATION` map kept LOCAL to library.tsx** (not added to `src/config/deities.ts`). Per-deity diacritized-name split + sectarian classifications live in the screen file. Keeps `deities.ts` as pure data; respects "no roster edits" scope cap.
+- **Sectarian filter chips: Śaiva / Vaiṣṇava / Śākta / Saura.** Defensible classification but not the only valid mapping. Brahma + Sai Baba have empty `traditions` so they only appear under "All".
+- **DeityAvatar API NOT changed.** The library card halo (over a deity-coloured gradient with translucent bone-white rings) is a different motif from the standard `<DeityAvatar ring="editorial">`. Built locally with absolutely-positioned Views + LinearGradient instead of extending the avatar API for one screen.
+
+### Step P6.6: Aarti + Chalisa reader redesign
+
+**Implementation:** Refactor [`app/aarti/[id].tsx`](app/aarti/[id].tsx) and [`app/chalisa/[id].tsx`](app/chalisa/[id].tsx):
+- Header: back button + action cluster (text-size, favorite, overflow) as small parchment-bright pills.
+- Title block: sindoor kicker "Aarti · Śrī Gaṇeśa Jī" + large Devanāgarī title + italic-serif transliteration below + lotus-ornament centered rule.
+- Verse structure: mono kicker "Verse I" with trailing hairline; Devanāgarī lines at 18.5px with refrain lines in sindoor red + semibold; italic-serif English translation underneath.
+- Floating audio player: dark `<NightCard>` docked to bottom inset, 40px sindoor play button, italic-serif title, gold-leaf progress thread, mono time-remaining + autoplay line.
+- Keep existing text-size setting and favorite logic — reuse both state paths.
+
+**Decisions / deviations during P6.6:**
+- **Refrain detection is line-level, not verse-level.** The design study showed "Verse I · refrain" where the whole verse is refrain. We detect refrain lines by normalized equality against the FIRST verse's lines (trim + collapse whitespace). Defensible reading of traditional aarti structure but not strictly per the design — works reliably for the Ganesha sample and for any aarti where the first verse contains the chorus.
+- **Audio player progress thread renders empty (0% fill).** No real audio integration yet; faking timecode would invent data. Caption shows "Read along · Coming soon" via new `reader.playerMeta` i18n key. When read-along ships, swap the static fill for an animated value and replace caption with real time-remaining.
+- **Text-size and overflow action pills NOT shipped.** The plan called for "back + (text-size, favorite, overflow)" pills in the header. Text-size already lives in Settings and scales every screen via `FONT_SCALE` in AppText. Overflow has no defined action surface. Adding either now would invent functionality — deferred until specific actions are greenlit.
+- **Kicker copy uses plain screen purpose** (per the P6.5 rule above): "AARTI · {deity displayName}" / "CHALISA · {displayName}", resolved from existing `deities.{id}.displayName` i18n. The design study's "Śrī Gaṇeśa Jī" diacritized form was NOT hand-rolled — we use whatever the i18n already has.
+
+### Step P6.7: Supporting screens (Settings, Favorites, Search, Festivals, Dasha, Muhurat, God detail)
+
+**Why:** Without this sweep, the app fractures — redesigned tabs + unchanged deep screens feel broken.
+
+**Implementation:** Apply the shared component vocabulary (P6.2) to every non-tab screen. Functionality stays identical.
+- [`app/settings.tsx`](app/settings.tsx) + [`app/settings/`](app/settings/): editorial list style — section labels in mono small-caps, rows with italic-serif labels, supporting text in muted italic, mono values on the right.
+- [`app/favorites.tsx`](app/favorites.tsx): same card treatment as featured aarti on home; empty state uses centered lotus ornament + italic-serif copy.
+- [`app/search.tsx`](app/search.tsx): large italic-serif input field on parchment; filter chips as in Library; grouped results with mono section headers.
+- [`app/festivals.tsx`](app/festivals.tsx): apply "group by month" convention (per `feedback_list_presentation.md`) — month as italic-serif drop heading, festival rows with sindoor left rule for near-term items.
+- [`app/dasha.tsx`](app/dasha.tsx): timeline treatment — vertical gold-leaf spine with tithi-style date markers, current mahādaśā period emphasized in `<NightCard>`.
+- [`app/muhurat/`](app/muhurat/): form treatment as an almanac — labeled mono fields, result card in `<NightCard>` with quality windows listed like Panchang quality rows.
+- [`app/god/[id].tsx`](app/god/): hero portrait block (full-width deity gradient with halo), mono section labels for "Aartis", "Chalisas", "Stotras" — each a list with content-type pills.
+
+**Decisions / deviations during P6.7:**
+- **God detail hero has TWO layouts:** with image (full-width 280h photo + dark gradient shade overlay) and without image (deity-color gradient + bone-white double-halo + Devanāgarī initial at 96px — same motif as the Library card halo scaled up). Branch is `getDeityImage(deity.id)`.
+- **Festivals "Soon" badge added** per `feedback_list_presentation.md` — items dated 0–14 days from today get a sindoor border + "SOON" / "शीघ्र" badge (new `festivals.soonBadge` i18n key). The plan didn't call for this; came in from list-presentation feedback.
+- **Settings `FontSizePicker` / `LanguagePicker` / `MasaSystemPicker` segmented controls left on Mukta** in P6.7 (the segmented "A / A / A / A" and "En / हि / ಕ" pickers needed per-button font-size mutation). **Ported in P6.9.1** to Fraunces_500Medium / NotoSerifDevanagari_500Medium.
+- **`<DatePickerModal>` and `<DeitySelectionGrid>` internals untouched** in P6.7 — shared primitives, restyling deferred (DeitySelectionGrid touched in P6.8 onboarding, DatePickerModal touched in P6.9.1 Mukta drop).
+- **Ad placements unchanged** — no new ones added, no existing ones removed (per `feedback_no_ads_after_onboarding.md`).
+- **Removed dead-code constants** from settings.tsx (`FONT_SIZE_OPTIONS`, `FONT_SIZE_LABELS`) — pre-existing lint warnings cleared up as a side-effect.
+
+### Step P6.8: Onboarding + walkthrough polish
+
+**Implementation:**
+- Refactor [`app/onboarding/`](app/onboarding/): three-step flow in Sacred Editorial language — italic-serif step titles, mono progress indicator, editorial welcome copy. Deity-selection grid reuses P6.5 card style.
+- [`app/location-permission.tsx`](app/location-permission.tsx): centered mandala watermark behind italic-serif copy; sindoor primary CTA; "Skip" as ghost link.
+- Walkthrough overlay ([`WalkthroughSpotlight`](src/components/common/WalkthroughOverlay.tsx)): restyle tooltip as parchment-bright card with corner brackets + gold kicker; retest spotlight rect measurement on home and panchang after P6.3/P6.4 reflow.
+
+**Decisions / deviations during P6.8:**
+- **Onboarding step1 + step2 hardcoded parchment regardless of theme.** Step3 still respects `isDarkMode` (it's the screen where the user previews / picks a theme). This means a user who chooses dark in step3 will see step3 flip immediately but steps 1+2 stay parchment. Intentional — "Sacred Editorial is parchment-first" for the welcome flow.
+- **Walkthrough tooltip is parchment-bright in BOTH app themes** (not theme-responsive). Rationale: the walkthrough is a temporary overlay — its surface should read consistently whether the user is on light or dark theme. Sindoor + ink + gold all read fine on parchmentBright in both themes.
+- **`WalkthroughOverlay` `colors` prop kept on the interface** for API compatibility (callers on home/panchang/library still pass it) but is no longer destructured or read — the tooltip surface is constant. Cleaned up in P6.9 (callers updated, `colors` prop removed from interface).
+- **`_progressDots.tsx` extracted as a `_`-prefixed shared primitive** — Expo Router treats `_`-prefixed files as non-routes. Shared by all three onboarding steps.
+- **Decorative kickers DROPPED from onboarding** ("WELCOME", "Your Pantheon", "Preferences") per the no-decorative-taglines rule. Kept the walkthrough step counter ("STEP 1 · OF 4") because it carries genuine info.
+- **Skip ghost link DROPPED from location-permission.** The screen is reached either via onboarding step3 (user already committed to GPS) or via Settings (already has back navigation). Skip would be redundant next to Back.
+- **MandalaWatermark on location-permission positioned `top-right` with offset `-60`** rather than centered — the long scrolling city list would hide a centered watermark.
+- **`walkthrough.stepCounter` i18n key added** (en + hi). Normalized `onboarding.beginJourney` by dropping the trailing ASCII arrow (the editorial button uses mono-caps + a real `<Icon>` arrow).
+
+### Step P6.9: Platform polish + dark mode + QA
+
+**Implementation:**
+- **Dark mode variant:** invert parchment to deep ink (`#1B140A` → base, `#2B1A0F` → surface). Keep sindoor + gold unchanged; desaturate slightly for dark backgrounds. Verify all `isDarkMode` branches in screens render correctly.
+- **Icon set migration:** replace Ionicons usage in tab bar, headers, and quick-access cards with the custom SVG set shown in the mockup (build a `<Icon name="...">` component backed by `react-native-svg` symbols — ~15 glyphs total). Keep Ionicons loaded during transition; drop dependency once no `import { Ionicons }` remains.
+- **Android status-bar + edge-to-edge:** with `react-native-edge-to-edge` already installed, verify light/dark status-bar contrast on parchment hero and night plinth. Nav bar: re-verify per `feedback_android_navigation.md` (inspector first).
+- **Font loading perf:** Fraunces variable is ~90 KB — preload via `expo-font`; verify no FOIT on cold start. Measure TTI on a Pixel 3a (low-budget Android target).
+- **Screenshot regression:** hand-capture the 21 designed screens/states (Section 5.3) in both themes before and after; diff manually for unintended breakage.
+- **Accessibility pass:** new palette contrast check (parchment + deep ink passes WCAG AA; verify sindoor on parchment for body text — may need to restrict sindoor to accent usage only where contrast is borderline).
+
+**Decisions / deviations during P6.9:**
+- **Custom `<Icon>` set shipped 24 glyphs initially** — `chevron-up`/`-down`/`close`/`check` were drawn as Claude extensions (not in the design study's symbol sheet). Stroke weight 1.7, round joins, matching the editorial weight.
+- **P6.9 was a PARTIAL delivery** — Ionicons → Icon migration (only chevrons + hearts + tab bar landed), Mukta drop NOT done. Both deferred to follow-up sub-phases (P6.9.1 Mukta drop, P6.9.2 full Ionicons drop) because the deep-screen cleanup needed enough audit + per-call-site decisions to warrant their own phases.
+- **`colors.emphasis` semantic token added** (sindoor in light, **goldLeaf in dark**) for refrain lines / italicised tail syllables / "see all" links / planet glyphs — six call sites. Dark-mode is **gold-instead-of-sindoor**; semantic shift the user accepted because sindoor on nightPlinthDeep was 1.78:1 (failed WCAG AA). User can swap `darkColors.emphasis` to `palette.sindoorWarm` (4.05:1, AA large only) if they prefer to keep the red identity at the cost of contrast.
+- **WCAG audit results:** sindoor (#A5301C) on parchment (#F4E9CE) = 5.55:1 (AA body, AAA large); sindoorDeep (#782110) on parchment = 8.64:1 (AAA); sindoorDeep on nightPlinthDeep = 1.78:1 (FAILED, fixed via emphasis swap); goldLeaf on nightPlinthDeep = 7.28:1 (AAA).
+- **Tab bar `marginBottom` uses `Math.max(insets.bottom, 10)`** — guarantees min 10px clearance per `feedback_android_navigation.md` AND honours system insets on iOS / Android edge-to-edge.
+- **Dropped scaffold files** as side-effect: `src/components/themed-text.tsx`, `src/components/themed-view.tsx`, etc. Some left in place (HapticTab is still consumed by the tab bar layout).
+
+### Step P6.9.1: Mukta drop (follow-up sub-phase, not in original plan)
+
+**Implementation:** Port all ~40 Mukta references across 6 files to typeScale-native fonts. `npm uninstall @expo-google-fonts/mukta`.
+
+**Decisions during P6.9.1:**
+- **Per-style font mapping** based on content:
+  - Latin-only numeric (planet times, day numbers, year chips, durations) → `JetBrainsMono_400Regular` / `_500Medium`.
+  - Mixed Latin + Devanagari (labels, kickers, tithi/nakshatra names, i18n strings) → `NotoSerifDevanagari_400Regular` / `_500Medium` / `_700Bold` (NSD renders Latin too — softer than mono but consistent with Hindi siblings).
+  - Latin-only editorial accent (HoraCard planet names, settings FontSizePicker A label) → `Fraunces_400Regular` / `Fraunces_500Medium`.
+- **HoraCard label kept `NotoSerifDevanagari_500Medium`** — tried mono-caps tracking on "HORA / होरा" but Devanagari has no upper/lowercase, so mono-caps tracking looks strange on "होरा".
+- **`FontSizePicker` segmented "A / A / A / A" picker uses `Fraunces_500Medium`** at 12/15/19/24px inline. The serif A reads editorial. If user finds it too whimsical for a settings control, swap to mono.
+- **`LanguagePicker` "📱 / En / हि" uses `NotoSerifDevanagari_500Medium`** — covers both English and Devanagari; emoji renders from system font regardless.
+
+### Step P6.9.2: Ionicons drop (follow-up sub-phase, not in original plan)
+
+**Implementation:** Draw 36 new glyphs in `<Icon>` (60 total now), migrate ~100 Ionicon call sites, delete 3 unused scaffold files (`src/components/ui/icon-symbol.tsx`, `icon-symbol.ios.tsx`, `collapsible.tsx`), `npm uninstall @expo/vector-icons`.
+
+**Decisions during P6.9.2:**
+- **Outline → base glyph collapse:** Our Icon set is outline-first (e.g. `search-outline` / `chevron-back` / `time-outline` all map to `search` / `chevron-left` / `clock`). Single glyph per concept; `-outline` / suffix-variants don't exist.
+- **`@expo/vector-icons` removed as a direct dep** but stays as a transitive dep of `expo` (for internal `@expo-google-fonts` flows). `npm ls @expo/vector-icons` confirms only `expo@54.0.33` references it.
+- **`DatePickerModal` month-row rewritten** — old code inlined `<Ionicons name="caret-down">` INSIDE a `<Text>` (Text-based glyph renderer). `<Icon>` is `<Svg>`, can't render inside `<Text>`. Rewrote to a flex-row TouchableOpacity with the label `<Text>` + caret as siblings (gap: 6).
+- **Glyph subjectivity flagged:** `compass`, `contrast` (yin-yang for eclipses), `restaurant` (fork+knife), `school` (mortarboard only), `walk` (stylised stick figure), `flower` (4-petal), `hand` (open palm), `cut` (scissors), `gift` (box+bow) are Claude-drawn approximations — each editable in-place at [src/components/common/Icon.tsx](src/components/common/Icon.tsx) without touching call sites.
+- **Typed icon-name props cleaned up** across 8 files: `keyof typeof Ionicons.glyphMap` literal unions → `IconName`.
+
+### Step P6.10: Release gate
+
+- Fresh Play Store screenshots (8 screens, both languages).
+- Updated feature graphic + app icon if the icon still feels off against the new palette.
+- `app.json` version bump + `android.versionCode` increment.
+- Local AAB build via EAS (per README).
+- Staged Play Store rollout: 20% → 50% → 100% over 5 days.
+- Monitor: crash-free rate (font-loading and SVG paths are highest-risk regression surfaces), session length, onboarding completion. Halt rollout if crash-free rate drops > 0.5% from baseline.
+
+**Decisions / deviations during P6.10:**
+
+P6.10 expanded well beyond a "release gate" sub-phase — it became a **second contrast pass + theme-responsiveness sweep** because dark-mode QA revealed many surfaces still hardcoded to light tokens. Code-side P6.10 work landed in this order:
+
+**P6.10/C — font perf + Android polish (static review):**
+- Cold-start font weight measured at 1.34 MB (well over the implicit 500 KB target). **Only `Fraunces_500Medium_Italic` had zero call-site references** — dropped (~86 KB saved). All other weights confirmed used.
+- Devanagari weights (NSD 400/500/700) account for half the budget but each has multiple unique call sites — kept all three; trimming risks visible Devanagari weight regression.
+- Font-load gating verified — `appReady = (fontsLoaded || !!fontError) && storeHydrated` correctly gates `SplashScreen.hideAsync()`. No FOUT possible.
+- StatusBar style `isDarkMode ? 'light' : 'dark'` is correct for every redesigned surface — status bar always sits over `colors.base` (never over dark hero cards, those render below the SafeAreaView top inset).
+- All 23 SafeAreaView call sites verified per `feedback_safe_area_edges.md` — tab screens use `['top']`, all others use `['top','bottom']`.
+
+**P6.10/D — first dark-mode contrast sweep:**
+- Found settings + reminders row icons hardcoded `palette.sindoor` (~2.7:1 on nightPlinthDeep, fails WCAG 1.4.11's 3:1 graphical-object requirement).
+- **Sweep applied: `palette.sindoor` → `colors.accent`** (sindoor in light, goldLeaf in dark) wherever the element is a foreground (icon/text/border) on a theme-responsive surface. **15 files touched:** settings.tsx, settings/reminders.tsx, muhurat/index.tsx, muhurat/[occasion].tsx, dasha.tsx, (tabs)/index.tsx, (tabs)/panchang.tsx, festivals.tsx, aarti/[id].tsx, chalisa/[id].tsx, god/[id].tsx, favorites.tsx, search.tsx, location-permission.tsx, QualitySlotsCard.tsx.
+- **Stayed sindoor (intentional):** all CTA backgrounds (sindoor pills with parchmentBright text on top), the calendar selected-day fill / festivals today fill / muhurat upcoming dateCol fill (parchmentBright text on top), onboarding step1+step2 (hardcoded parchment), WalkthroughOverlay tooltip (parchment-bright per P6.8), Ornament/Kicker/SectionLabel component defaults, god/[id].tsx hero kicker (over deity-gradient hero image), `lightColors.accent: palette.sindoor` token definition.
+- **`festivals.tsx` `TYPE_ICON` map** — `major` color refactored from `palette.sindoor` to `null` sentinel, resolved at render-time via `typeInfo.color ?? colors.accent`. Module-scoped maps can't see colors otherwise.
+
+**P6.10 follow-up — SectionLabel auto-themes via store:**
+- After the sindoor sweep, `<SectionLabel>` rule + default text color were still hardcoded sindoor + inkQuiet (~1.78 / 2.7:1 on dark base). User chose the cleanest fix: subscribe to `useStore.isDarkMode` inside the component.
+- New behaviour: `tone === 'dark'` → forced gold + bone-white-alpha; `tone === 'light'` → forced sindoor + inkQuiet; `tone === undefined` (all 16 current callers) → follows `isDarkMode`. This deliberate store-coupling avoids 16 caller updates or threading theme context through React.
+- Pattern is component-specific — `<Kicker>` and `<Ornament>` were left with palette defaults because all callers already pass an explicit `color` prop (the defaults are dead code).
+
+**P6.10 follow-up — home screen full theme pass:**
+- After dark-mode QA, the home screen's featured-aarti / featured-chalisa / quick-row / muhurat callout cards all rendered as light cards in dark mode (hardcoded `palette.parchmentBright` from P6.3). **Reversed the prior "intentional editorial" call.** All four card vocabularies now use `colors.surface` + `colors.border` + `colors.text*` + `colors.accent`. `<QuickCard>` API extended to take `colors` prop (was a memo'd component without one).
+- `paperEdge` borders on `colors.surface*` backgrounds swapped to `colors.borderAccent` in muhurat/index + library so borders read tinted-accent in both themes instead of always-tan.
+
+**P6.10 follow-up — panchang banners theme pass:**
+- Festival / special yoga / panchaka alert banners initially shipped with hardcoded Material Design alert palettes (`#FFF8E1` / `#E8F5E9` / `#FFF3E0`) — pre-redesign chrome.
+- **Replaced with alpha-tinted semantic colors** that compose on both grounds. Pattern: `color + '1E'` (12% bg) / `+ '66'` (40% border) / full-color foreground. Festival = `palette.goldLeaf`; yoga = new `AUSPICIOUS_GREEN = '#5DA85D'` module const (chosen mid-green to clear ~4.5:1 on both grounds without per-theme swap); panchaka = `palette.sindoorWarm`.
+- Eclipse card stays hardcoded `#3A1E1E` warm-dark plinth — content-semantic darkness, exempt from theme-responsive treatment.
+
+**P6.10/E — release gate prep (user-gated, not auto-executed):**
+- `app.json` bumped: `version 1.3.0 → 1.4.0`, `android.versionCode 5 → 6`. Minor version bump matches prior cadence (1.x → 1.x+1 = visible feature/design drop); user can change to `2.0.0` before building if they prefer to signal the redesign as a flagship release.
+- Detailed release checklist captured in `memory/project_p6_10_prepared.md` (screenshot list, feature graphic refresh recommendation, AAB build command, staged rollout plan, halt thresholds).
+- Steps NOT auto-executed (require user environment / Play Console / design tool): AAB build, screenshot capture, feature graphic refresh, Play Console upload, staged rollout management.
+
+### Phase 6 Exit Criteria
+
+- All 21 designed screens/states (Section 5) ported to the Sacred Editorial system in both themes. ✅ (code-side)
+- Fraunces, Noto Serif Devanagari, JetBrains Mono loaded; Mukta removed. ✅ (P6.9.1)
+- Ionicons dependency removed in favor of the custom SVG icon set. ✅ (P6.9.2 — `@expo/vector-icons` is no longer a direct dep; remains as a transitive dep of `expo` itself, which is unavoidable and harmless)
+- Walkthrough spotlight geometry verified against redesigned home + panchang. ✅ (re-verified post-P6.3/P6.4/P6.5 reflow during P6.8)
+- Dark-mode variant shipped and verified on Android + iOS. ⚠️ Code-side complete (full sindoor → colors.accent sweep + SectionLabel auto-theme + home + banner theme passes); **device verification still pending**.
+- Updated Play Store listing (screenshots + feature graphic) and a monitored staged rollout completed. ❌ User-gated; checklist prepared in `memory/project_p6_10_prepared.md`.
+
+**Phase 6 conventions established (use forward in P7+):**
+- **Theme-responsive surfaces** — every card / row / icon-circle / border on a theme-responsive screen MUST use `colors.surface` / `colors.surfaceRecessed` / `colors.border` / `colors.borderAccent` / `colors.text*` / `colors.accent` / `colors.emphasis`. Hardcoded `palette.parchmentBright` / `palette.ink` / `palette.sindoor` is allowed ONLY for: (a) CTA backgrounds with light foreground text, (b) onboarding steps that are deliberately parchment-only, (c) content-semantic dark plinths (eclipse card), (d) component-internal defaults that all callers override.
+- **`colors.accent`** — sindoor in light, goldLeaf in dark — for icons / mono-caps text / borders on theme-responsive surfaces.
+- **`colors.emphasis`** — sindoor-deep in light, goldLeaf in dark — for body emphasis (refrain lines, italicised tail syllables, see-all links, planet glyphs).
+- **Alpha-tinted alert banners** — `color + '1E'` (bg) / `+ '66'` (border) / full-color foreground. Used for festival / yoga / panchaka banners, sindoor row tints, and selected-state highlights.
+- **Plain screen names, not decorative kickers.** Hero copy in [design/redesign-preview.html](design/redesign-preview.html) is typographic demo text only — use the actual screen name in `display-italic`. Add a kicker only when it surfaces real info (location, count, step counter, active month, section purpose).
+- **No new deities, no roster edits, no fabricated classifications** (per `feedback_content_accuracy_audit.md`). The Library card classifications (PRESENTATION map) live screen-local.
+- **No ad placement changes** during redesign sub-phases (per `feedback_no_ads_after_onboarding.md`).
+- **SafeAreaView edges:** non-tab screens use `['top','bottom']`; tab screens use `['top']` only.
+- **`tsc --noEmit` clean + `npx expo lint` ≤ 7-warning baseline** (pre-existing infra warnings only) is the post-sub-phase gate.
+
+---
+
+## 15. Phase 7 — Motion & Interaction Polish — 📐 PLANNED (scoped 2026-04-22)
+
+**Why:** Phase 6 established the Sacred Editorial visual language (type, color, surfaces, icons). With those final, motion is the missing layer between "well-designed app" and "premium devotional artefact." Static layouts feel inert next to the typographic richness; the right motion makes the app feel considered and alive without ever crossing into performance. Phase 7 runs **after P6 code is complete but does not block P6.10 rollout** — motion lands in a follow-up release.
+
+**Relation to P6:** Pure additive. Phase 7 must not regress any P6 visual spec, any existing screen behavior, any i18n string, or the ≤7-warning lint baseline.
+
+**Non-negotiable performance constraint:** Every Phase 7 animation must hold **60 fps on a Pixel 3a (4GB RAM, Android 12)** — the P6.9 perf target carried forward. Low-end Android is the gate. This dictates technique, and the technique choices in this plan are not optional.
+
+### Motion principles (carried forward into every sub-phase)
+
+1. **Driven properties only:** `transform` (translateX / translateY / scale / rotate) and `opacity`. These are compositor-only on Fabric — zero layout / paint cost. **Never animate** `width`, `height`, `borderRadius`, `shadow*`, raw `color` (use `interpolateColor` on a worklet instead), `left`/`top`, `padding`, or `margin`. Those trigger layout and instantly drop frames on 3a-class devices.
+2. **UI-thread worklets always:** `useSharedValue` + `useAnimatedStyle` + `withTiming` / `withRepeat` / `interpolate` / `interpolateColor` from `react-native-reanimated` 4.1. Never the legacy `Animated` API. Never `setInterval`/`setTimeout`-driven animation.
+3. **Snappy, not spring-y:** default duration **220ms**, `Easing.out(Easing.cubic)`. Max duration for any interaction feedback is **320ms**. Ambient loops (mandala drift, ember breath) run at 2–90s but at very low magnitudes. **No overshooting springs** — they read "playful," wrong register for devotional.
+4. **Stagger cap:** when staggering N items, cap total stagger time at **400ms** (e.g. 6 items × 60ms). Longer feels sluggish; the last item should never feel forgotten.
+5. **Concurrency budget:** max **6 simultaneous animations per screen**. Navigating away cancels orphans (`cancelAnimation` in effect cleanup).
+6. **Reduced Motion honored:** single hook `useReducedMotion()` wraps `AccessibilityInfo.isReduceMotionEnabled` + change listener. When true: durations collapse to 0 (instant), loops disabled, staggers skipped. Functionality unchanged.
+7. **Haptics pair discreetly:** `Selection` on state change (tab, date, chip), `Light` on action confirmation (favorite toggle). **Never `Heavy`.** Already-installed `expo-haptics`.
+8. **Gesture rules:** Gesture Handler worklets only; never conflict with vertical scroll (require either clear directional intent via velocity/displacement thresholds or non-overlapping gesture surfaces).
+
+### Step P7.1: Motion foundation
+
+**Scope:** the shared primitives every subsequent sub-phase depends on. No user-visible animation yet.
+
+- **`src/config/motion.ts`** — central tokens (import everywhere; magic numbers banned in new animated code):
+  - `durations = { instant: 120, fast: 180, base: 220, slow: 320 }`
+  - `easings = { standard: Easing.out(Easing.cubic), emphasized: Easing.out(Easing.quad), sine: Easing.inOut(Easing.sin) }`
+  - `stagger = { tight: 40, base: 60, loose: 80 }`
+  - `loop = { breath: 2200, drift: 90000 }`
+- **`src/hooks/useReducedMotion.ts`** — subscribes to `AccessibilityInfo` change events; returns `{ reduced: boolean, dur: (d: number) => number }` where `dur` collapses to 0 when reduced.
+- **`src/hooks/useAnimatedMount.ts`** — common entrance (`opacity 0→1 + translateY 8→0` over `durations.base`, `easings.standard`, respects reduced motion). Used by screen roots.
+- **`src/hooks/useEntranceStagger.ts`** — takes `index`, returns animated style with `delay = Math.min(index × stagger.base, 400)` and the shared entrance transform.
+- **`src/components/common/MotionPressable.tsx`** — Pressable wrapper: scale 1 → 0.985 on press-in over `durations.instant`, back to 1 over `durations.fast`. Replaces raw Pressable wherever a NightCard / button is tapped.
+- **Perf harness:** document a `npm run perf:motion` recipe in README (Hermes sampling profile + React Native Perf Monitor for frame timing, with Pixel 3a as the target). Not a lint gate — a manual checklist for P7.6.
+
+**Exit:** tokens in use in ≥1 component, `useReducedMotion` verified to collapse durations to 0 under Android's "Remove animations" system setting, `MotionPressable` swapped at ≥3 smoke-test sites.
+
+### Step P7.2: System-wide micro-interactions
+
+**Scope:** the low-ambition, high-reach layer. Every screen inherits these; this is where the app starts to feel different.
+
+- **Tab bar ember** — [`app/(tabs)/_layout.tsx`](app/(tabs)/_layout.tsx). Focused tab's 4×4 dot gets a slow `scale 1.0 ↔ 1.25 + opacity 0.85 ↔ 1` loop on `withRepeat(withTiming(…, { duration: loop.breath, easing: easings.sine }), -1, true)`. On tab change: departing ember `scale 1→0.6 + opacity 1→0` in 180ms; arriving ember does the inverse in 260ms with a 60ms delay. Haptic `Selection` on tap.
+- **NightCard press-in** — [`src/components/common/NightCard.tsx`](src/components/common/NightCard.tsx). Pressable variants wrapped in `MotionPressable`. Non-pressable variants untouched.
+- **Heart / favorite toggle** — used in aarti reader, chalisa reader, favorites list, god detail, search results. On toggle: three-keyframe scale `1 → 1.12 → 1` over 280ms; color interpolates `inkQuiet → accent` via `interpolateColor`. Haptic `Light` on activation.
+- **Chip / filter select** — library sectarian chips, festival filters, settings segmented pickers. `backgroundColor` + `borderColor` interpolate over 220ms. Selected state's visual weight bump uses `scale` on a 1.5px-border layer View sitting behind — never animates `borderWidth` directly.
+- **Skeleton → content crossfade** — [`src/components/common/SkeletonLoader.tsx`](src/components/common/SkeletonLoader.tsx). Extend API with `onDataReady`. When content arrives: skeleton `opacity 1 → 0` (300ms) while real content mounts at `opacity 0 → 1` in parallel. Pre-measured heights prevent any layout jump.
+- **Screen entrance** — every `(tabs)/*` screen and every detail screen root uses `useAnimatedMount`. Fires once on mount; returning to a tab does NOT re-fire (lazy-mounted child stays mounted).
+
+**Exit:** ember visibly breathes on device; heart toggle verified at 4+ call sites; rapid tab-switching holds 60fps on Pixel 3a (perf harness).
+
+### Step P7.3: Editorial reveal patterns
+
+**Scope:** the "typographic settling" moments that make the app feel printed rather than rendered.
+
+- **Verse stagger inking** — [`app/aarti/[id].tsx`](app/aarti/[id].tsx), [`app/chalisa/[id].tsx`](app/chalisa/[id].tsx). On first reader mount, first 6 visible verses fade up (`translateY 8→0 + opacity 0→1`) with `stagger.base = 60ms` between each. Verses scrolled in later do NOT animate — only the initial visible set. Scroll handler stays idle during entrance.
+- **Verse refrain quiet highlight** (stateless, no audio dep) — after verse stagger completes (~400ms), refrain lines fade `opacity 0.55 → 1.0` over 600ms, once. Pulls the eye to the refrain structure on first read. **Does not loop** (audio support isn't in scope; this is a one-shot on-mount cue only). Never re-runs for the same reader instance.
+- **SectionLabel settling** — only major instances (home hero section titles, not chip labels). On first enter: `opacity 0 → 1` + a tight `scaleX 0.96 → 1` over 500ms. **Note:** true letter-spacing animation is non-trivial in RN and costs a relayout per frame — we explicitly **do not** animate letter-spacing. The scaleX approximation reads as "settling" without the perf cost.
+- **CornerBrackets draw-in** — [`src/components/common/CornerBrackets.tsx`](src/components/common/CornerBrackets.tsx). Four corners animate `scale 0 → 1` in a stagger (40ms between corners, 240ms total). Runs only on NightCard's first appearance per screen — a `hasAnimated` ref on the parent prevents re-runs on re-render.
+
+**Exit:** reader opens with observable staggered ink on Pixel 3a; SectionLabel settle visible on home; time-to-first-interaction unchanged ± 50ms from pre-P7 baseline.
+
+### Step P7.4: Screen-level transitions
+
+**Scope:** inter-screen and intra-screen state transitions. Sacred Editorial demands **crossfades over slides** — context swaps with held type.
+
+- **Panchang date change** — [`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx). Tapping a date cell: content area (not the calendar grid itself) `opacity 1 → 0` over 140ms, new content mounts and fades `opacity 0 → 1 + translateY 4 → 0` over 220ms. Calendar cells use P7.2 chip interpolation for selected-state change. Haptic `Selection` on cell tap.
+- **Panchang horizontal swipe** — Pan gesture on the calendar hero changes day (previous / next). Commit if `|displacement| > 80px` OR `|velocity| > 400px/s`; spring back otherwise. Uses `useAnimatedGestureHandler` worklet. **Activation offset** set so vertical scroll in the screen body wins when gesture starts on a scrollable area (directional precedence via `activeOffsetX` on the Pan config).
+- **Muhurat occasion card → detail delayed fade** — [`app/muhurat/index.tsx`](app/muhurat/index.tsx) → [`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx). Detail screen's title + icon mount at opacity 0, fade in over 220ms after route mount completes (simple `useEffect` + shared value). **Explicitly NOT a true shared-element transition** — those crash on Android + Fabric in RN 0.81; we keep the illusion without the risk.
+- **God detail hero image fade** — [`app/god/[id].tsx`](app/god/[id].tsx). Hero photo starts at `opacity 0`, fades in over 320ms once loaded. Deity-gradient scrim stays at full opacity underneath — prevents the hard "pop" when a network / bundled image resolves.
+
+**Exit:** panchang date changes feel cohesive (no hard flash); swipe gesture does not hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a.
+
+### Step P7.5: Signature moments
+
+**Scope:** the few animations that define the app's character. Restrained, sacred, memorable.
+
+- **DeityAvatar "Pranam" arrival** — [`src/components/common/DeityAvatar.tsx`](src/components/common/DeityAvatar.tsx) + god detail hero avatar. When the avatar first appears on a route-level surface (NOT in scrollable lists):
+  1. Outer parchment ring: `scale 0.92 → 1 + opacity 0 → 1` over 320ms, `easings.emphasized`.
+  2. Inner gold ring: same transform, delayed +120ms.
+  3. Portrait: `opacity 0 → 1` at delay +240ms, 280ms duration.
+  4. Total ~700ms. In library grid, the cheaper `useAnimatedMount` fade is used instead — reserving Pranam for single-focus screens.
+- **Mandala watermark slow drift** — [`src/components/common/MandalaWatermark.tsx`](src/components/common/MandalaWatermark.tsx). `withRepeat(withTiming('360deg', { duration: loop.drift, easing: Easing.linear }), -1)` on the UI thread. Opacity unchanged. **Pauses when off-screen** — component subscribes to `useIsFocused` (or equivalent) and cancels the animation on blur to avoid ambient battery cost. Disabled entirely under reduced motion.
+- **Muhurat result card verdict** — [`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx). When results compute, the result `NightCard` `translateY 16 → 0 + opacity 0 → 1` over 320ms. P7.3 CornerBrackets draw-in fires immediately after (stacked). Feels like a ruling settling into place.
+
+**Exit:** Pranam arrival reads as intentional on a Pixel 3a screen capture (not jittery, not staggered-too-long); mandala drift is invisible at first glance, noticeable only on second look; reduced-motion toggle instantly stills every Phase 7 animation.
+
+### Step P7.6: Perf QA + low-end Android gate (no new code)
+
+**Device matrix:**
+- **Pixel 3a (Android 12, 4GB RAM) — primary gate.** All P7 animations must hold 60 fps.
+- **Samsung A14 or equivalent budget Android** — secondary gate.
+- **Pixel 7 / modern iPhone** — reference only (passing on flagship proves nothing).
+
+**Profile per screen:** React Native Performance Monitor + Hermes CPU sampling. Capture the 5 most-animated interactions: reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
+
+**Acceptance thresholds:**
+- **UI FPS ≥ 58 avg, ≥ 55 p95** during any animation on Pixel 3a.
+- **JS FPS ≥ 55 avg** (worklets run on UI — if JS drops, something isn't on a worklet and must be fixed).
+- **No single dropped-frame event > 50ms** during any interaction.
+- **Cold-start to tab-bar-visible** unchanged from pre-P7 baseline ± 50ms.
+
+**Regression rule:** if any screen fails the gate, the offending animation is **removed**, not "optimized later." Motion is non-essential; frame rate is essential. This is the hard line.
+
+**Reduced-motion end-to-end:** toggle Android's "Remove animations" system setting; verify every Phase 7 animation collapses to instant. Nothing should still run. Recorded on device video.
+
+**Battery check:** mandala drift is the only continuous animation. Measure 30-min foreground drain on Pixel 3a against pre-P7 baseline. If > 2% delta, verify the off-screen pause is firing (the plan already specifies it — this is implementation verification).
+
+**Artifact:** `motion-perf.md` capturing per-screen FPS numbers + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
+
+### Phase 7 Exit Criteria
+
+- Motion tokens + hooks shipped (`motion.ts`, `useReducedMotion`, `useAnimatedMount`, `useEntranceStagger`, `MotionPressable`).
+- P7.2 system micro-interactions landed across every screen — zero regressions to P6 visual spec.
+- P7.3 editorial reveals observable on reader + home without delaying first interaction.
+- P7.4 panchang date crossfade + swipe gesture working on device without conflicting with vertical scroll.
+- P7.5 signature moments (Pranam, drift, verdict) record well on a 60fps screen capture.
+- P7.6 Pixel 3a perf gate passed — all animations hold ≥ 58 UI FPS; no frame drop > 50ms.
+- Reduced-motion system setting fully respected end-to-end.
+- `tsc --noEmit` clean; `npx expo lint` ≤ current baseline (7 warnings).
+- App Store / Play Store: no metadata changes needed; ship as a minor version bump (`1.4.x`).
+
+**Phase 7 conventions (forward-applicable into Phase 4):**
+- **Transform + opacity only** for every new animation unless documented otherwise.
+- **Worklets always**; JS-driven animation banned in new code.
+- **220ms default** interaction duration — deviations must be justified inline.
+- **Reduced motion in every new animated component** — no exceptions.
+- **Motion tokens over magic numbers** — always import from `src/config/motion.ts`.
+- **Haptics are paired, not scattered** — `Selection` on state change, `Light` on confirmation, never `Heavy`.
+- **Ambient loops (>2s) must pause off-screen** — measurable battery impact otherwise.
+
+---
+
+## 16. Out-of-Scope / Explicitly Not Doing
 
 - Paid subscription tier (we stay ad-supported until ad revenue clearly plateaus; no rush to introduce paywall friction).
 - Live streaming temple darshan (requires partnerships and 24/7 stream infra — revisit alongside P5.2).
@@ -1240,17 +1635,21 @@ Listed in rough priority order for when we do revisit:
 
 ---
 
-## 15. Phase Dependencies Summary
+## 17. Phase Dependencies Summary
 
 ```
 Phase 1 ✅
     ↓
-Phase 2 (Daily habit drivers)  ──┐
-    ↓                             │
-Phase 3 (Reach + content depth)  ─┤
-    ↓                             │   (P4.1 Kundli can proceed in parallel
-Phase 4 (Native extensions)     ──┘    with P3 once P2 ships)
-    ↓
+Phase 2 (Daily habit drivers) ✅ ──┐
+    ↓                               │
+Phase 3 (Reach + content depth)  ──┤
+    ↓                               │
+Phase 6 (Visual redesign) ✅  ←─────┤   (P6 redesign ran in parallel with
+    ↓                               │    P3 content work. P7 layers motion
+Phase 7 (Motion & interaction) ────┤    on top of the finished visual
+    ↓                               │    vocabulary BEFORE P4 extensions,
+Phase 4 (Native extensions)    ────┘    so widgets / mantra counter inherit
+    ↓                                    both the surface and the cadence.)
 Phase 5 (Far-future — on hold)
 ```
 

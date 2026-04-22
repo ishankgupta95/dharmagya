@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { type ReactNode, useState, useEffect } from 'react';
+import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,6 +11,8 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import type { ColorPalette } from '@/config/theme';
+import { easings } from '@/config/motion';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 // ─── Base shimmer block ───────────────────────────────────────────────────────
 
@@ -143,6 +145,66 @@ export function PanchangSkeleton({ colors }: { colors: ColorPalette }) {
         </View>
       </View>
 
+    </View>
+  );
+}
+
+// ─── Skeleton → content crossfade wrapper ─────────────────────────────────────
+// Mounts skeleton + content simultaneously and crossfades them when `ready`
+// flips true. Both children are absolutely stacked — a pre-sized container
+// prevents layout jump. Per P7.2: skeleton opacity 1→0 + content 0→1 over
+// 300ms, in parallel. Reduced motion snaps instantly.
+
+const CROSSFADE_MS = 300;
+
+interface SkeletonCrossfadeProps {
+  ready: boolean;
+  skeleton: ReactNode;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function SkeletonCrossfade({ ready, skeleton, children, style }: SkeletonCrossfadeProps) {
+  const { dur } = useReducedMotion();
+  const progress = useSharedValue(ready ? 1 : 0);
+  // Keep the skeleton mounted during the outbound fade so both layers animate
+  // in parallel. Drops out after the transition completes.
+  const [showSkeleton, setShowSkeleton] = useState(!ready);
+
+  useEffect(() => {
+    if (ready) {
+      setShowSkeleton(true);
+      progress.value = withTiming(1, {
+        duration: dur(CROSSFADE_MS),
+        easing: easings.standard,
+      });
+      const t = setTimeout(() => setShowSkeleton(false), dur(CROSSFADE_MS));
+      return () => {
+        clearTimeout(t);
+        cancelAnimation(progress);
+      };
+    }
+    setShowSkeleton(true);
+    progress.value = withTiming(0, {
+      duration: dur(CROSSFADE_MS),
+      easing: easings.standard,
+    });
+    return () => cancelAnimation(progress);
+  }, [ready, dur, progress]);
+
+  const skeletonStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }));
+  const contentStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+
+  return (
+    <View style={style}>
+      {ready && <Animated.View style={contentStyle}>{children}</Animated.View>}
+      {showSkeleton && (
+        <Animated.View
+          style={[ready ? StyleSheet.absoluteFill : undefined, skeletonStyle]}
+          pointerEvents="none">
+          {skeleton}
+        </Animated.View>
+      )}
     </View>
   );
 }

@@ -13,14 +13,17 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
-import { DeityAvatar } from '@/components/common/DeityAvatar';
-import { getDeityImage } from '@/config/deityImages';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { Kicker } from '@/components/common/Kicker';
+import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
+import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
+import { getDeityImage } from '@/config/deityImages';
 import {
   getAartiForDeity,
   getChalisaForDeity,
@@ -38,7 +41,7 @@ interface ListSection {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const BANNER_HEIGHT = 260;
+const HERO_HEIGHT = 280;
 
 export default function GodDetailScreen() {
   const { t } = useTranslation();
@@ -65,8 +68,10 @@ export default function GodDetailScreen() {
         const a = item.data;
         const favKey = `aarti-${a.deity}`;
         return (
-          <AartiCard
-            item={a}
+          <ContentCard
+            titleHindi={a.titleHindi}
+            titleEnglish={a.titleEnglish}
+            badge={t('god.aartiBadge')}
             colors={colors}
             isFavorite={favoriteIds.includes(favKey)}
             onToggleFavorite={() => toggleFavorite(favKey)}
@@ -76,9 +81,13 @@ export default function GodDetailScreen() {
       }
       const c = item.data;
       const favKey = `chalisa-${c.deity}`;
+      const chaupaiCount = c.chaupai.hindi.length;
       return (
-        <ChalisaCard
-          item={c}
+        <ContentCard
+          titleHindi={c.titleHindi}
+          titleEnglish={c.titleEnglish}
+          badge={t('god.chalisaBadge')}
+          secondary={chaupaiCount > 0 ? t('god.chaupaiCount', { count: chaupaiCount }) : undefined}
           colors={colors}
           isFavorite={favoriteIds.includes(favKey)}
           onToggleFavorite={() => toggleFavorite(favKey)}
@@ -86,15 +95,19 @@ export default function GodDetailScreen() {
         />
       );
     },
-    [colors, favoriteIds, toggleFavorite]
+    [colors, favoriteIds, toggleFavorite, t]
   );
 
   const renderSectionHeader = useCallback(
     ({ section }: { section: SectionListData<ListItem, ListSection> }) => (
       <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
-        <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>
+        <Kicker
+          color={colors.accent}
+          size={10}
+          withTrailingRule
+          ruleColor={colors.divider}>
           {section.title}
-        </Text>
+        </Kicker>
       </View>
     ),
     [colors]
@@ -103,76 +116,125 @@ export default function GodDetailScreen() {
   if (!deity) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('god.deityNotFound')}</Text>
+        <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
+          {t('god.deityNotFound')}
+        </Text>
       </SafeAreaView>
     );
   }
 
   const deityImage = getDeityImage(deity.id);
   const hasImage = !!deityImage;
+  const deityColor = deity.color;
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-
-      <View style={[styles.headerWrap, hasImage && { height: BANNER_HEIGHT }]}>
-        {hasImage ? (
-          <View style={styles.bannerBox}>
-            <Image source={deityImage} style={styles.bannerImage} resizeMode="cover" />
-            <LinearGradient
-              colors={['transparent', colors.base]}
-              style={styles.bannerGradientBottom}
-            />
-            <View style={styles.bannerOverlay}>
-              <Text style={styles.bannerName}>{t(`deities.${deity.id}.displayName`)}</Text>
-              <Text style={styles.bannerDesc}>{t(`deities.${deity.id}.description`)}</Text>
-            </View>
-          </View>
-        ) : (
-          <LinearGradient colors={[deity.color + '30', colors.base]} style={styles.fallbackHeader}>
-            <View style={styles.fallbackContent}>
-              <DeityAvatar deity={deity.id} size={72} />
-              <Text style={[styles.fallbackName, { color: colors.textPrimary }]}>
-                {t(`deities.${deity.id}.displayName`)}
-              </Text>
-              <Text style={[styles.fallbackSubname, { color: colors.textSecondary }]}>
-                {deity.name}
-              </Text>
-              <Text style={[styles.fallbackDesc, { color: colors.textMuted }]}>
-                {t(`deities.${deity.id}.description`)}
-              </Text>
-            </View>
-          </LinearGradient>
-        )}
-
-        <View style={styles.bannerBackWrap}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[styles.bannerBackBtn, !hasImage && { backgroundColor: 'rgba(0,0,0,0.25)' }]}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <SectionList
         sections={sections}
         keyExtractor={(item) => `${item.type}-${item.data.deity}`}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
-        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={ListItemSeparator}
         SectionSeparatorComponent={ListSectionSeparator}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          <HeroBlock
+            deityId={deity.id}
+            deityColor={deityColor}
+            displayName={t(`deities.${deity.id}.displayName`)}
+            subname={deity.name}
+            description={t(`deities.${deity.id}.description`)}
+            image={hasImage ? deityImage : null}
+            colors={colors}
+            onBack={() => router.back()}
+          />
+        }
         ListEmptyComponent={
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+          <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
             {t('god.noContent')}
           </Text>
         }
       />
     </SafeAreaView>
+    </ScreenMount>
+  );
+}
+
+interface HeroBlockProps {
+  deityId: string;
+  deityColor: string;
+  displayName: string;
+  subname: string;
+  description: string;
+  image: ReturnType<typeof getDeityImage> | null;
+  colors: ColorPalette;
+  onBack: () => void;
+}
+
+function HeroBlock({ deityId, deityColor, displayName, subname, description, image, colors, onBack }: HeroBlockProps) {
+  const { t } = useTranslation();
+  const meta = DEITY_BY_ID[deityId];
+  const initial = meta?.initial ?? 'ॐ';
+
+  return (
+    <View style={styles.heroWrap}>
+      <View style={styles.heroPortrait}>
+        <LinearGradient
+          colors={[`${deityColor}E6`, `${deityColor}55`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {image ? (
+          <>
+            <Image source={image} style={styles.heroImage} resizeMode="cover" />
+            <LinearGradient
+              colors={['transparent', 'rgba(20,10,4,0.55)']}
+              style={styles.heroImageShade}
+            />
+          </>
+        ) : (
+          <>
+            {/* Bone-white double halo (solid inner + dashed outer) — Library card treatment at hero scale. */}
+            <View style={styles.heroHaloOuter} />
+            <View style={styles.heroHaloInner} />
+            <Text
+              variant="deva-bold"
+              style={styles.heroInitial}>
+              {initial}
+            </Text>
+          </>
+        )}
+      </View>
+
+      <TouchableOpacity
+        onPress={onBack}
+        style={styles.heroBackBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={t('a11y.back')}>
+        <Icon name="chevron-left" size={18} color={palette.parchmentBright} />
+      </TouchableOpacity>
+
+      <View style={styles.heroMeta}>
+        <Text variant="mono-caps" style={styles.heroKicker}>
+          {subname}
+        </Text>
+        <Text variant="display-italic" style={[styles.heroName, { color: colors.textPrimary }]}>
+          {displayName}
+        </Text>
+        <Text variant="body-italic" style={[styles.heroDescription, { color: colors.textTertiary }]}>
+          {description}
+        </Text>
+        <Ornament variant="lotus" style={styles.heroOrnament} />
+      </View>
+    </View>
   );
 }
 
@@ -180,168 +242,169 @@ const ListItemSeparator = () => <View style={{ height: spacing.gridGap }} />;
 const ListSectionSeparator = ({ leadingItem }: { leadingItem?: unknown }) =>
   leadingItem ? <View style={{ height: 8 }} /> : null;
 
-interface AartiCardProps {
-  item: Recitation;
+interface ContentCardProps {
+  titleHindi: string;
+  titleEnglish: string;
+  badge: string;
+  secondary?: string;
   colors: ColorPalette;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onPress: () => void;
 }
 
-const AartiCard = memo(function AartiCard({ item, colors, isFavorite, onToggleFavorite, onPress }: AartiCardProps) {
+const ContentCard = memo(function ContentCard({
+  titleHindi,
+  titleEnglish,
+  badge,
+  secondary,
+  colors,
+  isFavorite,
+  onToggleFavorite,
+  onPress,
+}: ContentCardProps) {
   const { t } = useTranslation();
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${titleEnglish} — ${badge}`}>
       <View style={styles.cardText}>
-        <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleHindi}
+        <Text variant="deva-bold" style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
+          {titleHindi}
         </Text>
-        <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
-          {item.titleEnglish}
+        <Text variant="body-italic" style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
+          {titleEnglish}
         </Text>
-        <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-          <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.aartiBadge')}</Text>
-        </View>
-      </View>
-      <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons
-          name={isFavorite ? 'heart' : 'heart-outline'}
-          size={22}
-          color={isFavorite ? colors.accent : colors.textMuted}
-        />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-});
-
-interface ChalisaCardProps {
-  item: Chalisa;
-  colors: ColorPalette;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-  onPress: () => void;
-}
-
-const ChalisaCard = memo(function ChalisaCard({ item, colors, isFavorite, onToggleFavorite, onPress }: ChalisaCardProps) {
-  const { t } = useTranslation();
-  const chaupaiCount = item.chaupai.hindi.length;
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.cardText}>
-        <Text style={[styles.cardTitleNative, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.titleHindi}
-        </Text>
-        <Text style={[styles.cardTitleEn, { color: colors.textTertiary }]} numberOfLines={1}>
-          {item.titleEnglish}
-        </Text>
-        <View style={styles.badgeRow}>
-          <View style={[styles.badge, { backgroundColor: colors.borderAccent }]}>
-            <Text style={[styles.badgeText, { color: colors.accent }]}>{t('god.chalisaBadge')}</Text>
-          </View>
-          {chaupaiCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.surfaceRecessed }]}>
-              <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
-                {t('god.chaupaiCount', { count: chaupaiCount })}
+        <View style={styles.metaRow}>
+          <Text variant="mono-caps" style={[styles.metaKicker, { color: palette.gold }]}>
+            {badge}
+          </Text>
+          {secondary && (
+            <>
+              <View style={[styles.metaDot, { backgroundColor: colors.textMuted }]} />
+              <Text variant="body-italic" style={[styles.metaSecondary, { color: colors.textTertiary }]}>
+                {secondary}
               </Text>
-            </View>
+            </>
           )}
         </View>
       </View>
-      <TouchableOpacity onPress={onToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons
-          name={isFavorite ? 'heart' : 'heart-outline'}
-          size={22}
-          color={isFavorite ? colors.accent : colors.textMuted}
-        />
-      </TouchableOpacity>
+      <FavoriteHeart
+        active={isFavorite}
+        onPress={onToggleFavorite}
+        size={20}
+        inactiveColor={colors.textMuted}
+        activeColor={colors.accent}
+        accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+      />
     </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  headerWrap: { overflow: 'hidden' },
-  bannerBox: {
-    width: SCREEN_WIDTH,
-    height: BANNER_HEIGHT,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+
+  listContent: { paddingBottom: 32 },
+
+  // Hero
+  heroWrap: {
+    marginBottom: 12,
   },
-  bannerImage: {
+  heroPortrait: {
     width: SCREEN_WIDTH,
-    height: BANNER_HEIGHT,
+    height: HERO_HEIGHT,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bannerGradientBottom: {
+  heroImage: {
+    width: SCREEN_WIDTH,
+    height: HERO_HEIGHT,
+  },
+  heroImageShade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 100,
+    height: 120,
   },
-  bannerOverlay: {
+  heroHaloOuter: {
     position: 'absolute',
-    bottom: 16,
-    left: spacing.screenH,
-    right: spacing.screenH,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(251,243,222,0.25)',
   },
-  bannerName: {
-    fontSize: 24,
-    fontFamily: 'Mukta_700Bold',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+  heroHaloInner: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    borderWidth: 1,
+    borderColor: 'rgba(251,243,222,0.38)',
   },
-  bannerDesc: {
-    fontSize: 13,
-    fontFamily: 'Mukta_400Regular',
-    color: 'rgba(255,255,255,0.85)',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    marginTop: 2,
+  heroInitial: {
+    fontSize: 96,
+    lineHeight: 110,
+    color: 'rgba(251,243,222,0.97)',
+    textShadowColor: 'rgba(20,10,4,0.28)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
-  bannerBackWrap: {
+  heroBackBtn: {
     position: 'absolute',
     top: 8,
     left: spacing.screenH,
-    zIndex: 10,
-  },
-  bannerBackBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(20,10,4,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
-  fallbackHeader: { paddingBottom: 20 },
-  fallbackContent: { alignItems: 'center', gap: 4, paddingTop: 52 },
-  fallbackName: { fontSize: 22, fontFamily: 'Mukta_700Bold', marginTop: 8 },
-  fallbackSubname: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
-  fallbackDesc: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 2 },
-  sectionHeader: {
-    paddingTop: 16,
-    paddingBottom: 10,
+  heroMeta: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenH,
+    paddingTop: 18,
+    gap: 6,
   },
-  sectionHeaderText: {
+  heroKicker: {
+    fontSize: 10,
+    color: palette.sindoor,
+  },
+  heroName: {
+    fontSize: 32,
+    lineHeight: 38,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  heroDescription: {
     fontSize: 14,
-    fontFamily: 'Mukta_500Medium',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: spacing.cardPadLg,
   },
-  listContent: { paddingTop: 2, paddingBottom: 32 },
+  heroOrnament: {
+    marginTop: 12,
+    width: '55%',
+  },
+
+  // Sections + list
+  sectionHeader: {
+    paddingTop: 20,
+    paddingBottom: 12,
+    paddingHorizontal: spacing.screenH,
+  },
+
   emptyText: {
     textAlign: 'center',
-    fontFamily: 'Mukta_400Regular',
     fontSize: 15,
     marginTop: 48,
   },
@@ -352,11 +415,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.card,
     borderWidth: 1,
     padding: spacing.cardPad,
+    marginHorizontal: spacing.screenH,
   },
   cardText: { flex: 1 },
-  cardTitleNative: { fontSize: 16, fontFamily: 'Mukta_700Bold', marginBottom: 2 },
-  cardTitleEn: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginBottom: 6 },
-  badgeRow: { flexDirection: 'row', gap: 6 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.chip },
-  badgeText: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.3 },
+  cardTitleNative: { fontSize: 16, lineHeight: 22, marginBottom: 2 },
+  cardTitleEn: { fontSize: 12, lineHeight: 16, marginBottom: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaKicker: { fontSize: 9 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5 },
+  metaSecondary: { fontSize: 12, flexShrink: 1 },
 });

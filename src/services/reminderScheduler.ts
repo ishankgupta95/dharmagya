@@ -6,6 +6,8 @@ import type {
   FestivalReminderKey,
 } from '@/store/useStore';
 import festivalsData from '@/data/static/festivals.json';
+import { applyQuietHoursShift } from '@/utils/format';
+import type { QuietHours } from './notifications';
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
@@ -26,10 +28,18 @@ const TITHI_PREFIX = 'dharmagya-tithi-';
 const FESTIVAL_PREFIX = 'dharmagya-festival-';
 /** Look this many days ahead when scheduling. */
 const HORIZON_DAYS = 30;
-/** Hour (24h) when tithi reminders fire on the evening BEFORE the observance. */
-const TITHI_REMINDER_HOUR = 19;
-/** Hour (24h) when festival reminders fire on the evening BEFORE. */
-const FESTIVAL_REMINDER_HOUR = 20;
+/** Default tithi reminder time on the evening BEFORE the observance. */
+const DEFAULT_TITHI_TIME = '19:00';
+/** Default festival reminder time on the evening BEFORE. */
+const DEFAULT_FESTIVAL_TIME = '20:00';
+
+function parseHHmm(timeHHmm: string, fallbackHour: number): { hour: number; minute: number } {
+  const [h, m] = timeHHmm.split(':').map((n) => parseInt(n, 10));
+  return {
+    hour: Number.isFinite(h) && h >= 0 && h < 24 ? h : fallbackHour,
+    minute: Number.isFinite(m) && m >= 0 && m < 60 ? m : 0,
+  };
+}
 
 // ─── Festival name matching for tithi reminders ───────────────────────────────
 // Maps a TithiReminderKey to a predicate over a festival entry. We use the
@@ -72,10 +82,10 @@ function parseObservanceDate(s: string): Date {
   return new Date(s + 'T00:00:00');
 }
 
-function eveningBefore(observance: Date, hour: number): Date {
+function eveningBefore(observance: Date, hour: number, minute: number = 0): Date {
   const d = new Date(observance);
   d.setDate(d.getDate() - 1);
-  d.setHours(hour, 0, 0, 0);
+  d.setHours(hour, minute, 0, 0);
   return d;
 }
 
@@ -91,11 +101,21 @@ interface ScheduledReminder {
  * Returns a pure list (no side effects) so callers can diff against
  * currently-scheduled notifications and test logic easily.
  */
+export interface ReminderTimes {
+  /** HH:mm — evening before observance, when tithi reminders fire. */
+  tithi?: string;
+  /** HH:mm — evening before observance, when festival reminders fire. */
+  festival?: string;
+}
+
 export function enumerateReminders(
   prefs: ReminderPrefs,
   now: Date = new Date(),
-  horizonDays: number = HORIZON_DAYS
+  horizonDays: number = HORIZON_DAYS,
+  times: ReminderTimes = {}
 ): ScheduledReminder[] {
+  const tithi = parseHHmm(times.tithi ?? DEFAULT_TITHI_TIME, 19);
+  const festival = parseHHmm(times.festival ?? DEFAULT_FESTIVAL_TIME, 20);
   const out: ScheduledReminder[] = [];
   const nowMs = now.getTime();
   const cutoffMs = nowMs + horizonDays * 24 * 60 * 60 * 1000;
@@ -123,7 +143,7 @@ export function enumerateReminders(
         for (const key of Object.keys(prefs.tithi) as TithiReminderKey[]) {
           if (!prefs.tithi[key]) continue;
           if (!TITHI_MATCHES[key](f)) continue;
-          const fireAt = eveningBefore(observance, TITHI_REMINDER_HOUR);
+          const fireAt = eveningBefore(observance, tithi.hour, tithi.minute);
           if (fireAt.getTime() < nowMs || fireAt.getTime() > cutoffMs) continue;
           out.push({
             id: `${TITHI_PREFIX}${key}-${day.date}`,
@@ -149,7 +169,7 @@ export function enumerateReminders(
               ? 'major'
               : (f.type as FestivalReminderKey);
         if (festivalKey && prefs.festival[festivalKey]) {
-          const fireAt = eveningBefore(observance, FESTIVAL_REMINDER_HOUR);
+          const fireAt = eveningBefore(observance, festival.hour, festival.minute);
           if (fireAt.getTime() >= nowMs && fireAt.getTime() <= cutoffMs) {
             out.push({
               id: `${FESTIVAL_PREFIX}${festivalKey}-${day.date}`,
@@ -186,7 +206,11 @@ export function enumerateReminders(
 
 // ─── Scheduling side effects ──────────────────────────────────────────────────
 
-export async function rescheduleReminders(prefs: ReminderPrefs): Promise<void> {
+export async function rescheduleReminders(
+  prefs: ReminderPrefs,
+  times: ReminderTimes = {},
+  quietHours?: QuietHours,
+): Promise<void> {
   if (!Notifications) return;
   const granted = await requestReminderPermission();
   if (!granted) return;
@@ -199,14 +223,21 @@ export async function rescheduleReminders(prefs: ReminderPrefs): Promise<void> {
     }
   }
 
-  const desired = enumerateReminders(prefs);
+  const desired = enumerateReminders(prefs, new Date(), HORIZON_DAYS, times);
   for (const r of desired) {
+    const fireAt = quietHours?.enabled
+      ? applyQuietHoursShift(r.fireAt, {
+          enabled: true,
+          startHHmm: quietHours.startHHmm,
+          endHHmm: quietHours.endHHmm,
+        })
+      : r.fireAt;
     await Notifications.scheduleNotificationAsync({
       identifier: r.id,
       content: { title: r.title, body: r.body },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: r.fireAt,
+        date: fireAt,
       },
     });
   }

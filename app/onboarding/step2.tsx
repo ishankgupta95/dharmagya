@@ -4,13 +4,16 @@ import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, borderRadius, spacing } from '@/config/theme';
+import { borderRadius, lightColors, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
+import { ProgressDots } from './_progressDots';
 
-const colors = darkColors;
+// Onboarding renders on the parchment ground — the grid component colorises its
+// cells from the palette passed in, so we hand it the light palette explicitly.
+const colors = lightColors;
 
 export default function OnboardingStep2() {
   const { t } = useTranslation();
@@ -25,18 +28,26 @@ export default function OnboardingStep2() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
 
-      <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+      <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerStep}>{t('onboarding.step2of3')}</Text>
-        <View style={{ width: 20 }} />
+        <Text variant="mono-caps" style={[styles.headerStep, { color: palette.inkQuiet }]}>
+          {t('onboarding.step2of3')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
-      <View style={{ paddingHorizontal: spacing.screenH }}>
-        <Text style={styles.titleHindi}>{t('onboarding.chooseDeitiesHi')}</Text>
-        <Text style={styles.title}>{t('onboarding.chooseDeities')}</Text>
-        <Text style={styles.subtitle}>
+      <View style={[styles.titleBlock, { paddingHorizontal: spacing.screenH }]}>
+        <Text variant="display-italic" style={[styles.title, { color: colors.textPrimary }]}>
+          {t('onboarding.chooseDeities')}
+        </Text>
+        <Text variant="body-italic" style={[styles.subtitle, { color: colors.textTertiary }]}>
           {t('onboarding.chooseDeitiesDesc')}
         </Text>
       </View>
@@ -45,11 +56,11 @@ export default function OnboardingStep2() {
         value={localSelected}
         onChange={setLocalSelected}
         colors={colors}
-        contentContainerStyle={{ paddingHorizontal: spacing.screenH }}
+        contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 16 }}
       />
 
       {localSelected.length > 0 && (
-        <Text style={styles.selectionCount}>
+        <Text variant="mono-caps" style={[styles.selectionCount, { color: palette.sindoor }]}>
           {t('onboarding.selectedCount', { count: localSelected.length })}
         </Text>
       )}
@@ -59,11 +70,19 @@ export default function OnboardingStep2() {
         <TouchableOpacity
           onPress={handleContinue}
           activeOpacity={0.85}
-          style={styles.cta}>
-          <Text style={styles.ctaText}>{t('common.continue')}</Text>
+          style={styles.cta}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.continue')}>
+          <Text variant="mono-caps" style={styles.ctaText}>{t('common.continue')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleContinue}>
-          <Text style={styles.skipText}>{t('common.skip')}</Text>
+        <TouchableOpacity
+          onPress={handleContinue}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.skip')}>
+          <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
+            {t('common.skip')}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -71,69 +90,50 @@ export default function OnboardingStep2() {
   );
 }
 
-function ProgressDots({ current, total }: { current: number; total: number }) {
-  return (
-    <View style={dotsStyles.row}>
-      {Array.from({ length: total }, (_item, index) => (
-        <View
-          key={index}
-          style={[
-            dotsStyles.dot,
-            index + 1 === current
-              ? { backgroundColor: colors.accent, width: 20 }
-              : index + 1 < current
-              ? { backgroundColor: colors.accent + '60' }
-              : { backgroundColor: 'rgba(255,255,255,0.15)' },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const dotsStyles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  dot: { height: 6, width: 6, borderRadius: 3 },
-});
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.base },
+  root: { flex: 1, backgroundColor: palette.parchment },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerStep: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: colors.textMuted },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerStep: { fontSize: 10 },
 
-  titleHindi: { fontSize: 26, fontFamily: 'Mukta_700Bold', color: colors.textPrimary, marginBottom: 4 },
-  title: { fontSize: 15, fontFamily: 'Mukta_400Regular', color: colors.textSecondary, marginBottom: 8 },
+  titleBlock: { paddingTop: 16, paddingBottom: 12 },
+  title: { fontSize: 30, lineHeight: 36, marginTop: 8 },
   subtitle: {
-    fontSize: 13,
-    fontFamily: 'Mukta_400Regular',
-    color: colors.textMuted,
+    fontSize: 14,
     lineHeight: 20,
-    marginBottom: 16,
+    marginTop: 6,
+    marginBottom: 4,
   },
 
   selectionCount: {
-    fontSize: 12,
-    fontFamily: 'Mukta_400Regular',
-    color: colors.accent,
+    fontSize: 10,
     textAlign: 'center',
     marginBottom: 8,
   },
 
-  bottom: { gap: 14, paddingBottom: 8, alignItems: 'center' },
+  bottom: { gap: 14, paddingBottom: 10, paddingTop: 4, alignItems: 'center' },
   cta: {
     width: '100%',
-    backgroundColor: colors.accent,
-    paddingVertical: 15,
+    backgroundColor: palette.sindoor,
+    paddingVertical: 16,
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
-  ctaText: { fontSize: 16, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
-  skipText: { fontSize: 13, fontFamily: 'Mukta_400Regular', color: colors.textMuted, marginBottom: 8 },
+  ctaText: { fontSize: 12, color: palette.parchmentBright },
+  skipText: { fontSize: 10, marginBottom: 4 },
 });

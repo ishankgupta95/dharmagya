@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
-import { getDailyPanchang, type FestivalRegion, type Language } from 'panchang-ts';
+import type { FestivalRegion, Language } from 'panchang-ts';
 
 import {
   FALLBACK_COORDS,
-  mapToPanchangDay,
-  fetchGrahaPositions,
+  getCachedPanchangDay,
+  getCachedGrahaPositions,
 } from '@/services/astrology/panchangService';
 import type { IPanchangDay } from '@/types';
+
 interface UsePanchangResult {
   panchang: IPanchangDay | null;
   /** True once end-times (pass 2) have been computed. */
@@ -36,52 +37,49 @@ export function usePanchang(
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     setError(false);
-    setIsFullyLoaded(false);
 
-    const timezone = -new Date().getTimezoneOffset();
-    const loc = { latitude: lat, longitude: lon };
+    const coords = { lat, lon };
 
-    // ── Pass 1: Fast — names only (~60–100ms on budget Android) ──────────────
+    // ── Pass 1: fast path (or cache hit) ──────────────────────────────────────
+    // A full-pass entry in the cache satisfies this fast request too, so a
+    // warm cache (e.g. populated by home) means no sync compute at all.
+    let fast: IPanchangDay | null;
     try {
-      const fast = getDailyPanchang(date, loc, { timezone, computeEndTimes: false, language, region });
-      if (!cancelled) {
-        if (!fast) {
-          setError(true);
-          setLoading(false);
-          return;
-        }
-        setPanchang(mapToPanchangDay(fast));
-        setLoading(false);
-      }
+      fast = getCachedPanchangDay(date, coords, { computeEndTimes: false, language, region });
     } catch {
-      if (!cancelled) {
-        setError(true);
-        setLoading(false);
-      }
+      setError(true);
+      setLoading(false);
       return;
     }
+    if (!fast) {
+      setError(true);
+      setLoading(false);
+      return;
+    }
+    setPanchang(fast);
+    setLoading(false);
+    // If the cache already carries planetary positions, this *might* be a full
+    // entry — but we can't tell from IPanchangDay alone, so let pass 2 confirm.
+    setIsFullyLoaded(false);
 
-    // ── Pass 2: Full — end-times + planetary positions after interactions ────
+    // ── Pass 2: full + planetary positions, after interactions ───────────────
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
       try {
-        const full = getDailyPanchang(date, loc, { timezone, computeEndTimes: true, language, region });
+        const full = getCachedPanchangDay(date, coords, { computeEndTimes: true, language, region });
         if (!full) return;
+        let positions = full.planetaryPositions;
+        if (!positions) {
+          try { positions = getCachedGrahaPositions(date, language); } catch { /* non-critical */ }
+        }
+        if (positions) full.planetaryPositions = positions;
         if (!cancelled) {
-          const mapped = mapToPanchangDay(full);
-          // Planetary positions are computed separately (CPU-heavy)
-          try {
-            mapped.planetaryPositions = fetchGrahaPositions(date, language);
-          } catch {
-            // Non-critical — positions just won't appear
-          }
-          setPanchang(mapped);
+          setPanchang(full);
           setIsFullyLoaded(true);
         }
       } catch {
-        // Keep the fast pass result — end times just won't appear
+        // Keep the fast pass — end times just won't appear
       }
     });
 

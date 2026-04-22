@@ -207,6 +207,82 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
   };
 }
 
+// ── Cache layer ──────────────────────────────────────────────────────────────
+// Small in-memory LRUs for the user-facing screens. Direct `getDailyPanchang` /
+// `fetchPanchang` calls stay uncached so [muhurat.ts](./muhurat.ts)'s 365-day
+// bulk scan doesn't thrash this cache.
+
+interface CachedDay { day: IPanchangDay; full: boolean }
+const DAY_CACHE = new Map<string, CachedDay>();
+const DAY_CACHE_MAX = 60;
+const GRAHA_CACHE = new Map<string, IGrahaPosition[]>();
+const GRAHA_CACHE_MAX = 30;
+
+function ymdLocal(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayCacheKey(
+  date: Date,
+  lat: number,
+  lon: number,
+  language: Language,
+  region: FestivalRegion,
+): string {
+  return `${ymdLocal(date)}|${lat.toFixed(4)}|${lon.toFixed(4)}|${language}|${region}`;
+}
+
+function lruSet<K, V>(map: Map<K, V>, key: K, value: V, max: number) {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  if (map.size > max) {
+    const first = map.keys().next().value as K;
+    map.delete(first);
+  }
+}
+
+function lruHit<K, V>(map: Map<K, V>, key: K): V | undefined {
+  const v = map.get(key);
+  if (v === undefined) return undefined;
+  map.delete(key);
+  map.set(key, v);
+  return v;
+}
+
+/**
+ * Cached panchang-for-a-day. A full-pass result (`computeEndTimes: true`) also
+ * satisfies later fast-pass requests — cache is upgrade-only.
+ */
+export function getCachedPanchangDay(
+  date: Date,
+  coords: { lat: number; lon: number },
+  opts: { computeEndTimes: boolean; language: Language; region: FestivalRegion },
+): IPanchangDay | null {
+  const key = dayCacheKey(date, coords.lat, coords.lon, opts.language, opts.region);
+  const hit = lruHit(DAY_CACHE, key);
+  if (hit && (hit.full || !opts.computeEndTimes)) return hit.day;
+
+  const timezone = -new Date().getTimezoneOffset();
+  const raw = getDailyPanchang(
+    date,
+    { latitude: coords.lat, longitude: coords.lon },
+    { timezone, computeEndTimes: opts.computeEndTimes, language: opts.language, region: opts.region },
+  );
+  if (!raw) return null;
+  const mapped = mapToPanchangDay(raw);
+  lruSet(DAY_CACHE, key, { day: mapped, full: opts.computeEndTimes }, DAY_CACHE_MAX);
+  return mapped;
+}
+
+export function getCachedGrahaPositions(date: Date, language: Language = 'en'): IGrahaPosition[] {
+  const key = `${ymdLocal(date)}|${language}`;
+  const hit = lruHit(GRAHA_CACHE, key);
+  if (hit) return hit;
+  const result = fetchGrahaPositions(date, language);
+  lruSet(GRAHA_CACHE, key, result, GRAHA_CACHE_MAX);
+  return result;
+}
+
 export function fetchGrahaPositions(date: Date, language: Language = 'en'): IGrahaPosition[] {
   const grahaNames = GRAHA_NAMES[language];
   const rashiNames = RASHI_NAMES[language];
@@ -275,5 +351,10 @@ export async function fetchPanchangForToday(
   language: Language = 'en',
   region: FestivalRegion = 'all',
 ): Promise<IPanchangDay | null> {
-  return fetchPanchang(new Date(), savedCoords, true, language, region);
+  try {
+    const coords = savedCoords ?? (await getCoords());
+    return getCachedPanchangDay(new Date(), coords, { computeEndTimes: true, language, region });
+  } catch {
+    return null;
+  }
 }

@@ -4,50 +4,63 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Modal,
   StyleSheet,
-  ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
-import { fetchPanchang } from '@/services/astrology/panchangService';
+import { useLocaleFormatters } from '@/utils/format';
+import {
+  darkColors,
+  lightColors,
+  palette,
+  semanticColors,
+  borderRadius,
+  spacing,
+  type ColorPalette,
+} from '@/config/theme';
 import { usePanchang } from '@/hooks/usePanchang';
 import { resolveLanguage } from '@/i18n';
-import { PanchangSkeleton } from '@/components/common/SkeletonLoader';
+import { PanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
+import { SectionLabel } from '@/components/common/SectionLabel';
+import { Ornament } from '@/components/common/Ornament';
+import { WheelDatePickerModal } from '@/components/common/WheelDatePickerModal';
 import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
 import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
-import type { IPanchangDay, IPanchangElement, IQualitySlot } from '@/types';
+import { getFestivalDaysInMonth } from '@/services/astrology/calendarMonth';
+import type { IPanchangElement } from '@/types';
+
+// Auspicious-yoga banner accent. Mid-green chosen to clear ~4.5:1 on both
+// parchment (#F4E9CE) and nightPlinthDeep (#1A1008) so the banner reads
+// editorial-green in both themes without a per-theme swap.
+const AUSPICIOUS_GREEN = '#5DA85D';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
-const DAY_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const MONTH_NAMES_SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-const YEAR_MIN = 2016;
-const YEAR_MAX = 2036;
-const YEARS = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MIN + i);
-
-function buildCalendarCells(year: number, month: number): (number | null)[] {
+function buildCalendarCells(year: number, month: number): (Date | null)[] {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const cells: (Date | null)[] = [];
+  // Leading overflow from previous month
+  const prevDays = new Date(year, month, 0).getDate();
+  for (let i = firstDay - 1; i >= 0; i--) {
+    cells.push(new Date(year, month - 1, prevDays - i));
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(new Date(year, month, d));
+  }
+  // Trailing overflow to fill a 42-cell grid (6 rows × 7 cols)
+  while (cells.length < 42) {
+    const offset = cells.length - (firstDay + daysInMonth) + 1;
+    cells.push(new Date(year, month + 1, offset));
+  }
   return cells;
 }
 
@@ -55,6 +68,10 @@ function isSameDay(a: Date, b: Date) {
   return a.getDate() === b.getDate() &&
     a.getMonth() === b.getMonth() &&
     a.getFullYear() === b.getFullYear();
+}
+
+function isSameMonth(a: Date, b: Date) {
+  return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -67,7 +84,6 @@ interface LimbRowProps {
   isToday?: boolean;
 }
 
-/** Parse "8:43 AM" style time into minutes since midnight for comparison. */
 function parseTimeToMinutes(timeStr: string): number | null {
   const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return null;
@@ -85,7 +101,7 @@ function getActiveIndex(elements: IPanchangElement[]): number {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
-    if (!el.endTime) return i; // no end time = extends past midnight, so it's the last active
+    if (!el.endTime) return i;
     const endMin = parseTimeToMinutes(el.endTime);
     if (endMin !== null && nowMinutes < endMin) return i;
   }
@@ -132,7 +148,7 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
 });
 
 interface SunCardProps {
-  icon: 'sunny-outline' | 'moon-outline';
+  icon: IconName;
   label: string;
   time: string;
   colors: ColorPalette;
@@ -142,264 +158,12 @@ interface SunCardProps {
 const SunCard = memo(function SunCard({ icon, label, time, colors, iconColor }: SunCardProps) {
   return (
     <View style={[styles.sunCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Ionicons name={icon} size={22} color={iconColor} />
+      <Icon name={icon} size={22} color={iconColor} />
       <Text style={[styles.sunCardLabel, { color: colors.textMuted }]}>{label}</Text>
       <Text style={[styles.sunCardTime, { color: colors.textPrimary }]}>{time}</Text>
     </View>
   );
 });
-
-// ─── Date Picker ──────────────────────────────────────────────────────────────
-
-interface DatePickerProps {
-  visible: boolean;
-  onClose: () => void;
-  pickerDate: Date;
-  onPickDate: (d: Date) => void;
-  pickerPanchang: IPanchangDay | null;
-  pickerLoading: boolean;
-  colors: ColorPalette;
-}
-
-function DatePickerOverlay({
-  visible, onClose, pickerDate, onPickDate, pickerPanchang, pickerLoading, colors,
-}: DatePickerProps) {
-  const { t } = useTranslation();
-  const today = new Date();
-  const [calMonth, setCalMonth] = useState(
-    new Date(pickerDate.getFullYear(), pickerDate.getMonth(), 1)
-  );
-  const [showJumper, setShowJumper] = useState(false);
-  const [jumperYear, setJumperYear] = useState(calMonth.getFullYear());
-
-  const year = calMonth.getFullYear();
-  const month = calMonth.getMonth();
-  const cells = useMemo(() => buildCalendarCells(year, month), [year, month]);
-
-  function prevMonth() {
-    setCalMonth(new Date(year, month - 1, 1));
-  }
-  function nextMonth() {
-    setCalMonth(new Date(year, month + 1, 1));
-  }
-
-  function openJumper() {
-    setJumperYear(year);
-    setShowJumper(true);
-  }
-
-  function pickMonthYear(m: number) {
-    setCalMonth(new Date(jumperYear, m, 1));
-    setShowJumper(false);
-  }
-
-  function goToToday() {
-    setCalMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-    setShowJumper(false);
-    onPickDate(today);
-  }
-
-  const isViewingToday = isSameDay(pickerDate, today) && year === today.getFullYear() && month === today.getMonth();
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.pickerOverlay}>
-        <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
-
-          {showJumper ? (
-            <>
-              {/* Year selector */}
-              <View style={styles.pickerMonthRow}>
-                <TouchableOpacity onPress={() => setJumperYear(Math.max(YEAR_MIN, jumperYear - 1))} hitSlop={12}>
-                  <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <Text style={[styles.pickerMonthLabel, { color: colors.textPrimary }]}>
-                  {jumperYear}
-                </Text>
-                <TouchableOpacity onPress={() => setJumperYear(Math.min(YEAR_MAX, jumperYear + 1))} hitSlop={12}>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Month grid */}
-              <View style={styles.monthGrid}>
-                {(t('panchang.monthNamesShort', { returnObjects: true }) as string[]).map((name, i) => {
-                  const isCurrent = jumperYear === year && i === month;
-                  const isThisMonth = jumperYear === today.getFullYear() && i === today.getMonth();
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={[
-                        styles.monthCell,
-                        isThisMonth && { backgroundColor: colors.accent },
-                        isCurrent && !isThisMonth && { backgroundColor: colors.accent + 'AA' },
-                      ]}
-                      onPress={() => pickMonthYear(i)}>
-                      <Text style={[
-                        styles.monthCellText,
-                        { color: (isThisMonth || isCurrent) ? colors.base : colors.textSecondary },
-                      ]}>
-                        {name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Year list for quick jump */}
-              <FlatList
-                data={YEARS}
-                keyExtractor={(item) => item.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.yearList}
-                initialScrollIndex={Math.max(0, jumperYear - YEAR_MIN - 2)}
-                getItemLayout={(_, index) => ({ length: 64, offset: 64 * index, index })}
-                renderItem={({ item: y }) => (
-                  <TouchableOpacity
-                    onPress={() => setJumperYear(y)}
-                    style={[
-                      styles.yearChip,
-                      { borderColor: y === jumperYear ? colors.accent : colors.border },
-                      y === jumperYear && { backgroundColor: colors.accent + '22' },
-                    ]}>
-                    <Text style={[
-                      styles.yearChipText,
-                      { color: y === jumperYear ? colors.accent : colors.textMuted },
-                    ]}>
-                      {y}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              />
-
-              <TouchableOpacity
-                onPress={() => setShowJumper(false)}
-                style={[styles.pickerDoneBtn, { backgroundColor: colors.accent, marginTop: 16 }]}>
-                <Text style={[styles.pickerDoneText, { color: colors.base }]}>{t('common.back')}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              {/* Month nav */}
-              <View style={styles.pickerMonthRow}>
-                <TouchableOpacity onPress={prevMonth} hitSlop={12}>
-                  <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={openJumper} hitSlop={8}>
-                  <Text style={[styles.pickerMonthLabel, { color: colors.textPrimary }]}>
-                    {(t('panchang.monthNames', { returnObjects: true }) as string[])[month]} {year}  <Ionicons name="caret-down" size={12} color={colors.textMuted} />
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={nextMonth} hitSlop={12}>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Day headers */}
-              <View style={styles.calRow}>
-                {(t('panchang.dayHeaders', { returnObjects: true }) as string[]).map((d, i) => (
-                  <Text
-                    key={i}
-                    style={[
-                      styles.calDayHeader,
-                      { color: (i === 0 || i === 6) ? colors.textDisabled : colors.textMuted },
-                    ]}>
-                    {d}
-                  </Text>
-                ))}
-              </View>
-
-              {/* Calendar cells */}
-              <View style={styles.calGrid}>
-                {cells.map((cell, idx) => {
-                  if (cell === null) return <View key={`blank-${idx}`} style={styles.calCell} />;
-                  const cellDate = new Date(year, month, cell);
-                  const isToday = isSameDay(cellDate, today);
-                  const isSelected = isSameDay(cellDate, pickerDate);
-                  const col = idx % 7;
-                  const isWeekend = col === 0 || col === 6;
-                  const textColor = isToday || isSelected
-                    ? colors.base
-                    : isWeekend ? colors.textDisabled : colors.textSecondary;
-
-                  return (
-                    <TouchableOpacity
-                      key={cell}
-                      style={styles.calCell}
-                      onPress={() => onPickDate(cellDate)}>
-                      <View style={[
-                        styles.calCellInner,
-                        isToday && { backgroundColor: colors.accent },
-                        isSelected && !isToday && { backgroundColor: colors.accent + 'AA' },
-                      ]}>
-                        <Text style={[styles.calDayNum, { color: textColor }]}>{cell}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Today button */}
-              {!isViewingToday && (
-                <View style={styles.todayBtnRow}>
-                  <TouchableOpacity onPress={goToToday} activeOpacity={0.7} style={[styles.todayBtn, { backgroundColor: colors.accent }]}>
-                    <Ionicons name="return-down-back" size={14} color={colors.base} />
-                    <Text style={[styles.todayBtnText, { color: colors.base }]}>{t('panchang.jumpToToday')}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Mini panchang summary */}
-              {pickerPanchang ? (
-                <View style={{ opacity: pickerLoading ? 0.4 : 1 }}>
-                  {pickerPanchang.festivals.length > 0 && (
-                    <View style={[styles.miniFestivalBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
-                      <Ionicons name="star" size={13} color="#F9A825" />
-                      <Text style={[styles.miniFestivalText, { color: '#F57F17' }]}>
-                        {pickerPanchang.festivals.map(f => f.description ?? f.name).join(', ')}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={[styles.miniGrid, { borderColor: colors.border }]}>
-                    <MiniCell label={t('home.tithi')} value={pickerPanchang.tithis[0]?.name ?? ''} colors={colors} />
-                    <MiniCell label={t('home.nakshatra')} value={pickerPanchang.nakshatras[0]?.name ?? ''} colors={colors} />
-                    <MiniCell label={t('home.yoga')} value={pickerPanchang.yogas[0]?.name ?? ''} colors={colors} />
-                    <MiniCell label={t('home.karana')} value={pickerPanchang.karanas[0]?.name ?? ''} colors={colors} />
-                  </View>
-                </View>
-              ) : pickerLoading ? (
-                <ActivityIndicator color={colors.accent} style={{ marginVertical: 12 }} />
-              ) : null}
-
-              <TouchableOpacity
-                onPress={onClose}
-                style={[styles.pickerDoneBtn, { backgroundColor: colors.accent }]}>
-                <Text style={[styles.pickerDoneText, { color: colors.base }]}>{t('common.done')}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const MiniCell = memo(function MiniCell({ label, value, colors }: { label: string; value: string; colors: ColorPalette }) {
-  return (
-    <View style={styles.miniCell}>
-      <Text style={[styles.miniLabel, { color: colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.miniValue, { color: colors.textPrimary }]}>{value}</Text>
-    </View>
-  );
-});
-
-function SectionHeader({ title, colors }: { title: string; colors: ColorPalette }) {
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.accent }]}>{title}</Text>
-  );
-}
 
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -418,22 +182,41 @@ export default function PanchangScreen() {
   const masaSystem = useStore(s => s.masaSystem);
   const setMasaSystem = useStore(s => s.setMasaSystem);
   const region = useStore(s => s.region);
+  const showVikramSamvat = useStore(s => s.showVikramSamvat);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
+  const { digits } = useLocaleFormatters();
   const colors = isDarkMode ? darkColors : lightColors;
 
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const today = useMemo(() => new Date(), []);
+  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const [calMonth, setCalMonth] = useState<Date>(
+    new Date(today.getFullYear(), today.getMonth(), 1),
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const panchangLang = resolveLanguage(language);
   const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang, region);
 
-  // ── Walkthrough ref & measurement ──────────────────────────────────────
+  // Calendar cells + per-day tithi/festival data for the visible month.
+  const calYear = calMonth.getFullYear();
+  const calMonthIdx = calMonth.getMonth();
+  const cells = useMemo(
+    () => buildCalendarCells(calYear, calMonthIdx),
+    [calYear, calMonthIdx],
+  );
+  const festivalDays = useMemo(
+    () => getFestivalDaysInMonth(calYear, calMonthIdx),
+    [calYear, calMonthIdx],
+  );
+
+  // Walkthrough ref & measurement
   const panchaAngaRef = useRef<View>(null);
   const [panchaAngaRect, setPanchaAngaRect] = useState<SpotlightRect | null>(null);
 
   const measurePanchaAnga = useCallback(() => {
     panchaAngaRef.current?.measureInWindow((x, y, width, height) => {
       if (width > 0) {
-        // Cap height so the tooltip fits above the spotlight
         setPanchaAngaRect({ x, y, width, height: Math.min(height, 320) });
       }
     });
@@ -448,50 +231,58 @@ export default function PanchangScreen() {
     }, [walkthroughStep, measurePanchaAnga])
   );
 
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerDate, setPickerDate] = useState(new Date());
-  const [pickerPanchang, setPickerPanchang] = useState<IPanchangDay | null>(null);
-  const [pickerLoading, setPickerLoading] = useState(false);
+  const goPrevMonth = useCallback(() => {
+    setCalMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1));
+  }, []);
+  const goNextMonth = useCallback(() => {
+    setCalMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1));
+  }, []);
+  const goToday = useCallback(() => {
+    const now = new Date();
+    setCalMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(now);
+  }, []);
 
-  async function handlePickDate(date: Date) {
-    setPickerDate(date);
-    setPickerLoading(true);
-    const result = await fetchPanchang(date, userLocation, true, panchangLang, region);
-    setPickerLoading(false);
-    setPickerPanchang(result);
-  }
-
-  function handlePickerClose() {
-    setShowPicker(false);
-    if (!isSameDay(pickerDate, selectedDate)) {
-      setSelectedDate(pickerDate);
+  const handlePickDay = useCallback((d: Date) => {
+    setSelectedDate(d);
+    if (!isSameMonth(d, calMonth)) {
+      setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
     }
-  }
+  }, [calMonth]);
 
-  function openPicker() {
-    setPickerDate(selectedDate);
-    setPickerPanchang(panchang);
-    setShowPicker(true);
-  }
+  const handlePickFromModal = useCallback((d: Date) => {
+    setSelectedDate(d);
+    setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, []);
 
-  const dateDay = selectedDate.getDate();
-  const gregDate = selectedDate.toLocaleDateString('en-IN', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
+  const isViewingToday = isSameDay(selectedDate, today);
+  const monthNames = t('panchang.monthNames', { returnObjects: true }) as string[];
+  const dayHeaders = t('panchang.dayHeaders', { returnObjects: true }) as string[];
+
+  const selectedGregorian = selectedDate.toLocaleDateString(
+    panchangLang === 'hi' ? 'hi-IN' : 'en-IN',
+    { weekday: 'short', day: 'numeric', month: 'short' },
+  );
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
-      {/* Header */}
+      {/* ── Editorial Header ──────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
-        <Text style={[styles.screenTitle, { color: colors.textPrimary }]}>{t('panchang.title')}</Text>
-        <View style={[styles.locationBadge, { backgroundColor: colors.surfaceRecessed }]}>
-          <Ionicons name="location" size={10} color={colors.accent} />
-          <Text style={[styles.locationText, { color: colors.textMuted }]}>
-            {' '}{locationName ?? (userLocation
-              ? `${userLocation.lat.toFixed(2)}°N, ${userLocation.lon.toFixed(2)}°E`
-              : 'Varanasi, UP (default)')}
+        <View style={styles.headerSide} />
+        <View style={styles.headerCenter}>
+          <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            {t('panchang.headerTitle')}
           </Text>
+        </View>
+        <View style={[styles.headerSide, styles.headerSideRight]}>
+          <View style={[styles.locPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Icon name="location" size={10} color={colors.accent} />
+            <Text variant="mono-caps" style={[styles.locText, { color: colors.textTertiary }]} numberOfLines={1}>
+              {locationName ?? (userLocation ? 'GPS' : 'Varanasi')}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -499,35 +290,137 @@ export default function PanchangScreen() {
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
-        {/* Date display — tappable */}
-        <TouchableOpacity
-          onPress={openPicker}
-          activeOpacity={0.7}
-          style={styles.dateDisplay}>
-          <Text style={[styles.dateTopLabel, { color: colors.textMuted }]}>
-            {panchang
-              ? `${(masaSystem === 'purnimanta' ? panchang.hinduMonthPurnimanta : panchang.hinduMonthAmanta) ?? ''} · ${panchang.tithis[0]?.name ?? ''}`.toUpperCase()
-              : ' '}
+        {/* ── Month strip ──────────────────────────────────────────────────── */}
+        <View style={styles.monthStrip}>
+          <TouchableOpacity
+            onPress={goPrevMonth}
+            hitSlop={12}
+            style={styles.monthBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.previousMonth')}>
+            <Icon name="chevron-left" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPickerOpen(true)}
+            activeOpacity={0.7}
+            hitSlop={8}
+            style={styles.monthLabelRow}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.openDatePicker')}>
+            <Text variant="display-italic" style={[styles.monthName, { color: colors.textPrimary }]}>
+              {monthNames[calMonthIdx]}
+            </Text>
+            <Text variant="mono" style={[styles.monthYear, { color: colors.textTertiary }]}>
+              {calYear}
+            </Text>
+            <View style={styles.monthCaret}>
+              <Icon name="chevron-down" size={11} color={palette.gold} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={goNextMonth}
+            hitSlop={12}
+            style={styles.monthBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.nextMonth')}>
+            <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+
+        {!isViewingToday && (
+          <View style={styles.todayRow}>
+            <TouchableOpacity
+              onPress={goToday}
+              activeOpacity={0.7}
+              style={[styles.todayChip, { borderColor: colors.accent }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.today')}>
+              <Icon name="return-back" size={12} color={colors.accent} />
+              <Text variant="mono-caps" style={[styles.todayChipText, { color: colors.accent }]}>
+                {t('panchang.todayChip')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── Day-of-week headers ──────────────────────────────────────────── */}
+        <View style={styles.calHeaderRow}>
+          {dayHeaders.map((d, i) => (
+            <Text
+              key={i}
+              variant="mono-caps"
+              style={[styles.calDayHeader, { color: colors.textMuted }]}>
+              {d}
+            </Text>
+          ))}
+        </View>
+
+        {/* ── Calendar grid ────────────────────────────────────────────────── */}
+        <View style={styles.calGrid}>
+          {cells.map((cellDate, idx) => {
+            if (!cellDate) return <View key={`blank-${idx}`} style={styles.calCell} />;
+            const inCurrentMonth = cellDate.getMonth() === calMonthIdx;
+            const isTodayCell = isSameDay(cellDate, today);
+            const isSelected = isSameDay(cellDate, selectedDate);
+            const hasFestival = inCurrentMonth && festivalDays.has(cellDate.getDate());
+
+            const baseNumColor = isSelected
+              ? palette.parchmentBright
+              : !inCurrentMonth
+                ? colors.textDisabled
+                : hasFestival
+                  ? colors.accent
+                  : colors.textPrimary;
+
+            return (
+              <TouchableOpacity
+                key={idx}
+                activeOpacity={0.7}
+                onPress={() => handlePickDay(cellDate)}
+                style={styles.calCell}
+                accessibilityRole="button"
+                accessibilityLabel={cellDate.toDateString()}
+                accessibilityState={{ selected: isSelected }}>
+
+                <View
+                  style={[
+                    styles.calCellInner,
+                    isSelected && { backgroundColor: palette.sindoor },
+                    !isSelected && isTodayCell && { borderColor: colors.accent, borderWidth: 1 },
+                  ]}>
+                  <Text style={[styles.calDayNum, { color: baseNumColor }]}>
+                    {cellDate.getDate()}
+                  </Text>
+                  {hasFestival && !isSelected && (
+                    <View style={[styles.festivalDot, { backgroundColor: colors.accent }]} />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Ornament variant="double-rule" style={styles.postCalRule} />
+
+        {/* ── Selected-day line ────────────────────────────────────────────── */}
+        <View style={styles.selectedLine}>
+          <Text variant="mono-caps" style={[styles.selectedKicker, { color: colors.accent }]}>
+            {isViewingToday ? t('panchang.todayChip') : selectedGregorian}
           </Text>
-          <Text style={[styles.dateBigNumber, { color: colors.accent }]}>{dateDay}</Text>
-          <Text style={[styles.dateGregorian, { color: colors.textSecondary }]}>{gregDate}</Text>
-          {panchang?.vikramSamvat && (
-            <Text style={[styles.dateSamvat, { color: colors.textMuted }]}>
-              {t('panchang.vsSamvat', { year: panchang.vikramSamvat })}
+          {panchang?.vikramSamvat && showVikramSamvat && (
+            <Text variant="body-italic" style={[styles.selectedSamvat, { color: colors.textTertiary }]}>
+              {t('panchang.vsSamvat', { year: digits(String(panchang.vikramSamvat)) })}
             </Text>
           )}
-          <View style={styles.dateTapHint}>
-            <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-            <Text style={[styles.dateTapHintText, { color: colors.textMuted }]}>{t('panchang.tapToChangeDate')}</Text>
-          </View>
-        </TouchableOpacity>
+        </View>
 
-        {loading ? (
-          <PanchangSkeleton colors={colors} />
-        ) : error ? (
+        <SkeletonCrossfade
+          ready={!loading}
+          skeleton={<PanchangSkeleton colors={colors} />}>
+          {error ? (
           <View style={styles.errorContainer}>
             <View style={[styles.errorIconCircle, { backgroundColor: colors.surfaceRecessed }]}>
-              <Ionicons name="alert-circle-outline" size={28} color="#E24B4A" />
+              <Icon name="alert-circle" size={28} color={semanticColors.error} />
             </View>
             <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>{t('panchang.calculationFailed')}</Text>
             <Text style={[styles.errorDesc, { color: colors.textTertiary }]}>
@@ -535,7 +428,9 @@ export default function PanchangScreen() {
             </Text>
             <TouchableOpacity
               onPress={retry}
-              style={[styles.retryBtn, { backgroundColor: colors.accent }]}>
+              style={[styles.retryBtn, { backgroundColor: colors.accent }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}>
               <Text style={[styles.retryText, { color: colors.base }]}>{t('common.retry')}</Text>
             </TouchableOpacity>
             <Text style={[styles.fallbackNote, { color: colors.textMuted }]}>
@@ -548,33 +443,36 @@ export default function PanchangScreen() {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => router.push('/muhurat')}
-              style={[styles.muhuratEntry, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
-              <Ionicons name="calendar-outline" size={16} color={colors.accent} />
+              style={[styles.muhuratEntry, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.openMuhuratFinder')}>
+              <Icon name="calendar" size={16} color={colors.accent} />
               <Text style={[styles.muhuratEntryText, { color: colors.accent }]}>
                 {t('panchang.findAuspiciousDate')}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+              <Icon name="chevron-right" size={14} color={colors.accent} />
             </TouchableOpacity>
 
             {/* ── Banners (festivals, special yogas, panchaka) ── */}
+            {/* Tinted-semantic alerts compose on both parchment + nightPlinth grounds. */}
             {panchang.festivals.length > 0 && panchang.festivals.map((f, i) => (
-              <View key={i} style={[styles.panchakaBar, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
-                <Ionicons name="star" size={14} color="#F9A825" />
-                <Text style={[styles.panchakaText, { color: '#F57F17' }]}>
+              <View key={i} style={[styles.panchakaBar, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}>
+                <Icon name="star" size={14} color={palette.goldLeaf} />
+                <Text style={[styles.panchakaText, { color: palette.goldLeaf }]}>
                   {f.description ?? f.name}
                 </Text>
               </View>
             ))}
             {panchang.specialYogas.length > 0 && panchang.specialYogas.map((y, i) => (
-              <View key={i} style={[styles.panchakaBar, { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }]}>
-                <Ionicons name="sparkles" size={14} color="#4CAF50" />
-                <Text style={[styles.panchakaText, { color: '#2E7D32' }]}>{y.name}</Text>
+              <View key={i} style={[styles.panchakaBar, { backgroundColor: AUSPICIOUS_GREEN + '1E', borderColor: AUSPICIOUS_GREEN + '66' }]}>
+                <Icon name="sparkles" size={14} color={AUSPICIOUS_GREEN} />
+                <Text style={[styles.panchakaText, { color: AUSPICIOUS_GREEN }]}>{y.name}</Text>
               </View>
             ))}
             {panchang.panchaka && (
-              <View style={[styles.panchakaBar, { backgroundColor: '#FFF3E0', borderColor: '#FF9800' }]}>
-                <Ionicons name="alert-circle-outline" size={15} color="#FF9800" />
-                <Text style={[styles.panchakaText, { color: '#E65100' }]}>{t('panchang.panchaka')}</Text>
+              <View style={[styles.panchakaBar, { backgroundColor: palette.sindoorWarm + '1E', borderColor: palette.sindoorWarm + '66' }]}>
+                <Icon name="alert-circle" size={15} color={palette.sindoorWarm} />
+                <Text style={[styles.panchakaText, { color: palette.sindoorWarm }]}>{t('panchang.panchaka')}</Text>
               </View>
             )}
 
@@ -582,10 +480,10 @@ export default function PanchangScreen() {
             <View
               ref={panchaAngaRef}
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <LimbRow label={t('panchang.tithiLunarDay')} elements={panchang.tithis} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
-              <LimbRow label={t('panchang.nakshatraLunarMansion')} elements={panchang.nakshatras} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
-              <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
-              <LimbRow label={t('home.karana')} elements={panchang.karanas} colors={colors} isToday={isSameDay(selectedDate, new Date())} />
+              <LimbRow label={t('panchang.tithiLunarDay')} elements={panchang.tithis} colors={colors} isToday={isViewingToday} />
+              <LimbRow label={t('panchang.nakshatraLunarMansion')} elements={panchang.nakshatras} colors={colors} isToday={isViewingToday} />
+              <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} isToday={isViewingToday} />
+              <LimbRow label={t('home.karana')} elements={panchang.karanas} colors={colors} isToday={isViewingToday} />
               <LimbRow label={t('panchang.varaDayOfWeek')} elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} />
               {panchang.chandraRashi && (
                 <LimbRow label={t('panchang.chandraRashi')} elements={[{ name: panchang.chandraRashi }]} colors={colors} />
@@ -604,11 +502,13 @@ export default function PanchangScreen() {
                     <TouchableOpacity
                       onPress={() => setMasaSystem(masaSystem === 'purnimanta' ? 'amanta' : 'purnimanta')}
                       activeOpacity={0.7}
-                      style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}>
+                      style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={masaSystem === 'purnimanta' ? t('panchang.amanta') : t('panchang.purnimanta')}>
                       <Text style={[styles.masaChipText, { color: colors.accent }]}>
                         {masaSystem === 'purnimanta' ? t('panchang.purnimanta') : t('panchang.amanta')}
                       </Text>
-                      <Ionicons name="swap-horizontal" size={12} color={colors.accent} />
+                      <Icon name="swap-horizontal" size={12} color={colors.accent} />
                     </TouchableOpacity>
                   </View>
                 </>
@@ -620,22 +520,22 @@ export default function PanchangScreen() {
 
             {/* ── Sun / Moon times ── */}
             <View style={styles.sunGrid}>
-              <SunCard icon="sunny-outline" label={t('home.sunrise')}  time={panchang.sunrise}         colors={colors} iconColor={colors.accent} />
-              <SunCard icon="moon-outline"  label={t('home.sunset')}   time={panchang.sunset}          colors={colors} iconColor={colors.textMuted} />
-              <SunCard icon="moon-outline"  label={t('panchang.moonrise')} time={panchang.moonrise ?? '—'} colors={colors} iconColor={colors.accent} />
-              <SunCard icon="moon-outline"  label={t('panchang.moonset')}  time={panchang.moonset  ?? '—'} colors={colors} iconColor={colors.textMuted} />
+              <SunCard icon="sun"  label={t('home.sunrise')}  time={panchang.sunrise}         colors={colors} iconColor={colors.accent} />
+              <SunCard icon="moon" label={t('home.sunset')}   time={panchang.sunset}          colors={colors} iconColor={colors.textMuted} />
+              <SunCard icon="moon" label={t('panchang.moonrise')} time={panchang.moonrise ?? '—'} colors={colors} iconColor={colors.accent} />
+              <SunCard icon="moon" label={t('panchang.moonset')}  time={panchang.moonset  ?? '—'} colors={colors} iconColor={colors.textMuted} />
             </View>
 
             {/* Day / Night duration */}
             <View style={[styles.durationRow, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
               <View style={styles.durationCell}>
-                <Ionicons name="sunny-outline" size={13} color={colors.accent} />
+                <Icon name="sun" size={13} color={colors.accent} />
                 <Text style={[styles.durationText, { color: colors.textMuted }]}>{t('panchang.day')} </Text>
                 <Text style={[styles.durationValue, { color: colors.textPrimary }]}>{formatDuration(panchang.dayDurationMinutes)}</Text>
               </View>
               <View style={[styles.durationDivider, { backgroundColor: colors.divider }]} />
               <View style={styles.durationCell}>
-                <Ionicons name="moon-outline" size={13} color={colors.textMuted} />
+                <Icon name="moon" size={13} color={colors.textMuted} />
                 <Text style={[styles.durationText, { color: colors.textMuted }]}>{t('panchang.night')} </Text>
                 <Text style={[styles.durationValue, { color: colors.textPrimary }]}>{formatDuration(panchang.nightDurationMinutes)}</Text>
               </View>
@@ -645,11 +545,11 @@ export default function PanchangScreen() {
             <AdBanner colors={colors} placement="panchangInline" inline />
 
             {/* ── Auspicious Times ── */}
-            <SectionHeader title={t('panchang.auspiciousTimes')} colors={colors} />
+            <SectionLabel style={styles.sectionLabel}>{t('panchang.auspiciousTimes')}</SectionLabel>
 
             {panchang.brahmaMuhurtaStart && panchang.brahmaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.brahmaMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.brahmaMuhurtaStart} – {panchang.brahmaMuhurtaEnd}
@@ -658,7 +558,7 @@ export default function PanchangScreen() {
             )}
             {panchang.abhijitMuhurtaStart && panchang.abhijitMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.abhijitMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.abhijitMuhurtaStart} – {panchang.abhijitMuhurtaEnd}
@@ -667,7 +567,7 @@ export default function PanchangScreen() {
             )}
             {panchang.vijayaMuhurtaStart && panchang.vijayaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.vijayaMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.vijayaMuhurtaStart} – {panchang.vijayaMuhurtaEnd}
@@ -676,7 +576,7 @@ export default function PanchangScreen() {
             )}
             {panchang.godhuliMuhurtaStart && panchang.godhuliMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.godhuliMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.godhuliMuhurtaStart} – {panchang.godhuliMuhurtaEnd}
@@ -685,7 +585,7 @@ export default function PanchangScreen() {
             )}
             {panchang.nishitaMuhurtaStart && panchang.nishitaMuhurtaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.nishitaMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.nishitaMuhurtaStart} – {panchang.nishitaMuhurtaEnd}
@@ -694,7 +594,7 @@ export default function PanchangScreen() {
             )}
             {panchang.amritKalaStart && panchang.amritKalaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="sparkles-outline" size={16} color="#4CAF50" />
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.amritKala')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.amritKalaStart} – {panchang.amritKalaEnd}
@@ -703,11 +603,11 @@ export default function PanchangScreen() {
             )}
 
             {/* ── Inauspicious Times ── */}
-            <SectionHeader title={t('panchang.inauspiciousTimes')} colors={colors} />
+            <SectionLabel style={styles.sectionLabel}>{t('panchang.inauspiciousTimes')}</SectionLabel>
 
             {panchang.rahuKalamStart && panchang.rahuKalamEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.rahuKalam')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.rahuKalamStart} – {panchang.rahuKalamEnd}
@@ -716,7 +616,7 @@ export default function PanchangScreen() {
             )}
             {panchang.yamagandaStart && panchang.yamagandaEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.yamaganda')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.yamagandaStart} – {panchang.yamagandaEnd}
@@ -725,7 +625,7 @@ export default function PanchangScreen() {
             )}
             {panchang.gulikaKalamStart && panchang.gulikaKalamEnd && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.gulikaKalam')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {panchang.gulikaKalamStart} – {panchang.gulikaKalamEnd}
@@ -734,7 +634,7 @@ export default function PanchangScreen() {
             )}
             {panchang.durMuhurta.map((dm, i) => (
               <View key={i} style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="warning-outline" size={16} color="#F44336" />
+                <Icon name="warning" size={16} color={semanticColors.error} />
                 <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.durMuhurta')}</Text>
                 <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
                   {dm.start} – {dm.end}
@@ -743,7 +643,7 @@ export default function PanchangScreen() {
             ))}
             {panchang.bhadra && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-                <Ionicons name="warning-outline" size={16} color={panchang.bhadra.location === 'earth' ? '#F44336' : '#FF9800'} />
+                <Icon name="warning" size={16} color={panchang.bhadra.location === 'earth' ? semanticColors.error : palette.goldLeaf} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.bhadra')}</Text>
                   <Text style={[styles.bhadraNote, { color: colors.textSecondary }]}>
@@ -759,32 +659,32 @@ export default function PanchangScreen() {
             {/* ── Eclipse (Grahan) ── */}
             {panchang.eclipse && (
               <>
-                <SectionHeader title={t('panchang.eclipseSection')} colors={colors} />
-                <View style={[styles.eclipseCard, { backgroundColor: '#3A1E1E', borderColor: '#8A3A3A' }]}>
+                <SectionLabel style={styles.sectionLabel}>{t('panchang.eclipseSection')}</SectionLabel>
+                <View style={[styles.eclipseCard, { backgroundColor: semanticColors.error + '1E', borderColor: semanticColors.error + '66' }]}>
                   <View style={styles.eclipseHeader}>
-                    <Ionicons
-                      name={panchang.eclipse.kind === 'solar' ? 'sunny' : 'moon'}
+                    <Icon
+                      name={panchang.eclipse.kind === 'solar' ? 'sun' : 'moon'}
                       size={18}
-                      color="#E8893C"
+                      color={semanticColors.error}
                     />
-                    <Text style={[styles.eclipseTitle, { color: '#FFE4C4' }]}>
+                    <Text style={[styles.eclipseTitle, { color: colors.textPrimary }]}>
                       {panchang.eclipse.kind === 'solar' ? t('panchang.eclipseSolar') : t('panchang.eclipseLunar')}
                       {'  ·  '}
                       {t(`panchang.eclipseSubtype.${panchang.eclipse.subtype}`)}
                     </Text>
                   </View>
-                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                  <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                     {t('panchang.eclipseWindow', { start: panchang.eclipse.start, end: panchang.eclipse.end })}
                   </Text>
-                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                  <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                     {t('panchang.eclipsePeak', { time: panchang.eclipse.peak })}
                     {'  ·  '}
                     {t('panchang.eclipseMagnitude', { value: panchang.eclipse.magnitude.toFixed(2) })}
                   </Text>
-                  <Text style={[styles.eclipseRow, { color: '#F3E0C8' }]}>
+                  <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                     {t('panchang.eclipseSutak', { start: panchang.eclipse.sutakStart, end: panchang.eclipse.sutakEnd })}
                   </Text>
-                  <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? '#5DCAA5' : '#BFA68A' }]}>
+                  <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? semanticColors.success : colors.textMuted }]}>
                     {panchang.eclipse.visibleFromLocation ? t('panchang.eclipseVisible') : t('panchang.eclipseNotVisible')}
                   </Text>
                 </View>
@@ -792,7 +692,7 @@ export default function PanchangScreen() {
             )}
 
             {/* ── Time Slots ── */}
-            <SectionHeader title={t('panchang.timeQuality')} colors={colors} />
+            <SectionLabel style={styles.sectionLabel}>{t('panchang.timeQuality')}</SectionLabel>
 
             <QualitySlotsCard label={t('panchang.choghadiya')} slots={panchang.choghadiya} colors={colors} />
             <QualitySlotsCard label={t('panchang.gowriPanchangam')} slots={panchang.gowriPanchangam} colors={colors} />
@@ -801,24 +701,15 @@ export default function PanchangScreen() {
             {/* ── Planetary Positions ── */}
             {panchang.planetaryPositions && panchang.planetaryPositions.length > 0 && (
               <>
-                <SectionHeader title={t('panchang.planetaryPositions')} colors={colors} />
+                <SectionLabel style={styles.sectionLabel}>{t('panchang.planetaryPositions')}</SectionLabel>
                 <PlanetaryPositionsCard positions={panchang.planetaryPositions} colors={colors} />
               </>
             )}
           </>
         ) : null}
+        </SkeletonCrossfade>
 
       </ScrollView>
-
-      <DatePickerOverlay
-        visible={showPicker}
-        onClose={handlePickerClose}
-        pickerDate={pickerDate}
-        onPickDate={handlePickDate}
-        pickerPanchang={pickerPanchang}
-        pickerLoading={pickerLoading}
-        colors={colors}
-      />
 
       {/* ── Walkthrough Step 2: Spotlight Pancha Anga card ── */}
       {walkthroughStep === 2 && panchaAngaRect && (
@@ -834,10 +725,20 @@ export default function PanchangScreen() {
             router.push('/(tabs)/library');
           }}
           onSkip={() => setWalkthroughStep(0)}
-          colors={colors}
         />
       )}
+
+      <WheelDatePickerModal
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        value={selectedDate}
+        onPick={handlePickFromModal}
+        minimumDate={new Date(1900, 0, 1)}
+        maximumDate={new Date(2100, 11, 31)}
+        title={t('panchang.datePickerTitle', { defaultValue: 'Pick a date' })}
+      />
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 
@@ -845,51 +746,150 @@ export default function PanchangScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { paddingBottom: 40, paddingTop: 8 },
+  scroll: { paddingBottom: 40, paddingTop: 4 },
 
-  // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
-  screenTitle: { fontSize: 22, fontFamily: 'Mukta_500Medium' },
-  locationBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: borderRadius.chip },
-  locationText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  // Editorial header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  headerSide: { width: 90 },
+  headerSideRight: { alignItems: 'flex-end' },
+  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
+  headerTitle: { fontSize: 20, lineHeight: 26 },
+  locPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    maxWidth: 104,
+  },
+  locText: { fontSize: 8.5 },
 
-  // Date display
-  dateDisplay: { alignItems: 'center', paddingVertical: 20, gap: 4 },
-  dateTopLabel: { fontSize: 13, fontFamily: 'Mukta_400Regular', letterSpacing: 0.8 },
-  dateBigNumber: { fontSize: 42, fontFamily: 'Mukta_500Medium', lineHeight: 52 },
-  dateGregorian: { fontSize: 14, fontFamily: 'Mukta_400Regular' },
-  dateSamvat: { fontSize: 13, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  dateTapHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  dateTapHintText: { fontSize: 11, fontFamily: 'Mukta_400Regular' },
+  // Month strip
+  monthStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  monthBtn: { padding: 6 },
+  monthLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  monthName: { fontSize: 22, lineHeight: 26 },
+  monthYear: { fontSize: 13, letterSpacing: 1.2, marginBottom: 2 },
+  monthCaret: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 2,
+  },
 
-  // Pancha Anga card
+  todayRow: { alignItems: 'center', marginBottom: 4 },
+  todayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  todayChipText: { fontSize: 9 },
+
+  // Calendar grid
+  calHeaderRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+  },
+  calDayHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 9,
+  },
+  calGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1 / 1.08,
+    padding: 2,
+  },
+  calCellInner: {
+    flex: 1,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    paddingTop: 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  calDayNum: {
+    fontFamily: 'Fraunces_400Regular',
+    fontSize: 14,
+    lineHeight: 16,
+  },
+  festivalDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  postCalRule: { marginTop: 10, marginBottom: 12 },
+
+  // Selected-day line
+  selectedLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 14,
+  },
+  selectedKicker: { fontSize: 9.5 },
+  selectedSamvat: { fontSize: 12 },
+
+  // Section label (primitive wrapper)
+  sectionLabel: { marginTop: 16, marginBottom: 10 },
+
+  // Pancha Anga card (unchanged from pre-P6.4)
   card: { borderRadius: borderRadius.card, borderWidth: 1, padding: 16, marginBottom: 16 },
   limbRow: { paddingVertical: 12 },
-  limbLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, marginBottom: 4 },
+  limbLabel: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 1, marginBottom: 4 },
   limbElement: {},
   limbSecondary: { marginTop: 6 },
   limbNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   limbNameLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 },
-  limbValue: { fontSize: 17, fontFamily: 'Mukta_700Bold' },
-  limbEndTime: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  limbValue: { fontSize: 17, fontFamily: 'NotoSerifDevanagari_700Bold' },
+  limbEndTime: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
   limbActiveBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
-  limbActiveText: { fontSize: 10, fontFamily: 'Mukta_700Bold', letterSpacing: 0.8 },
+  limbActiveText: { fontSize: 10, fontFamily: 'NotoSerifDevanagari_700Bold', letterSpacing: 0.8 },
   limbDivider: { height: 0.5 },
 
-  // Masa system chip
   masaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6, alignSelf: 'flex-start' },
-  masaChipText: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 0.3 },
+  masaChipText: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 0.3 },
 
-  // Sun / Moon grid (2×2)
+  // Sun / Moon grid (unchanged)
   sunGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
-  sunRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   sunCard: { width: '47%', borderRadius: borderRadius.cardInner, borderWidth: 1, padding: 16, alignItems: 'center', gap: 6 },
-  sunCardLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5 },
-  sunCardTime: { fontSize: 16, fontFamily: 'Mukta_500Medium' },
+  sunCardLabel: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 0.5 },
+  sunCardTime: { fontSize: 16, fontFamily: 'JetBrainsMono_500Medium' },
 
-  // Panchaka
   panchakaBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
-  panchakaText: { fontSize: 12, fontFamily: 'Mukta_500Medium', flex: 1 },
+  panchakaText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium', flex: 1 },
 
   muhuratEntry: {
     flexDirection: 'row',
@@ -901,73 +901,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
   },
-  muhuratEntryText: { flex: 1, fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  muhuratEntryText: { flex: 1, fontSize: 13, fontFamily: 'NotoSerifDevanagari_500Medium' },
 
-  // Rahukaal / Brahma Muhurta
   rahuBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
-  rahuLabel: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1, flex: 1 },
-  rahuTime: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
-  bhadraNote: { fontSize: 11, fontFamily: 'Mukta_400Regular', marginTop: 2 },
+  rahuLabel: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 1, flex: 1 },
+  rahuTime: { fontSize: 13, fontFamily: 'JetBrainsMono_500Medium' },
+  bhadraNote: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_400Regular', marginTop: 2 },
 
-  // Eclipse card
   eclipseCard: { borderRadius: borderRadius.card, borderWidth: 1, padding: 14, marginBottom: 12, gap: 6 },
   eclipseHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  eclipseTitle: { fontSize: 14, fontFamily: 'Mukta_700Bold' },
-  eclipseRow: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
-  eclipseVisibility: { fontSize: 12, fontFamily: 'Mukta_500Medium', marginTop: 4 },
+  eclipseTitle: { fontSize: 14, fontFamily: 'NotoSerifDevanagari_700Bold' },
+  eclipseRow: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
+  eclipseVisibility: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium', marginTop: 4 },
 
-  // Section header
-  sectionHeader: { fontSize: 11, fontFamily: 'Mukta_500Medium', letterSpacing: 1.2, marginTop: 16, marginBottom: 8 },
-
-  // Day/night duration row
   durationRow: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.cardInner, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12 },
   durationCell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   durationDivider: { width: 0.5, height: 16 },
-  durationText: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
-  durationValue: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  durationText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
+  durationValue: { fontSize: 13, fontFamily: 'JetBrainsMono_500Medium' },
 
-  // Error
   errorContainer: { alignItems: 'center', paddingVertical: 32, gap: 12 },
   errorIconCircle: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
-  errorTitle: { fontSize: 16, fontFamily: 'Mukta_500Medium' },
-  errorDesc: { fontSize: 13, fontFamily: 'Mukta_400Regular', textAlign: 'center', lineHeight: 20, paddingHorizontal: 24 },
+  errorTitle: { fontSize: 16, fontFamily: 'NotoSerifDevanagari_500Medium' },
+  errorDesc: { fontSize: 13, fontFamily: 'NotoSerifDevanagari_400Regular', textAlign: 'center', lineHeight: 20, paddingHorizontal: 24 },
   retryBtn: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: borderRadius.button, marginTop: 4 },
-  retryText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  fallbackNote: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
-
-  // Date picker
-  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  pickerSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 },
-  pickerMonthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  pickerMonthLabel: { fontSize: 16, fontFamily: 'Mukta_500Medium' },
-
-  calRow: { flexDirection: 'row', marginBottom: 8 },
-  calDayHeader: { flex: 1, textAlign: 'center', fontSize: 12, fontFamily: 'Mukta_500Medium' },
-
-  calGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
-  calCell: { width: `${100 / 7}%`, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
-  calCellInner: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
-  calDayNum: { fontSize: 14, fontFamily: 'Mukta_400Regular' },
-
-  todayBtnRow: { alignItems: 'center', marginBottom: 14 },
-  todayBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: borderRadius.chip, paddingHorizontal: 14, paddingVertical: 6 },
-  todayBtnText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
-
-  miniFestivalBar: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
-  miniFestivalText: { fontSize: 12, fontFamily: 'Mukta_500Medium', flex: 1 },
-  miniGrid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: 1, borderRadius: borderRadius.cardInner, padding: 12, gap: 8, marginBottom: 16 },
-  miniCell: { width: '47%' },
-  miniLabel: { fontSize: 10, fontFamily: 'Mukta_400Regular', letterSpacing: 0.5, marginBottom: 2 },
-  miniValue: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
-
-  pickerDoneBtn: { borderRadius: borderRadius.button, paddingVertical: 14, alignItems: 'center' },
-  pickerDoneText: { fontSize: 15, fontFamily: 'Mukta_700Bold' },
-
-  // Month-year jumper
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
-  monthCell: { width: '28%', paddingVertical: 12, borderRadius: borderRadius.cardInner, alignItems: 'center' },
-  monthCellText: { fontSize: 14, fontFamily: 'Mukta_500Medium' },
-  yearList: { paddingVertical: 8, gap: 8 },
-  yearChip: { width: 56, paddingVertical: 6, borderRadius: borderRadius.chip, borderWidth: 1, alignItems: 'center' },
-  yearChipText: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  retryText: { fontSize: 14, fontFamily: 'NotoSerifDevanagari_500Medium' },
+  fallbackNote: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
 });

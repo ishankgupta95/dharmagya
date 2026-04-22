@@ -1,12 +1,13 @@
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { darkColors, borderRadius, spacing } from '@/config/theme';
 
-const colors = darkColors;
+import { borderRadius, palette, spacing } from '@/config/theme';
+import { Ornament } from '@/components/common/Ornament';
+import { MandalaWatermark } from '@/components/common/MandalaWatermark';
+import { ProgressDots } from './_progressDots';
 
 export default function OnboardingStep1() {
   const { t } = useTranslation();
@@ -14,28 +15,40 @@ export default function OnboardingStep1() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
 
-      {/* ── Decorative gradient backdrop ────────────────────────────── */}
-      <LinearGradient
-        colors={['#2E2418', colors.base]}
-        style={styles.backdrop}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        pointerEvents="none"
-      />
+      {/* Subtle watermark mandala behind the hero — editorial tone */}
+      <View style={styles.watermarkWrap} pointerEvents="none">
+        <MandalaWatermark
+          size={460}
+          color={palette.goldLeaf}
+          opacity={0.07}
+          position="center"
+        />
+      </View>
 
       {/* ── Center content ──────────────────────────────────────────── */}
       <View style={styles.content}>
 
-        {/* Om symbol circle */}
-        <LinearGradient
-          colors={[colors.accent + '40', colors.accent + '10']}
-          style={styles.omCircle}>
-          <Text style={styles.omSymbol}>ॐ</Text>
-        </LinearGradient>
+        {/* Double-ring plinth with ॐ — editorial take on the old Om circle */}
+        <View style={styles.omPlinth}>
+          <View style={styles.omGoldRing}>
+            <View style={styles.omParchmentRing}>
+              <Text variant="deva-bold" style={styles.omSymbol}>ॐ</Text>
+            </View>
+          </View>
+        </View>
 
-        <Text style={styles.appName}>{t('common.appName')}</Text>
-        <Text style={styles.appNameHindi}>{t('common.appNameHindi')}</Text>
-        <Text style={styles.tagline}>{t('onboarding.tagline')}</Text>
+        <Text variant="display-italic" style={styles.appName}>
+          {t('common.appName')}
+        </Text>
+        <Text variant="deva-bold" style={styles.appNameHindi}>
+          {t('common.appNameHindi')}
+        </Text>
+
+        <Ornament variant="lotus" style={styles.ornament} />
+
+        <Text variant="body-italic" style={styles.tagline}>
+          {t('onboarding.tagline')}
+        </Text>
 
       </View>
 
@@ -45,48 +58,27 @@ export default function OnboardingStep1() {
         <TouchableOpacity
           onPress={() => router.push('/onboarding/step2')}
           activeOpacity={0.85}
-          style={styles.cta}>
-          <Text style={styles.ctaText}>{t('onboarding.beginJourney')}</Text>
+          style={styles.cta}
+          accessibilityRole="button"
+          accessibilityLabel={t('onboarding.beginJourney')}>
+          <Text variant="mono-caps" style={styles.ctaText}>
+            {t('onboarding.beginJourney')}
+          </Text>
         </TouchableOpacity>
-        <Text style={styles.skipHint}>{t('onboarding.takesSeconds')}</Text>
+        <Text variant="body-italic" style={styles.skipHint}>
+          {t('onboarding.takesSeconds')}
+        </Text>
       </View>
 
     </SafeAreaView>
   );
 }
 
-// ─── Progress Dots ────────────────────────────────────────────────────────────
-
-function ProgressDots({ current, total }: { current: number; total: number }) {
-  return (
-    <View style={dots.row}>
-      {Array.from({ length: total }, (_item, index) => (
-        <View
-          key={index}
-          style={[
-            dots.dot,
-            index + 1 === current
-              ? { backgroundColor: colors.accent, width: 20 }
-              : index + 1 < current
-              ? { backgroundColor: colors.accent + '60' }
-              : { backgroundColor: 'rgba(255,255,255,0.15)' },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const dots = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  dot: { height: 6, width: 6, borderRadius: 3 },
-});
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.base },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  root: { flex: 1, backgroundColor: palette.parchment },
+  watermarkWrap: { ...StyleSheet.absoluteFillObject },
 
   content: {
     flex: 1,
@@ -96,39 +88,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenH,
   },
 
-  omCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  // ॐ plinth (double ring)
+  omPlinth: { marginBottom: 16 },
+  omGoldRing: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: palette.rule,
+    padding: 1.5,
+  },
+  omParchmentRing: {
+    flex: 1,
+    borderRadius: 68,
+    backgroundColor: palette.parchmentBright,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: palette.parchmentBright,
   },
   omSymbol: {
-    fontSize: 56,
-    color: colors.accent,
-    fontFamily: 'Mukta_700Bold',
+    fontSize: 74,
+    lineHeight: 88,
+    color: palette.sindoor,
   },
 
+  // Text block
   appName: {
-    fontSize: 36,
-    fontFamily: 'Mukta_700Bold',
-    color: colors.textPrimary,
-    letterSpacing: 0.5,
+    fontSize: 42,
+    lineHeight: 48,
+    color: palette.ink,
+    marginTop: 4,
+    textAlign: 'center',
   },
   appNameHindi: {
-    fontSize: 18,
-    fontFamily: 'Mukta_400Regular',
-    color: colors.textSecondary,
-    marginTop: -6,
+    fontSize: 22,
+    lineHeight: 30,
+    color: palette.inkSoft,
+    marginTop: -4,
+  },
+  ornament: {
+    width: 140,
+    marginTop: 12,
+    marginBottom: 8,
   },
   tagline: {
-    fontSize: 14,
-    fontFamily: 'Mukta_400Regular',
-    color: colors.textMuted,
+    fontSize: 15,
+    color: palette.inkQuiet,
     textAlign: 'center',
-    marginTop: 4,
     lineHeight: 22,
+    paddingHorizontal: 12,
   },
 
   bottom: {
@@ -139,20 +147,18 @@ const styles = StyleSheet.create({
   },
   cta: {
     width: '100%',
-    backgroundColor: colors.accent,
-    paddingVertical: 15,
+    backgroundColor: palette.sindoor,
+    paddingVertical: 16,
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
   ctaText: {
-    fontSize: 16,
-    fontFamily: 'Mukta_500Medium',
-    color: '#FFFFFF',
+    fontSize: 12,
+    color: palette.parchmentBright,
   },
   skipHint: {
     fontSize: 12,
-    fontFamily: 'Mukta_400Regular',
-    color: colors.textMuted,
+    color: palette.inkMuted,
     marginBottom: 8,
   },
 });

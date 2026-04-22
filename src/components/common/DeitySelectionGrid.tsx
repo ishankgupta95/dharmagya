@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { View, TouchableOpacity, FlatList, StyleSheet, Dimensions, ListRenderItemInfo } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { useTranslation } from 'react-i18next';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 
 import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
@@ -83,14 +83,17 @@ const DeityCard = memo(function DeityCard({ deity, isSelected, colors, onPress }
           width: CARD_WIDTH,
         },
         isSelected && { backgroundColor: deity.color + '12' },
-      ]}>
+      ]}
+      accessibilityRole="checkbox"
+      accessibilityLabel={t(`deities.${deity.id}.displayName`)}
+      accessibilityState={{ checked: isSelected }}>
       <DeityAvatar deity={deity.id} size={64} />
       <Text style={[styles.cardNameHindi, { color: colors.textPrimary }]} numberOfLines={1}>
         {t(`deities.${deity.id}.displayName`)}
       </Text>
       {isSelected && (
         <View style={[styles.checkCircle, { backgroundColor: deity.color }]}>
-          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+          <Icon name="check" size={10} color="#FFFFFF" />
         </View>
       )}
     </TouchableOpacity>
@@ -109,7 +112,7 @@ const styles = StyleSheet.create({
     gap: 4,
     position: 'relative',
   },
-  cardNameHindi: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  cardNameHindi: { fontSize: 13, fontFamily: 'NotoSerifDevanagari_500Medium' },
   checkCircle: {
     position: 'absolute',
     top: 6,

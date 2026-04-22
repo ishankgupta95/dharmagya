@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, StyleSheet, Alert, Linking } from 'react-native';
+import Constants from 'expo-constants';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type FontSize, type MasaSystem, type Region } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { useStore, type FontSize, type MasaSystem, type Region, type TimeFormat } from '@/store/useStore';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { SectionLabel } from '@/components/common/SectionLabel';
+import { ScreenMount } from '@/components/common/ScreenMount';
 import { LANGUAGE_OPTIONS, resolveLanguage, changeLanguage, type AppLanguage } from '@/i18n';
 import {
   scheduleDailyReminder,
@@ -17,23 +20,17 @@ import {
 } from '@/services/notifications';
 import { fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
+import { TimePickerModal } from '@/components/common/TimePickerModal';
+import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
 
-// ─── Font size config ─────────────────────────────────────────────────────────
-
-const FONT_SIZE_OPTIONS: { key: FontSize; label: string }[] = [
-  { key: 'small', label: 'A' },
-  { key: 'normal', label: 'A' },
-  { key: 'large', label: 'A' },
-  { key: 'xl', label: 'A' },
+const SUNRISE_OFFSET_OPTIONS: { key: string; min: number }[] = [
+  { key: '0', min: 0 },
+  { key: '5', min: 5 },
+  { key: '10', min: 10 },
+  { key: '15', min: 15 },
+  { key: '30', min: 30 },
 ];
-
-const FONT_SIZE_LABELS: Record<FontSize, string> = {
-  small: 'Small',
-  normal: 'Normal',
-  large: 'Large',
-  xl: 'Extra Large',
-};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -49,19 +46,39 @@ export default function SettingsScreen() {
     setLanguage,
     dailyReminderEnabled,
     setDailyReminderEnabled,
+    dailyReminderTime,
+    setDailyReminderTime,
     sunriseAlertEnabled,
     setSunriseAlertEnabled,
+    sunriseAlertOffsetMin,
+    setSunriseAlertOffsetMin,
+    useDevanagariNumerals,
+    setUseDevanagariNumerals,
+    timeFormat,
+    setTimeFormat,
+    quietHoursEnabled,
+    setQuietHoursEnabled,
+    quietHoursStart,
+    setQuietHoursStart,
+    quietHoursEnd,
+    setQuietHoursEnd,
+    showVikramSamvat,
+    setShowVikramSamvat,
     masaSystem,
     setMasaSystem,
     region,
     setRegion,
     userBirthDate,
     setUserBirthDate,
+    userBirthTime,
+    setUserBirthTime,
+    userBirthPlace,
     setWalkthroughStep,
     selectedDeities,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
+  const { formatTime: formatDisplayTime } = useLocaleFormatters();
 
   function handleLanguageChange(lang: AppLanguage) {
     setLanguage(lang);
@@ -70,6 +87,36 @@ export default function SettingsScreen() {
 
   const [sunriseTime, setSunriseTime] = useState<string | null>(null);
   const [dobPickerOpen, setDobPickerOpen] = useState(false);
+  const [fontSheetOpen, setFontSheetOpen] = useState(false);
+  const [langSheetOpen, setLangSheetOpen] = useState(false);
+  const [masaSheetOpen, setMasaSheetOpen] = useState(false);
+  const [dailyTimePickerOpen, setDailyTimePickerOpen] = useState(false);
+  const [sunriseOffsetSheetOpen, setSunriseOffsetSheetOpen] = useState(false);
+  const [birthTimePickerOpen, setBirthTimePickerOpen] = useState(false);
+  const [timeFormatSheetOpen, setTimeFormatSheetOpen] = useState(false);
+  const [quietStartPickerOpen, setQuietStartPickerOpen] = useState(false);
+  const [quietEndPickerOpen, setQuietEndPickerOpen] = useState(false);
+
+  const timeFormatOptions: OptionSheetItem<TimeFormat>[] = [
+    { key: 'auto', label: t('settings.timeFormatAuto'), desc: t('settings.timeFormatAutoDesc') },
+    { key: '12h', label: t('settings.timeFormat12h') },
+    { key: '24h', label: t('settings.timeFormat24h') },
+  ];
+
+  const fontSizeLabel = t(`settings.fontSize${fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}` as any);
+  const languageLabel =
+    LANGUAGE_OPTIONS.find(o => o.key === language)?.nativeLabel ?? t('settings.systemDefault');
+  const masaLabel = t(`panchang.${masaSystem}`);
+
+  const languageOptions: OptionSheetItem<AppLanguage>[] = LANGUAGE_OPTIONS.map(o => ({
+    key: o.key,
+    label: o.key === 'system' ? t('settings.systemDefault') : o.nativeLabel,
+  }));
+
+  const masaOptions: OptionSheetItem<MasaSystem>[] = [
+    { key: 'purnimanta', label: t('panchang.purnimanta'), desc: t('settings.masaSystemPurnimantaDesc') },
+    { key: 'amanta', label: t('panchang.amanta'), desc: t('settings.masaSystemAmantaDesc') },
+  ];
 
   // Fetch today's sunrise once (needed to schedule the sunrise alert)
   useEffect(() => {
@@ -88,7 +135,7 @@ export default function SettingsScreen() {
 
   async function handleDailyReminderToggle(val: boolean) {
     if (val) {
-      const ok = await scheduleDailyReminder();
+      const ok = await scheduleDailyReminder(dailyReminderTime);
       if (!ok) {
         Alert.alert(
           t('settings.permissionRequired'),
@@ -100,6 +147,20 @@ export default function SettingsScreen() {
       await cancelDailyReminder();
     }
     setDailyReminderEnabled(val);
+  }
+
+  async function handleDailyReminderTimeChange(timeHHmm: string) {
+    setDailyReminderTime(timeHHmm);
+    if (dailyReminderEnabled) {
+      await scheduleDailyReminder(timeHHmm);
+    }
+  }
+
+  async function handleSunriseOffsetChange(min: number) {
+    setSunriseAlertOffsetMin(min);
+    if (sunriseAlertEnabled && sunriseTime) {
+      await scheduleSunriseAlert(sunriseTime, min);
+    }
   }
 
   function handleDobPick(date: Date) {
@@ -125,7 +186,7 @@ export default function SettingsScreen() {
         Alert.alert(t('settings.sunriseUnavailable'), t('settings.sunriseUnavailableDesc'));
         return;
       }
-      const ok = await scheduleSunriseAlert(sunriseTime);
+      const ok = await scheduleSunriseAlert(sunriseTime, sunriseAlertOffsetMin);
       if (!ok) {
         Alert.alert(
           t('settings.permissionRequired'),
@@ -140,18 +201,23 @@ export default function SettingsScreen() {
   }
 
   return (
+    <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('settings.title')}</Text>
-        <View style={styles.backBtn} />
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {t('settings.title')}
+        </Text>
+        <View style={{ width: 36, height: 36 }} />
       </View>
 
       <ScrollView
@@ -161,14 +227,12 @@ export default function SettingsScreen() {
         {/* ── Language ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.language')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SettingRow
-            icon="language-outline"
+          <PickerRow
+            icon="globe"
             label={t('settings.appLanguage')}
-            sublabel={LANGUAGE_OPTIONS.find(o => o.key === language)?.nativeLabel ?? t('settings.systemDefault')}
+            value={languageLabel}
+            onPress={() => setLangSheetOpen(true)}
             colors={colors}
-            right={
-              <LanguagePicker value={language} onChange={handleLanguageChange} colors={colors} />
-            }
           />
         </View>
 
@@ -177,7 +241,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
-            icon="moon-outline"
+            icon="moon"
             label={t('settings.darkMode')}
             colors={colors}
             right={
@@ -192,14 +256,63 @@ export default function SettingsScreen() {
 
           <Divider colors={colors} />
 
-          {/* Font Size — inline segmented picker */}
-          <SettingRow
-            icon="text-outline"
+          <PickerRow
+            icon="text"
             label={t('settings.fontSize')}
-            sublabel={t(`settings.fontSize${fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}` as any)}
+            value={fontSizeLabel}
+            onPress={() => setFontSheetOpen(true)}
+            colors={colors}
+          />
+
+        </View>
+
+        {/* ── Display ───────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.display')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+          <PickerRow
+            icon="clock"
+            label={t('settings.timeFormat')}
+            value={
+              timeFormat === '12h' ? t('settings.timeFormat12h')
+                : timeFormat === '24h' ? t('settings.timeFormat24h')
+                  : t('settings.timeFormatAuto')
+            }
+            onPress={() => setTimeFormatSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="text"
+            label={t('settings.devanagariNumerals')}
+            sublabel={t('settings.devanagariNumeralsDesc')}
             colors={colors}
             right={
-              <FontSizePicker value={fontSize} onChange={setFontSize} colors={colors} />
+              <Switch
+                value={useDevanagariNumerals}
+                onValueChange={setUseDevanagariNumerals}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={useDevanagariNumerals ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="calendar"
+            label={t('settings.showVikramSamvat')}
+            sublabel={t('settings.showVikramSamvatDesc')}
+            colors={colors}
+            right={
+              <Switch
+                value={showVikramSamvat}
+                onValueChange={setShowVikramSamvat}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={showVikramSamvat ? colors.accent : colors.textDisabled}
+              />
             }
           />
 
@@ -208,14 +321,12 @@ export default function SettingsScreen() {
         {/* ── Calendar ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.calendar')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SettingRow
-            icon="calendar-outline"
+          <PickerRow
+            icon="calendar"
             label={t('settings.masaSystem')}
-            sublabel={t('settings.masaSystemDesc')}
+            value={masaLabel}
+            onPress={() => setMasaSheetOpen(true)}
             colors={colors}
-            right={
-              <MasaSystemPicker value={masaSystem} onChange={setMasaSystem} colors={colors} />
-            }
           />
         </View>
 
@@ -224,16 +335,18 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.push('/location-permission')}>
+            onPress={() => router.push('/location-permission')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.myLocation')}>
             <SettingRow
-              icon="location-outline"
+              icon="location"
               label={t('settings.gpsLocation')}
               sublabel={locationText}
               colors={colors}
               right={
                 <View style={styles.locationRight}>
                   <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
-                  <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
                 </View>
               }
             />
@@ -247,9 +360,11 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => router.push('/settings/deities')}>
+            onPress={() => router.push('/settings/deities')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.manageDeities')}>
             <SettingRow
-              icon="flower-outline"
+              icon="flower"
               label={t('settings.manageDeities')}
               sublabel={
                 selectedDeities.length > 0
@@ -257,7 +372,7 @@ export default function SettingsScreen() {
                   : t('settings.manageDeitiesNone')
               }
               colors={colors}
-              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
         </View>
@@ -265,15 +380,39 @@ export default function SettingsScreen() {
         {/* ── Horoscope ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.horoscope')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setDobPickerOpen(true)}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setDobPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.birthDate')}>
             <SettingRow
-              icon="gift-outline"
+              icon="gift"
               label={t('settings.birthDate')}
               sublabel={birthDateLabel}
               colors={colors}
-              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="clock"
+            label={t('settings.birthTime')}
+            value={userBirthTime ? formatDisplayTime(userBirthTime) : t('settings.birthTimeNotSet')}
+            onPress={() => setBirthTimePickerOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="location"
+            label={t('settings.birthPlace')}
+            value={userBirthPlace?.name ?? t('settings.birthPlaceNotSet')}
+            onPress={() => router.push('/settings/birth-place')}
+            colors={colors}
+          />
         </View>
 
         {/* ── Notifications ─────────────────────────────────────────── */}
@@ -281,9 +420,9 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
           <SettingRow
-            icon="notifications-outline"
+            icon="bell"
             label={t('settings.dailyReminder')}
-            sublabel={t('settings.dailyReminderDesc')}
+            sublabel={t('settings.dailyReminderAt', { time: formatDisplayTime(dailyReminderTime) })}
             colors={colors}
             right={
               <Switch
@@ -295,10 +434,23 @@ export default function SettingsScreen() {
             }
           />
 
+          {dailyReminderEnabled && (
+            <>
+              <Divider colors={colors} />
+              <PickerRow
+                icon="clock"
+                label={t('settings.dailyReminderTime')}
+                value={formatDisplayTime(dailyReminderTime)}
+                onPress={() => setDailyTimePickerOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
+
           <Divider colors={colors} />
 
           <SettingRow
-            icon="sunny-outline"
+            icon="sun"
             label={t('settings.sunriseAlert')}
             sublabel={sunriseTime ? t('settings.sunriseAlertAt', { time: sunriseTime }) : t('settings.sunriseAlertGeneric')}
             colors={colors}
@@ -312,19 +464,83 @@ export default function SettingsScreen() {
             }
           />
 
+          {sunriseAlertEnabled && (
+            <>
+              <Divider colors={colors} />
+              <PickerRow
+                icon="alarm"
+                label={t('settings.sunriseOffset')}
+                value={
+                  sunriseAlertOffsetMin === 0
+                    ? t('settings.sunriseOffsetAtSunrise')
+                    : t('settings.sunriseOffsetMinBefore', { min: sunriseAlertOffsetMin })
+                }
+                onPress={() => setSunriseOffsetSheetOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
+
           <Divider colors={colors} />
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => router.push('/settings/reminders')}>
+            onPress={() => router.push('/settings/reminders')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.festivalTithiReminders')}>
             <SettingRow
-              icon="alarm-outline"
+              icon="alarm"
               label={t('settings.festivalTithiReminders')}
               sublabel={t('settings.festivalTithiRemindersDesc')}
               colors={colors}
-              right={<Ionicons name="chevron-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="moon"
+            label={t('settings.quietHours')}
+            sublabel={
+              quietHoursEnabled
+                ? t('settings.quietHoursActive', {
+                    start: formatDisplayTime(quietHoursStart),
+                    end: formatDisplayTime(quietHoursEnd),
+                  })
+                : t('settings.quietHoursDesc')
+            }
+            colors={colors}
+            right={
+              <Switch
+                value={quietHoursEnabled}
+                onValueChange={setQuietHoursEnabled}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={quietHoursEnabled ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+          {quietHoursEnabled && (
+            <>
+              <Divider colors={colors} />
+              <PickerRow
+                icon="clock"
+                label={t('settings.quietHoursStart')}
+                value={formatDisplayTime(quietHoursStart)}
+                onPress={() => setQuietStartPickerOpen(true)}
+                colors={colors}
+              />
+              <Divider colors={colors} />
+              <PickerRow
+                icon="clock"
+                label={t('settings.quietHoursEnd')}
+                value={formatDisplayTime(quietHoursEnd)}
+                onPress={() => setQuietEndPickerOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
 
         </View>
 
@@ -334,37 +550,61 @@ export default function SettingsScreen() {
 
           <TouchableOpacity
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.replayWalkthrough')}
             onPress={() => {
               setWalkthroughStep(1);
               router.back();
             }}>
             <SettingRow
-              icon="walk-outline"
+              icon="walk"
               label={t('settings.replayWalkthrough')}
               sublabel={t('settings.replayWalkthroughDesc')}
               colors={colors}
-              right={<Ionicons name="arrow-forward" size={14} color={colors.textMuted} />}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+
+          <Divider colors={colors} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.sendFeedback')}
+            onPress={() => Linking.openURL('mailto:ishank1995dev@gmail.com?subject=Dharmagya%20Feedback')}>
+            <SettingRow
+              icon="chat"
+              label={t('settings.sendFeedback')}
+              sublabel={t('settings.sendFeedbackDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+
+          <Divider colors={colors} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.privacyPolicy')}
+            onPress={() => Linking.openURL('https://dharmagya.app/privacy')}>
+            <SettingRow
+              icon="shield"
+              label={t('settings.privacyPolicy')}
+              sublabel={t('settings.privacyPolicyDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
 
           <Divider colors={colors} />
 
           <SettingRow
-            icon="apps-outline"
+            icon="apps"
             label={t('settings.appVersion')}
             sublabel={t('common.appNameHindi')}
             colors={colors}
-            right={<Text style={[styles.versionText, { color: colors.textMuted }]}>v1.0.0</Text>}
-          />
-
-          <Divider colors={colors} />
-
-          <SettingRow
-            icon="heart-outline"
-            label={t('settings.madeWithDevotion')}
-            sublabel={t('settings.offlineFirst')}
-            colors={colors}
-            right={<Text style={{ fontSize: 18 }}>🙏</Text>}
+            right={<Text variant="mono" style={[styles.versionText, { color: colors.textMuted }]}>v{Constants.expoConfig?.version ?? '—'}</Text>}
           />
 
         </View>
@@ -385,119 +625,294 @@ export default function SettingsScreen() {
         title={t('settings.birthDatePickerTitle')}
       />
 
+      <FontSizeSheet
+        visible={fontSheetOpen}
+        onClose={() => setFontSheetOpen(false)}
+        value={fontSize}
+        onChange={setFontSize}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={langSheetOpen}
+        onClose={() => setLangSheetOpen(false)}
+        title={t('settings.languagePickerTitle')}
+        options={languageOptions}
+        value={language}
+        onChange={(next) => handleLanguageChange(next as AppLanguage)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={masaSheetOpen}
+        onClose={() => setMasaSheetOpen(false)}
+        title={t('settings.masaSystemPickerTitle')}
+        options={masaOptions}
+        value={masaSystem}
+        onChange={(next) => setMasaSystem(next as MasaSystem)}
+        colors={colors}
+      />
+
+      <TimePickerModal
+        visible={dailyTimePickerOpen}
+        onClose={() => setDailyTimePickerOpen(false)}
+        value={dailyReminderTime}
+        onPick={handleDailyReminderTimeChange}
+        title={t('settings.dailyReminderTimePickerTitle')}
+      />
+
+      <OptionSheet
+        visible={sunriseOffsetSheetOpen}
+        onClose={() => setSunriseOffsetSheetOpen(false)}
+        title={t('settings.sunriseOffsetPickerTitle')}
+        options={SUNRISE_OFFSET_OPTIONS.map(o => ({
+          key: o.key,
+          label: o.min === 0
+            ? t('settings.sunriseOffsetAtSunrise')
+            : t('settings.sunriseOffsetMinBefore', { min: o.min }),
+        }))}
+        value={String(sunriseAlertOffsetMin)}
+        onChange={(next) => handleSunriseOffsetChange(parseInt(next, 10))}
+        colors={colors}
+      />
+
+      <TimePickerModal
+        visible={birthTimePickerOpen}
+        onClose={() => setBirthTimePickerOpen(false)}
+        value={userBirthTime ?? '12:00'}
+        onPick={setUserBirthTime}
+        title={t('settings.birthTimePickerTitle')}
+      />
+
+      <OptionSheet
+        visible={timeFormatSheetOpen}
+        onClose={() => setTimeFormatSheetOpen(false)}
+        title={t('settings.timeFormatPickerTitle')}
+        options={timeFormatOptions}
+        value={timeFormat}
+        onChange={(next) => setTimeFormat(next as TimeFormat)}
+        colors={colors}
+      />
+
+      <TimePickerModal
+        visible={quietStartPickerOpen}
+        onClose={() => setQuietStartPickerOpen(false)}
+        value={quietHoursStart}
+        onPick={setQuietHoursStart}
+        title={t('settings.quietHoursStartPickerTitle')}
+      />
+
+      <TimePickerModal
+        visible={quietEndPickerOpen}
+        onClose={() => setQuietEndPickerOpen(false)}
+        value={quietHoursEnd}
+        onPick={setQuietHoursEnd}
+        title={t('settings.quietHoursEndPickerTitle')}
+      />
+
     </SafeAreaView>
+    </ScreenMount>
   );
 }
 
-// ─── Font Size Picker ─────────────────────────────────────────────────────────
+// ─── Generic Option Sheet ───────────────────────────────────────────────────
 
-interface FontSizePickerProps {
+interface OptionSheetItem<T extends string> {
+  key: T;
+  label: string;
+  desc?: string;
+}
+
+interface OptionSheetProps<T extends string> {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  options: OptionSheetItem<T>[];
+  value: T;
+  onChange: (next: T) => void;
+  colors: ColorPalette;
+}
+
+function OptionSheet<T extends string>({
+  visible, onClose, title, options, value, onChange, colors,
+}: OptionSheetProps<T>) {
+  const { t } = useTranslation();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {title}
+          </Text>
+          <View style={{ marginTop: 4 }}>
+            {options.map((opt, i) => {
+              const active = opt.key === value;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  activeOpacity={0.7}
+                  onPress={() => onChange(opt.key)}
+                  style={[
+                    styles.sheetItem,
+                    i < options.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+                    active && { backgroundColor: colors.accent + '18' },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={opt.label}
+                  accessibilityState={{ selected: active }}>
+                  <View style={styles.sheetItemText}>
+                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+                      {opt.label}
+                    </Text>
+                    {opt.desc && (
+                      <Text variant="body-italic" style={[styles.sheetItemDesc, { color: colors.textTertiary }]}>
+                        {opt.desc}
+                      </Text>
+                    )}
+                  </View>
+                  {active && <Icon name="check" size={18} color={colors.accent} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.done')}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+              {t('common.done')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Picker Row (current-value + chevron, opens a sheet) ────────────────────
+
+interface PickerRowProps {
+  icon: IconName;
+  label: string;
+  value: string;
+  onPress: () => void;
+  colors: ColorPalette;
+  a11yLabel?: string;
+}
+
+function PickerRow({ icon, label, value, onPress, colors, a11yLabel }: PickerRowProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel ?? label}>
+      <SettingRow
+        icon={icon}
+        label={label}
+        colors={colors}
+        right={
+          <View style={styles.regionRight}>
+            <Text
+              variant="body-italic"
+              style={[styles.regionValue, { color: colors.textPrimary }]}
+              numberOfLines={1}>
+              {value}
+            </Text>
+            <Icon name="chevron-right" size={14} color={colors.textMuted} />
+          </View>
+        }
+      />
+    </TouchableOpacity>
+  );
+}
+
+// ─── Font Size Sheet (preview + segmented steps) ────────────────────────────
+
+interface FontSizeSheetProps {
+  visible: boolean;
+  onClose: () => void;
   value: FontSize;
   onChange: (size: FontSize) => void;
   colors: ColorPalette;
 }
 
-function FontSizePicker({ value, onChange, colors }: FontSizePickerProps) {
-  const sizes: { fontSize: number; key: FontSize }[] = [
-    { key: 'small', fontSize: 12 },
-    { key: 'normal', fontSize: 15 },
-    { key: 'large', fontSize: 19 },
-    { key: 'xl', fontSize: 24 },
-  ];
-  return (
-    <View style={[styles.fontPicker, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-      {sizes.map(({ key, fontSize }, i) => {
-        const active = value === key;
-        return (
-          <TouchableOpacity
-            key={key}
-            onPress={() => onChange(key)}
-            style={[
-              styles.fontPickerBtn,
-              i < sizes.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
-              active && { backgroundColor: colors.accent },
-            ]}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
-            <RNText style={[styles.fontPickerLabel, { fontSize, color: active ? '#FFFFFF' : colors.textSecondary }]}>
-              A
-            </RNText>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-// ─── Language Picker ──────────────────────────────────────────────────────────
-
-interface LanguagePickerProps {
-  value: AppLanguage;
-  onChange: (lang: AppLanguage) => void;
-  colors: ColorPalette;
-}
-
-function LanguagePicker({ value, onChange, colors }: LanguagePickerProps) {
-  return (
-    <View style={[styles.fontPicker, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-      {LANGUAGE_OPTIONS.map(({ key, nativeLabel }, i) => {
-        const active = value === key;
-        const label = key === 'system' ? '📱' : nativeLabel.slice(0, 2);
-        return (
-          <TouchableOpacity
-            key={key}
-            onPress={() => onChange(key)}
-            style={[
-              styles.langPickerBtn,
-              i < LANGUAGE_OPTIONS.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
-              active && { backgroundColor: colors.accent },
-            ]}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
-            <RNText style={[styles.langPickerLabel, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
-              {label}
-            </RNText>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-// ─── Masa System Picker ─────────────────────────────────────────────────────
-
-interface MasaSystemPickerProps {
-  value: MasaSystem;
-  onChange: (system: MasaSystem) => void;
-  colors: ColorPalette;
-}
-
-const MASA_OPTIONS: { key: MasaSystem; tKey: string }[] = [
-  { key: 'purnimanta', tKey: 'panchang.purnimanta' },
-  { key: 'amanta', tKey: 'panchang.amanta' },
+const FONT_SIZE_STEPS: { key: FontSize; tKey: string; sample: number }[] = [
+  { key: 'small',  tKey: 'settings.fontSizeSmall',  sample: 11 },
+  { key: 'normal', tKey: 'settings.fontSizeNormal', sample: 13 },
+  { key: 'medium', tKey: 'settings.fontSizeMedium', sample: 15 },
+  { key: 'large',  tKey: 'settings.fontSizeLarge',  sample: 17 },
+  { key: 'xl',     tKey: 'settings.fontSizeXl',     sample: 20 },
+  { key: 'xxl',    tKey: 'settings.fontSizeXxl',    sample: 23 },
 ];
 
-function MasaSystemPicker({ value, onChange, colors }: MasaSystemPickerProps) {
+function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSheetProps) {
   const { t } = useTranslation();
+  const activeStep = FONT_SIZE_STEPS.find(s => s.key === value);
   return (
-    <View style={[styles.fontPicker, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-      {MASA_OPTIONS.map(({ key, tKey }, i) => {
-        const active = value === key;
-        return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {t('settings.fontSizePickerTitle')}
+          </Text>
+
+          {/* Live preview — uses AppText so it scales with the store */}
+          <View style={[styles.previewWrap, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+            <Text variant="body" style={[styles.previewBody, { color: colors.textPrimary }]}>
+              {t('settings.fontSizePreview')}
+            </Text>
+          </View>
+
+          {/* Segmented Aa steps */}
+          <View style={[styles.segmentRow, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+            {FONT_SIZE_STEPS.map((step, i) => {
+              const active = step.key === value;
+              return (
+                <TouchableOpacity
+                  key={step.key}
+                  onPress={() => onChange(step.key)}
+                  style={[
+                    styles.segmentBtn,
+                    i < FONT_SIZE_STEPS.length - 1 && {
+                      borderRightWidth: StyleSheet.hairlineWidth,
+                      borderRightColor: colors.border,
+                    },
+                    active && { backgroundColor: colors.accent },
+                  ]}
+                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(step.tKey)}
+                  accessibilityState={{ selected: active }}>
+                  <RNText style={[styles.segmentGlyph, {
+                    fontSize: step.sample,
+                    color: active ? '#FFFFFF' : colors.textSecondary,
+                  }]}>
+                    A
+                  </RNText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Current step name */}
+          <Text variant="mono-caps" style={[styles.segmentCaption, { color: colors.textMuted }]}>
+            {activeStep ? t(activeStep.tKey) : ''}
+          </Text>
+
           <TouchableOpacity
-            key={key}
-            onPress={() => onChange(key)}
-            style={[
-              styles.masaPickerBtn,
-              i < MASA_OPTIONS.length - 1 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
-              active && { backgroundColor: colors.accent },
-            ]}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
-            <RNText style={[styles.langPickerLabel, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
-              {t(tKey)}
-            </RNText>
+            onPress={onClose}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 18 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.done')}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+              {t('common.done')}
+            </Text>
           </TouchableOpacity>
-        );
-      })}
-    </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -538,28 +953,34 @@ function RegionRow({
         style={[
           styles.regionItem,
           { borderBottomColor: colors.divider },
-          active && { backgroundColor: colors.accent + '22' },
-        ]}>
-        <Text style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+          active && { backgroundColor: colors.accent + '18' },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={tr(r)}
+        accessibilityState={{ selected: active }}>
+        <Text variant="body" style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
           {tr(r)}
         </Text>
-        {active && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+        {active && <Icon name="check" size={18} color={colors.accent} />}
       </TouchableOpacity>
     );
   }
 
   return (
     <>
-      <TouchableOpacity activeOpacity={0.7} onPress={() => setOpen(true)}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings.region')}>
         <SettingRow
-          icon="compass-outline"
+          icon="compass"
           label={t('settings.region')}
-          sublabel={t('settings.regionDesc')}
           colors={colors}
           right={
             <View style={styles.regionRight}>
-              <Text style={[styles.regionValue, { color: colors.textPrimary }]}>{tr(region)}</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              <Text variant="body-italic" style={[styles.regionValue, { color: colors.textPrimary }]}>{tr(region)}</Text>
+              <Icon name="chevron-right" size={14} color={colors.textMuted} />
             </View>
           }
         />
@@ -568,7 +989,7 @@ function RegionRow({
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={styles.regionOverlay}>
           <View style={[styles.regionSheet, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
+            <Text variant="display-italic" style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
               {t('settings.regionPickerTitle')}
             </Text>
             <ScrollView
@@ -580,7 +1001,7 @@ function RegionRow({
 
               {REGION_GROUPS.map(group => (
                 <View key={group.key}>
-                  <Text style={[styles.regionGroupHeader, { color: colors.textMuted }]}>
+                  <Text variant="mono-caps" style={[styles.regionGroupHeader, { color: colors.textMuted }]}>
                     {t(`settings.regionGroup.${group.key}`)}
                   </Text>
                   {group.regions.map(renderRegionItem)}
@@ -589,8 +1010,12 @@ function RegionRow({
             </ScrollView>
             <TouchableOpacity
               onPress={() => setOpen(false)}
-              style={[styles.pickerDoneBtn, { backgroundColor: colors.accent, marginTop: 12 }]}>
-              <Text style={[styles.pickerDoneText, { color: colors.base }]}>{t('common.done')}</Text>
+              style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 12 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}>
+              <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+                {t('common.done')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -606,14 +1031,12 @@ interface SectionHeaderProps {
   colors: ColorPalette;
 }
 
-function SectionHeader({ label, colors }: SectionHeaderProps) {
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>{label}</Text>
-  );
+function SectionHeader({ label }: SectionHeaderProps) {
+  return <SectionLabel style={styles.sectionHeader}>{label}</SectionLabel>;
 }
 
 interface SettingRowProps {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: IconName;
   label: string;
   sublabel?: string;
   colors: ColorPalette;
@@ -624,12 +1047,12 @@ function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
   return (
     <View style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-        <Ionicons name={icon} size={17} color={colors.accent} />
+        <Icon name={icon} size={16} color={colors.accent} />
       </View>
       <View style={styles.rowText}>
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
+        <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
         {sublabel && (
-          <Text style={[styles.rowSublabel, { color: colors.textSecondary }]} numberOfLines={1}>
+          <Text variant="body-italic" style={[styles.rowSublabel, { color: colors.textTertiary }]} numberOfLines={1}>
             {sublabel}
           </Text>
         )}
@@ -654,22 +1077,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22 },
 
   // Scroll
   scroll: { paddingTop: 8, paddingBottom: 32 },
 
   // Section label
   sectionHeader: {
-    fontSize: 11,
-    fontFamily: 'Mukta_400Regular',
-    letterSpacing: 1,
     marginTop: 24,
-    marginBottom: 8,
+    marginBottom: 10,
     marginLeft: 4,
   },
 
@@ -696,8 +1123,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rowText: { flex: 1 },
-  rowLabel: { fontSize: 15, fontFamily: 'Mukta_400Regular' },
-  rowSublabel: { fontSize: 12, fontFamily: 'Mukta_400Regular', marginTop: 1 },
+  rowLabel: { fontSize: 15, lineHeight: 20 },
+  rowSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
   rowRight: { alignItems: 'flex-end' },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
@@ -708,16 +1135,14 @@ const styles = StyleSheet.create({
 
   // Region picker
   regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  regionValue: { fontSize: 13, fontFamily: 'Mukta_500Medium' },
+  regionValue: { fontSize: 13 },
   regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   regionSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, maxHeight: '75%' },
-  regionSheetTitle: { fontSize: 16, fontFamily: 'Mukta_500Medium', marginBottom: 14, textAlign: 'center' },
+  regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
   regionScroll: { flexShrink: 1 },
   regionGroupHeader: {
-    fontSize: 11,
-    fontFamily: 'Mukta_500Medium',
-    letterSpacing: 1.2,
-    marginTop: 14,
+    fontSize: 10,
+    marginTop: 16,
     marginBottom: 4,
     marginLeft: 14,
   },
@@ -730,51 +1155,63 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
   },
-  regionItemLabel: { fontSize: 15, fontFamily: 'Mukta_400Regular' },
+  regionItemLabel: { fontSize: 15 },
   pickerDoneBtn: { borderRadius: borderRadius.button, paddingVertical: 14, alignItems: 'center' },
-  pickerDoneText: { fontSize: 15, fontFamily: 'Mukta_700Bold' },
+  pickerDoneText: { fontSize: 11 },
 
   // Version text
-  versionText: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
+  versionText: { fontSize: 12 },
 
-  // Font size picker
-  fontPicker: {
+  // Generic picker sheet (reused by language + masa system)
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 },
+  sheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
+  sheetItem: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderRadius: 8,
+    gap: 12,
+  },
+  sheetItemText: { flex: 1 },
+  sheetItemLabel: { fontSize: 15 },
+  sheetItemDesc: { fontSize: 12, marginTop: 2 },
+
+  // Font size sheet
+  previewWrap: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 18,
+    minHeight: 88,
+    justifyContent: 'center',
+  },
+  previewBody: { fontSize: 15, lineHeight: 22 },
+
+  segmentRow: {
+    flexDirection: 'row',
+    borderRadius: 10,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  fontPickerBtn: {
-    width: 34,
-    height: 34,
+  segmentBtn: {
+    flex: 1,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fontPickerLabel: {
-    fontFamily: 'Mukta_500Medium',
+  segmentGlyph: {
+    fontFamily: 'Fraunces_500Medium',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
-
-  // Language picker
-  langPickerBtn: {
-    paddingHorizontal: 10,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  langPickerLabel: {
-    fontSize: 13,
-    fontFamily: 'Mukta_500Medium',
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-
-  // Masa system picker
-  masaPickerBtn: {
-    paddingHorizontal: 12,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
+  segmentCaption: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 10,
+    letterSpacing: 1,
   },
 });

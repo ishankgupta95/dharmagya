@@ -33,7 +33,10 @@ export function HoraCard({ slots, colors }: Props) {
             <TouchableOpacity
               key={key}
               onPress={() => setTab(key)}
-              style={[styles.tab, tab === key && { backgroundColor: colors.accent }]}>
+              style={[styles.tab, tab === key && { backgroundColor: colors.accent }]}
+              accessibilityRole="tab"
+              accessibilityLabel={key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
+              accessibilityState={{ selected: tab === key }}>
               <Text style={[styles.tabText, { color: tab === key ? colors.base : colors.textMuted }]}>
                 {key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
               </Text>
@@ -60,12 +63,12 @@ export function HoraCard({ slots, colors }: Props) {
 const styles = StyleSheet.create({
   card: { borderRadius: borderRadius.card, borderWidth: 1, padding: 16, marginBottom: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  label: { fontSize: 11, fontFamily: 'Mukta_400Regular', letterSpacing: 1 },
+  label: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 1 },
   tabs: { flexDirection: 'row', borderRadius: borderRadius.chip, padding: 2, gap: 2 },
   tab: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: borderRadius.chip },
-  tabText: { fontSize: 12, fontFamily: 'Mukta_500Medium' },
+  tabText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  name: { fontSize: 15, fontFamily: 'Mukta_500Medium', flex: 1 },
-  time: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  name: { fontSize: 15, fontFamily: 'Fraunces_400Regular', flex: 1 },
+  time: { fontSize: 12, fontFamily: 'JetBrainsMono_400Regular' },
 });

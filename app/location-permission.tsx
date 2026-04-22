@@ -14,11 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { INDIAN_CITIES, type City } from '@/config/cities';
+import { MandalaWatermark } from '@/components/common/MandalaWatermark';
+import { Ornament } from '@/components/common/Ornament';
 import { regionFromStateCode } from '@/utils/regionFromLocation';
 
 /** Find the nearest city within ~30 km of given coordinates. */
@@ -106,16 +108,19 @@ export default function LocationPickerScreen() {
       <TouchableOpacity
         onPress={() => handleSelectCity(item)}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.state}`}
+        accessibilityState={{ selected: !!isActive }}
         style={[
           styles.cityRow,
           { borderBottomColor: colors.divider },
-          isActive && { backgroundColor: colors.accent + '10' },
+          isActive && { backgroundColor: colors.accent + '14' },
         ]}>
         <View style={styles.cityInfo}>
-          <Text style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
-          <Text style={[styles.cityState, { color: colors.textMuted }]}>{item.state}</Text>
+          <Text variant="body" style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
+          <Text variant="body-italic" style={[styles.cityState, { color: colors.textTertiary }]}>{item.state}</Text>
         </View>
-        {isActive && <Ionicons name="checkmark-circle" size={18} color={colors.accent} />}
+        {isActive && <Icon name="check-circle" size={18} color={colors.accent} />}
       </TouchableOpacity>
     );
   }
@@ -125,57 +130,79 @@ export default function LocationPickerScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
+      {/* Editorial mandala watermark behind the GPS + search block */}
+      <View style={styles.watermarkWrap} pointerEvents="none">
+        <MandalaWatermark
+          size={340}
+          color={palette.goldLeaf}
+          opacity={0.05}
+          position="top-right"
+          offset={-60}
+        />
+      </View>
+
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('locationPermission.title')}</Text>
-        <View style={styles.backBtn} />
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {t('locationPermission.title')}
+        </Text>
+        <View style={styles.backPill} />
       </View>
 
       {/* ── Current Location ──────────────────────────────────────────── */}
-      <View style={[styles.currentRow, { paddingHorizontal: spacing.screenH, backgroundColor: colors.surfaceRecessed }]}>
+      <View style={[styles.currentRow, { paddingHorizontal: spacing.screenH }]}>
         <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
-        <Text style={[styles.currentLabel, { color: colors.textSecondary }]}>
-          {t('locationPermission.currentPrefix')}<Text style={{ color: colors.textPrimary }}>{currentLabel}</Text>
+        <Text variant="body-italic" style={[styles.currentLabel, { color: colors.textTertiary }]}>
+          {t('locationPermission.currentPrefix')}
+          <Text variant="body" style={{ color: colors.textPrimary }}>{currentLabel}</Text>
         </Text>
       </View>
 
       {/* ── GPS Button ────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: spacing.screenH, paddingTop: 16, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: spacing.screenH, paddingTop: 14, paddingBottom: 8 }}>
         <TouchableOpacity
           onPress={handleUseGPS}
           activeOpacity={0.85}
           disabled={gpsLoading}
-          style={[styles.gpsBtn, { backgroundColor: colors.accent, opacity: gpsLoading ? 0.7 : 1 }]}>
+          style={[styles.gpsBtn, { backgroundColor: palette.sindoor, opacity: gpsLoading ? 0.7 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('locationPermission.useGps')}
+          accessibilityState={{ disabled: gpsLoading, busy: gpsLoading }}>
           {gpsLoading ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={palette.parchmentBright} size="small" />
           ) : (
             <>
-              <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.gpsBtnText}>{t('locationPermission.useGps')}</Text>
+              <Icon name="navigate" size={16} color={palette.parchmentBright} />
+              <Text variant="mono-caps" style={styles.gpsBtnText}>
+                {t('locationPermission.useGps')}
+              </Text>
             </>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* ── Divider ───────────────────────────────────────────────────── */}
-      <View style={[styles.orRow, { paddingHorizontal: spacing.screenH }]}>
-        <View style={[styles.orLine, { backgroundColor: colors.divider }]} />
-        <Text style={[styles.orText, { color: colors.textMuted }]}>{t('locationPermission.orSearchCity')}</Text>
-        <View style={[styles.orLine, { backgroundColor: colors.divider }]} />
+      {/* ── Divider with lotus ornament ───────────────────────────────── */}
+      <View style={{ paddingHorizontal: spacing.screenH, paddingVertical: 12 }}>
+        <Ornament variant="lotus" />
+        <Text variant="body-italic" style={[styles.orHint, { color: colors.textMuted }]}>
+          {t('locationPermission.orSearchCity')}
+        </Text>
       </View>
 
       {/* ── Search ────────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: spacing.screenH, paddingBottom: 8 }}>
-        <View style={[styles.searchBox, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
-          <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+      <View style={{ paddingHorizontal: spacing.screenH, paddingBottom: 10 }}>
+        <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
             placeholder={t('locationPermission.searchPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             value={query}
@@ -185,8 +212,12 @@ export default function LocationPickerScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.clearSearch')}>
+              <Icon name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -200,7 +231,7 @@ export default function LocationPickerScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 32 }}
         ListEmptyComponent={
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+          <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
             {t('locationPermission.noCitiesFound', { query })}
           </Text>
         }
@@ -214,6 +245,7 @@ export default function LocationPickerScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  watermarkWrap: { ...StyleSheet.absoluteFillObject },
 
   // Header
   headerRow: {
@@ -221,21 +253,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontFamily: 'Mukta_500Medium' },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22 },
 
   // Current location
   currentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 12,
+    paddingTop: 14,
+    paddingBottom: 4,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  currentLabel: { fontSize: 13, fontFamily: 'Mukta_400Regular' },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  currentLabel: { fontSize: 13, lineHeight: 18 },
 
   // GPS button
   gpsBtn: {
@@ -246,12 +286,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: borderRadius.button,
   },
-  gpsBtnText: { fontSize: 15, fontFamily: 'Mukta_500Medium', color: '#FFFFFF' },
+  gpsBtnText: { fontSize: 11, color: palette.parchmentBright },
 
-  // Or divider
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  orText: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  // Or hint
+  orHint: { fontSize: 12, textAlign: 'center', marginTop: 10 },
 
   // Search
   searchBox: {
@@ -259,14 +297,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: borderRadius.card,
+    paddingVertical: 11,
+    borderRadius: borderRadius.button,
     borderWidth: 1,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    fontFamily: 'Mukta_400Regular',
+    fontSize: 14,
     padding: 0,
   },
 
@@ -275,13 +312,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 6,
   },
   cityInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  cityName: { fontSize: 15, fontFamily: 'Mukta_500Medium' },
-  cityState: { fontSize: 12, fontFamily: 'Mukta_400Regular' },
+  cityName: { fontSize: 15, lineHeight: 20 },
+  cityState: { fontSize: 12, lineHeight: 16 },
 
   // Empty
-  emptyText: { fontSize: 14, fontFamily: 'Mukta_400Regular', textAlign: 'center', paddingTop: 32 },
+  emptyText: { fontSize: 14, textAlign: 'center', paddingTop: 32 },
 });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, TouchableOpacity, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   FadeIn,
@@ -13,7 +13,8 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-import { borderRadius, type ColorPalette } from '@/config/theme';
+import { borderRadius, palette } from '@/config/theme';
+import { CornerBrackets } from './CornerBrackets';
 
 const PADDING = 6;
 const TOOLTIP_GAP = 16;
@@ -40,7 +41,6 @@ interface WalkthroughSpotlightProps {
   /** Called when user taps the highlighted element (spotlight cutout) */
   onSpotlightTap?: () => void;
   onSkip: () => void;
-  colors: ColorPalette;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -56,7 +56,6 @@ export function WalkthroughSpotlight({
   onNext,
   onSpotlightTap,
   onSkip,
-  colors,
 }: WalkthroughSpotlightProps) {
   const { t } = useTranslation();
   const [tooltipHeight, setTooltipHeight] = useState(0);
@@ -86,11 +85,9 @@ export function WalkthroughSpotlight({
     opacity: pulseOpacity.value,
   }));
 
-  // Offset spotlight from screen-absolute to container-relative coords
   const ox = containerOffset?.x ?? 0;
   const oy = containerOffset?.y ?? 0;
 
-  // Spotlight rect with padding
   const s = {
     x: spotlight.x - PADDING - ox,
     y: spotlight.y - PADDING - oy,
@@ -98,20 +95,25 @@ export function WalkthroughSpotlight({
     h: spotlight.height + PADDING * 2,
   };
 
-  // Arrow horizontal position: center on spotlight, relative to tooltip left edge (20px)
   const arrowLeft = Math.max(10, s.x + s.w / 2 - 20 - 10);
 
-  // Tooltip top position
   const tooltipTop =
     tooltipPosition === 'below'
       ? s.y + s.h + TOOLTIP_GAP
       : s.y - TOOLTIP_GAP - tooltipHeight;
 
-  // Hide tooltip until measured for 'above' positioning
   const tooltipReady = tooltipPosition === 'below' || tooltipHeight > 0;
-
-  // Hide everything until we know our own screen offset
   const overlayReady = containerOffset !== null;
+
+  // Tooltip card: always on parchment-bright with paperEdge border + gold
+  // corner brackets. Editorial motif reads the same on either app theme —
+  // the walkthrough is a temporary overlay, so its surface doesn't need to
+  // match the underlying screen's palette.
+  const cardBg = palette.parchmentBright;
+  const cardBorder = palette.paperEdge;
+  const cardTitleColor = palette.ink;
+  const cardBodyColor = palette.inkQuiet;
+  const arrowColor = cardBg;
 
   return (
     <View
@@ -134,7 +136,7 @@ export function WalkthroughSpotlight({
       <View style={[styles.strip, { top: s.y, left: 0, width: s.x, height: s.h }]} />
       <View style={[styles.strip, { top: s.y, left: s.x + s.w, right: 0, height: s.h }]} />
 
-      {/* ── Glowing border around spotlight ── */}
+      {/* ── Glowing sindoor border around spotlight ── */}
       <Animated.View
         style={[
           styles.spotlightBorder,
@@ -143,9 +145,9 @@ export function WalkthroughSpotlight({
             left: s.x,
             width: s.w,
             height: s.h,
-            borderColor: colors.accent,
-            backgroundColor: colors.accent + '20',
-            shadowColor: colors.accent,
+            borderColor: palette.sindoor,
+            backgroundColor: palette.sindoor + '20',
+            shadowColor: palette.sindoor,
           },
           pulseStyle,
         ]}
@@ -164,13 +166,13 @@ export function WalkthroughSpotlight({
         />
       </TouchableWithoutFeedback>
 
-      {/* ── Tooltip card ── */}
+      {/* ── Tooltip card — parchment-bright plinth with gold brackets ── */}
       <View
         style={[
           styles.tooltip,
           {
-            backgroundColor: colors.surface,
-            borderColor: colors.borderAccent,
+            backgroundColor: cardBg,
+            borderColor: cardBorder,
             top: tooltipTop,
             opacity: tooltipReady ? 1 : 0,
           },
@@ -182,18 +184,26 @@ export function WalkthroughSpotlight({
         }}
         pointerEvents="box-none"
       >
+        <CornerBrackets color={palette.goldLeaf} inset={8} length={14} />
+
         {/* Arrow pointing to spotlight */}
         {tooltipPosition === 'below' && (
           <View
-            style={[
-              styles.arrowUp,
-              { borderBottomColor: colors.surface, left: arrowLeft },
-            ]}
+            style={[styles.arrowUp, { borderBottomColor: arrowColor, left: arrowLeft }]}
           />
         )}
 
-        <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
-        <Text style={[styles.desc, { color: colors.textSecondary }]}>{description}</Text>
+        {/* Gold kicker — "Step 1 · of 4" */}
+        <Text variant="mono-caps" style={[styles.kicker, { color: palette.goldLeaf }]}>
+          {t('walkthrough.stepCounter', { current: stepIndex + 1, total: totalSteps })}
+        </Text>
+
+        <Text variant="display-italic" style={[styles.title, { color: cardTitleColor }]}>
+          {title}
+        </Text>
+        <Text variant="body-italic" style={[styles.desc, { color: cardBodyColor }]}>
+          {description}
+        </Text>
 
         {/* Step dots */}
         <View style={styles.dotsRow}>
@@ -202,7 +212,7 @@ export function WalkthroughSpotlight({
               key={i}
               style={[
                 styles.dot,
-                { backgroundColor: i === stepIndex ? colors.accent : colors.border },
+                { backgroundColor: i === stepIndex ? palette.sindoor : palette.paperEdge },
                 i === stepIndex && styles.dotActive,
               ]}
             />
@@ -211,25 +221,33 @@ export function WalkthroughSpotlight({
 
         {/* Action row */}
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={onSkip} hitSlop={10}>
-            <Text style={[styles.skipText, { color: colors.textMuted }]}>{t('walkthrough.skip')}</Text>
+          <TouchableOpacity
+            onPress={onSkip}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('walkthrough.skip')}>
+            <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
+              {t('walkthrough.skip')}
+            </Text>
           </TouchableOpacity>
 
           {onNext ? (
             <TouchableOpacity
               onPress={onNext}
-              style={[styles.nextBtn, { backgroundColor: colors.accent }]}
-              activeOpacity={0.8}
+              style={[styles.nextBtn, { backgroundColor: palette.sindoor }]}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={nextLabel ?? t('walkthrough.next')}
             >
-              <Text style={[styles.nextText, { color: '#FFFFFF' }]}>
+              <Text variant="mono-caps" style={styles.nextText}>
                 {nextLabel ?? t('walkthrough.next')}
               </Text>
-              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+              <Icon name="arrow-right" size={14} color={palette.parchmentBright} />
             </TouchableOpacity>
           ) : (
-            <View style={[styles.tapHint, { backgroundColor: colors.accent + '18' }]}>
-              <Ionicons name="hand-left-outline" size={14} color={colors.accent} />
-              <Text style={[styles.tapHintText, { color: colors.accent }]}>
+            <View style={[styles.tapHint, { borderColor: palette.sindoor }]}>
+              <Icon name="hand" size={12} color={palette.sindoor} />
+              <Text variant="mono-caps" style={[styles.tapHintText, { color: palette.sindoor }]}>
                 {t('walkthrough.tapHighlighted')}
               </Text>
             </View>
@@ -238,10 +256,7 @@ export function WalkthroughSpotlight({
 
         {tooltipPosition === 'above' && (
           <View
-            style={[
-              styles.arrowDown,
-              { borderTopColor: colors.surface, left: arrowLeft },
-            ]}
+            style={[styles.arrowDown, { borderTopColor: arrowColor, left: arrowLeft }]}
           />
         )}
       </View>
@@ -279,11 +294,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.card,
     borderWidth: 1,
     padding: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 10,
   },
   arrowUp: {
     position: 'absolute',
@@ -307,14 +323,17 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
   },
+  kicker: {
+    fontSize: 9,
+    marginBottom: 6,
+  },
   title: {
-    fontSize: 18,
-    fontFamily: 'Mukta_700Bold',
+    fontSize: 22,
+    lineHeight: 28,
     marginBottom: 6,
   },
   desc: {
     fontSize: 14,
-    fontFamily: 'Mukta_400Regular',
     lineHeight: 21,
     marginBottom: 16,
   },
@@ -338,31 +357,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   skipText: {
-    fontSize: 14,
-    fontFamily: 'Mukta_500Medium',
+    fontSize: 10,
   },
   tapHint: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: borderRadius.chip,
+    borderWidth: 1,
   },
   tapHintText: {
-    fontSize: 12,
-    fontFamily: 'Mukta_500Medium',
+    fontSize: 9,
   },
   nextBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
+    gap: 8,
+    paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: borderRadius.button,
   },
   nextText: {
-    fontSize: 14,
-    fontFamily: 'Mukta_700Bold',
+    fontSize: 11,
+    color: palette.parchmentBright,
   },
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -7,10 +7,21 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import {
   useFonts,
-  Mukta_400Regular,
-  Mukta_500Medium,
-  Mukta_700Bold,
-} from '@expo-google-fonts/mukta';
+  Fraunces_300Light,
+  Fraunces_400Regular,
+  Fraunces_500Medium,
+  Fraunces_300Light_Italic,
+  Fraunces_400Regular_Italic,
+} from '@expo-google-fonts/fraunces';
+import {
+  NotoSerifDevanagari_400Regular,
+  NotoSerifDevanagari_500Medium,
+  NotoSerifDevanagari_700Bold,
+} from '@expo-google-fonts/noto-serif-devanagari';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+} from '@expo-google-fonts/jetbrains-mono';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
@@ -24,15 +35,42 @@ import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isDarkMode, hasOnboarded, language, initFirstOpen, dailyReminderEnabled, reminderPrefs } = useStore();
+  const {
+    isDarkMode,
+    hasOnboarded,
+    language,
+    initFirstOpen,
+    dailyReminderEnabled,
+    dailyReminderTime,
+    reminderPrefs,
+    tithiReminderTime,
+    festivalReminderTime,
+    quietHoursEnabled,
+    quietHoursStart,
+    quietHoursEnd,
+  } = useStore();
+  const quietHours = useMemo(
+    () => ({ enabled: quietHoursEnabled, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }),
+    [quietHoursEnabled, quietHoursStart, quietHoursEnd],
+  );
   const [storeHydrated, setStoreHydrated] = useState(
     () => useStore.persist.hasHydrated()
   );
 
   const [fontsLoaded, fontError] = useFonts({
-    Mukta_400Regular,
-    Mukta_500Medium,
-    Mukta_700Bold,
+    // Sacred Editorial — Fraunces (display + body serif, italic pairs).
+    Fraunces_300Light,
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_300Light_Italic,
+    Fraunces_400Regular_Italic,
+    // Sacred Editorial — Noto Serif Devanagari (hi-titles, mantras).
+    NotoSerifDevanagari_400Regular,
+    NotoSerifDevanagari_500Medium,
+    NotoSerifDevanagari_700Bold,
+    // Sacred Editorial — JetBrains Mono (kickers, timestamps).
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
   });
 
   // Wait for Zustand persistence to rehydrate from AsyncStorage
@@ -83,23 +121,33 @@ export default function RootLayout() {
         // Roll the daily-reminder 14-day horizon forward so tomorrow's vrat
         // stays accurate. Safe no-op when disabled.
         if (dailyReminderEnabled) {
-          void scheduleDailyReminder();
+          void scheduleDailyReminder(dailyReminderTime, quietHours);
         }
         // Roll the reminder horizon (next 30 days of tithi + festival reminders).
         if (hasAnyReminderEnabled(reminderPrefs)) {
-          void rescheduleReminders(reminderPrefs);
+          void rescheduleReminders(
+            reminderPrefs,
+            { tithi: tithiReminderTime, festival: festivalReminderTime },
+            quietHours,
+          );
         }
       }
     });
     return () => sub.remove();
-  }, [appReady, hasOnboarded, dailyReminderEnabled, reminderPrefs]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours]);
 
   // Roll reminder horizons once on each cold start too.
   useEffect(() => {
     if (!appReady || !hasOnboarded) return;
-    if (dailyReminderEnabled) void scheduleDailyReminder();
-    if (hasAnyReminderEnabled(reminderPrefs)) void rescheduleReminders(reminderPrefs);
-  }, [appReady, hasOnboarded, dailyReminderEnabled, reminderPrefs]);
+    if (dailyReminderEnabled) void scheduleDailyReminder(dailyReminderTime, quietHours);
+    if (hasAnyReminderEnabled(reminderPrefs)) {
+      void rescheduleReminders(
+        reminderPrefs,
+        { tithi: tithiReminderTime, festival: festivalReminderTime },
+        quietHours,
+      );
+    }
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours]);
 
   if (!appReady) return null;
 

@@ -1,0 +1,1275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dharmagya — A Redesign Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Noto+Serif+Devanagari:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Ground */
+  --parchment: #F4E9CE;
+  --parchment-deep: #E8D9B4;
+  --parchment-bright: #FBF3DE;
+  --paper-edge: #D9C799;
+
+  /* Ink */
+  --ink: #1B140A;
+  --ink-soft: #3A2F1F;
+  --ink-quiet: #6A5A40;
+  --ink-muted: #9A8A6C;
+
+  /* Accents */
+  --sindoor: #A5301C;
+  --sindoor-deep: #782110;
+  --sindoor-warm: #C54927;
+  --gold: #9C7623;
+  --gold-leaf: #C99B3A;
+  --saffron: #D96A28;
+  --indigo: #1F2A4A;
+
+  /* Rules */
+  --rule: #B8A670;
+  --rule-soft: #D4C28C;
+
+  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+  --devanagari: 'Noto Serif Devanagari', serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;}
+html,body{background:var(--parchment);color:var(--ink);font-family:var(--serif);font-optical-sizing:auto;}
+body{
+  font-variation-settings:"opsz" 14,"SOFT" 40;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(165,48,28,.04), transparent 40%),
+    radial-gradient(circle at 88% 74%, rgba(156,118,35,.05), transparent 45%),
+    linear-gradient(180deg, #F4E9CE 0%, #EFE2BD 100%);
+  min-height:100vh;
+  overflow-x:hidden;
+  position:relative;
+}
+/* Film grain over everything */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:1000;opacity:.22;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .1  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+/* Page border rule */
+body::after{
+  content:"";position:fixed;inset:16px;pointer-events:none;z-index:999;
+  border:1px solid rgba(120,33,16,.18);
+}
+
+/* ───────────── MASTHEAD ───────────── */
+.page{max-width:1440px;margin:0 auto;padding:56px 48px 96px;position:relative;}
+
+.masthead{
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:40px;
+  padding-bottom:20px;border-bottom:3px double var(--sindoor);
+}
+.masthead .edition{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-quiet);line-height:1.8;}
+.masthead .edition strong{color:var(--sindoor-deep);font-weight:500;}
+.masthead .center{text-align:center;}
+.masthead .sanskrit{
+  font-family:var(--devanagari);font-weight:700;font-size:58px;line-height:1;color:var(--ink);
+  margin-bottom:6px;letter-spacing:-.01em;
+}
+.masthead .wordmark{
+  font-family:var(--serif);font-variation-settings:"opsz" 144,"SOFT" 100,"wght" 400;
+  font-size:88px;line-height:.85;letter-spacing:-.04em;font-style:italic;color:var(--sindoor-deep);
+}
+.masthead .right{text-align:right;font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-quiet);line-height:1.8;}
+.masthead .right strong{color:var(--sindoor-deep);font-weight:500;}
+
+.tagline{
+  margin-top:18px;display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.35em;text-transform:uppercase;color:var(--ink-soft);
+  padding-bottom:28px;border-bottom:1px solid var(--rule);
+}
+.tagline .dot{color:var(--sindoor);margin:0 10px;}
+
+/* ───────────── CONCEPT ───────────── */
+.concept{
+  display:grid;grid-template-columns:5fr 7fr;gap:56px;margin-top:48px;
+}
+.concept .kicker{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--sindoor);
+  margin-bottom:18px;
+}
+.concept h1{
+  font-family:var(--serif);font-variation-settings:"opsz" 144,"SOFT" 100,"wght" 300;
+  font-size:64px;line-height:.95;letter-spacing:-.025em;color:var(--ink);
+}
+.concept h1 em{font-style:italic;color:var(--sindoor-deep);font-variation-settings:"opsz" 144,"SOFT" 100,"wght" 300;}
+.concept .lede{font-family:var(--serif);font-size:19px;line-height:1.55;color:var(--ink-soft);font-variation-settings:"opsz" 18;}
+.concept .lede p+p{margin-top:14px;}
+.concept .lede .drop{
+  float:left;font-family:var(--serif);font-size:70px;line-height:.82;margin:6px 10px -4px 0;
+  color:var(--sindoor-deep);font-variation-settings:"opsz" 144,"SOFT" 100,"wght" 500;font-style:italic;
+}
+.pillars{
+  margin-top:42px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border-top:1px solid var(--rule);padding-top:22px;
+}
+.pillar{padding-right:18px;border-right:1px solid var(--rule-soft);}
+.pillar:last-child{border-right:none;padding-right:0;}
+.pillar .num{font-family:var(--mono);font-size:10.5px;letter-spacing:.3em;color:var(--gold);margin-bottom:8px;}
+.pillar h3{font-family:var(--serif);font-style:italic;font-size:18px;font-variation-settings:"opsz" 36,"wght" 500;line-height:1.2;margin-bottom:6px;color:var(--ink);}
+.pillar p{font-size:13px;line-height:1.5;color:var(--ink-quiet);}
+
+/* ───────────── SCREEN SECTION ───────────── */
+.section-rule{
+  margin:80px 0 48px;display:flex;align-items:center;gap:18px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.35em;text-transform:uppercase;color:var(--sindoor-deep);
+}
+.section-rule::before,.section-rule::after{content:"";flex:1;height:1px;background:var(--rule);}
+.section-rule .lotus{color:var(--sindoor);font-size:14px;line-height:1;}
+
+.screens-hero{
+  display:grid;grid-template-columns:auto 1fr;gap:72px;align-items:start;margin-bottom:80px;
+}
+.screens-hero .caption{padding-top:40px;}
+.screens-hero .caption .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.3em;color:var(--sindoor);margin-bottom:14px;}
+.screens-hero .caption h2{
+  font-family:var(--serif);font-size:54px;line-height:.95;font-variation-settings:"opsz" 96,"wght" 300;
+  letter-spacing:-.02em;margin-bottom:16px;color:var(--ink);
+}
+.screens-hero .caption h2 em{font-style:italic;color:var(--sindoor-deep);}
+.screens-hero .caption p{font-size:15px;line-height:1.6;color:var(--ink-soft);max-width:42ch;margin-bottom:20px;}
+.screens-hero .caption ul{list-style:none;max-width:42ch;}
+.screens-hero .caption li{
+  padding:10px 0;border-bottom:1px solid var(--rule-soft);font-size:14px;color:var(--ink-soft);
+  display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:baseline;
+}
+.screens-hero .caption li .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--gold);}
+
+/* Screen triplet below hero */
+.screens-triplet{display:grid;grid-template-columns:repeat(3,1fr);gap:56px;align-items:start;}
+.screens-triplet .caption{margin-top:18px;}
+.screens-triplet .caption .tag{font-family:var(--mono);font-size:10px;letter-spacing:.28em;color:var(--sindoor);margin-bottom:8px;text-transform:uppercase;}
+.screens-triplet .caption h3{font-family:var(--serif);font-style:italic;font-size:26px;line-height:1.05;font-variation-settings:"opsz" 48,"wght" 400;margin-bottom:8px;color:var(--ink);}
+.screens-triplet .caption p{font-size:13.5px;line-height:1.55;color:var(--ink-quiet);}
+
+/* ───────────── PHONE FRAME ───────────── */
+.phone{
+  width:375px;height:780px;background:#0c0806;border-radius:44px;padding:10px;
+  box-shadow:
+    0 60px 80px -40px rgba(60,24,8,.45),
+    0 24px 40px -20px rgba(60,24,8,.25),
+    inset 0 0 0 1px rgba(255,255,255,.04),
+    0 0 0 1px rgba(80,40,16,.4);
+  position:relative;flex-shrink:0;
+}
+.phone.lg{width:396px;height:820px;}
+.phone .notch{
+  position:absolute;top:22px;left:50%;transform:translateX(-50%);width:106px;height:28px;background:#000;border-radius:14px;z-index:10;
+}
+.phone .screen{
+  width:100%;height:100%;background:var(--parchment-bright);border-radius:36px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;
+}
+
+/* Status bar */
+.statusbar{
+  height:52px;padding:18px 26px 0;display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.05em;
+  flex-shrink:0;
+}
+.statusbar .icons{display:flex;gap:5px;align-items:center;}
+.statusbar .icons svg{width:14px;height:10px;}
+
+/* Scrollable body */
+.body{flex:1;overflow:hidden;position:relative;padding:0 22px 24px;}
+
+/* Decorative mandala watermark for a screen */
+.screen-mandala{
+  position:absolute;pointer-events:none;opacity:.07;
+}
+
+/* ───────────── HOME SCREEN ───────────── */
+.home-head{
+  display:flex;justify-content:space-between;align-items:flex-start;padding-top:6px;margin-bottom:14px;
+}
+.home-head .date-stack{line-height:1;}
+.home-head .date-stack .weekday{
+  font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--ink-muted);text-transform:uppercase;
+}
+.home-head .date-stack .date-main{
+  font-family:var(--serif);font-style:italic;font-size:22px;font-variation-settings:"opsz" 48,"wght" 400;
+  color:var(--ink);margin-top:4px;
+}
+.home-head .date-stack .date-main .num{color:var(--sindoor-deep);font-weight:500;font-style:normal;font-variation-settings:"opsz" 48,"wght" 500;}
+.home-head .gear{
+  width:36px;height:36px;border-radius:18px;border:1px solid var(--paper-edge);
+  background:var(--parchment);display:grid;place-items:center;color:var(--ink-soft);
+}
+
+.greeting-block{margin:10px 0 20px;}
+.greeting-block .hi{
+  font-family:var(--serif);font-size:34px;line-height:1;font-variation-settings:"opsz" 96,"wght" 300;
+  letter-spacing:-.02em;color:var(--ink);
+}
+.greeting-block .hi em{font-style:italic;color:var(--sindoor-deep);font-variation-settings:"opsz" 96,"wght" 300;}
+.greeting-block .hi-sub{
+  font-family:var(--devanagari);font-size:15px;color:var(--ink-quiet);margin-top:6px;font-weight:500;
+}
+
+/* Panchang hero card */
+.panchang-hero{
+  position:relative;border-radius:20px;overflow:hidden;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(217,106,40,.22), transparent 55%),
+    radial-gradient(circle at 12% 88%, rgba(156,118,35,.2), transparent 50%),
+    linear-gradient(155deg, #2B1A0F 0%, #1A1008 55%, #221208 100%);
+  color:#F3E5C8;
+  padding:20px 20px 18px;
+  border:1px solid rgba(201,155,58,.3);
+  box-shadow:0 18px 32px -18px rgba(60,16,8,.5);
+  margin-bottom:18px;
+}
+.panchang-hero .corner{position:absolute;width:18px;height:18px;border:1.5px solid rgba(201,155,58,.5);}
+.panchang-hero .c1{top:8px;left:8px;border-right:none;border-bottom:none;}
+.panchang-hero .c2{top:8px;right:8px;border-left:none;border-bottom:none;}
+.panchang-hero .c3{bottom:8px;left:8px;border-right:none;border-top:none;}
+.panchang-hero .c4{bottom:8px;right:8px;border-left:none;border-top:none;}
+.panchang-hero .mandala-bg{position:absolute;right:-40px;bottom:-40px;opacity:.12;width:220px;height:220px;}
+.ph-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;position:relative;z-index:2;}
+.ph-head .title-group .kick{font-family:var(--mono);font-size:9.5px;letter-spacing:.32em;color:rgba(201,155,58,.9);text-transform:uppercase;}
+.ph-head .title-group .main{font-family:var(--devanagari);font-size:18px;font-weight:600;color:#F3E5C8;margin-top:3px;letter-spacing:.01em;}
+.ph-head .loc{
+  font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(243,229,200,.65);
+  border:1px solid rgba(201,155,58,.35);padding:5px 9px;border-radius:14px;display:flex;align-items:center;gap:4px;
+}
+.ph-rows{display:flex;flex-direction:column;gap:3px;position:relative;z-index:2;}
+.ph-row{display:grid;grid-template-columns:78px 1fr auto;align-items:baseline;padding:8px 0;border-bottom:1px solid rgba(201,155,58,.14);}
+.ph-row:last-of-type{border-bottom:none;}
+.ph-row .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:rgba(243,229,200,.55);text-transform:uppercase;}
+.ph-row .val{font-family:var(--devanagari);font-size:15.5px;color:#F3E5C8;font-weight:500;}
+.ph-row .val .en{font-family:var(--serif);font-style:italic;font-size:12.5px;color:rgba(243,229,200,.7);margin-left:6px;font-variation-settings:"opsz" 24,"wght" 400;}
+.ph-row .time{font-family:var(--mono);font-size:11px;color:var(--gold-leaf);letter-spacing:.04em;}
+.ph-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(201,155,58,.4),transparent);margin:10px 0 8px;position:relative;z-index:2;}
+.ph-divider::after{content:"◆";position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);color:var(--gold-leaf);font-size:9px;background:#1A1008;padding:0 10px;}
+.ph-sun{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2;padding-top:4px;}
+.ph-sun .item{display:flex;align-items:center;gap:8px;}
+.ph-sun .item .ic{width:26px;height:26px;border-radius:13px;background:rgba(217,106,40,.15);display:grid;place-items:center;color:var(--gold-leaf);}
+.ph-sun .item .stack{line-height:1.1;}
+.ph-sun .item .k{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:rgba(243,229,200,.55);text-transform:uppercase;}
+.ph-sun .item .v{font-family:var(--mono);font-size:13px;color:#F3E5C8;font-weight:500;margin-top:2px;}
+.ph-sun .sep{width:1px;height:28px;background:rgba(201,155,58,.25);}
+
+/* Section label */
+.section-lbl{
+  display:flex;justify-content:space-between;align-items:center;margin:6px 0 12px;
+}
+.section-lbl .lhs{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.32em;color:var(--ink-quiet);text-transform:uppercase;
+  display:flex;align-items:center;gap:10px;
+}
+.section-lbl .lhs::before{content:"";width:20px;height:1px;background:var(--sindoor);}
+.section-lbl .rhs{
+  font-family:var(--serif);font-style:italic;font-size:12px;color:var(--sindoor-deep);
+  font-variation-settings:"opsz" 24,"wght" 500;
+}
+
+/* Deities strip */
+.deities-strip{display:flex;gap:14px;overflow:visible;margin-bottom:20px;padding-bottom:4px;}
+.deity-chip{text-align:center;width:54px;}
+.deity-avatar{
+  width:54px;height:54px;border-radius:50%;position:relative;overflow:hidden;
+  box-shadow:0 4px 12px -4px rgba(60,24,8,.3),0 0 0 2px var(--parchment-bright),0 0 0 3px var(--rule);
+  display:grid;place-items:center;font-family:var(--devanagari);font-weight:700;font-size:19px;
+}
+.deity-avatar.d-ganesha{background:linear-gradient(160deg,#E8893C,#A5301C);color:#FBF3DE;}
+.deity-avatar.d-shiva{background:linear-gradient(160deg,#7AA8C8,#1F2A4A);color:#FBF3DE;}
+.deity-avatar.d-lakshmi{background:linear-gradient(160deg,#F4C454,#9C7623);color:#2A1A00;}
+.deity-avatar.d-krishna{background:linear-gradient(160deg,#5D80D4,#1F2A4A);color:#FBF3DE;}
+.deity-avatar.d-hanuman{background:linear-gradient(160deg,#E85D3A,#782110);color:#FBF3DE;}
+.deity-avatar.d-durga{background:linear-gradient(160deg,#D45454,#782110);color:#FBF3DE;}
+.deity-avatar.d-saraswati{background:linear-gradient(160deg,#C7B6E0,#7A68A2);color:#FBF3DE;}
+.deity-chip .nm{
+  font-family:var(--serif);font-style:italic;font-size:11px;color:var(--ink-soft);margin-top:7px;
+  font-variation-settings:"opsz" 14,"wght" 500;
+}
+
+/* Featured aarti card */
+.feat-card{
+  background:var(--parchment-bright);border:1px solid var(--paper-edge);border-radius:18px;
+  padding:16px;margin-bottom:14px;position:relative;overflow:hidden;
+  box-shadow:0 2px 0 var(--paper-edge);
+}
+.feat-card .corner-mark{position:absolute;top:10px;right:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.28em;color:var(--gold);text-transform:uppercase;}
+.feat-row{display:flex;align-items:center;gap:14px;}
+.feat-row .av{width:58px;height:58px;flex-shrink:0;}
+.feat-row .body{flex:1;min-width:0;}
+.feat-row .body .hi-title{font-family:var(--devanagari);font-size:18px;font-weight:600;color:var(--ink);line-height:1.2;}
+.feat-row .body .en-title{font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-quiet);margin-top:2px;font-variation-settings:"opsz" 24,"wght" 400;}
+.feat-row .body .meta{margin-top:6px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;color:var(--sindoor);text-transform:uppercase;}
+.feat-row .play{
+  width:42px;height:42px;border-radius:50%;background:var(--sindoor);color:#FBF3DE;
+  display:grid;place-items:center;flex-shrink:0;
+  box-shadow:0 6px 14px -4px rgba(165,48,28,.5);
+}
+.feat-card .verse-peek{
+  margin-top:14px;padding-top:12px;border-top:1px dashed var(--rule-soft);
+  font-family:var(--devanagari);font-size:13.5px;line-height:1.5;color:var(--ink-soft);font-style:italic;
+}
+
+/* Quick row */
+.quick-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px;margin-bottom:16px;}
+.quick{
+  background:var(--parchment-bright);border:1px solid var(--paper-edge);border-radius:14px;
+  padding:14px 10px;text-align:center;
+}
+.quick .ic{width:28px;height:28px;margin:0 auto 6px;color:var(--sindoor);display:grid;place-items:center;}
+.quick .lbl{font-family:var(--serif);font-style:italic;font-size:12px;color:var(--ink-soft);font-variation-settings:"opsz" 24,"wght" 500;}
+
+/* Dasha / Muhurat call-out card */
+.callout-card{
+  display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;
+  background:linear-gradient(100deg,rgba(165,48,28,.08),rgba(156,118,35,.08));
+  border:1px solid rgba(165,48,28,.2);margin-bottom:14px;
+}
+.callout-card .ic-w{width:38px;height:38px;border-radius:50%;background:var(--parchment-bright);display:grid;place-items:center;color:var(--sindoor);flex-shrink:0;border:1px solid var(--rule);}
+.callout-card .stack{flex:1;}
+.callout-card .stack .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--sindoor);text-transform:uppercase;margin-bottom:2px;}
+.callout-card .stack .t{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink);font-variation-settings:"opsz" 24,"wght" 500;}
+.callout-card .arr{color:var(--ink-quiet);}
+
+/* Tab bar */
+.tabbar{
+  position:absolute;left:18px;right:18px;bottom:14px;height:58px;
+  background:rgba(43,26,15,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-radius:29px;border:1px solid rgba(201,155,58,.25);
+  display:flex;align-items:center;justify-content:space-around;padding:0 18px;z-index:20;
+  box-shadow:0 12px 24px -8px rgba(60,16,8,.4);
+}
+.tabbar .t{display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(243,229,200,.5);position:relative;}
+.tabbar .t.active{color:var(--gold-leaf);}
+.tabbar .t.active::before{content:"";position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--gold-leaf);box-shadow:0 0 8px var(--gold-leaf);}
+.tabbar .t .lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;}
+
+/* ───────────── PANCHANG SCREEN ───────────── */
+.p-head{display:flex;justify-content:space-between;align-items:center;padding:4px 0 14px;}
+.p-head .back{width:34px;height:34px;border-radius:50%;border:1px solid var(--paper-edge);display:grid;place-items:center;color:var(--ink-soft);background:var(--parchment-bright);}
+.p-head .title-g{text-align:center;}
+.p-head .title-g .k{font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--sindoor);text-transform:uppercase;}
+.p-head .title-g .t{font-family:var(--serif);font-style:italic;font-size:20px;font-variation-settings:"opsz" 36,"wght" 500;color:var(--ink);}
+
+/* Month strip */
+.month-strip{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 2px;}
+.month-strip .btn{color:var(--ink-quiet);}
+.month-strip .lbl{font-family:var(--serif);font-style:italic;font-size:18px;font-variation-settings:"opsz" 36,"wght" 500;color:var(--ink);}
+.month-strip .lbl .yr{color:var(--ink-muted);margin-left:6px;font-family:var(--mono);font-style:normal;font-size:12px;letter-spacing:.1em;}
+
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:14px;}
+.cal-grid .hdr{
+  font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--ink-muted);text-transform:uppercase;text-align:center;padding:6px 0;
+}
+.cal-grid .d{
+  aspect-ratio:1/1.05;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:10px;font-family:var(--serif);color:var(--ink);font-size:14px;position:relative;
+  font-variation-settings:"opsz" 24,"wght" 400;
+}
+.cal-grid .d .sub{font-family:var(--devanagari);font-size:9px;color:var(--ink-muted);margin-top:-1px;}
+.cal-grid .d.m{color:var(--ink-muted);opacity:.4;}
+.cal-grid .d.f{color:var(--sindoor);}
+.cal-grid .d.f::after{content:"";position:absolute;bottom:5px;width:3px;height:3px;border-radius:50%;background:var(--sindoor);}
+.cal-grid .d.today{
+  background:var(--sindoor);color:#FBF3DE;box-shadow:0 4px 10px -3px rgba(165,48,28,.55);
+}
+.cal-grid .d.today .sub{color:rgba(251,243,222,.75);}
+
+/* Detail block */
+.detail-blk{
+  background:var(--parchment-bright);border:1px solid var(--paper-edge);border-radius:16px;padding:16px;margin-bottom:14px;
+  box-shadow:0 2px 0 var(--paper-edge);
+}
+.detail-blk .hd{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;
+  border-bottom:1px solid var(--rule-soft);
+}
+.detail-blk .hd .k{font-family:var(--mono);font-size:9px;letter-spacing:.28em;color:var(--sindoor);text-transform:uppercase;}
+.detail-blk .hd .v{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-quiet);font-variation-settings:"opsz" 24,"wght" 500;}
+.qrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;}
+.qrow .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--ink-quiet);text-transform:uppercase;}
+.qrow .v{font-family:var(--mono);font-size:12px;color:var(--ink);letter-spacing:.04em;}
+.qrow .v.good{color:#3F7A3F;}
+.qrow .v.bad{color:var(--sindoor);}
+
+/* Planets */
+.planets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.planet{
+  background:var(--parchment);border:1px solid var(--paper-edge);border-radius:12px;padding:10px 8px;text-align:center;
+}
+.planet .sym{font-family:var(--serif);font-size:20px;color:var(--sindoor-deep);line-height:1;}
+.planet .nm{font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--ink-quiet);text-transform:uppercase;margin-top:4px;}
+.planet .sign{font-family:var(--serif);font-style:italic;font-size:11px;color:var(--ink);margin-top:2px;}
+
+/* ───────────── LIBRARY SCREEN ───────────── */
+.lib-head{padding-top:4px;margin-bottom:12px;}
+.lib-head .kicker{font-family:var(--mono);font-size:9.5px;letter-spacing:.32em;color:var(--sindoor);text-transform:uppercase;}
+.lib-head .title{font-family:var(--serif);font-size:40px;line-height:.9;margin-top:6px;font-variation-settings:"opsz" 96,"wght" 300;letter-spacing:-.02em;}
+.lib-head .title em{font-style:italic;color:var(--sindoor-deep);}
+.lib-head .sub{font-family:var(--devanagari);font-size:14px;color:var(--ink-quiet);margin-top:6px;}
+
+.search-bar{
+  background:var(--parchment-bright);border:1px solid var(--paper-edge);border-radius:14px;
+  padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:16px;
+  font-family:var(--serif);font-style:italic;font-size:13.5px;color:var(--ink-muted);
+}
+
+.lib-filter{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
+.chip{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);
+  padding:7px 11px;border-radius:16px;border:1px solid var(--paper-edge);background:var(--parchment-bright);white-space:nowrap;
+}
+.chip.active{background:var(--ink);color:var(--parchment-bright);border-color:var(--ink);}
+
+.deity-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.d-card{
+  background:var(--parchment-bright);border:1px solid var(--paper-edge);border-radius:16px;overflow:hidden;
+  box-shadow:0 2px 0 var(--paper-edge);position:relative;
+}
+.d-portrait{
+  height:116px;display:flex;align-items:flex-end;justify-content:center;padding:10px;position:relative;overflow:hidden;
+}
+.d-portrait.d-ganesha{background:linear-gradient(170deg,#F2B37A 0%,#B33E1F 100%);}
+.d-portrait.d-shiva{background:linear-gradient(170deg,#9ABAD1 0%,#1F2A4A 100%);}
+.d-portrait.d-lakshmi{background:linear-gradient(170deg,#F4C454 0%,#8F6A1A 100%);}
+.d-portrait.d-krishna{background:linear-gradient(170deg,#6F92D8 0%,#1C2550 100%);}
+.d-portrait.d-hanuman{background:linear-gradient(170deg,#E85D3A 0%,#5C1A0A 100%);}
+.d-portrait.d-saraswati{background:linear-gradient(170deg,#CFC0E8 0%,#5A4A8E 100%);}
+.d-portrait .sans{
+  font-family:var(--devanagari);font-weight:700;font-size:42px;color:rgba(251,243,222,.97);line-height:1;
+  text-shadow:0 2px 8px rgba(20,10,4,.3);
+}
+.d-portrait .halo{
+  position:absolute;top:6px;left:50%;transform:translateX(-50%);width:72px;height:72px;border-radius:50%;
+  border:1px solid rgba(251,243,222,.35);
+}
+.d-portrait .halo::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px dashed rgba(251,243,222,.2);}
+.d-card .d-info{padding:10px 12px 12px;}
+.d-card .nm{font-family:var(--serif);font-size:16px;color:var(--ink);font-variation-settings:"opsz" 36,"wght" 500;line-height:1.1;}
+.d-card .nm em{font-style:italic;color:var(--sindoor-deep);font-weight:400;}
+.d-card .sub-en{font-family:var(--serif);font-style:italic;font-size:11px;color:var(--ink-quiet);margin-top:3px;font-variation-settings:"opsz" 24,"wght" 400;}
+.d-card .pill{margin-top:8px;font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;}
+
+/* ───────────── AARTI READER SCREEN ───────────── */
+.ar-head{
+  display:flex;justify-content:space-between;align-items:center;padding:4px 0 18px;
+  border-bottom:1px solid var(--rule-soft);margin-bottom:18px;
+}
+.ar-head .back{width:34px;height:34px;border-radius:50%;border:1px solid var(--paper-edge);display:grid;place-items:center;color:var(--ink-soft);background:var(--parchment-bright);}
+.ar-head .actions{display:flex;gap:8px;}
+.ar-head .actions .b{width:34px;height:34px;border-radius:50%;border:1px solid var(--paper-edge);display:grid;place-items:center;color:var(--ink-soft);background:var(--parchment-bright);}
+.ar-head .actions .b.heart{color:var(--sindoor);}
+
+.ar-title{text-align:center;margin-bottom:22px;padding:0 10px;}
+.ar-title .kicker{font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--sindoor);text-transform:uppercase;}
+.ar-title .sans{font-family:var(--devanagari);font-weight:700;font-size:30px;color:var(--ink);line-height:1.15;margin-top:8px;}
+.ar-title .en{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-quiet);margin-top:6px;font-variation-settings:"opsz" 36,"wght" 400;}
+.ar-title .rule{
+  margin:14px auto 0;width:60%;height:1px;background:var(--rule);position:relative;
+}
+.ar-title .rule::before{content:"❖";position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);background:var(--parchment-bright);padding:0 10px;color:var(--sindoor-deep);font-size:12px;}
+
+.verse{margin-bottom:18px;}
+.verse .vn{
+  font-family:var(--mono);font-size:9px;letter-spacing:.28em;color:var(--gold);text-transform:uppercase;
+  margin-bottom:8px;display:flex;align-items:center;gap:8px;
+}
+.verse .vn::after{content:"";flex:1;height:1px;background:var(--rule-soft);}
+.verse .sans-line{
+  font-family:var(--devanagari);font-size:18.5px;line-height:1.55;color:var(--ink);font-weight:500;letter-spacing:.005em;
+}
+.verse .sans-line.refrain{color:var(--sindoor-deep);font-weight:600;}
+.verse .trans{
+  font-family:var(--serif);font-style:italic;font-size:13px;line-height:1.5;color:var(--ink-quiet);margin-top:6px;
+  font-variation-settings:"opsz" 24,"wght" 400;
+}
+
+.ar-player{
+  position:absolute;left:14px;right:14px;bottom:14px;background:linear-gradient(160deg,#2B1A0F,#1A1008);
+  border:1px solid rgba(201,155,58,.3);border-radius:22px;padding:14px 16px;
+  display:flex;align-items:center;gap:14px;
+  box-shadow:0 18px 32px -12px rgba(40,12,4,.5);
+}
+.ar-player .play{width:40px;height:40px;border-radius:50%;background:var(--sindoor);color:#FBF3DE;display:grid;place-items:center;flex-shrink:0;}
+.ar-player .stack{flex:1;min-width:0;}
+.ar-player .stack .t{font-family:var(--serif);font-style:italic;font-size:12.5px;color:#F3E5C8;line-height:1.2;}
+.ar-player .stack .prog{margin-top:6px;height:2px;background:rgba(201,155,58,.2);border-radius:2px;overflow:hidden;}
+.ar-player .stack .prog::after{content:"";display:block;width:40%;height:100%;background:var(--gold-leaf);}
+.ar-player .stack .t-meta{font-family:var(--mono);font-size:9px;color:rgba(243,229,200,.55);margin-top:5px;letter-spacing:.1em;}
+.ar-player .dots{color:rgba(243,229,200,.6);}
+
+/* ───────────── DESIGN SYSTEM ───────────── */
+.system{margin-top:120px;}
+.sys-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:40px;margin-top:32px;}
+.sys-card{
+  background:var(--parchment-bright);border:1px solid var(--paper-edge);border-radius:16px;padding:28px;
+  box-shadow:0 2px 0 var(--paper-edge);
+}
+.sys-card .tag{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--sindoor);text-transform:uppercase;margin-bottom:16px;}
+.sys-card h3{font-family:var(--serif);font-style:italic;font-size:28px;line-height:1;margin-bottom:20px;font-variation-settings:"opsz" 48,"wght" 500;}
+
+/* Type specimen */
+.spec-item{padding:14px 0;border-top:1px solid var(--rule-soft);}
+.spec-item:first-of-type{border-top:none;}
+.spec-item .font-name{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-quiet);margin-bottom:6px;}
+.spec-item .sample-serif-d{font-family:var(--serif);font-variation-settings:"opsz" 144,"wght" 300;font-size:40px;line-height:1;}
+.spec-item .sample-serif-d em{font-style:italic;color:var(--sindoor-deep);}
+.spec-item .sample-deva{font-family:var(--devanagari);font-weight:700;font-size:32px;line-height:1;color:var(--ink);}
+.spec-item .sample-mono{font-family:var(--mono);font-size:15px;letter-spacing:.04em;color:var(--ink);}
+.spec-item .sample-serif-it{font-family:var(--serif);font-style:italic;font-variation-settings:"opsz" 48,"wght" 400;font-size:22px;color:var(--ink-soft);}
+
+/* Color swatches */
+.swatch{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:center;padding:11px 0;border-top:1px solid var(--rule-soft);}
+.swatch:first-of-type{border-top:none;}
+.swatch .chip-c{width:44px;height:44px;border-radius:10px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);}
+.swatch .nm{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink);font-variation-settings:"opsz" 24,"wght" 500;}
+.swatch .nm .role{display:block;font-family:var(--mono);font-size:9px;font-style:normal;letter-spacing:.24em;color:var(--ink-quiet);text-transform:uppercase;margin-top:2px;}
+.swatch .hex{font-family:var(--mono);font-size:11px;color:var(--ink-quiet);letter-spacing:.05em;}
+
+/* Ornament showcase */
+.orn-row{padding:10px 0;border-top:1px solid var(--rule-soft);display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;}
+.orn-row:first-of-type{border-top:none;}
+.orn-row .label{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink-soft);font-variation-settings:"opsz" 24,"wght" 500;}
+.orn-row .demo{text-align:right;}
+.orn-row .demo svg{vertical-align:middle;}
+
+.mandala-full{
+  position:absolute;top:-60px;right:-40px;width:320px;opacity:.07;pointer-events:none;
+}
+
+/* ───────────── FOOTER ───────────── */
+.foot{
+  margin-top:100px;padding-top:24px;border-top:3px double var(--sindoor);
+  display:grid;grid-template-columns:1fr auto 1fr;gap:40px;align-items:center;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-quiet);
+}
+.foot .mid{
+  font-family:var(--serif);font-style:italic;font-size:16px;color:var(--sindoor-deep);letter-spacing:0;text-transform:none;
+  font-variation-settings:"opsz" 24,"wght" 400;
+}
+.foot .r{text-align:right;}
+
+@media (max-width:1100px){
+  .screens-triplet{grid-template-columns:1fr;gap:80px;}
+  .screens-triplet .phone{margin:0 auto;}
+  .screens-hero{grid-template-columns:1fr;}
+  .screens-hero .phone{margin:0 auto;}
+  .concept{grid-template-columns:1fr;gap:24px;}
+  .sys-grid{grid-template-columns:1fr;}
+  .pillars{grid-template-columns:1fr 1fr;gap:20px;}
+  .pillar{border-right:none;border-bottom:1px solid var(--rule-soft);padding-bottom:14px;margin-bottom:14px;}
+  .masthead{grid-template-columns:1fr;text-align:center;}
+  .masthead .edition,.masthead .right{text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- Reusable SVG mandala symbol -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mandala" viewBox="0 0 200 200">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <circle cx="100" cy="100" r="95"/>
+      <circle cx="100" cy="100" r="80"/>
+      <circle cx="100" cy="100" r="60"/>
+      <circle cx="100" cy="100" r="40"/>
+      <circle cx="100" cy="100" r="18"/>
+      <g>
+        <line x1="100" y1="5" x2="100" y2="195"/>
+        <line x1="5" y1="100" x2="195" y2="100"/>
+        <line x1="33" y1="33" x2="167" y2="167"/>
+        <line x1="167" y1="33" x2="33" y2="167"/>
+      </g>
+      <g stroke-width="1">
+        <path d="M100,40 Q120,70 100,100 Q80,70 100,40 Z"/>
+        <path d="M100,160 Q120,130 100,100 Q80,130 100,160 Z"/>
+        <path d="M40,100 Q70,120 100,100 Q70,80 40,100 Z"/>
+        <path d="M160,100 Q130,120 100,100 Q130,80 160,100 Z"/>
+        <path d="M57,57 Q80,85 100,100 Q85,80 57,57 Z" transform="rotate(45 100 100)"/>
+        <path d="M143,57 Q120,85 100,100 Q115,80 143,57 Z" transform="rotate(45 100 100)"/>
+        <path d="M57,143 Q80,115 100,100 Q85,120 57,143 Z" transform="rotate(45 100 100)"/>
+        <path d="M143,143 Q120,115 100,100 Q115,120 143,143 Z" transform="rotate(45 100 100)"/>
+      </g>
+      <polygon points="100,55 135,100 100,145 65,100"/>
+      <polygon points="100,55 135,100 100,145 65,100" transform="rotate(45 100 100)"/>
+      <circle cx="100" cy="100" r="4" fill="currentColor"/>
+    </g>
+  </symbol>
+  <symbol id="lotus" viewBox="0 0 48 20">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <path d="M24 18 C16 18 10 14 6 10 C14 12 20 14 24 14 C28 14 34 12 42 10 C38 14 32 18 24 18 Z"/>
+      <path d="M24 16 C18 16 14 12 12 8 C18 11 22 12 24 12 C26 12 30 11 36 8 C34 12 30 16 24 16 Z"/>
+      <path d="M24 14 C20 14 18 10 17 6 C21 9 23 10 24 10 C25 10 27 9 31 6 C30 10 28 14 24 14 Z"/>
+      <path d="M24 12 V 4"/>
+    </g>
+  </symbol>
+  <symbol id="sun-ic" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.4">
+      <circle cx="12" cy="12" r="4.5"/>
+      <g stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="7" y2="7"/><line x1="17" y1="17" x2="18.7" y2="18.7"/><line x1="18.7" y1="5.3" x2="17" y2="7"/><line x1="7" y1="17" x2="5.3" y2="18.7"/></g>
+    </g>
+  </symbol>
+  <symbol id="moon-ic" viewBox="0 0 24 24">
+    <path d="M20 14.5 A8 8 0 1 1 9.5 4 A6.5 6.5 0 0 0 20 14.5 Z" fill="none" stroke="currentColor" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="gear-ic" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2.5 L13.2 5 L16 4 L16.2 6.8 L19 7.5 L17.8 10 L20 12 L17.8 14 L19 16.5 L16.2 17.2 L16 20 L13.2 19 L12 21.5 L10.8 19 L8 20 L7.8 17.2 L5 16.5 L6.2 14 L4 12 L6.2 10 L5 7.5 L7.8 6.8 L8 4 L10.8 5 Z"/>
+    </g>
+  </symbol>
+  <symbol id="chevron-r" viewBox="0 0 24 24"><polyline points="9,5 16,12 9,19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="chevron-l" viewBox="0 0 24 24"><polyline points="15,5 8,12 15,19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="play-ic" viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19" fill="currentColor"/></symbol>
+  <symbol id="pause-ic" viewBox="0 0 24 24"><rect x="7" y="5" width="3.5" height="14" fill="currentColor"/><rect x="13.5" y="5" width="3.5" height="14" fill="currentColor"/></symbol>
+  <symbol id="heart-ic" viewBox="0 0 24 24"><path d="M12 21 S4 15.5 4 9.5 C4 6.5 6.5 4.5 9 4.5 C10.7 4.5 12 5.5 12 7 C12 5.5 13.3 4.5 15 4.5 C17.5 4.5 20 6.5 20 9.5 C20 15.5 12 21 12 21 Z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></symbol>
+  <symbol id="heart-o" viewBox="0 0 24 24"><path d="M12 21 S4 15.5 4 9.5 C4 6.5 6.5 4.5 9 4.5 C10.7 4.5 12 5.5 12 7 C12 5.5 13.3 4.5 15 4.5 C17.5 4.5 20 6.5 20 9.5 C20 15.5 12 21 12 21 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="search-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="16" x2="21" y2="21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="bookmark-ic" viewBox="0 0 24 24"><path d="M6 3 H18 V21 L12 16 L6 21 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="flame-ic" viewBox="0 0 24 24"><path d="M12 22 C7 22 4 19 4 14.5 C4 11 6.5 9 7 7 C7.5 8 8 9 10 9 C9.5 6 10.5 3 12 2 C12 5 14 7 15 9 C15.5 8 16 7 16.5 7 C17 9 19 11 19 14.5 C19 19 16 22 12 22 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+  <symbol id="calendar-ic" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="3.5" y1="10" x2="20.5" y2="10" stroke="currentColor" stroke-width="1.4"/><line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="home-ic" viewBox="0 0 24 24"><path d="M4 11 L12 4 L20 11 V20 H14 V14 H10 V20 H4 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="people-ic" viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3 20 C3 16.5 5.5 14 9 14 C12.5 14 15 16.5 15 20" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="16.5" cy="8" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M14 14.5 C15 14.1 15.7 14 16.5 14 C19 14 21 16 21 19" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="dots-ic" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="loc-ic" viewBox="0 0 24 24"><path d="M12 22 S5 14.5 5 9.5 C5 5.9 8.1 3 12 3 C15.9 3 19 5.9 19 9.5 C19 14.5 12 22 12 22 Z" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="9.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="text-ic" viewBox="0 0 24 24"><line x1="5" y1="6" x2="19" y2="6" stroke="currentColor" stroke-width="1.5"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.5"/><line x1="5" y1="18" x2="14" y2="18" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="diamond" viewBox="0 0 20 20"><polygon points="10,3 17,10 10,17 3,10" fill="none" stroke="currentColor" stroke-width="1.2"/><polygon points="10,7 13,10 10,13 7,10" fill="currentColor"/></symbol>
+</svg>
+
+<div class="page">
+
+<!-- ───────────── MASTHEAD ───────────── -->
+<header class="masthead">
+  <div class="edition">
+    <div>Edition № 01</div>
+    <div>Phālguna, <strong>Saṃvat 2082</strong></div>
+    <div>Vol. I · Issue I</div>
+  </div>
+  <div class="center">
+    <div class="sanskrit">धर्मज्ञ</div>
+    <div class="wordmark">Dharmagya</div>
+  </div>
+  <div class="right">
+    <div>A Redesign Study</div>
+    <div><strong>MMXXVI</strong> · Spring</div>
+    <div>Typeset at Home</div>
+  </div>
+</header>
+
+<div class="tagline">
+  <span>Panchang <span class="dot">◆</span> Aartis <span class="dot">◆</span> Chalisas <span class="dot">◆</span> Muhurat <span class="dot">◆</span> Dasha</span>
+  <span>Offline · Bilingual · Devanāgarī-first</span>
+</div>
+
+<!-- ───────────── CONCEPT ───────────── -->
+<section class="concept">
+  <div>
+    <div class="kicker">The Brief</div>
+    <h1>From clip-art devotion to an <em>illuminated</em> manuscript of the everyday.</h1>
+  </div>
+  <div>
+    <div class="lede">
+      <p><span class="drop">D</span>evotional software in Hindi-speaking markets has, for too long, been a contest between garish kitsch and the sterile, flattened grid of generic Silicon-Valley UI. The former shouts; the latter apologises. Neither earns reverence.</p>
+      <p>This redesign argues for a third way — one that treats the app like a <em>pothi</em>, a hand-bound scripture: warm paper, measured rule, restrained ornament. Devanāgarī is typeset, not decorated. Astronomical times are set in steady monospace, as a ship's almanac would print them. Mandalas appear only where they earn their presence: as structure, never as stickers.</p>
+    </div>
+
+    <div class="pillars">
+      <div class="pillar">
+        <div class="num">I.</div>
+        <h3>Parchment, not plastic</h3>
+        <p>A single warm ground across all surfaces. No white boxes floating on beige — the paper <em>is</em> the paper.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">II.</div>
+        <h3>Typeset Devanāgarī</h3>
+        <p>Hindi leads every hierarchy. Serif-with-serif pairing. The Latin script plays support, never shout.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">III.</div>
+        <h3>Ornament with purpose</h3>
+        <p>Yantras as structure. Lotus as rule-break. Gold leaf reserved for the card that matters most.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">IV.</div>
+        <h3>Calm, data-dense</h3>
+        <p>A tithi is data. Sunrise is data. Treat them with the quiet dignity of an almanac, not a slot machine.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── SCREEN: HOME ───────────── -->
+<div class="section-rule">
+  <span class="lotus">❖</span>
+  <span>Screen the First · The Home</span>
+  <span class="lotus">❖</span>
+</div>
+
+<section class="screens-hero">
+  <!-- PHONE: HOME -->
+  <div class="phone lg">
+    <div class="notch"></div>
+    <div class="screen" style="background:var(--parchment-bright);">
+      <div class="statusbar">
+        <span>9:24</span>
+        <div class="icons">
+          <svg viewBox="0 0 24 10"><path d="M2 6 L6 2 L10 6 L14 2 L18 6 L22 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+          <span style="font-size:10px;">85%</span>
+          <svg viewBox="0 0 24 10"><rect x="1" y="2" width="18" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/><rect x="3" y="4" width="14" height="2" fill="currentColor"/><rect x="20" y="4" width="2" height="2" fill="currentColor" rx=".5"/></svg>
+        </div>
+      </div>
+
+      <div class="body" style="overflow:hidden;">
+        <svg class="screen-mandala" style="top:-30px;right:-70px;width:240px;height:240px;color:var(--sindoor);" aria-hidden="true"><use href="#mandala"/></svg>
+
+        <div class="home-head">
+          <div class="date-stack">
+            <div class="weekday">Ravivar · Sunday</div>
+            <div class="date-main"><span class="num">20</span> April <span class="num">2026</span></div>
+          </div>
+          <div class="gear"><svg width="18" height="18"><use href="#gear-ic"/></svg></div>
+        </div>
+
+        <div class="greeting-block">
+          <div class="hi">Good morning, <em>Ishank</em></div>
+          <div class="hi-sub">शुभ प्रभात — आज रविवार है</div>
+        </div>
+
+        <!-- Panchang hero card -->
+        <div class="panchang-hero">
+          <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+          <svg class="mandala-bg" style="color:var(--gold-leaf);"><use href="#mandala"/></svg>
+
+          <div class="ph-head">
+            <div class="title-group">
+              <div class="kick">The Five Limbs</div>
+              <div class="main">आज का पंचांग</div>
+            </div>
+            <div class="loc"><svg width="9" height="9"><use href="#loc-ic"/></svg>Varanasi</div>
+          </div>
+
+          <div class="ph-rows">
+            <div class="ph-row">
+              <span class="lbl">Tithi</span>
+              <span class="val">त्रयोदशी <span class="en">· Trayodashi</span></span>
+              <span class="time">until 14:32</span>
+            </div>
+            <div class="ph-row">
+              <span class="lbl">Nakshatra</span>
+              <span class="val">उत्तराषाढा <span class="en">· Uttarāṣāḍhā</span></span>
+              <span class="time">until 11:08</span>
+            </div>
+            <div class="ph-row">
+              <span class="lbl">Yoga</span>
+              <span class="val">शिव <span class="en">· Shiva</span></span>
+              <span class="time">until 18:44</span>
+            </div>
+            <div class="ph-row">
+              <span class="lbl">Karana</span>
+              <span class="val">वणिज <span class="en">· Vaṇija</span></span>
+              <span class="time">until 14:32</span>
+            </div>
+          </div>
+
+          <div class="ph-divider"></div>
+
+          <div class="ph-sun">
+            <div class="item">
+              <div class="ic"><svg width="14" height="14"><use href="#sun-ic"/></svg></div>
+              <div class="stack"><div class="k">Sunrise</div><div class="v">05:52</div></div>
+            </div>
+            <div class="sep"></div>
+            <div class="item">
+              <div class="ic"><svg width="14" height="14"><use href="#moon-ic"/></svg></div>
+              <div class="stack"><div class="k">Sunset</div><div class="v">18:41</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Your deities -->
+        <div class="section-lbl">
+          <span class="lhs">Your Deities</span>
+          <span class="rhs">Manage →</span>
+        </div>
+        <div class="deities-strip">
+          <div class="deity-chip"><div class="deity-avatar d-ganesha">ग</div><div class="nm">Gaṇeśa</div></div>
+          <div class="deity-chip"><div class="deity-avatar d-shiva">शि</div><div class="nm">Śiva</div></div>
+          <div class="deity-chip"><div class="deity-avatar d-lakshmi">ल</div><div class="nm">Lakṣmī</div></div>
+          <div class="deity-chip"><div class="deity-avatar d-krishna">कृ</div><div class="nm">Kṛṣṇa</div></div>
+          <div class="deity-chip"><div class="deity-avatar d-hanuman">ह</div><div class="nm">Hanumān</div></div>
+        </div>
+
+        <!-- Featured aarti -->
+        <div class="section-lbl">
+          <span class="lhs">For your deities · Today</span>
+          <span class="rhs">All →</span>
+        </div>
+        <div class="feat-card">
+          <div class="corner-mark">Aarti № 07</div>
+          <div class="feat-row">
+            <div class="av deity-avatar d-ganesha" style="width:58px;height:58px;font-size:22px;">ग</div>
+            <div class="body">
+              <div class="hi-title">जय गणेश देवा</div>
+              <div class="en-title">Jaya Gaṇeśa Devā</div>
+              <div class="meta">Morning · 4 verses</div>
+            </div>
+            <div class="play"><svg width="14" height="14"><use href="#play-ic"/></svg></div>
+          </div>
+          <div class="verse-peek">"जय गणेश जय गणेश जय गणेश देवा / माता जाकी पार्वती पिता महादेवा..."</div>
+        </div>
+
+        <!-- Dasha callout -->
+        <div class="callout-card">
+          <div class="ic-w"><svg width="18" height="18"><use href="#calendar-ic"/></svg></div>
+          <div class="stack">
+            <div class="k">Vimśottarī Daśā</div>
+            <div class="t">You are in <em style="font-style:italic;color:var(--sindoor-deep)">Venus</em> mahādaśā</div>
+          </div>
+          <div class="arr"><svg width="18" height="18"><use href="#chevron-r"/></svg></div>
+        </div>
+
+        <div class="quick-row">
+          <div class="quick"><div class="ic"><svg width="20" height="20"><use href="#heart-ic"/></svg></div><div class="lbl">Favourites</div></div>
+          <div class="quick"><div class="ic"><svg width="20" height="20"><use href="#flame-ic"/></svg></div><div class="lbl">Festivals</div></div>
+          <div class="quick"><div class="ic"><svg width="20" height="20"><use href="#search-ic"/></svg></div><div class="lbl">Search</div></div>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tabbar">
+        <div class="t active"><svg width="19" height="19"><use href="#home-ic"/></svg><span class="lbl">Home</span></div>
+        <div class="t"><svg width="19" height="19"><use href="#calendar-ic"/></svg><span class="lbl">Panchang</span></div>
+        <div class="t"><svg width="19" height="19"><use href="#people-ic"/></svg><span class="lbl">Gods</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Caption for home -->
+  <div class="caption">
+    <div class="tag">Screen Study · I</div>
+    <h2>The <em>home</em> as a daily almanac.</h2>
+    <p>Every morning, the user opens to a spread that reads like the first page of a hand-bound almanac. The date is set in italic serif with tabular numerals. Panchang — the five limbs of the day — occupies the hero card in ink-dark treatment: a brief escape from the parchment surface, as if the planets demand their own sky.</p>
+    <ul>
+      <li><span class="lbl">01</span><span>Italic serif greeting pairs with a Devanāgarī echo below — bilingual, not redundant.</span></li>
+      <li><span class="lbl">02</span><span>Hero Panchang inverts to dark: gold-leaf rules, monospaced almanac times, a dim mandala watermark.</span></li>
+      <li><span class="lbl">03</span><span>Deity chips are portrait medallions — initialed Devanāgarī, warm gradient grounds, bone-white ring.</span></li>
+      <li><span class="lbl">04</span><span>The featured aarti card teases its opening verse — a reason to tap beyond a thumbnail.</span></li>
+      <li><span class="lbl">05</span><span>Tab bar floats as a dark pill; active tab earns a gold ember.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ───────────── OTHER SCREENS ───────────── -->
+<div class="section-rule">
+  <span class="lotus">❖</span>
+  <span>Further Spreads · Panchang · Library · Liturgy</span>
+  <span class="lotus">❖</span>
+</div>
+
+<section class="screens-triplet">
+
+  <!-- PHONE: PANCHANG -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:24</span>
+          <div class="icons">
+            <svg viewBox="0 0 24 10"><path d="M2 6 L6 2 L10 6 L14 2 L18 6 L22 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+            <span style="font-size:10px;">85%</span>
+            <svg viewBox="0 0 24 10"><rect x="1" y="2" width="18" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/><rect x="3" y="4" width="14" height="2" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="body">
+          <svg class="screen-mandala" style="top:140px;left:-60px;width:200px;height:200px;color:var(--gold);" aria-hidden="true"><use href="#mandala"/></svg>
+
+          <div class="p-head">
+            <div class="back"><svg width="16" height="16"><use href="#chevron-l"/></svg></div>
+            <div class="title-g">
+              <div class="k">The Almanac</div>
+              <div class="t">Panchāng</div>
+            </div>
+            <div class="back"><svg width="16" height="16"><use href="#loc-ic"/></svg></div>
+          </div>
+
+          <div class="month-strip">
+            <div class="btn"><svg width="18" height="18"><use href="#chevron-l"/></svg></div>
+            <div class="lbl">April<span class="yr">2026</span></div>
+            <div class="btn"><svg width="18" height="18"><use href="#chevron-r"/></svg></div>
+          </div>
+
+          <div class="cal-grid">
+            <div class="hdr">S</div><div class="hdr">M</div><div class="hdr">T</div><div class="hdr">W</div><div class="hdr">T</div><div class="hdr">F</div><div class="hdr">S</div>
+
+            <div class="d m"><span>29</span></div>
+            <div class="d m"><span>30</span></div>
+            <div class="d m"><span>31</span></div>
+            <div class="d"><span>1</span><span class="sub">प्र</span></div>
+            <div class="d"><span>2</span><span class="sub">द्वि</span></div>
+            <div class="d"><span>3</span><span class="sub">तृ</span></div>
+            <div class="d f"><span>4</span><span class="sub">च</span></div>
+
+            <div class="d"><span>5</span><span class="sub">पं</span></div>
+            <div class="d"><span>6</span><span class="sub">ष</span></div>
+            <div class="d"><span>7</span><span class="sub">स</span></div>
+            <div class="d"><span>8</span><span class="sub">अ</span></div>
+            <div class="d"><span>9</span><span class="sub">न</span></div>
+            <div class="d"><span>10</span><span class="sub">द</span></div>
+            <div class="d"><span>11</span><span class="sub">ए</span></div>
+
+            <div class="d"><span>12</span><span class="sub">द्वा</span></div>
+            <div class="d f"><span>13</span><span class="sub">त्र</span></div>
+            <div class="d f"><span>14</span><span class="sub">च</span></div>
+            <div class="d"><span>15</span><span class="sub">अ</span></div>
+            <div class="d"><span>16</span><span class="sub">प्र</span></div>
+            <div class="d"><span>17</span><span class="sub">द्वि</span></div>
+            <div class="d"><span>18</span><span class="sub">तृ</span></div>
+
+            <div class="d"><span>19</span><span class="sub">च</span></div>
+            <div class="d today"><span>20</span><span class="sub">त्र</span></div>
+            <div class="d"><span>21</span><span class="sub">पं</span></div>
+            <div class="d"><span>22</span><span class="sub">ष</span></div>
+            <div class="d"><span>23</span><span class="sub">स</span></div>
+            <div class="d"><span>24</span><span class="sub">अ</span></div>
+            <div class="d"><span>25</span><span class="sub">न</span></div>
+
+            <div class="d"><span>26</span><span class="sub">द</span></div>
+            <div class="d f"><span>27</span><span class="sub">ए</span></div>
+            <div class="d"><span>28</span><span class="sub">द्वा</span></div>
+            <div class="d"><span>29</span><span class="sub">त्र</span></div>
+            <div class="d"><span>30</span><span class="sub">च</span></div>
+            <div class="d m"><span>1</span></div>
+            <div class="d m"><span>2</span></div>
+          </div>
+
+          <div class="detail-blk">
+            <div class="hd">
+              <span class="k">Quality Windows · आज</span>
+              <span class="v">Mon 20 Apr</span>
+            </div>
+            <div class="qrow"><span class="k">Abhijit Muhūrta</span><span class="v good">11:46 — 12:33</span></div>
+            <div class="qrow"><span class="k">Rāhu Kāla</span><span class="v bad">07:30 — 09:04</span></div>
+            <div class="qrow"><span class="k">Yamagaṇḍa</span><span class="v bad">10:37 — 12:10</span></div>
+            <div class="qrow"><span class="k">Brahma Muhūrta</span><span class="v good">04:18 — 05:06</span></div>
+          </div>
+
+          <div class="detail-blk">
+            <div class="hd">
+              <span class="k">Planetary Houses</span>
+              <span class="v">Sidereal</span>
+            </div>
+            <div class="planets">
+              <div class="planet"><div class="sym">☉</div><div class="nm">Sūrya</div><div class="sign">Meṣa</div></div>
+              <div class="planet"><div class="sym">☽</div><div class="nm">Chandra</div><div class="sign">Makara</div></div>
+              <div class="planet"><div class="sym">♂</div><div class="nm">Maṅgala</div><div class="sign">Miṭhuna</div></div>
+              <div class="planet"><div class="sym">☿</div><div class="nm">Budha</div><div class="sign">Meṣa</div></div>
+              <div class="planet"><div class="sym">♃</div><div class="nm">Guru</div><div class="sign">Karka</div></div>
+              <div class="planet"><div class="sym">♀</div><div class="nm">Śukra</div><div class="sign">Vṛṣa</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="t"><svg width="19" height="19"><use href="#home-ic"/></svg><span class="lbl">Home</span></div>
+          <div class="t active"><svg width="19" height="19"><use href="#calendar-ic"/></svg><span class="lbl">Panchang</span></div>
+          <div class="t"><svg width="19" height="19"><use href="#people-ic"/></svg><span class="lbl">Gods</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caption">
+      <div class="tag">Screen Study · II</div>
+      <h3>Panchāng as ephemeris.</h3>
+      <p>Month grid overlays a lightweight Devanāgarī tithi sub-label on every date — a quiet astronomical signature the user learns to read over time. Selected day emerges in deep sindoor. Quality windows (rāhu kāla, abhijit) earn colour only on their values, never their rows.</p>
+    </div>
+  </div>
+
+  <!-- PHONE: LIBRARY -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:24</span>
+          <div class="icons">
+            <svg viewBox="0 0 24 10"><path d="M2 6 L6 2 L10 6 L14 2 L18 6 L22 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+            <span style="font-size:10px;">85%</span>
+            <svg viewBox="0 0 24 10"><rect x="1" y="2" width="18" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/><rect x="3" y="4" width="14" height="2" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="body">
+          <svg class="screen-mandala" style="top:-40px;right:-50px;width:180px;height:180px;color:var(--sindoor);" aria-hidden="true"><use href="#mandala"/></svg>
+
+          <div class="lib-head">
+            <div class="kicker">The Pantheon</div>
+            <div class="title">Thirty‑three <em>koṭi</em></div>
+            <div class="sub">देवताओं का संग्रह · A curated canon</div>
+          </div>
+
+          <div class="search-bar">
+            <svg width="16" height="16" style="color:var(--ink-quiet);"><use href="#search-ic"/></svg>
+            <span>Search gods, aartis, chalisas…</span>
+          </div>
+
+          <div class="lib-filter">
+            <div class="chip active">All</div>
+            <div class="chip">Śaiva</div>
+            <div class="chip">Vaiṣṇava</div>
+            <div class="chip">Śākta</div>
+            <div class="chip">Sūrya</div>
+          </div>
+
+          <div class="deity-grid">
+            <div class="d-card">
+              <div class="d-portrait d-ganesha"><span class="halo"></span><span class="sans">ग</span></div>
+              <div class="d-info">
+                <div class="nm">Gaṇe<em>śa</em></div>
+                <div class="sub-en">Remover of Obstacles</div>
+                <div class="pill">7 aartis · 1 chālīsā</div>
+              </div>
+            </div>
+            <div class="d-card">
+              <div class="d-portrait d-shiva"><span class="halo"></span><span class="sans">शि</span></div>
+              <div class="d-info">
+                <div class="nm">Śi<em>va</em></div>
+                <div class="sub-en">The Auspicious</div>
+                <div class="pill">5 aartis · 2 chālīsā</div>
+              </div>
+            </div>
+            <div class="d-card">
+              <div class="d-portrait d-lakshmi"><span class="halo"></span><span class="sans">ल</span></div>
+              <div class="d-info">
+                <div class="nm">Lak<em>ṣmī</em></div>
+                <div class="sub-en">Goddess of Fortune</div>
+                <div class="pill">6 aartis · 1 chālīsā</div>
+              </div>
+            </div>
+            <div class="d-card">
+              <div class="d-portrait d-krishna"><span class="halo"></span><span class="sans">कृ</span></div>
+              <div class="d-info">
+                <div class="nm">Kṛ<em>ṣṇa</em></div>
+                <div class="sub-en">The Dark One</div>
+                <div class="pill">9 aartis · 1 chālīsā</div>
+              </div>
+            </div>
+            <div class="d-card">
+              <div class="d-portrait d-hanuman"><span class="halo"></span><span class="sans">ह</span></div>
+              <div class="d-info">
+                <div class="nm">Hanu<em>mān</em></div>
+                <div class="sub-en">Son of the Wind</div>
+                <div class="pill">4 aartis · 1 chālīsā</div>
+              </div>
+            </div>
+            <div class="d-card">
+              <div class="d-portrait d-saraswati"><span class="halo"></span><span class="sans">स</span></div>
+              <div class="d-info">
+                <div class="nm">Sara<em>svatī</em></div>
+                <div class="sub-en">Muse of Learning</div>
+                <div class="pill">3 aartis · 1 chālīsā</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="t"><svg width="19" height="19"><use href="#home-ic"/></svg><span class="lbl">Home</span></div>
+          <div class="t"><svg width="19" height="19"><use href="#calendar-ic"/></svg><span class="lbl">Panchang</span></div>
+          <div class="t active"><svg width="19" height="19"><use href="#people-ic"/></svg><span class="lbl">Gods</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caption">
+      <div class="tag">Screen Study · III</div>
+      <h3>The pantheon, typeset.</h3>
+      <p>A deity is not a sticker — it is a portrait, a halo, a mood. Each card takes a colour grammar from its deity (ochre-sindoor for Gaṇeśa, blue-twilight for Kṛṣṇa), the initial Devanāgarī set large, the Latin rendered in italic swash. The content count is the only data visible before you tap through.</p>
+    </div>
+  </div>
+
+  <!-- PHONE: AARTI READER -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:24</span>
+          <div class="icons">
+            <svg viewBox="0 0 24 10"><path d="M2 6 L6 2 L10 6 L14 2 L18 6 L22 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+            <span style="font-size:10px;">85%</span>
+            <svg viewBox="0 0 24 10"><rect x="1" y="2" width="18" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"/><rect x="3" y="4" width="14" height="2" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="body" style="padding-bottom:100px;">
+          <svg class="screen-mandala" style="top:80px;right:-90px;width:240px;height:240px;color:var(--sindoor);opacity:.05;" aria-hidden="true"><use href="#mandala"/></svg>
+
+          <div class="ar-head">
+            <div class="back"><svg width="16" height="16"><use href="#chevron-l"/></svg></div>
+            <div class="actions">
+              <div class="b"><svg width="16" height="16"><use href="#text-ic"/></svg></div>
+              <div class="b heart"><svg width="16" height="16"><use href="#heart-ic"/></svg></div>
+              <div class="b"><svg width="16" height="16"><use href="#dots-ic"/></svg></div>
+            </div>
+          </div>
+
+          <div class="ar-title">
+            <div class="kicker">Aarti · Śrī Gaṇeśa Jī</div>
+            <div class="sans">जय गणेश देवा</div>
+            <div class="en">Jaya Gaṇeśa Devā</div>
+            <div class="rule"></div>
+          </div>
+
+          <div class="verse">
+            <div class="vn">Verse I <span style="font-family:var(--serif);font-style:italic;color:var(--sindoor-deep);font-size:11px;letter-spacing:0;text-transform:none;">· refrain</span></div>
+            <div class="sans-line refrain">जय गणेश जय गणेश, जय गणेश देवा ।</div>
+            <div class="sans-line refrain">माता जाकी पार्वती, पिता महादेवा ॥</div>
+            <div class="trans">Victory to Gaṇeśa, Lord of the gaṇas —<br>whose mother is Pārvatī, whose father, the great god.</div>
+          </div>
+
+          <div class="verse">
+            <div class="vn">Verse II</div>
+            <div class="sans-line">एकदन्त दयावन्त, चार भुजाधारी ।</div>
+            <div class="sans-line">माथे सिन्दूर सोहे, मूसे की सवारी ॥</div>
+            <div class="trans">Single-tusked, compassionate, four-armed —<br>sindūr adorns the brow; his mount, a humble mouse.</div>
+          </div>
+
+          <div class="verse">
+            <div class="vn">Verse III</div>
+            <div class="sans-line">पान चढ़े फूल चढ़े, और चढ़े मेवा ।</div>
+            <div class="sans-line">लड्डुअन का भोग लगे, सन्त करें सेवा ॥</div>
+            <div class="trans">Betel, flowers, and fruits are offered —<br>laddus in oblation; the devoted in service.</div>
+          </div>
+        </div>
+
+        <div class="ar-player">
+          <div class="play"><svg width="14" height="14"><use href="#play-ic"/></svg></div>
+          <div class="stack">
+            <div class="t">Jaya Gaṇeśa Devā · Anup Jalota</div>
+            <div class="prog"></div>
+            <div class="t-meta">1:44 / 4:18 · Autoplay next verse</div>
+          </div>
+          <div class="dots"><svg width="16" height="16"><use href="#dots-ic"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caption">
+      <div class="tag">Screen Study · IV</div>
+      <h3>The liturgy, in two tongues.</h3>
+      <p>Devanāgarī verse leads, set large enough to chant from. The refrain is marked in sindoor red — a convention borrowed from old printed aartīs. English translation sits quietly in italic serif, for comprehension, not performance. The player floats as a dark vessel with a gold-leaf progress thread.</p>
+    </div>
+  </div>
+
+</section>
+
+<!-- ───────────── DESIGN SYSTEM ───────────── -->
+<div class="section-rule">
+  <span class="lotus">❖</span>
+  <span>The Grammar · Type · Colour · Ornament</span>
+  <span class="lotus">❖</span>
+</div>
+
+<section class="system" style="position:relative;">
+  <svg class="mandala-full" style="color:var(--sindoor);"><use href="#mandala"/></svg>
+
+  <div class="sys-grid">
+
+    <div class="sys-card">
+      <div class="tag">I · Typographic Grammar</div>
+      <h3>Three voices in accord</h3>
+      <div class="spec-item">
+        <div class="font-name">Fraunces · Display · Italic</div>
+        <div class="sample-serif-d">The <em>dawn</em></div>
+      </div>
+      <div class="spec-item">
+        <div class="font-name">Noto Serif Devanāgarī · Bold</div>
+        <div class="sample-deva">जय गणेश देवा</div>
+      </div>
+      <div class="spec-item">
+        <div class="font-name">Fraunces · Text · Italic</div>
+        <div class="sample-serif-it">A quiet morning almanac.</div>
+      </div>
+      <div class="spec-item">
+        <div class="font-name">JetBrains Mono · Medium</div>
+        <div class="sample-mono">05:52 → 18:41</div>
+      </div>
+    </div>
+
+    <div class="sys-card">
+      <div class="tag">II · Palette</div>
+      <h3>Parchment &amp; sindoor</h3>
+      <div class="swatch"><div class="chip-c" style="background:#F4E9CE;"></div><div class="nm">Parchment<span class="role">Canvas · Base</span></div><div class="hex">#F4E9CE</div></div>
+      <div class="swatch"><div class="chip-c" style="background:#FBF3DE;"></div><div class="nm">Parchment Bright<span class="role">Surface · Card</span></div><div class="hex">#FBF3DE</div></div>
+      <div class="swatch"><div class="chip-c" style="background:#1B140A;"></div><div class="nm">Deep Ink<span class="role">Text · Primary</span></div><div class="hex">#1B140A</div></div>
+      <div class="swatch"><div class="chip-c" style="background:#A5301C;"></div><div class="nm">Sindoor<span class="role">Accent · Primary</span></div><div class="hex">#A5301C</div></div>
+      <div class="swatch"><div class="chip-c" style="background:#782110;"></div><div class="nm">Sindoor Deep<span class="role">Accent · Emphasis</span></div><div class="hex">#782110</div></div>
+      <div class="swatch"><div class="chip-c" style="background:#C99B3A;"></div><div class="nm">Gold Leaf<span class="role">Ornament · Rare</span></div><div class="hex">#C99B3A</div></div>
+      <div class="swatch"><div class="chip-c" style="background:#2B1A0F;"></div><div class="nm">Night Plinth<span class="role">Hero Card · Tabbar</span></div><div class="hex">#2B1A0F</div></div>
+    </div>
+
+    <div class="sys-card">
+      <div class="tag">III · Ornament</div>
+      <h3>Rules that speak</h3>
+      <div class="orn-row">
+        <div class="label">Double rule · masthead</div>
+        <div class="demo" style="width:110px;border-top:3px double var(--sindoor);"></div>
+      </div>
+      <div class="orn-row">
+        <div class="label">Lotus chapter break</div>
+        <div class="demo" style="color:var(--sindoor);font-size:14px;">
+          <span style="vertical-align:middle;">──</span> <span style="vertical-align:middle;">❖</span> <span style="vertical-align:middle;">──</span>
+        </div>
+      </div>
+      <div class="orn-row">
+        <div class="label">Diamond · data divider</div>
+        <div class="demo" style="color:var(--gold);"><svg width="16" height="16"><use href="#diamond"/></svg></div>
+      </div>
+      <div class="orn-row">
+        <div class="label">Card corner brackets</div>
+        <div class="demo" style="position:relative;width:48px;height:30px;display:inline-block;">
+          <span style="position:absolute;top:0;left:0;width:8px;height:8px;border-top:1.5px solid var(--gold-leaf);border-left:1.5px solid var(--gold-leaf);"></span>
+          <span style="position:absolute;top:0;right:0;width:8px;height:8px;border-top:1.5px solid var(--gold-leaf);border-right:1.5px solid var(--gold-leaf);"></span>
+          <span style="position:absolute;bottom:0;left:0;width:8px;height:8px;border-bottom:1.5px solid var(--gold-leaf);border-left:1.5px solid var(--gold-leaf);"></span>
+          <span style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-bottom:1.5px solid var(--gold-leaf);border-right:1.5px solid var(--gold-leaf);"></span>
+        </div>
+      </div>
+      <div class="orn-row">
+        <div class="label">Yantra watermark</div>
+        <div class="demo" style="color:var(--sindoor);opacity:.6;"><svg width="40" height="40"><use href="#mandala"/></svg></div>
+      </div>
+      <div class="orn-row">
+        <div class="label">Deity halo ring</div>
+        <div class="demo">
+          <span style="display:inline-block;width:32px;height:32px;border-radius:50%;background:linear-gradient(160deg,#E8893C,#A5301C);vertical-align:middle;box-shadow:0 0 0 2px var(--parchment-bright),0 0 0 3px var(--rule);"></span>
+        </div>
+      </div>
+      <div class="orn-row">
+        <div class="label">Pill rhythm · 20 / 14 / 10 px</div>
+        <div class="demo" style="display:flex;gap:5px;justify-content:flex-end;">
+          <span style="display:inline-block;padding:5px 12px;border-radius:16px;background:var(--ink);color:var(--parchment-bright);font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;">ALL</span>
+          <span style="display:inline-block;padding:5px 10px;border-radius:14px;background:var(--parchment-bright);border:1px solid var(--paper-edge);color:var(--ink-soft);font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;">ŚAIVA</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div>Set in Fraunces &amp; Noto Serif Devanāgarī</div>
+  <div class="mid">— श्री गणेशाय नमः —</div>
+  <div class="r">Dharmagya · An act of redesign</div>
+</footer>
+
+</div>
+
+</body>
+</html>
