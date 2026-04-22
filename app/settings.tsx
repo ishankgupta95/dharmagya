@@ -217,7 +217,7 @@ export default function SettingsScreen() {
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('settings.title')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={{ width: 36, height: 36 }} />
       </View>
 
       <ScrollView

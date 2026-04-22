@@ -19,6 +19,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const isDark = useStore((s) => s.isDarkMode);
+  const walkthroughStep = useStore((s) => s.walkthroughStep);
+  const walkthroughActive = walkthroughStep > 0;
 
   const activeColor = isDark ? ACTIVE_DARK : ACTIVE_LIGHT;
   const inactiveColor = isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
@@ -39,29 +41,31 @@ export default function TabLayout() {
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
         sceneStyle: { backgroundColor: sceneBg },
-        tabBarStyle: {
-          // Floating pill. Solid at 94–96% opacity — RN can't do
-          // backdrop-filter, so the bg is just near-opaque.
-          backgroundColor: barBg,
-          borderTopWidth: 0,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: barBorder,
-          borderRadius: 22,
-          height: 60,
-          marginHorizontal: 18,
-          marginBottom: Math.max(insets.bottom, 10),
-          paddingTop: 8,
-          paddingBottom: 8,
-          // Soft shadow — iOS reads this; Android uses elevation.
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: isDark ? 0.28 : 0.16,
-          shadowRadius: 14,
-          elevation: 10,
-          // Intentionally not absolute — keeps screens' bottom insets correct
-          // during the transition. Floating pill look still comes through via
-          // the horizontal margin + border radius + shadow.
-        },
+        tabBarStyle: walkthroughActive
+          ? { display: 'none' }
+          : {
+              // Floating pill. Solid at 94–96% opacity — RN can't do
+              // backdrop-filter, so the bg is just near-opaque.
+              backgroundColor: barBg,
+              borderTopWidth: 0,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: barBorder,
+              borderRadius: 22,
+              height: 60,
+              marginHorizontal: 18,
+              marginBottom: Math.max(insets.bottom, 10),
+              paddingTop: 8,
+              paddingBottom: 8,
+              // Soft shadow — iOS reads this; Android uses elevation.
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: isDark ? 0.28 : 0.16,
+              shadowRadius: 14,
+              elevation: 10,
+              // Intentionally not absolute — keeps screens' bottom insets correct
+              // during the transition. Floating pill look still comes through via
+              // the horizontal margin + border radius + shadow.
+            },
         tabBarItemStyle: {
           paddingTop: 0,
         },
