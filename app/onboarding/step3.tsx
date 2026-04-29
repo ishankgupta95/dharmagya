@@ -17,7 +17,7 @@ type LocationChoice = 'gps' | 'default';
 
 export default function OnboardingStep3() {
   const { t } = useTranslation();
-  const { isDarkMode, toggleTheme, setHasOnboarded } = useStore();
+  const { isDarkMode, setThemeMode, setHasOnboarded } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [locationChoice, setLocationChoice] = useState<LocationChoice>('default');
@@ -36,7 +36,7 @@ export default function OnboardingStep3() {
   }
 
   function handleThemeSelect(dark: boolean) {
-    if (dark !== isDarkMode) toggleTheme();
+    setThemeMode(dark ? 'dark' : 'light');
   }
 
   return (

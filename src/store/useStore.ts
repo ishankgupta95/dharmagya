@@ -7,6 +7,7 @@ import type { AppLanguage } from '@/i18n';
 export type FontSize = 'small' | 'normal' | 'medium' | 'large' | 'xl' | 'xxl';
 export type MasaSystem = 'purnimanta' | 'amanta';
 export type TimeFormat = 'auto' | '12h' | '24h';
+export type ThemeMode = 'system' | 'light' | 'dark';
 
 /** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
  *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
@@ -85,6 +86,10 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
  */
 interface AppStore {
   // Persisted
+  /** User preference. 'system' follows the OS color scheme. */
+  themeMode: ThemeMode;
+  /** Resolved boolean ('themeMode' + system scheme). Synced at runtime in
+   *  _layout.tsx; persisted so first paint matches the last known value. */
   isDarkMode: boolean;
   favoriteIds: string[]; // Stores both aarti and chalisa IDs (prefixed: "aarti-*", "chalisa-*")
   hasOnboarded: boolean;
@@ -129,7 +134,9 @@ interface AppStore {
   firstOpenTimestamp: number;
 
   // Actions (not persisted)
-  toggleTheme: () => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  /** Internal: called by _layout.tsx whenever themeMode or system scheme changes. */
+  setResolvedDarkMode: (val: boolean) => void;
   toggleFavorite: (id: string) => void;
   setUserLocation: (loc: { lat: number; lon: number }, name?: string) => void;
   setHasOnboarded: () => void;
@@ -162,6 +169,7 @@ interface AppStore {
 export const useStore = create<AppStore>()(
   persist(
     (set, get) => ({
+      themeMode: 'system' as ThemeMode,
       isDarkMode: true,
       favoriteIds: [],
       hasOnboarded: false,
@@ -191,7 +199,8 @@ export const useStore = create<AppStore>()(
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
 
-      toggleTheme: () => set((s) => ({ isDarkMode: !s.isDarkMode })),
+      setThemeMode: (mode) => set({ themeMode: mode }),
+      setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
       toggleFavorite: (id) =>
         set((s) => ({
           favoriteIds: s.favoriteIds.includes(id)
@@ -240,7 +249,7 @@ export const useStore = create<AppStore>()(
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 5,
+      version: 6,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -345,6 +354,14 @@ export const useStore = create<AppStore>()(
           const f = state.fontSize as string | undefined;
           if (f === 'large') state.fontSize = 'xl';
           else if (f === 'xl') state.fontSize = 'xxl';
+        }
+
+        // v5 → v6: themeMode introduced. Carry forward the user's existing
+        // explicit dark/light choice so an upgrade isn't a surprise reset.
+        if (version < 6) {
+          if (state.themeMode === undefined) {
+            state.themeMode = state.isDarkMode === false ? 'light' : 'dark';
+          }
         }
 
         return state as AppStore;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, useColorScheme, type AppStateStatus } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -37,6 +37,8 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const {
     isDarkMode,
+    themeMode,
+    setResolvedDarkMode,
     hasOnboarded,
     language,
     initFirstOpen,
@@ -49,6 +51,15 @@ export default function RootLayout() {
     quietHoursStart,
     quietHoursEnd,
   } = useStore();
+  const systemScheme = useColorScheme();
+  // Resolve themeMode + system scheme into isDarkMode. useColorScheme already
+  // re-renders on Appearance changes, so this stays in sync without a manual
+  // listener.
+  useEffect(() => {
+    const resolved =
+      themeMode === 'system' ? systemScheme !== 'light' : themeMode === 'dark';
+    setResolvedDarkMode(resolved);
+  }, [themeMode, systemScheme, setResolvedDarkMode]);
   const quietHours = useMemo(
     () => ({ enabled: quietHoursEnabled, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }),
     [quietHoursEnabled, quietHoursStart, quietHoursEnd],

@@ -1654,3 +1654,91 @@ Phase 5 (Far-future — on hold)
 ```
 
 Each phase should ship as its own production release. Do not bundle phases. Measure daily active users and D7 retention after each release before starting the next.
+
+---
+
+## 18. Phase 8 — panchang-ts Library Wave Consumption — 📐 PLANNED (scoped 2026-04-25)
+
+**Goal.** Surface the new `panchang-ts` capabilities (Phases 28/29/30 in [panchang-ts/PLAN.md](../panchang-ts/PLAN.md) — Waves 1, 2, 3) inside dharmagya. **This is a pure consumption + UI phase** — all calculation work lives in the library.
+
+**Sequencing.** This phase lights up incrementally as each library minor release ships. Pin `panchang-ts` to each new version as it lands, regenerate types, rebuild affected screens. The phase's three sub-phases mirror the library's three waves and **must ship in order** because Wave 2 and 3 depend on Wave 1's data shape.
+
+**Why this is a separate phase, not part of P4.** P4 (existing) outlined Kundli as if dharmagya would do the calculation. With the library Wave 2 shipping it natively, P4.1 collapses into "consume + render" — clean, fast, and the same logic also feeds the website. P4.1 / P4.1b are **superseded** by P8.2 below; references to them in P4 stand as historical context only.
+
+### Step P8.1 — Wave 1 consumption: DrikPanchang parity panels (~3d)
+
+**Triggered by:** `panchang-ts` v2.4 shipped.
+
+**Files to modify:**
+- `src/services/astrology/panchangService.ts` — extend `mapToPanchangDay()` to surface new fields: `tarabala`, `varjyam`, `gandaMula`, `madhyahna`, `pratahSandhya`, `sayahnaSandhya`, `dinamanaMinutes`, `ratrimanaMinutes`, `panchakaRahita`, `doGhatiMuhurta`, plus new entries in `specialYogas` (Dwipushkar/Tripushkar/Jwalamukhi/Aadal/Vidaal/Ravi/Anandadi).
+- `src/types/panchang.ts` (internal) — extend `IPanchangDay` to mirror new fields.
+- `app/(tabs)/panchang.tsx` — new sections in the existing scrollable layout:
+  - "Tarabala & Chandrabala" card (now both populated when user supplies birth nakshatra).
+  - "Varjyam" inline warning chip in the Inauspicious section.
+  - "Ganda Mula" warning banner when active.
+  - "Madhyahna" + "Sandhya" rows in the Auspicious Times block.
+  - Replace "Bhadra" simple banner with a richer panel that links to "Panchaka Rahita Muhurta" availability windows.
+  - "Do Ghati Muhurta" — new alternate-quality system tab alongside Choghadiya / Gowri (user toggle).
+- `src/components/panchang/QualitySlotsCard.tsx` — accept new `system: 'choghadiya' | 'gowri' | 'doGhati'` prop.
+- `src/components/panchang/SpecialYogasCard.tsx` — handle 6 new yoga types in the icon/colour map.
+- Onboarding update: in Step 1 (Deity Preference) or Settings, capture optional **birth nakshatra** so Tarabala can populate. Persist in `useUserStore`.
+- i18n: add UI strings for new panel labels in `src/lib/translations.ts` (en + hi only — locked decision, no new locales this roadmap).
+
+**Done when:** every field DrikPanchang shows on its day-panchang page also renders on dharmagya's Panchang tab. Smoke-test against drikpanchang.com for 3 cities × 3 dates.
+
+### Step P8.2 — Wave 2 consumption: Kundli + Matching + Sade Sati (~5d)
+
+**Triggered by:** `panchang-ts` v3.0 shipped.
+
+**Replaces:** P4.1 + P4.1b (now obsolete).
+
+**Files to add:**
+- `app/(tabs)/kundli.tsx` — new tab (or expose under a new "Astrology" pillar grouping with existing `dasha.tsx`). Birth-input flow → renders Lagna + D1 + D9 charts + planetary positions + dignity highlights.
+- `app/kundli/match.tsx` — Ashtakoot matching screen. Two birth-detail forms → 36-point breakdown + cancellations + interpretation copy.
+- `app/sade-sati.tsx` — current phase + arc start/end + visual timeline. Reads natal moon rashi from the user's saved birth chart.
+- `src/components/kundli/NorthChart.tsx` + `SouthChart.tsx` — SVG diamond / square chart renderers (no native deps; pure RN SVG via `react-native-svg`).
+- `src/components/kundli/PlanetaryDignityChart.tsx` — Shadbala-style strip showing exalted/debilitated/own status per planet. (Full Shadbala numeric output deferred to P8.3 when library ships it.)
+- `src/services/astrology/kundliService.ts` — wraps `computeRashiChart`, `computeNavamsa`, `computeAshtakoot`, `computeMangalDosha`, `computeSadeSati` with the same caching strategy as `panchangService.ts`.
+- `src/store/useBirthStore.ts` — Zustand slice with SQLite persistence; supports primary user + up to 5 named charts (spouse, children, parents). Persists `{ name, dateTime, location, derived: { lagna, moonRashi, moonNakshatra } }` so derived fields are stable even if user edits inputs later.
+
+**Files to modify:**
+- `app/(tabs)/index.tsx` — Sade Sati warning chip on home if active for the user's natal moon.
+- Settings: "Manage saved charts" row.
+- `app/(tabs)/dasha.tsx` — wire to `useBirthStore`'s primary chart instead of one-off date picker. Add **pratyantar dasha** drilldown (third level, library now provides).
+- House system selector in Settings: `'whole-sign' | 'equal' | 'placidus-kp'` (default `'whole-sign'`).
+- Ayanamsa selector now includes True Chitra + Thirukanitham.
+
+**Done when:**
+- Kundli tab renders for 5 sample DOBs and matches Jagannath Hora output for D1, D9, lagna.
+- Marriage matching produces same 36-point score as drikpanchang.com horoscope-match for 5 sample pairs.
+- Sade Sati phase + arc dates within ±2 days of authoritative sources.
+
+### Step P8.3 — Wave 3 consumption: Advanced + library-backed muhurat (~3d)
+
+**Triggered by:** `panchang-ts` v3.x shipped.
+
+**Files to remove:**
+- `src/services/astrology/muhurat.ts` — **delete entirely**. All occasion logic now lives in the library's `scoreMuhurta` / `findAuspiciousDates` API.
+
+**Files to modify:**
+- `app/muhurat/index.tsx` + `app/muhurat/[occasion].tsx` — call `findAuspiciousDates(rule, range, location)` directly. Render the same UI; under the hood the score is now richer (multi-factor, library-blessed).
+- `app/(tabs)/kundli.tsx` — add "Divisional charts" expandable section: D2, D3, D7, D10, D12, D30 toggle. Each calls the library's `computeDivisionalChart`.
+- `app/(tabs)/kundli.tsx` — add Aspects view (Drishti map per planet) + Shadbala bar-chart panel.
+- `src/components/kundli/DoshasCard.tsx` — extend to surface Kaal Sarp (with subtype) and Pitru Dosha alongside existing Mangal Dosha.
+- `app/(tabs)/dasha.tsx` — add system selector: Vimshottari (default) / Ashtottari / Yogini / Chara. Each is a separate library call; render with the same timeline component.
+- New: `app/calendar/index.tsx` — utility "convert Gregorian ↔ Hindu" tool, plus "Ekadashi this year" / "Sankrantis this year" / "Upcoming eclipses" lists (uses library's calendar conversion APIs).
+
+**Done when:**
+- The duplicated muhurat logic is fully gone from the app; all behaviour comes from the library and parity is verified against the previous app behaviour for 7 stock occasions.
+- Divisional charts + dashas + doshas all visible inside the Kundli surface.
+
+### Phase 8 Exit Criteria
+
+- All three sub-phases shipped; pinned to corresponding `panchang-ts` versions.
+- Existing P3 / P4 / P6 / P7 work unaffected (additive on top of the panchang screen, no visual regressions).
+- Smoke-tested against drikpanchang.com (panchang values), Jagannath Hora (kundli values), and ProKerala (matching/Sade Sati values).
+- App startup time and panchang screen render time **unchanged** from pre-Phase-8 baseline (library is fast; consumption is just rendering).
+
+### Where to start (mobile)
+
+The mobile app is **blocked on the library** — start library Phase 28 first. Once `panchang-ts` v2.2 is published with Tarabala alone, ship a tiny dharmagya release that adds the Tarabala card to the Panchang tab. That's the smallest possible end-to-end loop and exercises the full publish → bump → render pipeline. After that, batch the rest of P8.1 fields together for v2.4.

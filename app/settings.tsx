@@ -7,7 +7,8 @@ import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type FontSize, type MasaSystem, type Region, type TimeFormat } from '@/store/useStore';
+import { useStore, type FontSize, type MasaSystem, type Region, type ThemeMode, type TimeFormat } from '@/store/useStore';
+import { requestRating, shareApp } from '@/utils/share';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
@@ -37,7 +38,8 @@ const SUNRISE_OFFSET_OPTIONS: { key: string; min: number }[] = [
 export default function SettingsScreen() {
   const {
     isDarkMode,
-    toggleTheme,
+    themeMode,
+    setThemeMode,
     userLocation,
     locationName,
     fontSize,
@@ -90,6 +92,7 @@ export default function SettingsScreen() {
   const [fontSheetOpen, setFontSheetOpen] = useState(false);
   const [langSheetOpen, setLangSheetOpen] = useState(false);
   const [masaSheetOpen, setMasaSheetOpen] = useState(false);
+  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [dailyTimePickerOpen, setDailyTimePickerOpen] = useState(false);
   const [sunriseOffsetSheetOpen, setSunriseOffsetSheetOpen] = useState(false);
   const [birthTimePickerOpen, setBirthTimePickerOpen] = useState(false);
@@ -117,6 +120,18 @@ export default function SettingsScreen() {
     { key: 'purnimanta', label: t('panchang.purnimanta'), desc: t('settings.masaSystemPurnimantaDesc') },
     { key: 'amanta', label: t('panchang.amanta'), desc: t('settings.masaSystemAmantaDesc') },
   ];
+
+  const themeOptions: OptionSheetItem<ThemeMode>[] = [
+    { key: 'system', label: t('settings.themeSystem'), desc: t('settings.themeSystemDesc') },
+    { key: 'light', label: t('settings.themeLight') },
+    { key: 'dark', label: t('settings.themeDark') },
+  ];
+  const themeLabel =
+    themeMode === 'light'
+      ? t('settings.themeLight')
+      : themeMode === 'dark'
+        ? t('settings.themeDark')
+        : t('settings.themeSystem');
 
   // Fetch today's sunrise once (needed to schedule the sunrise alert)
   useEffect(() => {
@@ -240,18 +255,12 @@ export default function SettingsScreen() {
         <SectionHeader label={t('settings.appearance')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
-          <SettingRow
+          <PickerRow
             icon="moon"
-            label={t('settings.darkMode')}
+            label={t('settings.theme')}
+            value={themeLabel}
+            onPress={() => setThemeSheetOpen(true)}
             colors={colors}
-            right={
-              <Switch
-                value={isDarkMode}
-                onValueChange={toggleTheme}
-                trackColor={{ false: colors.border, true: colors.accent + '60' }}
-                thumbColor={isDarkMode ? colors.accent : colors.textDisabled}
-              />
-            }
           />
 
           <Divider colors={colors} />
@@ -570,6 +579,38 @@ export default function SettingsScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             accessibilityRole="button"
+            accessibilityLabel={t('settings.rateApp')}
+            onPress={() => { void requestRating(); }}>
+            <SettingRow
+              icon="heart"
+              label={t('settings.rateApp')}
+              sublabel={t('settings.rateAppDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+
+          <Divider colors={colors} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.shareApp')}
+            onPress={() => { void shareApp(t('settings.shareAppMessage')); }}>
+            <SettingRow
+              icon="share"
+              label={t('settings.shareApp')}
+              sublabel={t('settings.shareAppDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+
+          <Divider colors={colors} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
             accessibilityLabel={t('settings.sendFeedback')}
             onPress={() => Linking.openURL('mailto:ishank1995dev@gmail.com?subject=Dharmagya%20Feedback')}>
             <SettingRow
@@ -650,6 +691,16 @@ export default function SettingsScreen() {
         options={masaOptions}
         value={masaSystem}
         onChange={(next) => setMasaSystem(next as MasaSystem)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={themeSheetOpen}
+        onClose={() => setThemeSheetOpen(false)}
+        title={t('settings.themePickerTitle')}
+        options={themeOptions}
+        value={themeMode}
+        onChange={(next) => setThemeMode(next as ThemeMode)}
         colors={colors}
       />
 

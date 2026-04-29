@@ -78,6 +78,7 @@ export type IconName =
   | 'walk'
   | 'warning'
   | 'chat'
+  | 'share'
   | 'shield';
 
 interface IconProps extends Omit<SvgProps, 'color'> {
@@ -625,6 +626,18 @@ function Glyph({ name, color }: GlyphProps) {
       return (
         <G fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round">
           <Path d="M4 5 H20 V16 H10 L5.5 20 V16 H4 Z" />
+        </G>
+      );
+    case 'share':
+      // Three-node share diagram: top-right + bottom-left + bottom-right
+      // circles connected by two diagonals.
+      return (
+        <G fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx={18} cy={5} r={2.5} />
+          <Circle cx={6} cy={12} r={2.5} />
+          <Circle cx={18} cy={19} r={2.5} />
+          <Line x1={8.2} y1={10.7} x2={15.8} y2={6.3} />
+          <Line x1={8.2} y1={13.3} x2={15.8} y2={17.7} />
         </G>
       );
     case 'shield':
