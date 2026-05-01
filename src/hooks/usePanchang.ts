@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
-import type { FestivalRegion, Language } from 'panchang-ts';
+import type { AyanamsaType, FestivalRegion, Language } from 'panchang-ts';
 
 import {
   FALLBACK_COORDS,
@@ -23,6 +23,9 @@ export function usePanchang(
   location: { lat: number; lon: number } | null,
   language: Language = 'en',
   region: FestivalRegion = 'all',
+  janmaNakshatra?: number,
+  janmaRashi?: number,
+  ayanamsa: AyanamsaType = 'lahiri',
 ): UsePanchangResult {
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [isFullyLoaded, setIsFullyLoaded] = useState(false);
@@ -46,7 +49,7 @@ export function usePanchang(
     // warm cache (e.g. populated by home) means no sync compute at all.
     let fast: IPanchangDay | null;
     try {
-      fast = getCachedPanchangDay(date, coords, { computeEndTimes: false, language, region });
+      fast = getCachedPanchangDay(date, coords, { computeEndTimes: false, language, region, janmaNakshatra, janmaRashi, ayanamsa });
     } catch {
       setError(true);
       setLoading(false);
@@ -67,11 +70,11 @@ export function usePanchang(
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
       try {
-        const full = getCachedPanchangDay(date, coords, { computeEndTimes: true, language, region });
+        const full = getCachedPanchangDay(date, coords, { computeEndTimes: true, language, region, janmaNakshatra, janmaRashi, ayanamsa });
         if (!full) return;
         let positions = full.planetaryPositions;
         if (!positions) {
-          try { positions = getCachedGrahaPositions(date, language); } catch { /* non-critical */ }
+          try { positions = getCachedGrahaPositions(date, language, ayanamsa); } catch { /* non-critical */ }
         }
         if (positions) full.planetaryPositions = positions;
         if (!cancelled) {
@@ -87,7 +90,7 @@ export function usePanchang(
       cancelled = true;
       handle.cancel();
     };
-  }, [date, lat, lon, language, region, retryCount]);
+  }, [date, lat, lon, language, region, janmaNakshatra, janmaRashi, ayanamsa, retryCount]);
 
   return { panchang, isFullyLoaded, loading, error, retry };
 }

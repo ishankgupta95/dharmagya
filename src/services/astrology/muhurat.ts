@@ -123,15 +123,6 @@ const RULES: Record<Occasion, OccasionRule> = {
 
 // ─── Rule evaluation ──────────────────────────────────────────────────────────
 
-/** Extract the tithi name without its paksha prefix. "Shukla Panchami" → "Panchami". */
-function stripPaksha(tithiName: string): { tithi: string; paksha: 'Shukla' | 'Krishna' | null } {
-  const trimmed = tithiName.trim();
-  if (trimmed.startsWith('Shukla ')) return { tithi: trimmed.slice(7), paksha: 'Shukla' };
-  if (trimmed.startsWith('Krishna ')) return { tithi: trimmed.slice(8), paksha: 'Krishna' };
-  // Purnima / Amavasya come through without a paksha prefix in some mappings.
-  return { tithi: trimmed, paksha: null };
-}
-
 export interface MuhuratMatch {
   /** Date with time zeroed to local midnight. */
   date: Date;
@@ -255,15 +246,18 @@ interface EvalMatch {
 }
 
 function evaluateDay(p: IPanchangDay, rule: OccasionRule): EvalMatch | null {
-  const tithiName = p.tithis[0]?.name ?? '';
+  const tithi = p.tithis[0];
+  const tithiName = tithi?.name ?? '';
+  const paksha = tithi?.paksha ?? null;
   const nakshatraName = p.nakshatras[0]?.name ?? '';
   const yogaName = p.yogas[0]?.name ?? '';
   const varaName = p.vara ?? '';
 
-  const { tithi: tithiStripped, paksha } = stripPaksha(tithiName);
-
   if (rule.requiresShuklaPaksha && paksha !== 'Shukla') return null;
-  if (!rule.auspiciousTithis.some(t => ciEq(t, tithiStripped))) return null;
+  // Tithi names from panchang-ts (English) come paksha-prefixed (e.g. "Shukla
+  // Panchami") — match against the rule's bare name via endsWith. Purnima /
+  // Amavasya come through without a prefix and aren't in any rule's list.
+  if (!rule.auspiciousTithis.some(t => endsWithCI(tithiName, t))) return null;
   if (!rule.auspiciousNakshatras.some(n => ciEq(n, nakshatraName))) return null;
   if (rule.excludedVaras.some(v => ciEq(v, varaName))) return null;
   if (rule.excludedYogas.some(y => ciEq(y, yogaName))) return null;
@@ -273,4 +267,8 @@ function evaluateDay(p: IPanchangDay, rule: OccasionRule): EvalMatch | null {
 
 function ciEq(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function endsWithCI(haystack: string, needle: string): boolean {
+  return haystack.trim().toLowerCase().endsWith(needle.trim().toLowerCase());
 }

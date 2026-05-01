@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   SectionList,
@@ -19,6 +19,8 @@ import { AdBanner } from '@/components/common/AdBanner';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
 import festivalsData from '@/data/static/festivals.json';
+import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
+import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
   name: string;
@@ -183,10 +185,20 @@ export default function FestivalsScreen() {
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const region = useStore(s => s.region);
+  const userLocation = useStore(s => s.userLocation);
   const colors = isDarkMode ? darkColors : lightColors;
 
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Upcoming eclipses (next ~12 months from today). Cached in service.
+  const [upcomingEclipses, setUpcomingEclipses] = useState<{ solar: IEclipseSummary | null; lunar: IEclipseSummary | null }>(
+    { solar: null, lunar: null },
+  );
+  useEffect(() => {
+    const coords = userLocation ?? FALLBACK_COORDS;
+    setUpcomingEclipses(fetchUpcomingEclipses(new Date(), coords));
+  }, [userLocation]);
 
   const festivalDays = useMemo(() => parseFestivalDays(year, region), [year, region]);
 
@@ -297,6 +309,46 @@ export default function FestivalsScreen() {
           )}
         </View>
       </View>
+
+      {(upcomingEclipses.solar || upcomingEclipses.lunar) && (
+        <View style={[styles.eclipseSection, { paddingHorizontal: spacing.screenH }]}>
+          <Kicker color={colors.accent} size={10} withTrailingRule ruleColor={colors.divider}>
+            {t('festivals.upcomingEclipses')}
+          </Kicker>
+          {(['solar', 'lunar'] as const).map(kind => {
+            const e = upcomingEclipses[kind];
+            if (!e) return null;
+            return (
+              <View
+                key={kind}
+                style={[
+                  styles.eclipseCard,
+                  { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' },
+                ]}>
+                <Icon
+                  name={e.kind === 'solar' ? 'sun' : 'moon'}
+                  size={16}
+                  color={palette.goldLeaf}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" style={[styles.eclipseTitle, { color: colors.textPrimary }]}>
+                    {t(e.kind === 'solar' ? 'festivals.solarEclipse' : 'festivals.lunarEclipse')}
+                    {' · '}
+                    {t(`festivals.eclipseSubtype.${e.subtype}`)}
+                  </Text>
+                  <Text variant="body-italic" style={[styles.eclipseMeta, { color: colors.textMuted }]}>
+                    {e.date}
+                    {' · '}
+                    {e.visibleFromLocation
+                      ? t('festivals.eclipseVisible')
+                      : t('festivals.eclipseNotVisible')}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       <SectionList
         sections={sections}
@@ -530,4 +582,18 @@ const styles = StyleSheet.create({
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontSize: 14 },
+
+  eclipseSection: { paddingTop: 4, paddingBottom: 12, gap: 8 },
+  eclipseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: borderRadius.cardInner,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  eclipseTitle: { fontSize: 13, lineHeight: 18 },
+  eclipseMeta: { fontSize: 11, marginTop: 2 },
 });

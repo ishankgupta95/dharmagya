@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type FontSize, type MasaSystem, type Region, type ThemeMode, type TimeFormat } from '@/store/useStore';
+import { useStore, type Ayanamsa, type FontSize, type MasaSystem, type Region, type ThemeMode, type TimeFormat } from '@/store/useStore';
 import { requestRating, shareApp } from '@/utils/share';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
@@ -46,6 +46,8 @@ export default function SettingsScreen() {
     setFontSize,
     language,
     setLanguage,
+    ayanamsa,
+    setAyanamsa,
     dailyReminderEnabled,
     setDailyReminderEnabled,
     dailyReminderTime,
@@ -121,6 +123,19 @@ export default function SettingsScreen() {
     { key: 'amanta', label: t('panchang.amanta'), desc: t('settings.masaSystemAmantaDesc') },
   ];
 
+  const ayanamsaOptions: OptionSheetItem<Ayanamsa>[] = [
+    { key: 'lahiri', label: t('settings.ayanamsa.lahiri'), desc: t('settings.ayanamsa.lahiriDesc') },
+    { key: 'raman', label: t('settings.ayanamsa.raman') },
+    { key: 'krishnamurti', label: t('settings.ayanamsa.kp') },
+  ];
+  const ayanamsaLabel =
+    ayanamsa === 'raman'
+      ? t('settings.ayanamsa.raman')
+      : ayanamsa === 'krishnamurti'
+        ? t('settings.ayanamsa.kp')
+        : t('settings.ayanamsa.lahiri');
+  const [ayanamsaSheetOpen, setAyanamsaSheetOpen] = useState(false);
+
   const themeOptions: OptionSheetItem<ThemeMode>[] = [
     { key: 'system', label: t('settings.themeSystem'), desc: t('settings.themeSystemDesc') },
     { key: 'light', label: t('settings.themeLight') },
@@ -134,11 +149,14 @@ export default function SettingsScreen() {
         : t('settings.themeSystem');
 
   // Fetch today's sunrise once (needed to schedule the sunrise alert)
+  // Also captures the numeric ayanamsa value for the diagnostic row.
+  const [ayanamsaValue, setAyanamsaValue] = useState<number | null>(null);
   useEffect(() => {
-    fetchPanchangForToday(userLocation).then((p) => {
+    fetchPanchangForToday(userLocation, resolveLanguage(language), region, ayanamsa).then((p) => {
       if (p?.sunrise && p.sunrise !== '—') setSunriseTime(p.sunrise);
+      if (typeof p?.ayanamsa === 'number') setAyanamsaValue(p.ayanamsa);
     });
-  }, [userLocation]);
+  }, [userLocation, language, region, ayanamsa]);
 
   const locationText = locationName
     ? locationName
@@ -335,6 +353,14 @@ export default function SettingsScreen() {
             label={t('settings.masaSystem')}
             value={masaLabel}
             onPress={() => setMasaSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <PickerRow
+            icon="compass"
+            label={t('settings.ayanamsa.label')}
+            value={ayanamsaLabel}
+            onPress={() => setAyanamsaSheetOpen(true)}
             colors={colors}
           />
         </View>
@@ -648,6 +674,23 @@ export default function SettingsScreen() {
             right={<Text variant="mono" style={[styles.versionText, { color: colors.textMuted }]}>v{Constants.expoConfig?.version ?? '—'}</Text>}
           />
 
+          {ayanamsaValue !== null && (
+            <>
+              <Divider colors={colors} />
+              <SettingRow
+                icon="compass"
+                label={t('settings.ayanamsa.label')}
+                sublabel={ayanamsaLabel}
+                colors={colors}
+                right={
+                  <Text variant="mono" style={[styles.versionText, { color: colors.textMuted }]}>
+                    {t('settings.ayanamsa.value', { degrees: ayanamsaValue.toFixed(2) })}
+                  </Text>
+                }
+              />
+            </>
+          )}
+
         </View>
 
         <View style={{ height: 40 }} />
@@ -691,6 +734,16 @@ export default function SettingsScreen() {
         options={masaOptions}
         value={masaSystem}
         onChange={(next) => setMasaSystem(next as MasaSystem)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={ayanamsaSheetOpen}
+        onClose={() => setAyanamsaSheetOpen(false)}
+        title={t('settings.ayanamsa.pickerTitle')}
+        options={ayanamsaOptions}
+        value={ayanamsa}
+        onChange={(next) => setAyanamsa(next as Ayanamsa)}
         colors={colors}
       />
 

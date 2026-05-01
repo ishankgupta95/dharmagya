@@ -1,9 +1,21 @@
 import * as Location from 'expo-location';
 import {
   getDailyPanchang,
+  getInstantPanchang,
   computePlanetaryPositions,
+  getSiderealMoonLongitude,
+  getUpcomingSolarEclipse,
+  getUpcomingLunarEclipse,
+  GRAHA_ABBR,
+  PanchangError,
+  type AyanamsaType,
   type DailyPanchangResult,
+  type DailyTithiInfo,
+  type DailyNakshatraInfo,
+  type DailyYogaInfo,
+  type DailyKaranaInfo,
   type FestivalRegion,
+  type GrahaName,
   type Language,
 } from 'panchang-ts';
 
@@ -15,11 +27,39 @@ import type {
   IGrahaPosition,
   IFestival,
   IEclipse,
+  IEclipseSummary,
+  IInstantPanchang,
   IBhadra,
+  IChandraBalam,
   FestivalType,
 } from '@/types';
 
 export const FALLBACK_COORDS = { lat: 25.3176, lon: 83.0103 }; // Varanasi (Kashi)
+
+// Re-exported for diagnostic UI; everything else uses the canonical `IGrahaPosition.planetEn`.
+export { GRAHA_ABBR };
+export type { GrahaName };
+
+/**
+ * Native's janma (birth) nakshatra index (0=Ashwini … 26=Revati) derived
+ * from the sidereal Moon longitude at the birth moment. Geocentric — does
+ * not depend on birth location.
+ */
+export function computeJanmaNakshatraIndex(birth: Date): number {
+  const lon = getSiderealMoonLongitude(birth, 'lahiri');
+  const idx = Math.floor(lon / (360 / 27));
+  return ((idx % 27) + 27) % 27;
+}
+
+/**
+ * Native's janma (birth) rashi index (0=Mesha … 11=Meena) — companion to
+ * janmaNakshatra, used for Chandra Balam.
+ */
+export function computeJanmaRashiIndex(birth: Date): number {
+  const lon = getSiderealMoonLongitude(birth, 'lahiri');
+  const idx = Math.floor(lon / 30);
+  return ((idx % 12) + 12) % 12;
+}
 
 // Name tables for computePlanetaryPositions (which uses callbacks, not a language option)
 const RASHI_NAMES: Record<Language, string[]> = {
@@ -50,10 +90,21 @@ const NAKSHATRA_NAMES: Record<Language, string[]> = {
   ],
 };
 
-const GRAHA_NAMES: Record<Language, Record<string, string>> = {
+const GRAHA_NAMES: Record<Language, Record<GrahaName, string>> = {
   en: { Sun: 'Sun', Moon: 'Moon', Mars: 'Mars', Mercury: 'Mercury', Jupiter: 'Jupiter', Venus: 'Venus', Saturn: 'Saturn', Rahu: 'Rahu', Ketu: 'Ketu' },
   hi: { Sun: 'सूर्य', Moon: 'चंद्र', Mars: 'मंगल', Mercury: 'बुध', Jupiter: 'बृहस्पति', Venus: 'शुक्र', Saturn: 'शनि', Rahu: 'राहु', Ketu: 'केतु' },
 };
+
+// Note on intentionally-unused panchang-ts surface area:
+// • Classical aliases `dinamanaMinutes` / `ratrimanaMinutes` are not surfaced
+//   because they're identical to `dayDurationMinutes` / `nightDurationMinutes`,
+//   which we already display.
+// • Standalone helpers — `computeAbhijitMuhurta`, `getMoonrise`, `getEclipseDuringDay`,
+//   `computeVimshottariDasha` (raw), etc. — are deliberately not used directly:
+//   all daily fields flow through `getDailyPanchang` so the LRU cache below
+//   stays the source of truth, and `computeVimshottariDashaFromBirth` is
+//   preferred over `computeVimshottariDasha` because we always have a birth
+//   moment.
 
 // Dates from panchang-ts are offset-adjusted local display dates — read via getUTC*.
 function formatTime(date: Date | null | undefined): string | undefined {
@@ -65,17 +116,72 @@ function formatTime(date: Date | null | undefined): string | undefined {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
-function toElements(items: { name: string; endTime: Date | null }[]): IPanchangElement[] {
+/** Coerce the lib's locale-specific paksha string into our typed union. */
+function normalizePaksha(p: string | undefined | null): 'Shukla' | 'Krishna' | null {
+  if (!p) return null;
+  const trimmed = p.trim();
+  if (trimmed === 'Shukla' || trimmed === 'शुक्ल') return 'Shukla';
+  if (trimmed === 'Krishna' || trimmed === 'कृष्ण') return 'Krishna';
+  return null;
+}
+
+function toTithiElements(items: DailyTithiInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
     endTime: formatTime(item.endTime),
     endTimeMs: item.endTime?.getTime(),
+    paksha: normalizePaksha(item.paksha),
+    tithiNumber: item.number,
+    completionPercentage: item.completionPercentage,
+    startTime: formatTime(item.startTime),
+    isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
 
-function toQualitySlots(
-  slots: DailyPanchangResult['choghadiya']['day'],
-): IQualitySlot[] {
+function toNakshatraElements(items: DailyNakshatraInfo[]): IPanchangElement[] {
+  return items.map(item => ({
+    name: item.name,
+    endTime: formatTime(item.endTime),
+    endTimeMs: item.endTime?.getTime(),
+    pada: item.pada,
+    completionPercentage: item.completionPercentage,
+    startTime: formatTime(item.startTime),
+    isActiveAtSunrise: item.isActiveAtSunrise,
+  }));
+}
+
+function toYogaElements(items: DailyYogaInfo[]): IPanchangElement[] {
+  return items.map(item => ({
+    name: item.name,
+    endTime: formatTime(item.endTime),
+    endTimeMs: item.endTime?.getTime(),
+    completionPercentage: item.completionPercentage,
+    startTime: formatTime(item.startTime),
+    isActiveAtSunrise: item.isActiveAtSunrise,
+  }));
+}
+
+function toKaranaElements(items: DailyKaranaInfo[]): IPanchangElement[] {
+  return items.map(item => ({
+    name: item.name,
+    endTime: formatTime(item.endTime),
+    endTimeMs: item.endTime?.getTime(),
+    karanaType: item.type,
+    completionPercentage: item.completionPercentage,
+    startTime: formatTime(item.startTime),
+    isActiveAtSunrise: item.isActiveAtSunrise,
+  }));
+}
+
+interface RawQualitySlot {
+  name: string;
+  quality: IQualitySlot['quality'];
+  qualityName: string;
+  start: Date;
+  end: Date;
+}
+
+function toQualitySlots(slots: readonly RawQualitySlot[]): IQualitySlot[] {
   return slots.map(s => ({
     name: s.name,
     quality: s.quality,
@@ -143,15 +249,27 @@ function mapBhadra(b: DailyPanchangResult['bhadra']): IBhadra | null {
   };
 }
 
+function mapChandraBalam(cb: DailyPanchangResult['chandraBalam']): IChandraBalam | null {
+  if (!cb) return null;
+  return {
+    house: cb.house,
+    quality: cb.quality,
+    englishName: cb.englishName,
+    name: cb.name,
+  };
+}
+
 export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
   return {
     date: result.date,
-    tithis: toElements(result.tithis),
-    nakshatras: toElements(result.nakshatras),
-    yogas: toElements(result.yogas),
-    karanas: toElements(result.karanas),
+    tithis: toTithiElements(result.tithis),
+    nakshatras: toNakshatraElements(result.nakshatras),
+    yogas: toYogaElements(result.yogas),
+    karanas: toKaranaElements(result.karanas),
     sunrise: formatTime(result.sunrise) ?? '—',
     sunset: formatTime(result.sunset) ?? '—',
+    nextSunrise: formatTime(result.nextSunrise),
+    ayanamsa: result.ayanamsa,
     rahuKalamStart: formatTime(result.rahuKalam.start),
     rahuKalamEnd: formatTime(result.rahuKalam.end),
     yamagandaStart: formatTime(result.yamaganda.start),
@@ -168,6 +286,7 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
     hinduMonth: result.chandramasa.purnimantaName,
     hinduMonthAmanta: result.chandramasa.name,
     hinduMonthPurnimanta: result.chandramasa.purnimantaName,
+    isAdhikaMasa: result.chandramasa.isAdhika,
     masa: result.masa.name,
     vikramSamvat: result.samvat.vikramSamvat,
     shakaSamvat: result.samvat.shakaSamvat,
@@ -185,9 +304,29 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
     nishitaMuhurtaEnd: formatTime(result.nishitaMuhurta.end),
     amritKalaStart: result.amritKala ? formatTime(result.amritKala.start) : undefined,
     amritKalaEnd: result.amritKala ? formatTime(result.amritKala.end) : undefined,
+    madhyahnaStart: formatTime(result.madhyahna.start),
+    madhyahnaEnd: formatTime(result.madhyahna.end),
+    pratahSandhyaStart: formatTime(result.pratahSandhya.start),
+    pratahSandhyaEnd: formatTime(result.pratahSandhya.end),
+    sayahnaSandhyaStart: formatTime(result.sayahnaSandhya.start),
+    sayahnaSandhyaEnd: formatTime(result.sayahnaSandhya.end),
+    varjyamStart: result.varjyam ? formatTime(result.varjyam.start) : undefined,
+    varjyamEnd: result.varjyam ? formatTime(result.varjyam.end) : undefined,
+    gandaMula: result.gandaMula.active
+      ? { nakshatraName: result.gandaMula.nakshatraName, severity: result.gandaMula.severity }
+      : null,
+    anandadiYoga: { name: result.anandadiYoga.name, quality: result.anandadiYoga.quality },
+    tarabala: result.tarabala
+      ? { name: result.tarabala.name, englishName: result.tarabala.englishName, quality: result.tarabala.quality }
+      : null,
+    chandraBalam: mapChandraBalam(result.chandraBalam),
     bhadra: mapBhadra(result.bhadra),
     eclipse: mapEclipse(result.eclipse),
     panchaka: result.panchaka,
+    panchakaRahita: result.panchakaRahita.map(p => ({
+      start: formatTime(p.start) ?? '',
+      end: formatTime(p.end) ?? '',
+    })),
     dayDurationMinutes: result.dayDurationMinutes,
     nightDurationMinutes: result.nightDurationMinutes,
     choghadiya: {
@@ -197,6 +336,10 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
     gowriPanchangam: {
       day: toQualitySlots(result.gowriPanchangam.day),
       night: toQualitySlots(result.gowriPanchangam.night),
+    },
+    doGhatiMuhurta: {
+      day: toQualitySlots(result.doGhatiMuhurta.day),
+      night: toQualitySlots(result.doGhatiMuhurta.night),
     },
     hora: {
       day: toHoraSlots(result.hora.day),
@@ -228,8 +371,13 @@ function dayCacheKey(
   lon: number,
   language: Language,
   region: FestivalRegion,
+  janmaNakshatra: number | undefined,
+  janmaRashi: number | undefined,
+  ayanamsa: AyanamsaType,
 ): string {
-  return `${ymdLocal(date)}|${lat.toFixed(4)}|${lon.toFixed(4)}|${language}|${region}`;
+  const j = janmaNakshatra ?? '_';
+  const r = janmaRashi ?? '_';
+  return `${ymdLocal(date)}|${lat.toFixed(4)}|${lon.toFixed(4)}|${language}|${region}|${j}|${r}|${ayanamsa}`;
 }
 
 function lruSet<K, V>(map: Map<K, V>, key: K, value: V, max: number) {
@@ -256,9 +404,17 @@ function lruHit<K, V>(map: Map<K, V>, key: K): V | undefined {
 export function getCachedPanchangDay(
   date: Date,
   coords: { lat: number; lon: number },
-  opts: { computeEndTimes: boolean; language: Language; region: FestivalRegion },
+  opts: {
+    computeEndTimes: boolean;
+    language: Language;
+    region: FestivalRegion;
+    janmaNakshatra?: number;
+    janmaRashi?: number;
+    ayanamsa?: AyanamsaType;
+  },
 ): IPanchangDay | null {
-  const key = dayCacheKey(date, coords.lat, coords.lon, opts.language, opts.region);
+  const ayanamsa = opts.ayanamsa ?? 'lahiri';
+  const key = dayCacheKey(date, coords.lat, coords.lon, opts.language, opts.region, opts.janmaNakshatra, opts.janmaRashi, ayanamsa);
   const hit = lruHit(DAY_CACHE, key);
   if (hit && (hit.full || !opts.computeEndTimes)) return hit.day;
 
@@ -266,7 +422,15 @@ export function getCachedPanchangDay(
   const raw = getDailyPanchang(
     date,
     { latitude: coords.lat, longitude: coords.lon },
-    { timezone, computeEndTimes: opts.computeEndTimes, language: opts.language, region: opts.region },
+    {
+      timezone,
+      computeEndTimes: opts.computeEndTimes,
+      language: opts.language,
+      region: opts.region,
+      janmaNakshatra: opts.janmaNakshatra,
+      janmaRashi: opts.janmaRashi,
+      ayanamsa,
+    },
   );
   if (!raw) return null;
   const mapped = mapToPanchangDay(raw);
@@ -274,30 +438,49 @@ export function getCachedPanchangDay(
   return mapped;
 }
 
-export function getCachedGrahaPositions(date: Date, language: Language = 'en'): IGrahaPosition[] {
-  const key = `${ymdLocal(date)}|${language}`;
+export function getCachedGrahaPositions(
+  date: Date,
+  language: Language = 'en',
+  ayanamsa: AyanamsaType = 'lahiri',
+): IGrahaPosition[] {
+  const key = `${ymdLocal(date)}|${language}|${ayanamsa}`;
   const hit = lruHit(GRAHA_CACHE, key);
   if (hit) return hit;
-  const result = fetchGrahaPositions(date, language);
+  const result = fetchGrahaPositions(date, language, ayanamsa);
   lruSet(GRAHA_CACHE, key, result, GRAHA_CACHE_MAX);
   return result;
 }
 
-export function fetchGrahaPositions(date: Date, language: Language = 'en'): IGrahaPosition[] {
+export function fetchGrahaPositions(
+  date: Date,
+  language: Language = 'en',
+  ayanamsa: AyanamsaType = 'lahiri',
+): IGrahaPosition[] {
   const grahaNames = GRAHA_NAMES[language];
   const rashiNames = RASHI_NAMES[language];
   const nakshatraNames = NAKSHATRA_NAMES[language];
   const raw = computePlanetaryPositions(
     date,
-    'lahiri',
+    ayanamsa,
     (idx) => nakshatraNames[idx],
     (idx) => rashiNames[idx],
   );
-  const planets = ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn', 'rahu', 'ketu'] as const;
-  return planets.map(key => {
-    const p = (raw as Record<string, any>)[key];
+  const keys: { key: keyof typeof raw; en: GrahaName }[] = [
+    { key: 'sun', en: 'Sun' },
+    { key: 'moon', en: 'Moon' },
+    { key: 'mars', en: 'Mars' },
+    { key: 'mercury', en: 'Mercury' },
+    { key: 'jupiter', en: 'Jupiter' },
+    { key: 'venus', en: 'Venus' },
+    { key: 'saturn', en: 'Saturn' },
+    { key: 'rahu', en: 'Rahu' },
+    { key: 'ketu', en: 'Ketu' },
+  ];
+  return keys.map(({ key, en }) => {
+    const p = raw[key];
     return {
-      planet: grahaNames[p.planet] ?? p.planet,
+      planet: grahaNames[en] ?? en,
+      planetEn: en,
       rashi: p.rashi.name,
       degreeInRashi: Math.round(p.degreeInRashi * 100) / 100,
       nakshatra: p.nakshatra.name,
@@ -318,8 +501,10 @@ async function getCoords(): Promise<{ lat: number; lon: number }> {
       });
       return { lat: loc.coords.latitude, lon: loc.coords.longitude };
     }
-  } catch {
-    // fall through to fallback
+  } catch (e) {
+    if (e instanceof PanchangError) {
+      console.warn('[panchang]', e.code, e.message);
+    }
   }
   return FALLBACK_COORDS;
 }
@@ -330,6 +515,9 @@ export async function fetchPanchang(
   computeEndTimes = true,
   language: Language = 'en',
   region: FestivalRegion = 'all',
+  janmaNakshatra?: number,
+  janmaRashi?: number,
+  ayanamsa: AyanamsaType = 'lahiri',
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
@@ -337,11 +525,14 @@ export async function fetchPanchang(
     const result = getDailyPanchang(
       date,
       { latitude: coords.lat, longitude: coords.lon },
-      { timezone, computeEndTimes, language, region },
+      { timezone, computeEndTimes, language, region, janmaNakshatra, janmaRashi, ayanamsa },
     );
     if (!result) return null;
     return mapToPanchangDay(result);
-  } catch {
+  } catch (e) {
+    if (e instanceof PanchangError) {
+      console.warn('[panchang]', e.code, e.message);
+    }
     return null;
   }
 }
@@ -350,11 +541,102 @@ export async function fetchPanchangForToday(
   savedCoords?: { lat: number; lon: number } | null,
   language: Language = 'en',
   region: FestivalRegion = 'all',
+  ayanamsa: AyanamsaType = 'lahiri',
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
-    return getCachedPanchangDay(new Date(), coords, { computeEndTimes: true, language, region });
-  } catch {
+    return getCachedPanchangDay(new Date(), coords, { computeEndTimes: true, language, region, ayanamsa });
+  } catch (e) {
+    if (e instanceof PanchangError) {
+      console.warn('[panchang]', e.code, e.message);
+    }
     return null;
   }
+}
+
+/**
+ * Snapshot of tithi/nakshatra/yoga/karana at the queried instant. Lighter than
+ * `getCachedPanchangDay` — used to render an "AT THIS MOMENT" line on Today.
+ */
+export function fetchInstantPanchang(
+  now: Date,
+  coords: { lat: number; lon: number },
+  language: Language = 'en',
+  ayanamsa: AyanamsaType = 'lahiri',
+): IInstantPanchang | null {
+  try {
+    const raw = getInstantPanchang(
+      now,
+      { latitude: coords.lat, longitude: coords.lon },
+      { language, ayanamsa, computeEndTimes: false },
+    );
+    if (!raw) return null;
+    return {
+      tithi: raw.tithi.name,
+      nakshatra: raw.nakshatra.name,
+      yoga: raw.yoga.name,
+      karana: raw.karana.name,
+    };
+  } catch (e) {
+    if (e instanceof PanchangError) {
+      console.warn('[panchang]', e.code, e.message);
+    }
+    return null;
+  }
+}
+
+// Eclipses are deterministic and far apart; a tiny memo is plenty.
+interface EclipseCacheEntry {
+  solar: IEclipseSummary | null;
+  lunar: IEclipseSummary | null;
+}
+const ECLIPSE_CACHE = new Map<string, EclipseCacheEntry>();
+const ECLIPSE_CACHE_MAX = 8;
+
+const ECLIPSE_LOOK_AHEAD_DAYS = 365;
+
+function eclipseDateOf(d: Date): string {
+  // Eclipses come from panchang-ts as UTC Date objects; convert to local YMD.
+  const local = new Date(d);
+  const y = local.getFullYear();
+  const m = String(local.getMonth() + 1).padStart(2, '0');
+  const day = String(local.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function summarizeEclipse(e: ReturnType<typeof getUpcomingSolarEclipse>): IEclipseSummary | null {
+  if (!e) return null;
+  return {
+    kind: e.kind,
+    subtype: e.subtype,
+    date: eclipseDateOf(e.peak),
+    peak: formatTime(e.peak) ?? '',
+    visibleFromLocation: e.visibleFromLocation,
+    description: e.description,
+  };
+}
+
+export function fetchUpcomingEclipses(
+  fromDate: Date,
+  coords: { lat: number; lon: number },
+): EclipseCacheEntry {
+  const key = `${eclipseDateOf(fromDate)}|${coords.lat.toFixed(2)}|${coords.lon.toFixed(2)}`;
+  const hit = lruHit(ECLIPSE_CACHE, key);
+  if (hit) return hit;
+  const loc = { latitude: coords.lat, longitude: coords.lon };
+  let solar: IEclipseSummary | null = null;
+  let lunar: IEclipseSummary | null = null;
+  try {
+    solar = summarizeEclipse(getUpcomingSolarEclipse(fromDate, loc, ECLIPSE_LOOK_AHEAD_DAYS));
+  } catch (e) {
+    if (e instanceof PanchangError) console.warn('[panchang]', e.code, e.message);
+  }
+  try {
+    lunar = summarizeEclipse(getUpcomingLunarEclipse(fromDate, loc, ECLIPSE_LOOK_AHEAD_DAYS));
+  } catch (e) {
+    if (e instanceof PanchangError) console.warn('[panchang]', e.code, e.message);
+  }
+  const entry: EclipseCacheEntry = { solar, lunar };
+  lruSet(ECLIPSE_CACHE, key, entry, ECLIPSE_CACHE_MAX);
+  return entry;
 }

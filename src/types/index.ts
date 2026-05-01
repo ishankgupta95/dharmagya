@@ -58,6 +58,26 @@ export interface IFestival {
   deferralDate?: string;
 }
 
+/** Lightweight summary of an upcoming eclipse — used for forecasting cards. */
+export interface IEclipseSummary {
+  kind: 'solar' | 'lunar';
+  subtype: 'partial' | 'total' | 'annular' | 'penumbral';
+  /** ISO yyyy-mm-dd of the local calendar date the eclipse peak falls on. */
+  date: string;
+  /** Formatted h:mm AM/PM in the local timezone. */
+  peak: string;
+  visibleFromLocation: boolean;
+  description: string;
+}
+
+/** Snapshot of the panchang elements active at a single instant (vs sunrise-day). */
+export interface IInstantPanchang {
+  tithi: string;
+  nakshatra: string;
+  yoga: string;
+  karana: string;
+}
+
 /** Solar or lunar eclipse overlapping the Hindu day. */
 export interface IEclipse {
   kind: 'solar' | 'lunar';
@@ -81,9 +101,45 @@ export interface IBhadra {
   location: 'earth' | 'heaven' | 'paatal';
 }
 
+/** Ganda Mula — Moon in one of the 6 root nakshatras at sunrise. */
+export interface IGandaMula {
+  nakshatraName: string;
+  /** Mula/Jyeshtha = severe; Ashwini/Ashlesha/Magha/Revati = mild. */
+  severity: 'mild' | 'severe';
+}
+
+/** Anandadi Yoga — Vara × Nakshatra 28-name cycle yoga at sunrise. */
+export interface IAnandadiYoga {
+  name: string;
+  quality: 'auspicious' | 'inauspicious' | 'neutral';
+}
+
+/** Tarabala — 9-tara cycle position relative to native's janma nakshatra. */
+export interface ITarabala {
+  /** Locale-specific name (Janma/Sampat/Vipat/…). */
+  name: string;
+  /** Sanskrit transliteration; stable across locales for keying styles. */
+  englishName: string;
+  quality: 'auspicious' | 'inauspicious';
+}
+
+/** Chandra Balam — transit-Moon strength relative to native's janma rashi. */
+export interface IChandraBalam {
+  /** 1 = janma rashi itself; 2 = next rashi; … 12 = rashi prior to janma. */
+  house: number;
+  quality: 'strong' | 'weak';
+  /** Sanskrit transliteration ('Shubha' | 'Ashubha'). */
+  englishName: string;
+  /** Locale-specific name. */
+  name: string;
+}
+
 /** Sidereal position of a graha. */
 export interface IGrahaPosition {
+  /** Localized display name. */
   planet: string;
+  /** Canonical English name (stable key for icon / abbreviation lookup). */
+  planetEn: 'Sun' | 'Moon' | 'Mars' | 'Mercury' | 'Jupiter' | 'Venus' | 'Saturn' | 'Rahu' | 'Ketu';
   rashi: string;
   degreeInRashi: number;
   nakshatra: string;
@@ -102,6 +158,20 @@ export interface IPanchangElement {
    * Use this to find which element is active right now.
    */
   endTimeMs?: number;
+  /** Tithi-only: lunar fortnight. Null for Purnima/Amavasya boundary entries. */
+  paksha?: 'Shukla' | 'Krishna' | null;
+  /** Tithi-only: tithi number 1–15. */
+  tithiNumber?: number;
+  /** Nakshatra-only: pada (quarter) 1–4. */
+  pada?: number;
+  /** Karana-only: 4 fixed (Shakuni/Naga/Chatushpada/Kintughna) vs 7 movable. */
+  karanaType?: 'fixed' | 'movable';
+  /** Fraction (0–1) of this element's natural span elapsed at sunrise. */
+  completionPercentage?: number;
+  /** Formatted start time. Undefined = element began before previous sunrise. */
+  startTime?: string;
+  /** True for the entry that's active at the day's sunrise (the muhurta-correct one). */
+  isActiveAtSunrise?: boolean;
 }
 
 /** Full panchang for a sunrise-to-sunrise day. Elements are arrays because
@@ -144,13 +214,35 @@ export interface IPanchangDay {
   nishitaMuhurtaEnd?: string;
   amritKalaStart?: string;
   amritKalaEnd?: string;
+  madhyahnaStart?: string;
+  madhyahnaEnd?: string;
+  pratahSandhyaStart?: string;
+  pratahSandhyaEnd?: string;
+  sayahnaSandhyaStart?: string;
+  sayahnaSandhyaEnd?: string;
+  varjyamStart?: string;
+  varjyamEnd?: string;
+  gandaMula?: IGandaMula | null;
+  anandadiYoga?: IAnandadiYoga;
+  tarabala?: ITarabala | null;
+  chandraBalam?: IChandraBalam | null;
   bhadra?: IBhadra | null;
+  /** Sunrise of the day after this Hindu day (used to flank the panchang day). */
+  nextSunrise?: string;
+  /** Lahiri/Raman/KP ayanamsa value used for this calculation, in degrees. */
+  ayanamsa?: number;
+  /** True on Adhika Masa (leap-month) days — Purushottam Maas. */
+  isAdhikaMasa: boolean;
   eclipse?: IEclipse | null;
   panchaka: boolean;
+  /** Slices of the Hindu day FREE of Panchaka. Used to show a relief
+   *  window on Panchaka-transition days. */
+  panchakaRahita: { start: string; end: string }[];
   dayDurationMinutes: number;
   nightDurationMinutes: number;
   choghadiya: { day: IQualitySlot[]; night: IQualitySlot[] };
   gowriPanchangam: { day: IQualitySlot[]; night: IQualitySlot[] };
+  doGhatiMuhurta: { day: IQualitySlot[]; night: IQualitySlot[] };
   hora: { day: IHoraSlot[]; night: IHoraSlot[] };
   specialYogas: ISpecialYoga[];
   festivals: IFestival[];

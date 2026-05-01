@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, memo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import {
   View,
@@ -23,6 +23,7 @@ import {
   type ColorPalette,
 } from '@/config/theme';
 import { usePanchang } from '@/hooks/usePanchang';
+import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang } from '@/services/astrology/panchangService';
 import { resolveLanguage } from '@/i18n';
 import { PanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { ScreenMount } from '@/components/common/ScreenMount';
@@ -35,7 +36,7 @@ import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
 import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
 import { getFestivalDaysInMonth } from '@/services/astrology/calendarMonth';
-import type { IPanchangElement } from '@/types';
+import type { IInstantPanchang, IPanchangElement } from '@/types';
 
 // Auspicious-yoga banner accent. Mid-green chosen to clear ~4.5:1 on both
 // parchment (#F4E9CE) and nightPlinthDeep (#1A1008) so the banner reads
@@ -111,12 +112,17 @@ function getActiveIndex(elements: IPanchangElement[]): number {
 const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday }: LimbRowProps) {
   const { t } = useTranslation();
   const activeIdx = isToday ? getActiveIndex(elements) : -1;
+  const showSunriseDot = elements.length > 1 && elements.some(el => el.isActiveAtSunrise);
   return (
     <>
       <View style={styles.limbRow}>
         <Text style={[styles.limbLabel, { color: colors.accent }]}>{label}</Text>
         {elements.map((el, i) => {
           const isActive = i === activeIdx;
+          // Pada is appended only when the lib didn't already encode it in the name.
+          const padaSuffix = el.pada !== undefined ? ` · ${t('panchang.pada', { number: el.pada })}` : '';
+          const completion = el.completionPercentage;
+          const showProgress = typeof completion === 'number' && completion > 0 && completion < 1 && el.endTime;
           return (
             <View
               key={i}
@@ -127,17 +133,34 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
               ]}>
               <View style={styles.limbNameRow}>
                 <View style={styles.limbNameLeft}>
-                  <Text style={[styles.limbValue, { color: colors.textPrimary }]}>{el.name}</Text>
+                  <Text style={[styles.limbValue, { color: colors.textPrimary }]}>
+                    {el.name}{padaSuffix}
+                  </Text>
                   {el.endTime && (
                     <Text style={[styles.limbEndTime, { color: colors.textMuted }]}>{t('home.untilTime', { time: el.endTime })}</Text>
                   )}
                 </View>
+                {showSunriseDot && el.isActiveAtSunrise && !isActive && (
+                  <View style={[styles.limbSunriseChip, { borderColor: colors.accent }]}>
+                    <Text style={[styles.limbSunriseChipText, { color: colors.accent }]}>{t('panchang.atSunrise')}</Text>
+                  </View>
+                )}
                 {isActive && (
                   <View style={[styles.limbActiveBadge, { backgroundColor: colors.accent }]}>
                     <Text style={[styles.limbActiveText, { color: colors.base }]}>{t('panchang.activeNow')}</Text>
                   </View>
                 )}
               </View>
+              {showProgress && (
+                <View style={[styles.limbProgressTrack, { backgroundColor: colors.divider }]}>
+                  <View
+                    style={[
+                      styles.limbProgressFill,
+                      { width: `${Math.round(completion * 100)}%`, backgroundColor: colors.accent + 'AA' },
+                    ]}
+                  />
+                </View>
+              )}
             </View>
           );
         })}
@@ -182,6 +205,9 @@ export default function PanchangScreen() {
   const masaSystem = useStore(s => s.masaSystem);
   const setMasaSystem = useStore(s => s.setMasaSystem);
   const region = useStore(s => s.region);
+  const ayanamsa = useStore(s => s.ayanamsa);
+  const userBirthDate = useStore(s => s.userBirthDate);
+  const userBirthTime = useStore(s => s.userBirthTime);
   const showVikramSamvat = useStore(s => s.showVikramSamvat);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
@@ -196,7 +222,37 @@ export default function PanchangScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const panchangLang = resolveLanguage(language);
-  const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang, region);
+  const birthMoment = useMemo<Date | null>(() => {
+    if (!userBirthDate) return null;
+    const timePart = userBirthTime ? `${userBirthTime}:00` : '12:00:00';
+    const birth = new Date(`${userBirthDate}T${timePart}`);
+    return Number.isNaN(birth.getTime()) ? null : birth;
+  }, [userBirthDate, userBirthTime]);
+  const janmaNakshatra = useMemo<number | undefined>(() => {
+    if (!birthMoment) return undefined;
+    try { return computeJanmaNakshatraIndex(birthMoment); } catch { return undefined; }
+  }, [birthMoment]);
+  const janmaRashi = useMemo<number | undefined>(() => {
+    if (!birthMoment) return undefined;
+    try { return computeJanmaRashiIndex(birthMoment); } catch { return undefined; }
+  }, [birthMoment]);
+  const { panchang, loading, error, retry } = usePanchang(selectedDate, userLocation, panchangLang, region, janmaNakshatra, janmaRashi, ayanamsa);
+
+  // ── Instant snapshot — only relevant when viewing today ─────────────────
+  const [instant, setInstant] = useState<IInstantPanchang | null>(null);
+  const isViewingToday = isSameDay(selectedDate, today);
+  useEffect(() => {
+    if (!isViewingToday) {
+      setInstant(null);
+      return;
+    }
+    const coords = userLocation ?? { lat: 25.3176, lon: 83.0103 };
+    setInstant(fetchInstantPanchang(new Date(), coords, panchangLang, ayanamsa));
+    const id = setInterval(() => {
+      setInstant(fetchInstantPanchang(new Date(), coords, panchangLang, ayanamsa));
+    }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [isViewingToday, userLocation, panchangLang, ayanamsa]);
 
   // Calendar cells + per-day tithi/festival data for the visible month.
   const calYear = calMonth.getFullYear();
@@ -255,7 +311,6 @@ export default function PanchangScreen() {
     setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
 
-  const isViewingToday = isSameDay(selectedDate, today);
   const monthNames = t('panchang.monthNames', { returnObjects: true }) as string[];
   const dayHeaders = t('panchang.dayHeaders', { returnObjects: true }) as string[];
 
@@ -453,7 +508,7 @@ export default function PanchangScreen() {
               <Icon name="chevron-right" size={14} color={colors.accent} />
             </TouchableOpacity>
 
-            {/* ── Banners (festivals, special yogas, panchaka) ── */}
+            {/* ── Banners (festivals, adhika masa, special yogas, panchaka) ── */}
             {/* Tinted-semantic alerts compose on both parchment + nightPlinth grounds. */}
             {panchang.festivals.length > 0 && panchang.festivals.map((f, i) => (
               <View key={i} style={[styles.panchakaBar, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}>
@@ -463,6 +518,23 @@ export default function PanchangScreen() {
                 </Text>
               </View>
             ))}
+            {panchang.isAdhikaMasa && (
+              <View style={[styles.panchakaBar, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}>
+                <Icon name="sparkles" size={14} color={palette.goldLeaf} />
+                <Text style={[styles.panchakaText, { color: palette.goldLeaf }]}>{t('panchang.adhikaMasa')}</Text>
+              </View>
+            )}
+            {/* AT THIS MOMENT — only on today */}
+            {isViewingToday && instant && (
+              <View style={[styles.instantRow, { borderColor: colors.divider }]}>
+                <Text variant="mono-caps" style={[styles.instantKicker, { color: colors.accent }]}>
+                  {t('panchang.atThisMoment')}
+                </Text>
+                <Text variant="body-italic" style={[styles.instantBody, { color: colors.textSecondary }]}>
+                  {`${instant.tithi} · ${instant.nakshatra} · ${instant.yoga}`}
+                </Text>
+              </View>
+            )}
             {panchang.specialYogas.length > 0 && panchang.specialYogas.map((y, i) => (
               <View key={i} style={[styles.panchakaBar, { backgroundColor: AUSPICIOUS_GREEN + '1E', borderColor: AUSPICIOUS_GREEN + '66' }]}>
                 <Icon name="sparkles" size={14} color={AUSPICIOUS_GREEN} />
@@ -472,7 +544,44 @@ export default function PanchangScreen() {
             {panchang.panchaka && (
               <View style={[styles.panchakaBar, { backgroundColor: palette.sindoorWarm + '1E', borderColor: palette.sindoorWarm + '66' }]}>
                 <Icon name="alert-circle" size={15} color={palette.sindoorWarm} />
-                <Text style={[styles.panchakaText, { color: palette.sindoorWarm }]}>{t('panchang.panchaka')}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.panchakaText, { color: palette.sindoorWarm }]}>{t('panchang.panchaka')}</Text>
+                  {panchang.panchakaRahita.length > 0 && (
+                    <Text style={[styles.bhadraNote, { color: palette.sindoorWarm }]}>
+                      {t('panchang.panchakaRahita', {
+                        start: panchang.panchakaRahita[0].start,
+                        end: panchang.panchakaRahita[0].end,
+                      })}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+            {panchang.gandaMula && (
+              <View
+                style={[
+                  styles.panchakaBar,
+                  panchang.gandaMula.severity === 'severe'
+                    ? { backgroundColor: semanticColors.error + '1E', borderColor: semanticColors.error + '66' }
+                    : { backgroundColor: palette.sindoorWarm + '1E', borderColor: palette.sindoorWarm + '66' },
+                ]}>
+                <Icon
+                  name="alert-circle"
+                  size={15}
+                  color={panchang.gandaMula.severity === 'severe' ? semanticColors.error : palette.sindoorWarm}
+                />
+                <Text
+                  style={[
+                    styles.panchakaText,
+                    { color: panchang.gandaMula.severity === 'severe' ? semanticColors.error : palette.sindoorWarm },
+                  ]}>
+                  {t(
+                    panchang.gandaMula.severity === 'severe'
+                      ? 'panchang.gandaMulaSevere'
+                      : 'panchang.gandaMulaMild',
+                    { nakshatra: panchang.gandaMula.nakshatraName },
+                  )}
+                </Text>
               </View>
             )}
 
@@ -485,6 +594,23 @@ export default function PanchangScreen() {
               <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} isToday={isViewingToday} />
               <LimbRow label={t('home.karana')} elements={panchang.karanas} colors={colors} isToday={isViewingToday} />
               <LimbRow label={t('panchang.varaDayOfWeek')} elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} />
+              {panchang.anandadiYoga && (
+                <LimbRow label={t('panchang.anandadiYoga')} elements={[{ name: panchang.anandadiYoga.name }]} colors={colors} />
+              )}
+              {panchang.tarabala && (
+                <LimbRow
+                  label={t('panchang.tarabala')}
+                  elements={[{ name: panchang.tarabala.name }]}
+                  colors={colors}
+                />
+              )}
+              {panchang.chandraBalam && (
+                <LimbRow
+                  label={t('panchang.chandraBalam')}
+                  elements={[{ name: panchang.chandraBalam.name }]}
+                  colors={colors}
+                />
+              )}
               {panchang.chandraRashi && (
                 <LimbRow label={t('panchang.chandraRashi')} elements={[{ name: panchang.chandraRashi }]} colors={colors} />
               )}
@@ -522,6 +648,7 @@ export default function PanchangScreen() {
             <View style={styles.sunGrid}>
               <SunCard icon="sun"  label={t('home.sunrise')}  time={panchang.sunrise}         colors={colors} iconColor={colors.accent} />
               <SunCard icon="moon" label={t('home.sunset')}   time={panchang.sunset}          colors={colors} iconColor={colors.textMuted} />
+              <SunCard icon="sun"  label={t('panchang.nextSunrise')} time={panchang.nextSunrise ?? '—'} colors={colors} iconColor={colors.accent} />
               <SunCard icon="moon" label={t('panchang.moonrise')} time={panchang.moonrise ?? '—'} colors={colors} iconColor={colors.accent} />
               <SunCard icon="moon" label={t('panchang.moonset')}  time={panchang.moonset  ?? '—'} colors={colors} iconColor={colors.textMuted} />
             </View>
@@ -601,6 +728,33 @@ export default function PanchangScreen() {
                 </Text>
               </View>
             )}
+            {panchang.pratahSandhyaStart && panchang.pratahSandhyaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.pratahSandhya')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.pratahSandhyaStart} – {panchang.pratahSandhyaEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.madhyahnaStart && panchang.madhyahnaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.madhyahna')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.madhyahnaStart} – {panchang.madhyahnaEnd}
+                </Text>
+              </View>
+            )}
+            {panchang.sayahnaSandhyaStart && panchang.sayahnaSandhyaEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Icon name="sparkles" size={16} color={AUSPICIOUS_GREEN} />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.sayahnaSandhya')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.sayahnaSandhyaStart} – {panchang.sayahnaSandhyaEnd}
+                </Text>
+              </View>
+            )}
 
             {/* ── Inauspicious Times ── */}
             <SectionLabel style={styles.sectionLabel}>{t('panchang.inauspiciousTimes')}</SectionLabel>
@@ -641,6 +795,15 @@ export default function PanchangScreen() {
                 </Text>
               </View>
             ))}
+            {panchang.varjyamStart && panchang.varjyamEnd && (
+              <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+                <Icon name="warning" size={16} color={semanticColors.error} />
+                <Text style={[styles.rahuLabel, { color: colors.textMuted }]}>{t('panchang.varjyam')}</Text>
+                <Text style={[styles.rahuTime, { color: colors.textPrimary }]}>
+                  {panchang.varjyamStart} – {panchang.varjyamEnd}
+                </Text>
+              </View>
+            )}
             {panchang.bhadra && (
               <View style={[styles.rahuBar, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
                 <Icon name="warning" size={16} color={panchang.bhadra.location === 'earth' ? semanticColors.error : palette.goldLeaf} />
@@ -696,6 +859,7 @@ export default function PanchangScreen() {
 
             <QualitySlotsCard label={t('panchang.choghadiya')} slots={panchang.choghadiya} colors={colors} />
             <QualitySlotsCard label={t('panchang.gowriPanchangam')} slots={panchang.gowriPanchangam} colors={colors} />
+            <QualitySlotsCard label={t('panchang.doGhatiMuhurta')} slots={panchang.doGhatiMuhurta} colors={colors} />
             <HoraCard slots={panchang.hora} colors={colors} />
 
             {/* ── Planetary Positions ── */}
@@ -877,6 +1041,10 @@ const styles = StyleSheet.create({
   limbEndTime: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
   limbActiveBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
   limbActiveText: { fontSize: 10, fontFamily: 'NotoSerifDevanagari_700Bold', letterSpacing: 0.8 },
+  limbSunriseChip: { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 8 },
+  limbSunriseChipText: { fontSize: 8.5, fontFamily: 'JetBrainsMono_500Medium', letterSpacing: 0.6 },
+  limbProgressTrack: { height: 3, borderRadius: 2, marginTop: 8, overflow: 'hidden' },
+  limbProgressFill: { height: 3, borderRadius: 2 },
   limbDivider: { height: 0.5 },
 
   masaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6, alignSelf: 'flex-start' },
@@ -890,6 +1058,17 @@ const styles = StyleSheet.create({
 
   panchakaBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: borderRadius.cardInner, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
   panchakaText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium', flex: 1 },
+
+  instantRow: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+  },
+  instantKicker: { fontSize: 9, letterSpacing: 1.2 },
+  instantBody: { fontSize: 13 },
 
   muhuratEntry: {
     flexDirection: 'row',

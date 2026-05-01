@@ -117,6 +117,7 @@ export default function HomeScreen() {
   const locationName = useStore(s => s.locationName);
   const language = useStore(s => s.language);
   const region = useStore(s => s.region);
+  const ayanamsa = useStore(s => s.ayanamsa);
   const userBirthDate = useStore(s => s.userBirthDate);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
@@ -143,10 +144,10 @@ export default function HomeScreen() {
     if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
     lastFetchRef.current = now;
     if (showSpinner) setPanchangLoading(true);
-    fetchPanchangForToday(userLocation, panchangLang, region)
+    fetchPanchangForToday(userLocation, panchangLang, region, ayanamsa)
       .then(p => { if (p) setPanchang(p); })
       .finally(() => setPanchangLoading(false));
-  }, [userLocation, panchangLang, region]);
+  }, [userLocation, panchangLang, region, ayanamsa]);
 
   useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
   useFocusEffect(useCallback(() => { refreshPanchang(); }, [refreshPanchang]));

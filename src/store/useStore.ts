@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from 'expo-sqlite/kv-store';
+import type { AyanamsaType } from 'panchang-ts';
 
 import type { AppLanguage } from '@/i18n';
 
@@ -8,6 +9,7 @@ export type FontSize = 'small' | 'normal' | 'medium' | 'large' | 'xl' | 'xxl';
 export type MasaSystem = 'purnimanta' | 'amanta';
 export type TimeFormat = 'auto' | '12h' | '24h';
 export type ThemeMode = 'system' | 'light' | 'dark';
+export type Ayanamsa = AyanamsaType;
 
 /** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
  *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
@@ -100,6 +102,9 @@ interface AppStore {
   language: AppLanguage;
   masaSystem: MasaSystem;
   region: Region;
+  /** Sidereal-zodiac convention used for all panchang calculations.
+   *  Lahiri = official Indian government standard; Raman / KP are alternatives. */
+  ayanamsa: Ayanamsa;
   dailyReminderEnabled: boolean;
   /** HH:mm in 24h. */
   dailyReminderTime: string;
@@ -145,6 +150,7 @@ interface AppStore {
   setLanguage: (lang: AppLanguage) => void;
   setMasaSystem: (system: MasaSystem) => void;
   setRegion: (region: Region) => void;
+  setAyanamsa: (a: Ayanamsa) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setDailyReminderTime: (timeHHmm: string) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
@@ -180,6 +186,7 @@ export const useStore = create<AppStore>()(
       language: 'system' as AppLanguage,
       masaSystem: 'purnimanta' as MasaSystem,
       region: 'all' as Region,
+      ayanamsa: 'lahiri' as Ayanamsa,
       dailyReminderEnabled: false,
       dailyReminderTime: '07:00',
       sunriseAlertEnabled: false,
@@ -214,6 +221,7 @@ export const useStore = create<AppStore>()(
       setLanguage: (lang) => set({ language: lang }),
       setMasaSystem: (system) => set({ masaSystem: system }),
       setRegion: (region) => set({ region }),
+      setAyanamsa: (a) => set({ ayanamsa: a }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setDailyReminderTime: (timeHHmm) => set({ dailyReminderTime: timeHHmm }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
@@ -249,7 +257,7 @@ export const useStore = create<AppStore>()(
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 6,
+      version: 7,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -361,6 +369,14 @@ export const useStore = create<AppStore>()(
         if (version < 6) {
           if (state.themeMode === undefined) {
             state.themeMode = state.isDarkMode === false ? 'light' : 'dark';
+          }
+        }
+
+        // v6 → v7: ayanamsa setting introduced. Default existing users to Lahiri,
+        // which matches the previously hard-coded behaviour.
+        if (version < 7) {
+          if (state.ayanamsa === undefined) {
+            state.ayanamsa = 'lahiri';
           }
         }
 
