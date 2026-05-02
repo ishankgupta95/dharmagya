@@ -346,7 +346,7 @@ export default function FestivalsScreen() {
                     {t(`festivals.eclipseSubtype.${e.subtype}`)}
                   </Text>
                   <Text variant="body-italic" style={[styles.eclipseMeta, { color: colors.textMuted }]}>
-                    {e.date}
+                    {new Date(e.date + 'T00:00:00').toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
                     {' · '}
                     {e.visibleFromLocation
                       ? t('festivals.eclipseVisible')

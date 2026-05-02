@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import i18n from '@/i18n';
+import { localizeFestivalName } from '@/i18n/festivalNames';
 import type {
   ReminderPrefs,
   TithiReminderKey,
@@ -139,6 +140,10 @@ export function enumerateReminders(
       if (observance.getTime() < nowMs) continue;
 
       for (const f of day.festivals) {
+        // festivals.json names are English. Push notifications interpolate
+        // names into a localized template, so translate at the boundary.
+        const localizedName = localizeFestivalName(f.name, i18n.language);
+
         // ── Tithi reminders ────────────────────────────────────────────────
         for (const key of Object.keys(prefs.tithi) as TithiReminderKey[]) {
           if (!prefs.tithi[key]) continue;
@@ -149,11 +154,10 @@ export function enumerateReminders(
             id: `${TITHI_PREFIX}${key}-${day.date}`,
             fireAt,
             title: i18n.t(`reminders.tithiTitle.${key}`, {
-              defaultValue: f.name,
+              defaultValue: localizedName,
             }),
             body: i18n.t('reminders.tithiBody', {
-              defaultValue: '{{name}} is tomorrow — prepare your observance.',
-              name: f.name,
+              name: localizedName,
             }),
           });
         }
@@ -175,12 +179,10 @@ export function enumerateReminders(
               id: `${FESTIVAL_PREFIX}${festivalKey}-${day.date}`,
               fireAt,
               title: i18n.t('reminders.festivalTitle', {
-                defaultValue: '🪔 {{name}}',
-                name: f.name,
+                name: localizedName,
               }),
               body: i18n.t('reminders.festivalBody', {
-                defaultValue: '{{name}} is tomorrow.',
-                name: f.name,
+                name: localizedName,
               }),
             });
           }

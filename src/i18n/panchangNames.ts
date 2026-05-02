@@ -112,6 +112,42 @@ const CHOGHADIYA: Record<string, string> = {
   Rog: 'रोग',
 };
 
+// Rashi (zodiac sign) names — emitted by panchang-ts on chandraRashi /
+// suryaRashi when the lib is queried with language='en'.
+const RASHI: Record<string, string> = {
+  Mesha: 'मेष',
+  Vrishabha: 'वृषभ',
+  Mithuna: 'मिथुन',
+  Karka: 'कर्क',
+  Simha: 'सिंह',
+  Kanya: 'कन्या',
+  Tula: 'तुला',
+  Vrischika: 'वृश्चिक',
+  Dhanus: 'धनु',
+  Makara: 'मकर',
+  Kumbha: 'कुम्भ',
+  Meena: 'मीन',
+};
+
+// Chandra-masa (lunar month) names — emitted by panchang-ts on
+// hinduMonthPurnimanta / hinduMonthAmanta when queried with language='en'.
+const CHANDRA_MASA: Record<string, string> = {
+  Chaitra: 'चैत्र',
+  Vaishakha: 'वैशाख',
+  Jyeshtha: 'ज्येष्ठ',
+  Ashadha: 'आषाढ़',
+  Shravana: 'श्रावण',
+  Bhadrapada: 'भाद्रपद',
+  Ashwin: 'आश्विन',
+  Ashvin: 'आश्विन',
+  Kartik: 'कार्तिक',
+  Kartika: 'कार्तिक',
+  Margashirsha: 'मार्गशीर्ष',
+  Pausha: 'पौष',
+  Magha: 'माघ',
+  Phalguna: 'फाल्गुन',
+};
+
 /**
  * Localize a tithi name returned by panchang-ts in English. Tithis come either
  * paksha-prefixed ("Krishna Saptami", "Shukla Trayodashi") or bare for the
@@ -149,4 +185,14 @@ export function localizeVara(name: string, lang: string): string {
 export function localizeChoghadiya(name: string, lang: string): string {
   if (lang !== 'hi' || !name) return name;
   return CHOGHADIYA[name] ?? name;
+}
+
+export function localizeRashi(name: string, lang: string): string {
+  if (lang !== 'hi' || !name) return name;
+  return RASHI[name] ?? name;
+}
+
+export function localizeChandraMasa(name: string, lang: string): string {
+  if (lang !== 'hi' || !name) return name;
+  return CHANDRA_MASA[name] ?? name;
 }

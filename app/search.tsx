@@ -18,7 +18,6 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
-import { DEITY_BY_ID } from '@/config/deities';
 import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
 
 interface SearchResult {
@@ -57,40 +56,41 @@ export default function SearchScreen() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // All searchable items, computed once.
+  // All searchable items, recomputed when language changes so the deity badge
+  // and the search-filter target both follow the active i18n bundle.
   const corpus = useMemo<SearchResult[]>(() => {
     const items: SearchResult[] = [];
     for (const a of getAllAppAartis()) {
-      const meta = DEITY_BY_ID[a.deity];
       items.push({
         type: 'aarti',
         deity: a.deity,
         titleEnglish: a.titleEnglish,
         titleHindi: a.titleHindi,
-        deityLabel: meta?.name ?? a.deity,
+        deityLabel: t(`deities.${a.deity}.displayName`),
       });
     }
     for (const c of getAllAppChalisas()) {
-      const meta = DEITY_BY_ID[c.deity];
       items.push({
         type: 'chalisa',
         deity: c.deity,
         titleEnglish: c.titleEnglish,
         titleHindi: c.titleHindi,
-        deityLabel: meta?.name ?? c.deity,
+        deityLabel: t(`deities.${c.deity}.displayName`),
       });
     }
     return items;
-  }, []);
+  }, [t]);
 
   const results = useMemo<SearchResult[]>(() => {
     if (!debouncedQuery) return [];
     const q = debouncedQuery.toLowerCase();
+    const qRaw = debouncedQuery;
     const matched = corpus.filter(item =>
       item.titleEnglish.toLowerCase().includes(q) ||
-      item.titleHindi.includes(debouncedQuery) ||
+      item.titleHindi.includes(qRaw) ||
       item.deity.toLowerCase().includes(q) ||
-      item.deityLabel.toLowerCase().includes(q)
+      item.deityLabel.toLowerCase().includes(q) ||
+      item.deityLabel.includes(qRaw)
     );
     matched.sort((a, b) => {
       if (a.deity !== b.deity) return a.deity.localeCompare(b.deity);

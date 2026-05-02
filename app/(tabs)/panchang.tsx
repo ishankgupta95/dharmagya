@@ -25,6 +25,13 @@ import {
 import { usePanchang } from '@/hooks/usePanchang';
 import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang } from '@/services/astrology/panchangService';
 import { resolveLanguage } from '@/i18n';
+import {
+  localizeChandraMasa,
+  localizeNakshatra,
+  localizeRashi,
+  localizeTithi,
+  localizeYoga,
+} from '@/i18n/panchangNames';
 import { PanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
@@ -335,7 +342,7 @@ export default function PanchangScreen() {
           <View style={[styles.locPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Icon name="location" size={10} color={colors.accent} />
             <Text variant="mono-caps" style={[styles.locText, { color: colors.textTertiary }]} numberOfLines={1}>
-              {locationName ?? (userLocation ? 'GPS' : 'Varanasi')}
+              {locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'))}
             </Text>
           </View>
         </View>
@@ -531,14 +538,14 @@ export default function PanchangScreen() {
                   {t('panchang.atThisMoment')}
                 </Text>
                 <Text variant="body-italic" style={[styles.instantBody, { color: colors.textSecondary }]}>
-                  {`${instant.tithi} · ${instant.nakshatra} · ${instant.yoga}`}
+                  {`${localizeTithi(instant.tithi, panchangLang)} · ${localizeNakshatra(instant.nakshatra, panchangLang)} · ${localizeYoga(instant.yoga, panchangLang)}`}
                 </Text>
               </View>
             )}
             {panchang.specialYogas.length > 0 && panchang.specialYogas.map((y, i) => (
               <View key={i} style={[styles.panchakaBar, { backgroundColor: AUSPICIOUS_GREEN + '1E', borderColor: AUSPICIOUS_GREEN + '66' }]}>
                 <Icon name="sparkles" size={14} color={AUSPICIOUS_GREEN} />
-                <Text style={[styles.panchakaText, { color: AUSPICIOUS_GREEN }]}>{y.name}</Text>
+                <Text style={[styles.panchakaText, { color: AUSPICIOUS_GREEN }]}>{localizeYoga(y.name, panchangLang)}</Text>
               </View>
             ))}
             {panchang.panchaka && (
@@ -593,7 +600,11 @@ export default function PanchangScreen() {
               <LimbRow label={t('panchang.nakshatraLunarMansion')} elements={panchang.nakshatras} colors={colors} isToday={isViewingToday} />
               <LimbRow label={t('panchang.yogaSunMoon')} elements={panchang.yogas} colors={colors} isToday={isViewingToday} />
               <LimbRow label={t('home.karana')} elements={panchang.karanas} colors={colors} isToday={isViewingToday} />
-              <LimbRow label={t('panchang.varaDayOfWeek')} elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }) }]} colors={colors} />
+              <LimbRow
+                label={t('panchang.varaDayOfWeek')}
+                elements={[{ name: panchang.vara ?? selectedDate.toLocaleDateString(panchangLang === 'hi' ? 'hi-IN' : 'en-IN', { weekday: 'long' }) }]}
+                colors={colors}
+              />
               {panchang.anandadiYoga && (
                 <LimbRow label={t('panchang.anandadiYoga')} elements={[{ name: panchang.anandadiYoga.name }]} colors={colors} />
               )}
@@ -612,10 +623,10 @@ export default function PanchangScreen() {
                 />
               )}
               {panchang.chandraRashi && (
-                <LimbRow label={t('panchang.chandraRashi')} elements={[{ name: panchang.chandraRashi }]} colors={colors} />
+                <LimbRow label={t('panchang.chandraRashi')} elements={[{ name: localizeRashi(panchang.chandraRashi, panchangLang) }]} colors={colors} />
               )}
               {panchang.suryaNakshatra && (
-                <LimbRow label={t('panchang.suryaNakshatra')} elements={[{ name: panchang.suryaNakshatra }]} colors={colors} />
+                <LimbRow label={t('panchang.suryaNakshatra')} elements={[{ name: localizeNakshatra(panchang.suryaNakshatra, panchangLang) }]} colors={colors} />
               )}
               {(panchang.hinduMonthPurnimanta || panchang.hinduMonthAmanta) && (
                 <>
@@ -623,7 +634,10 @@ export default function PanchangScreen() {
                   <View style={styles.limbRow}>
                     <Text style={[styles.limbLabel, { color: colors.accent }]}>{t('panchang.chandraMasa')}</Text>
                     <Text style={[styles.limbValue, { color: colors.textPrimary }]}>
-                      {masaSystem === 'purnimanta' ? panchang.hinduMonthPurnimanta : panchang.hinduMonthAmanta}
+                      {localizeChandraMasa(
+                        (masaSystem === 'purnimanta' ? panchang.hinduMonthPurnimanta : panchang.hinduMonthAmanta) ?? '',
+                        panchangLang,
+                      )}
                     </Text>
                     <TouchableOpacity
                       onPress={() => setMasaSystem(masaSystem === 'purnimanta' ? 'amanta' : 'purnimanta')}

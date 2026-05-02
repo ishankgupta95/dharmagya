@@ -320,7 +320,7 @@ export default function HomeScreen() {
               <View style={[styles.locBadge, { backgroundColor: plinth.badgeBg, borderColor: plinth.badgeBorder }]}>
                 <Icon name="location" size={10} color={plinth.badgeText} />
                 <Text variant="mono-caps" style={[styles.locText, { color: plinth.badgeText }]} numberOfLines={1}>
-                  {locationName ?? (userLocation ? 'GPS' : 'Varanasi')}
+                  {locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'))}
                 </Text>
               </View>
             </View>
@@ -421,10 +421,10 @@ export default function HomeScreen() {
               onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
               style={[styles.featCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
-              accessibilityLabel={`${featuredAarti.titleEnglish} — ${t('a11y.openAarti')}`}>
+              accessibilityLabel={`${lang === 'hi' ? featuredAarti.titleHindi : featuredAarti.titleEnglish} — ${t('a11y.openAarti')}`}>
               <View style={styles.cornerMark}>
                 <Kicker color={palette.gold} size={8.5}>
-                  Aarti № {padTwo(featuredAartiIndex)}
+                  {t('home.aartiNumber', { num: padTwo(featuredAartiIndex) })}
                 </Kicker>
               </View>
               <View style={styles.featRow}>
@@ -461,10 +461,10 @@ export default function HomeScreen() {
             onPress={() => router.push(`/chalisa/${featuredChalisa.deity}`)}
             style={[styles.featCard, styles.featCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
-            accessibilityLabel={`${featuredChalisa.titleEnglish} — ${t('a11y.openChalisa')}`}>
+            accessibilityLabel={`${lang === 'hi' ? featuredChalisa.titleHindi : featuredChalisa.titleEnglish} — ${t('a11y.openChalisa')}`}>
             <View style={styles.cornerMark}>
               <Kicker color={palette.gold} size={8.5}>
-                Chalisa № {padTwo(featuredChalisaIndex)}
+                {t('home.chalisaNumber', { num: padTwo(featuredChalisaIndex) })}
               </Kicker>
             </View>
             <View style={styles.featRow}>

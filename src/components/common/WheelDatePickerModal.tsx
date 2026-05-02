@@ -117,7 +117,7 @@ function IosWheelPicker({
           accessible={false}>
 
           <Text variant="display-italic" style={[styles.title, { color: palette.ink }]}>
-            {title ?? t('common.pickDate', { defaultValue: 'Pick a date' })}
+            {title ?? t('common.pickDate')}
           </Text>
 
           <Ornament variant="lotus" style={styles.rule} />

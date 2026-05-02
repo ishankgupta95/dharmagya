@@ -80,7 +80,7 @@ export default function LocationPickerScreen() {
         });
         const { latitude, longitude } = loc.coords;
         const match = findNearestCity(latitude, longitude);
-        const name = match ? `${match.name}, ${match.state}` : 'GPS';
+        const name = match ? `${match.name}, ${match.state}` : t('common.gpsLabel');
         setUserLocation({ lat: latitude, lon: longitude }, name);
         if (match) maybeAutoSetRegion(match);
         router.back();
@@ -125,7 +125,7 @@ export default function LocationPickerScreen() {
     );
   }
 
-  const currentLabel = locationName ?? (userLocation ? 'GPS' : 'Varanasi (default)');
+  const currentLabel = locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefaultLong'));
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>

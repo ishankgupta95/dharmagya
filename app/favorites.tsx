@@ -18,7 +18,6 @@ import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { FavoriteHeart } from '@/components/common/FavoriteHeart';
-import { DEITY_BY_ID } from '@/config/deities';
 import { getAartiForDeity, getChalisaForDeity } from '@/services/content';
 
 interface FavoriteItem {
@@ -44,30 +43,28 @@ export default function FavoritesScreen() {
         const slug = favId.slice('aarti-'.length);
         const a = getAartiForDeity(slug);
         if (!a) continue;
-        const meta = DEITY_BY_ID[a.deity];
         result.push({
           type: 'aarti',
           deity: a.deity,
           titleEnglish: a.titleEnglish,
           titleHindi: a.titleHindi,
-          deityLabel: meta?.name ?? a.deity,
+          deityLabel: t(`deities.${a.deity}.displayName`),
         });
       } else if (favId.startsWith('chalisa-')) {
         const slug = favId.slice('chalisa-'.length);
         const c = getChalisaForDeity(slug);
         if (!c) continue;
-        const meta = DEITY_BY_ID[c.deity];
         result.push({
           type: 'chalisa',
           deity: c.deity,
           titleEnglish: c.titleEnglish,
           titleHindi: c.titleHindi,
-          deityLabel: meta?.name ?? c.deity,
+          deityLabel: t(`deities.${c.deity}.displayName`),
         });
       }
     }
     return result;
-  }, [favoriteIds]);
+  }, [favoriteIds, t]);
 
   const renderItem = useCallback(({ item }: ListRenderItemInfo<FavoriteItem>) => {
     const onPress = () => {

@@ -77,7 +77,7 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
           accessible={false}>
 
           <Text variant="display-italic" style={[styles.title, { color: palette.ink }]}>
-            {title ?? t('common.pickTime', { defaultValue: 'Pick a time' })}
+            {title ?? t('common.pickTime')}
           </Text>
 
           <Ornament variant="lotus" style={styles.rule} />

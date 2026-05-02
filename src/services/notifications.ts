@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import i18n from '@/i18n';
+import { localizeFestivalName } from '@/i18n/festivalNames';
 import { vratFestivalNameForDate } from '@/utils/vrat';
 import { applyQuietHoursShift } from '@/utils/format';
 
@@ -75,8 +76,7 @@ function dailyReminderBody(triggerDate: Date): string {
   const vrat = vratFestivalNameForDate(tomorrow);
   if (vrat) {
     return i18n.t('notifications.dailyReminderBodyWithVrat', {
-      defaultValue: '{{vrat}} is tomorrow. Prepare your prayers.',
-      vrat: vrat.name,
+      vrat: localizeFestivalName(vrat.name, i18n.language),
     });
   }
   return i18n.t('notifications.dailyReminderBody');

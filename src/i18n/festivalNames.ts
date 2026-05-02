@@ -6,6 +6,8 @@
 // templates (eclipse obscuration, deferred ekadashi, post-Bhadra observance)
 // — those are decomposed and reassembled in the target language.
 
+import { localizeChandraMasa } from './panchangNames';
+
 const NAMES: Record<string, string> = {
   'Akshaya Tritiya': 'अक्षय तृतीया',
   'Anant Chaturdashi': 'अनंत चतुर्दशी',
@@ -216,11 +218,11 @@ export function localizeFestivalDescription(desc: string, lang: string): string 
     return `भद्रा समाप्ति के बाद आचरण करें: ${bhadraMatch[1]}`;
   }
 
-  // "Purnimanta: {month} Krishna Paksha" — month name stays in Latin since we
-  // don't carry a chandra-masa map here; users still see the rest in Hindi.
+  // "Purnimanta: {month} Krishna Paksha" — chandra-masa names go through the
+  // localizer in panchangNames so the month renders in Devanagari too.
   const purnimantaMatch = /^Purnimanta: (.+) Krishna Paksha$/.exec(desc);
   if (purnimantaMatch) {
-    return `पूर्णिमांत: ${purnimantaMatch[1]} कृष्ण पक्ष`;
+    return `पूर्णिमांत: ${localizeChandraMasa(purnimantaMatch[1], lang)} कृष्ण पक्ष`;
   }
 
   // "{kind} — N% obscuration, visible/not visible from location."

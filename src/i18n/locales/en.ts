@@ -11,6 +11,11 @@ export default {
     search: 'Search',
     clear: 'Clear',
     save: 'Save',
+    pickDate: 'Pick a date',
+    pickTime: 'Pick a time',
+    gpsLabel: 'GPS',
+    locationDefault: 'Varanasi',
+    locationDefaultLong: 'Varanasi (default)',
   },
 
   // ── Accessibility labels for icon-only buttons and screen-reader hints ──
@@ -72,6 +77,8 @@ export default {
     fromYourFavourites: 'FROM YOUR FAVOURITES',
     featuredAarti: 'FEATURED AARTI',
     featuredChalisa: 'FEATURED CHALISA',
+    aartiNumber: 'Aarti № {{num}}',
+    chalisaNumber: 'Chalisa № {{num}}',
     forYourDeities: 'FOR YOUR DEITIES',
     yourDeities: 'YOUR DEITIES',
     yourDeitiesEmpty: 'Pick your Isht Devatas to personalise your Home feed.',
@@ -212,6 +219,9 @@ export default {
     chalisaLabel: 'Chalisa',
     verseLabel: 'Verse {{num}}',
     refrainTag: 'refrain',
+    dohaLabel: 'Doha',
+    sorathaLabel: 'Soratha',
+    chaupaiLabel: 'Chaupai',
   },
   langToggle: {
     english: 'English',
@@ -351,6 +361,7 @@ export default {
     systemDefault: 'System Default',
     location: 'LOCATION',
     gpsLocation: 'GPS Location',
+    myLocation: 'My location',
     usingDefault: 'Using default (Varanasi)',
     deities: 'DEITIES',
     manageDeities: 'Manage Your Deities',

@@ -148,7 +148,6 @@ export default function GodDetailScreen() {
             deityId={deity.id}
             deityColor={deityColor}
             displayName={t(`deities.${deity.id}.displayName`)}
-            subname={deity.name}
             description={t(`deities.${deity.id}.description`)}
             image={hasImage ? deityImage : null}
             colors={colors}
@@ -170,14 +169,13 @@ interface HeroBlockProps {
   deityId: string;
   deityColor: string;
   displayName: string;
-  subname: string;
   description: string;
   image: ReturnType<typeof getDeityImage> | null;
   colors: ColorPalette;
   onBack: () => void;
 }
 
-function HeroBlock({ deityId, deityColor, displayName, subname, description, image, colors, onBack }: HeroBlockProps) {
+function HeroBlock({ deityId, deityColor, displayName, description, image, colors, onBack }: HeroBlockProps) {
   const { t } = useTranslation();
   const meta = DEITY_BY_ID[deityId];
   const initial = meta?.initial ?? 'ॐ';
@@ -223,9 +221,6 @@ function HeroBlock({ deityId, deityColor, displayName, subname, description, ima
       </TouchableOpacity>
 
       <View style={styles.heroMeta}>
-        <Text variant="mono-caps" style={styles.heroKicker}>
-          {subname}
-        </Text>
         <Text variant="display-italic" style={[styles.heroName, { color: colors.textPrimary }]}>
           {displayName}
         </Text>
@@ -373,10 +368,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenH,
     paddingTop: 18,
     gap: 6,
-  },
-  heroKicker: {
-    fontSize: 10,
-    color: palette.sindoor,
   },
   heroName: {
     fontSize: 32,

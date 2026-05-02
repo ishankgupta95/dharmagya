@@ -11,6 +11,11 @@ export default {
     search: 'खोजें',
     clear: 'हटाएँ',
     save: 'सहेजें',
+    pickDate: 'दिनांक चुनें',
+    pickTime: 'समय चुनें',
+    gpsLabel: 'GPS',
+    locationDefault: 'वाराणसी',
+    locationDefaultLong: 'वाराणसी (डिफ़ॉल्ट)',
   },
 
   // ── Accessibility labels for icon-only buttons and screen-reader hints ──
@@ -72,6 +77,8 @@ export default {
     fromYourFavourites: 'आपके पसंदीदा से',
     featuredAarti: 'विशेष आरती',
     featuredChalisa: 'विशेष चालीसा',
+    aartiNumber: 'आरती № {{num}}',
+    chalisaNumber: 'चालीसा № {{num}}',
     forYourDeities: 'आपके इष्ट देवताओं के लिए',
     yourDeities: 'आपके इष्ट देव',
     yourDeitiesEmpty: 'अपने इष्ट देव चुनें ताकि होम फ़ीड व्यक्तिगत हो सके।',
@@ -212,6 +219,9 @@ export default {
     chalisaLabel: 'चालीसा',
     verseLabel: 'पद {{num}}',
     refrainTag: 'टेक',
+    dohaLabel: 'दोहा',
+    sorathaLabel: 'सोरठा',
+    chaupaiLabel: 'चौपाई',
   },
   langToggle: {
     english: 'English',
@@ -351,6 +361,7 @@ export default {
     systemDefault: 'फ़ोन की भाषा',
     location: 'स्थान',
     gpsLocation: 'GPS स्थान',
+    myLocation: 'मेरा स्थान',
     usingDefault: 'डिफ़ॉल्ट (वाराणसी)',
     deities: 'इष्ट देव',
     manageDeities: 'अपने इष्ट देव प्रबंधित करें',
