@@ -245,6 +245,20 @@ interface EvalMatch {
   vara: string;
 }
 
+// panchang-ts returns Sanskrit vara names (Raviwara…Shaniwara), but the rule
+// tables above use English weekday names because that's how classical sources
+// list them. Map between the two for the excludedVaras check only — the
+// displayed vara passes through localizeVara so it must stay in panchang-ts form.
+const VARA_SANSKRIT_TO_ENGLISH: Record<string, string> = {
+  raviwara: 'sunday',
+  somawara: 'monday',
+  mangalawara: 'tuesday',
+  budhawara: 'wednesday',
+  guruwara: 'thursday',
+  shukrawara: 'friday',
+  shaniwara: 'saturday',
+};
+
 function evaluateDay(p: IPanchangDay, rule: OccasionRule): EvalMatch | null {
   const tithi = p.tithis[0];
   const tithiName = tithi?.name ?? '';
@@ -252,6 +266,7 @@ function evaluateDay(p: IPanchangDay, rule: OccasionRule): EvalMatch | null {
   const nakshatraName = p.nakshatras[0]?.name ?? '';
   const yogaName = p.yogas[0]?.name ?? '';
   const varaName = p.vara ?? '';
+  const varaEnglish = VARA_SANSKRIT_TO_ENGLISH[varaName.trim().toLowerCase()] ?? varaName.toLowerCase();
 
   if (rule.requiresShuklaPaksha && paksha !== 'Shukla') return null;
   // Tithi names from panchang-ts (English) come paksha-prefixed (e.g. "Shukla
@@ -259,7 +274,7 @@ function evaluateDay(p: IPanchangDay, rule: OccasionRule): EvalMatch | null {
   // Amavasya come through without a prefix and aren't in any rule's list.
   if (!rule.auspiciousTithis.some(t => endsWithCI(tithiName, t))) return null;
   if (!rule.auspiciousNakshatras.some(n => ciEq(n, nakshatraName))) return null;
-  if (rule.excludedVaras.some(v => ciEq(v, varaName))) return null;
+  if (rule.excludedVaras.some(v => v.trim().toLowerCase() === varaEnglish)) return null;
   if (rule.excludedYogas.some(y => ciEq(y, yogaName))) return null;
 
   return { tithi: tithiName, nakshatra: nakshatraName, yoga: yogaName, vara: varaName };

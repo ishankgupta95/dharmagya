@@ -30,4 +30,14 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (occasion, lat_key, lon_key)
     );
   `);
+
+  // 1: 1.5.0 — excludedVaras rule was a no-op before (English weekday vs.
+  // panchang-ts Sanskrit name), so cached scans may include forbidden
+  // weekdays. Drop them once so the next open recomputes correctly.
+  const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
+  const version = row?.user_version ?? 0;
+  if (version < 1) {
+    db.execSync('DELETE FROM muhurat_cache');
+    db.execSync('PRAGMA user_version = 1');
+  }
 }
