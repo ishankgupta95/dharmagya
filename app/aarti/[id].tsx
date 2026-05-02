@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { AppText as Text } from '@/components/common/AppText';
+import { AppText as Text, FONT_SCALE } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/common/Icon';
@@ -22,7 +22,7 @@ import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { useEntranceStagger } from '@/hooks/useEntranceStagger';
 import { useRefrainHighlight } from '@/hooks/useRefrainHighlight';
-import { resolveLanguage } from '@/i18n';
+import i18n, { resolveLanguage } from '@/i18n';
 import { getAartiForDeity, aartiVerses, titleFor, type ContentLang } from '@/services/content';
 
 const VERSE_STAGGER_MAX = 6;
@@ -42,6 +42,12 @@ export default function AartiDetailScreen() {
 
   const [lang, setLang] = useState<ContentLang>(() => resolveLanguage(appLanguage));
 
+  const fontSizeKey = useStore(s => s.fontSize);
+  // Hero wrapper uses overflow:hidden for the scroll-collapse animation, so its
+  // expanded height must grow with the user's font scale — otherwise xxl users
+  // get the masthead clipped before it can render fully.
+  const heroExpandedHeight = useMemo(() => Math.round(170 * FONT_SCALE[fontSizeKey]), [fontSizeKey]);
+
   const scrollY = useSharedValue(0);
 
   const COLLAPSE_END = 140;
@@ -51,7 +57,7 @@ export default function AartiDetailScreen() {
 
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [0, COLLAPSE_END * 0.6], [1, 0], Extrapolation.CLAMP),
-    maxHeight: interpolate(scrollY.value, [0, COLLAPSE_END], [230, 0], Extrapolation.CLAMP),
+    maxHeight: interpolate(scrollY.value, [0, COLLAPSE_END], [heroExpandedHeight, 0], Extrapolation.CLAMP),
     overflow: 'hidden' as const,
   }));
   const compactTitleAnimatedStyle = useAnimatedStyle(() => ({
@@ -63,6 +69,10 @@ export default function AartiDetailScreen() {
 
   const verses = useMemo(() => (aarti ? aartiVerses(aarti, lang) : []), [aarti, lang]);
   const refrainLines = useMemo(() => buildRefrainSet(verses[0] ?? ''), [verses]);
+
+  // Masthead labels follow the in-screen lang toggle, not the global app
+  // language — when the user flips ENGLISH/हिन्दी the title flips with it.
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
   if (!aarti) {
     return (
@@ -87,8 +97,8 @@ export default function AartiDetailScreen() {
   }
 
   const compactTitle = titleFor(aarti, lang);
-  const deityDisplay = t(`deities.${aarti.deity}.displayName`);
-  const kickerText = `${t('reader.aartiLabel')} · ${deityDisplay}`;
+  const deityDisplay = tForLang(`deities.${aarti.deity}.displayName`);
+  const sectionLabel = tForLang('reader.aartiLabel');
 
   return (
     <ScreenMount>
@@ -131,13 +141,12 @@ export default function AartiDetailScreen() {
 
         {/* ── Editorial title block ─────────────────────────────────────────── */}
         <Animated.View style={[styles.heroBlock, heroAnimatedStyle]}>
-          <Kicker color={colors.accent} size={10}>{kickerText}</Kicker>
-          <Text variant="deva-bold" style={[styles.heroDeva, { color: colors.textPrimary }]}>
-            {aarti.titleHindi.trim()}
-          </Text>
-          <Text variant="body-italic" style={[styles.heroTranslit, { color: colors.textTertiary }]}>
-            {aarti.titleEnglish.trim()}
-          </Text>
+          <Kicker color={colors.accent} size={11} style={styles.heroEyebrow}>
+            {sectionLabel}
+          </Kicker>
+          <Kicker color={colors.accent} size={22} style={styles.heroTitle}>
+            {deityDisplay}
+          </Kicker>
           <Ornament variant="lotus" style={styles.heroRule} />
         </Animated.View>
 
@@ -346,25 +355,27 @@ const styles = StyleSheet.create({
 
   bodyScroll: { paddingTop: 20, paddingBottom: 32 },
 
-  // Editorial title block
+  // Editorial masthead — small mono-caps eyebrow ("AARTI") sits above the
+  // deity name set as the actual title. Both sindoor red, both mono-caps;
+  // hierarchy comes from size + tracking, not color or weight.
   heroBlock: {
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 22,
+    paddingTop: 8,
   },
-  heroDeva: {
-    fontSize: 30,
-    lineHeight: 38,
+  heroEyebrow: {
+    letterSpacing: 4.0,
     textAlign: 'center',
-    marginTop: 10,
+    marginBottom: 12,
   },
-  heroTranslit: {
-    fontSize: 15,
-    lineHeight: 22,
+  heroTitle: {
+    lineHeight: 32,
+    letterSpacing: 2.8,
     textAlign: 'center',
-    marginTop: 6,
+    paddingHorizontal: 12,
   },
   heroRule: {
-    marginTop: 16,
+    marginTop: 20,
     width: '60%',
   },
 

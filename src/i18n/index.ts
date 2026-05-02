@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import { getLocales } from 'expo-localization';
 
 import en from './locales/en';
+import hi from './locales/hi';
 
 export type AppLanguage = 'system' | 'en' | 'hi';
 
@@ -37,19 +38,18 @@ async function loadLanguage(lng: string): Promise<void> {
 const deviceLang = getDeviceLanguage();
 
 i18n.use(initReactI18next).init({
+  // Both supported bundles are eager-loaded so reader screens can resolve
+  // labels against either language regardless of the active app language —
+  // the in-screen lang toggle on aarti/chalisa needs synchronous access.
   resources: {
     en: { translation: en },
+    hi: { translation: hi },
   },
   lng: deviceLang,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
   compatibilityJSON: 'v4',
 });
-
-// Load non-English device language eagerly (but async to avoid blocking startup)
-if (deviceLang !== 'en') {
-  loadLanguage(deviceLang);
-}
 
 /** Change the active language, loading the bundle if needed. */
 export async function changeLanguage(lng: string): Promise<void> {

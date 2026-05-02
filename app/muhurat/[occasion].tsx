@@ -29,14 +29,17 @@ import {
   writeMuhuratCache,
   clearMuhuratCache,
 } from '@/services/astrology/muhuratCache';
+import {
+  localizeTithi,
+  localizeNakshatra,
+  localizeYoga,
+  localizeVara,
+  localizeChoghadiya,
+} from '@/i18n/panchangNames';
 
 const SCAN_DAYS = 365;
 const PERSIST_EVERY = 15; // flush partial scan to SQLite every N days
 const UPCOMING_WINDOW_DAYS = 14; // matches within this window get the "upcoming" highlight
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
 
 type Status = 'loading' | 'scanning' | 'complete' | 'cancelled' | 'error';
 
@@ -387,14 +390,15 @@ function DayRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const plinth = usePlinthColors();
-  const weekday = match.date.toLocaleDateString('en-IN', { weekday: 'short' });
+  const dateLocale = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
+  const weekday = match.date.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNum = match.date.getDate();
-  const month = MONTH_NAMES[match.date.getMonth()];
+  const month = match.date.toLocaleDateString(dateLocale, { month: 'long' });
   const year = match.date.getFullYear();
 
-  const bestSlots = useMemo(() => getBestSlots(match), [match]);
+  const bestSlots = useMemo(() => getBestSlots(match, t, i18n.language), [match, t, i18n.language]);
 
   return (
     <TouchableOpacity
@@ -436,7 +440,7 @@ function DayRow({
         <View style={styles.dayInfo}>
           <View style={styles.dayTitleRow}>
             <Text variant="body" style={[styles.dayTithi, { color: colors.textPrimary }]} numberOfLines={1}>
-              {match.tithi}
+              {localizeTithi(match.tithi, i18n.language)}
             </Text>
             {isUpcoming && (
               <View style={[styles.upcomingBadge, { borderColor: colors.accent }]}>
@@ -447,7 +451,7 @@ function DayRow({
             )}
           </View>
           <Text variant="body-italic" style={[styles.dayMeta, { color: colors.textTertiary }]} numberOfLines={1}>
-            {match.nakshatra} · {match.yoga} · {match.vara}
+            {localizeNakshatra(match.nakshatra, i18n.language)} · {localizeYoga(match.yoga, i18n.language)} · {localizeVara(match.vara, i18n.language)}
           </Text>
         </View>
         <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
@@ -498,20 +502,35 @@ interface DisplaySlot {
   end: string;
 }
 
-function getBestSlots(match: MuhuratMatch): DisplaySlot[] {
+function getBestSlots(
+  match: MuhuratMatch,
+  t: (key: string) => string,
+  lang: string,
+): DisplaySlot[] {
   const out: DisplaySlot[] = [];
   const p = match.panchang;
   if (p.abhijitMuhurtaStart && p.abhijitMuhurtaEnd) {
-    out.push({ label: 'Abhijit Muhurta', start: p.abhijitMuhurtaStart, end: p.abhijitMuhurtaEnd });
+    out.push({ label: titleCase(t('panchang.abhijitMuhurta')), start: p.abhijitMuhurtaStart, end: p.abhijitMuhurtaEnd });
   }
   if (p.brahmaMuhurtaStart && p.brahmaMuhurtaEnd) {
-    out.push({ label: 'Brahma Muhurta', start: p.brahmaMuhurtaStart, end: p.brahmaMuhurtaEnd });
+    out.push({ label: titleCase(t('panchang.brahmaMuhurta')), start: p.brahmaMuhurtaStart, end: p.brahmaMuhurtaEnd });
   }
   const auspiciousChoghadiya = p.choghadiya?.day?.filter(s => s.quality === 'auspicious') ?? [];
   for (const s of auspiciousChoghadiya.slice(0, 3)) {
-    out.push({ label: `Choghadiya · ${s.name}`, start: s.start, end: s.end });
+    out.push({
+      label: `${titleCase(t('panchang.choghadiya'))} · ${localizeChoghadiya(s.name, lang)}`,
+      start: s.start,
+      end: s.end,
+    });
   }
   return out;
+}
+
+// i18n keys for panchang labels are stored uppercase for the panchang screen's
+// kicker style; the muhurat slot rows use sentence case, so we reverse the
+// ASCII upper here. Devanagari is unchanged (no case in the script).
+function titleCase(s: string): string {
+  return s.replace(/\b[A-Z]+\b/g, w => w[0] + w.slice(1).toLowerCase());
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -611,8 +630,8 @@ const styles = StyleSheet.create({
   detailHeading: { marginBottom: 10 },
   detailText: { fontSize: 12, marginBottom: 4 },
   slotsPlinth: { marginTop: 2 },
-  slotRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  slotName: { fontSize: 13, lineHeight: 18 },
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  slotName: { flex: 1, fontSize: 13, lineHeight: 18 },
   slotTime: { fontSize: 12, lineHeight: 16 },
 
   rahuRow: {

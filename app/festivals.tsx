@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useState } from 'react';
 import {
   View,
-  SectionList,
+  ScrollView,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -20,6 +20,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 
 import festivalsData from '@/data/static/festivals.json';
 import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
+import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
 import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
@@ -40,11 +41,6 @@ interface SectionData {
   title: string;
   data: FestivalDay[];
 }
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
 
 // Color string is resolved at render-time so type 'major' can pick up the
 // theme-responsive accent (sindoor in light, goldLeaf in dark) for WCAG contrast.
@@ -174,15 +170,21 @@ function parseFestivalDays(year: number, region: Region): FestivalDay[] {
   }));
 }
 
-function festivalMatches(f: FestivalEntry, q: string): boolean {
+function festivalMatches(f: FestivalEntry, q: string, lang: string): boolean {
   if (f.name.toLowerCase().includes(q)) return true;
   if (f.description?.toLowerCase().includes(q)) return true;
   if (f.regionalVariants?.some(v => v.toLowerCase().includes(q))) return true;
+  if (lang === 'hi') {
+    if (localizeFestivalName(f.name, lang).toLowerCase().includes(q)) return true;
+    if (f.description && localizeFestivalDescription(f.description, lang).toLowerCase().includes(q)) return true;
+    if (f.regionalVariants?.some(v => localizeFestivalName(v, lang).toLowerCase().includes(q))) return true;
+  }
   return false;
 }
 
 export default function FestivalsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
   const isDarkMode = useStore(s => s.isDarkMode);
   const region = useStore(s => s.region);
   const userLocation = useStore(s => s.userLocation);
@@ -208,10 +210,10 @@ export default function FestivalsScreen() {
     return festivalDays
       .map(d => ({
         date: d.date,
-        festivals: d.festivals.filter(f => festivalMatches(f, q)),
+        festivals: d.festivals.filter(f => festivalMatches(f, q, i18n.language)),
       }))
       .filter(d => d.festivals.length > 0);
-  }, [festivalDays, searchQuery]);
+  }, [festivalDays, searchQuery, i18n.language]);
 
   const sections: SectionData[] = useMemo(() => {
     const grouped = new Map<number, FestivalDay[]>();
@@ -222,10 +224,16 @@ export default function FestivalsScreen() {
     }
     return [...grouped.entries()]
       .sort(([a], [b]) => a - b)
-      .map(([m, data]) => ({ title: `${MONTH_NAMES[m]} ${year}`, data }));
-  }, [visibleDays, year]);
+      .map(([m, data]) => {
+        // Build a Date in this section's month so Intl can produce a localized
+        // month name — gives "जनवरी" / "February" / etc. without a static map.
+        const monthDate = new Date(year, m, 1);
+        const monthLabel = monthDate.toLocaleDateString(dateLocale, { month: 'long' });
+        return { title: `${monthLabel} ${year}`, data };
+      });
+  }, [visibleDays, year, dateLocale]);
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const soonCutoff = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -237,6 +245,7 @@ export default function FestivalsScreen() {
     d.setHours(0, 0, 0, 0);
     return d.getTime();
   }, []);
+
   const canGoBack = year > MIN_YEAR;
   const canGoForward = year < MAX_YEAR;
 
@@ -350,38 +359,11 @@ export default function FestivalsScreen() {
         </View>
       )}
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item, index) => `${item.date.getTime()}-${index}`}
+      <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled
-        initialNumToRender={15}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        renderSectionHeader={({ section }) => (
-          <View style={[styles.sectionHeader, { backgroundColor: colors.base }]}>
-            <Kicker
-              color={colors.accent}
-              size={10}
-              withTrailingRule
-              ruleColor={colors.divider}>
-              {section.title}
-            </Kicker>
-          </View>
-        )}
-        renderItem={({ item }) => {
-          const t0 = item.date.getTime();
-          return (
-            <FestivalRow
-              item={item}
-              colors={colors}
-              isToday={isSameDay(item.date, today)}
-              isSoon={t0 >= nowStart && t0 <= soonCutoff && !isSameDay(item.date, today)}
-            />
-          );
-        }}
-        ListEmptyComponent={
+        showsVerticalScrollIndicator={false}>
+        {sections.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
               {searchQuery.trim()
@@ -389,8 +371,34 @@ export default function FestivalsScreen() {
                 : t('festivals.noFestivals', { year })}
             </Text>
           </View>
-        }
-      />
+        ) : (
+          sections.map(section => (
+            <Fragment key={section.title}>
+              <View style={styles.sectionHeader}>
+                <Kicker
+                  color={colors.accent}
+                  size={10}
+                  withTrailingRule
+                  ruleColor={colors.divider}>
+                  {section.title}
+                </Kicker>
+              </View>
+              {section.data.map(day => {
+                const t0 = day.date.getTime();
+                return (
+                  <FestivalRow
+                    key={t0}
+                    item={day}
+                    colors={colors}
+                    isToday={isSameDay(day.date, today)}
+                    isSoon={t0 >= nowStart && t0 <= soonCutoff && !isSameDay(day.date, today)}
+                  />
+                );
+              })}
+            </Fragment>
+          ))
+        )}
+      </ScrollView>
 
       <AdBanner colors={colors} placement="festivals" />
     </SafeAreaView>
@@ -398,7 +406,9 @@ export default function FestivalsScreen() {
   );
 }
 
-function FestivalRow({
+const FestivalRow = memo(FestivalRowImpl);
+
+function FestivalRowImpl({
   item,
   colors,
   isToday,
@@ -409,8 +419,9 @@ function FestivalRow({
   isToday: boolean;
   isSoon: boolean;
 }) {
-  const { t } = useTranslation();
-  const dayName = item.date.toLocaleDateString('en-IN', { weekday: 'short' });
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
+  const dayName = item.date.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNum = item.date.getDate();
   const highlighted = isToday || isSoon;
 
@@ -459,19 +470,29 @@ function FestivalRow({
           const typeInfo = TYPE_ICON[f.type] ?? TYPE_ICON.minor;
           const isSubvariant =
             f.type === 'smarta_ekadashi' || f.type === 'vaishnava_ekadashi';
-          const primary = isSubvariant && f.description ? f.description : f.name;
+          const primaryRaw = isSubvariant && f.description ? f.description : f.name;
+          const primary = isSubvariant && f.description
+            ? localizeFestivalDescription(primaryRaw, i18n.language)
+            : localizeFestivalName(primaryRaw, i18n.language);
           let secondary: string | undefined;
           if (isSubvariant) {
-            const sect = f.type === 'smarta_ekadashi' ? 'Smarta fast' : 'Vaishnava fast';
-            secondary = f.deferralDate ? `${sect} · deferred to ${f.deferralDate}` : sect;
+            const sectLabel = f.type === 'smarta_ekadashi'
+              ? t('festivals.smartaFast')
+              : t('festivals.vaishnavaFast');
+            secondary = f.deferralDate
+              ? t('festivals.deferredTo', { label: sectLabel, date: f.deferralDate })
+              : sectLabel;
           } else if (f.regionalVariants && f.regionalVariants.length > 0) {
-            secondary = `Also: ${f.regionalVariants.join(', ')}`;
+            const localizedVariants = f.regionalVariants
+              .map(v => localizeFestivalName(v, i18n.language))
+              .join(', ');
+            secondary = t('festivals.alsoObservedAs', { names: localizedVariants });
           } else if (
             f.description &&
             f.description !== f.name &&
             f.type !== 'sankranti'
           ) {
-            secondary = f.description;
+            secondary = localizeFestivalDescription(f.description, i18n.language);
           }
           return (
             <View key={i} style={styles.festivalItem}>

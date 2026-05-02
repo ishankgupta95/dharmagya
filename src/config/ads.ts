@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 // Switch between test and production by changing this single import.
 // Use `testAdUnitIds` for closed testing, `prodAdUnitIds` for production.
 
-import AD_UNITS from '@/data/static/adUnitIds.test.json';
-// import AD_UNITS from '@/data/static/adUnitIds.prod.json';
+// import AD_UNITS from '@/data/static/adUnitIds.test.json';
+import AD_UNITS from '@/data/static/adUnitIds.prod.json';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

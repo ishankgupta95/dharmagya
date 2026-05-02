@@ -252,6 +252,11 @@ export default {
     eclipseSubtype: { partial: 'Partial', total: 'Total', annular: 'Annular', penumbral: 'Penumbral' },
     eclipseVisible: 'Visible from your location',
     eclipseNotVisible: 'Not visible from your location',
+    smartaFast: 'Smarta fast',
+    vaishnavaFast: 'Vaishnava fast',
+    deferredTo: '{{label}} · deferred to {{date}}',
+    alsoObservedAs: 'Also: {{names}}',
+    sankrantiOf: 'Sankranti ({{rashi}})',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────

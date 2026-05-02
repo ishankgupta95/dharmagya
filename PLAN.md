@@ -310,6 +310,8 @@ All 10 sub-phases (P6.1 tokens → P6.10 release gate) landed 2026-04-20. Mukta 
 
 **Open Phase 6 follow-up:** Device verification of dark-mode redesign, Play Store screenshots, AAB build, staged rollout. User-gated; checklist in `memory/project_p6_10_prepared.md`.
 
+**Post-launch follow-up — Sentry crash reporting:** Add `@sentry/react-native` + `sentry-expo` config plugin **immediately after the staged rollout reaches 100%** (decision 2026-05-02). Deferred so the launch ships unblocked; Play Console's Android Vitals (crash-free rate, ANRs, stack traces) covers the rollout-watch window. What Sentry adds afterward: non-fatal JS exceptions, real-time alerts, source-mapped Hermes traces, breadcrumbs. Setup: install the plugin, register DSN, set `SENTRY_AUTH_TOKEN` as an EAS Build secret so source maps + Hermes bytecode maps upload at build time, wrap the root in `Sentry.wrap()`. Ship as a patch (`1.5.x` or `1.6.0`) — no UI surface change.
+
 ---
 
 ## 12. Phase 7 — Motion & Interaction Polish — 🟡 IN PROGRESS (P7.1–P7.3 shipped 2026-04-22)

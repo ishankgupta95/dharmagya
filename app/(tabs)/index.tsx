@@ -56,15 +56,6 @@ function getGreetingKey(): 'Morning' | 'Afternoon' | 'Evening' {
   return 'Evening';
 }
 
-// Devanāgarī echo is a design element, not a translation — always renders in
-// Devanāgarī regardless of UI language, so it's hardcoded rather than pulled
-// from the locale files.
-const GREETING_DEVA: Record<'Morning' | 'Afternoon' | 'Evening', string> = {
-  Morning: 'शुभ प्रभात',
-  Afternoon: 'शुभ दोपहर',
-  Evening: 'शुभ संध्या',
-};
-
 interface DateParts {
   weekday: string;
   day: string;
@@ -306,9 +297,6 @@ export default function HomeScreen() {
         <View style={styles.greetingBlock}>
           <Text variant="display-italic" style={[styles.greeting, { color: colors.textPrimary }]}>
             {t(`home.greeting${greetingKey}`)}
-          </Text>
-          <Text variant="deva" style={[styles.greetingSub, { color: colors.textTertiary }]}>
-            {GREETING_DEVA[greetingKey]}
           </Text>
         </View>
 
@@ -714,8 +702,10 @@ const styles = StyleSheet.create({
 
   // Greeting
   greetingBlock: { marginTop: 8, marginBottom: 20 },
-  greeting: { fontSize: 34, lineHeight: 38 },
-  greetingSub: { fontSize: 15, marginTop: 6 },
+  // 1.5× ratio so the Devanagari greeting ("शुभ दोपहर") renders without the
+  // shirorekha or top matras getting clipped at this size; safe headroom for
+  // Latin too.
+  greeting: { fontSize: 34, lineHeight: 50 },
 
   // Panchang hero
   panchangWrap: { marginBottom: 18 },

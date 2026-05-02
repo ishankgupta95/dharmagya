@@ -4,7 +4,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { AppText as Text } from '@/components/common/AppText';
+import { AppText as Text, FONT_SCALE } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/common/Icon';
@@ -21,7 +21,7 @@ import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { useEntranceStagger } from '@/hooks/useEntranceStagger';
-import { resolveLanguage } from '@/i18n';
+import i18n, { resolveLanguage } from '@/i18n';
 import {
   getChalisaForDeity,
   chalisaSections,
@@ -45,6 +45,12 @@ export default function ChalisaDetailScreen() {
 
   const [lang, setLang] = useState<ContentLang>(() => resolveLanguage(appLanguage));
 
+  const fontSizeKey = useStore(s => s.fontSize);
+  // Hero wrapper uses overflow:hidden for the scroll-collapse animation, so its
+  // expanded height must grow with the user's font scale — otherwise xxl users
+  // get the masthead clipped before it can render fully.
+  const heroExpandedHeight = useMemo(() => Math.round(170 * FONT_SCALE[fontSizeKey]), [fontSizeKey]);
+
   const scrollY = useSharedValue(0);
 
   const COLLAPSE_END = 140;
@@ -54,7 +60,7 @@ export default function ChalisaDetailScreen() {
 
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [0, COLLAPSE_END * 0.6], [1, 0], Extrapolation.CLAMP),
-    maxHeight: interpolate(scrollY.value, [0, COLLAPSE_END], [230, 0], Extrapolation.CLAMP),
+    maxHeight: interpolate(scrollY.value, [0, COLLAPSE_END], [heroExpandedHeight, 0], Extrapolation.CLAMP),
     overflow: 'hidden' as const,
   }));
   const compactTitleAnimatedStyle = useAnimatedStyle(() => ({
@@ -63,6 +69,10 @@ export default function ChalisaDetailScreen() {
 
   const favoriteKey = `chalisa-${deitySlug ?? ''}`;
   const isFavorite = favoriteIds.includes(favoriteKey);
+
+  // Masthead labels follow the in-screen lang toggle, not the global app
+  // language — when the user flips ENGLISH/हिन्दी the title flips with it.
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
   if (!chalisa) {
     return (
@@ -87,8 +97,8 @@ export default function ChalisaDetailScreen() {
 
   const sections = chalisaSections(chalisa, lang);
   const compactTitle = titleFor(chalisa, lang);
-  const deityDisplay = t(`deities.${chalisa.deity}.displayName`);
-  const kickerText = `${t('reader.chalisaLabel')} · ${deityDisplay}`;
+  const deityDisplay = tForLang(`deities.${chalisa.deity}.displayName`);
+  const sectionLabel = tForLang('reader.chalisaLabel');
 
   // Numbered globally across all chaupai sections; visible index tracks verse
   // order across every section so the stagger budget spans the whole reader.
@@ -136,13 +146,12 @@ export default function ChalisaDetailScreen() {
 
         {/* ── Editorial title block ─────────────────────────────────────────── */}
         <Animated.View style={[styles.heroBlock, heroAnimatedStyle]}>
-          <Kicker color={colors.accent} size={10}>{kickerText}</Kicker>
-          <Text variant="deva-bold" style={[styles.heroDeva, { color: colors.textPrimary }]}>
-            {chalisa.titleHindi.trim()}
-          </Text>
-          <Text variant="body-italic" style={[styles.heroTranslit, { color: colors.textTertiary }]}>
-            {chalisa.titleEnglish.trim()}
-          </Text>
+          <Kicker color={colors.accent} size={11} style={styles.heroEyebrow}>
+            {sectionLabel}
+          </Kicker>
+          <Kicker color={colors.accent} size={22} style={styles.heroTitle}>
+            {deityDisplay}
+          </Kicker>
           <Ornament variant="lotus" style={styles.heroRule} />
         </Animated.View>
 
@@ -334,25 +343,27 @@ const styles = StyleSheet.create({
 
   bodyScroll: { paddingTop: 20, paddingBottom: 32 },
 
-  // Editorial title block
+  // Editorial masthead — small mono-caps eyebrow ("CHALISA") sits above the
+  // deity name set as the actual title. Both sindoor red, both mono-caps;
+  // hierarchy comes from size + tracking, not color or weight.
   heroBlock: {
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 22,
+    paddingTop: 8,
   },
-  heroDeva: {
-    fontSize: 30,
-    lineHeight: 38,
+  heroEyebrow: {
+    letterSpacing: 4.0,
     textAlign: 'center',
-    marginTop: 10,
+    marginBottom: 12,
   },
-  heroTranslit: {
-    fontSize: 15,
-    lineHeight: 22,
+  heroTitle: {
+    lineHeight: 32,
+    letterSpacing: 2.8,
     textAlign: 'center',
-    marginTop: 6,
+    paddingHorizontal: 12,
   },
   heroRule: {
-    marginTop: 16,
+    marginTop: 20,
     width: '60%',
   },
 

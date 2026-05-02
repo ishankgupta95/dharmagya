@@ -252,6 +252,11 @@ export default {
     eclipseSubtype: { partial: 'आंशिक', total: 'पूर्ण', annular: 'वलयाकार', penumbral: 'उपछाया' },
     eclipseVisible: 'आपके स्थान से दृश्य',
     eclipseNotVisible: 'आपके स्थान से अदृश्य',
+    smartaFast: 'स्मार्त व्रत',
+    vaishnavaFast: 'वैष्णव व्रत',
+    deferredTo: '{{label}} · {{date}} पर स्थगित',
+    alsoObservedAs: 'इन रूपों में भी: {{names}}',
+    sankrantiOf: 'संक्रांति ({{rashi}})',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
