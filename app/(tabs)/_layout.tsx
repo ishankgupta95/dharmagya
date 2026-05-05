@@ -101,6 +101,13 @@ export default function TabLayout() {
           tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="people" />,
         }}
       />
+      <Tabs.Screen
+        name="astrology"
+        options={{
+          title: t('tabs.astrology'),
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="diamond" />,
+        }}
+      />
     </Tabs>
   );
 }

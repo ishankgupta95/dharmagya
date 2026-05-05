@@ -38,7 +38,7 @@
     "expo-web-browser": "~15.0.10",
     "hindu-devotional-texts": "0.1.1",
     "i18next": "^26.0.3",
-    "panchang-ts": "^2.4.0",
+    "panchang-ts": "^3.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-i18next": "^17.0.2",

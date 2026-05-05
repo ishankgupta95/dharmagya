@@ -14,6 +14,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import { computeVimshottariDashaFromBirth, type DashaLord } from 'panchang-ts';
+import { computeSadeSatiCached } from '@/services/astrology/kundliService';
 
 import { useTranslation } from 'react-i18next';
 
@@ -26,7 +27,7 @@ import {
   borderRadius,
   type ColorPalette,
 } from '@/config/theme';
-import { fetchPanchangForToday } from '@/services/astrology/panchangService';
+import { computeJanmaRashiIndex, fetchPanchangForToday } from '@/services/astrology/panchangService';
 import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { NightCard, usePlinthColors, type PlinthColors } from '@/components/common/NightCard';
@@ -218,6 +219,19 @@ export default function HomeScreen() {
     try {
       const birth = new Date(userBirthDate + 'T12:00:00');
       return computeVimshottariDashaFromBirth(birth, 'lahiri').currentMahaDashaLord;
+    } catch {
+      return null;
+    }
+  }, [userBirthDate]);
+
+  // ── Sade Sati — surface a small banner when Saturn is in the 7.5y arc ────
+  const sadeSatiPhase = useMemo<1 | 2 | 3 | null>(() => {
+    if (!userBirthDate) return null;
+    try {
+      const birth = new Date(userBirthDate + 'T12:00:00');
+      const moonRashi = computeJanmaRashiIndex(birth);
+      const info = computeSadeSatiCached(moonRashi, new Date(), 'lahiri');
+      return info?.active ? info.phase : null;
     } catch {
       return null;
     }
@@ -488,7 +502,7 @@ export default function HomeScreen() {
         {/* ── Dasha Callout ─────────────────────────────────────────────── */}
         <TouchableOpacity
           activeOpacity={0.88}
-          onPress={() => router.push('/dasha')}
+          onPress={() => router.push('/(tabs)/astrology')}
           style={styles.calloutWrap}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.openDasha')}>
@@ -517,6 +531,22 @@ export default function HomeScreen() {
             <Icon name="chevron-right" size={18} color={colors.textTertiary} />
           </LinearGradient>
         </TouchableOpacity>
+
+        {/* ── Sade Sati banner (only when active) ──────────────────────── */}
+        {sadeSatiPhase !== null && (
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={() => router.push('/(tabs)/astrology')}
+            style={[styles.sadeSatiBanner, { backgroundColor: 'rgba(165,48,28,0.12)', borderColor: 'rgba(165,48,28,0.40)' }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.sadeSatiBanner', { phase: sadeSatiPhase })}>
+            <Icon name="alert-circle" size={16} color={palette.sindoor} />
+            <Text variant="body" style={[styles.sadeSatiText, { color: colors.textPrimary }]}>
+              {t('home.sadeSatiBanner', { phase: sadeSatiPhase })}
+            </Text>
+            <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
 
         {/* ── Quick Row ─────────────────────────────────────────────────── */}
         <View style={styles.quickRow}>
@@ -830,6 +860,20 @@ const styles = StyleSheet.create({
 
   // Callout
   calloutWrap: { marginBottom: 16 },
+
+  // Sade Sati chip — sits between the dasha callout and the quick row.
+  sadeSatiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: borderRadius.cardInner,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  sadeSatiText: { flex: 1, fontSize: 13, lineHeight: 19 },
+
   callout: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -9,7 +9,6 @@ import { Icon } from '@/components/common/Icon';
 import { useStore } from '@/store/useStore';
 import { borderRadius, lightColors, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
-import { ProgressDots } from './_progressDots';
 
 // Onboarding renders on the parchment ground — the grid component colorises its
 // cells from the palette passed in, so we hand it the light palette explicitly.
@@ -66,7 +65,6 @@ export default function OnboardingStep2() {
       )}
 
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH }]}>
-        <ProgressDots current={2} total={3} />
         <TouchableOpacity
           onPress={handleContinue}
           activeOpacity={0.85}

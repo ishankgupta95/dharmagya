@@ -9,7 +9,6 @@ import { Icon, type IconName } from '@/components/common/Icon';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
-import { ProgressDots } from './_progressDots';
 
 type LocationChoice = 'gps' | 'default';
 
@@ -117,7 +116,6 @@ export default function OnboardingStep3() {
 
       {/* ── Bottom ────────────────────────────────────────────────────── */}
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH, borderTopColor: colors.divider }]}>
-        <ProgressDots current={3} total={3} />
         <TouchableOpacity
           onPress={handleFinish}
           activeOpacity={0.85}
