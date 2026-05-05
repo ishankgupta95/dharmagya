@@ -28,6 +28,7 @@ import {
   type ColorPalette,
 } from '@/config/theme';
 import { computeJanmaRashiIndex, fetchPanchangForToday } from '@/services/astrology/panchangService';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { NightCard, usePlinthColors, type PlinthColors } from '@/components/common/NightCard';
@@ -111,6 +112,8 @@ export default function HomeScreen() {
   const region = useStore(s => s.region);
   const ayanamsa = useStore(s => s.ayanamsa);
   const userBirthDate = useStore(s => s.userBirthDate);
+  const userBirthTime = useStore(s => s.userBirthTime);
+  const userBirthPlace = useStore(s => s.userBirthPlace);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
   const selectedDeities = useStore(s => s.selectedDeities);
@@ -213,29 +216,37 @@ export default function HomeScreen() {
     return lines[0] ?? null;
   }, [featuredAarti]);
 
-  // ── Dasha (Vimshottari) — current mahādaśā lord, if birth date set ────────
-  const dashaLord = useMemo<DashaLord | null>(() => {
+  const birthInstant = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
+    const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
     try {
-      const birth = new Date(userBirthDate + 'T12:00:00');
-      return computeVimshottariDashaFromBirth(birth, 'lahiri').currentMahaDashaLord;
+      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
     } catch {
       return null;
     }
-  }, [userBirthDate]);
+  }, [userBirthDate, userBirthTime, userBirthPlace]);
+
+  // ── Dasha (Vimshottari) — current mahādaśā lord, if birth date set ────────
+  const dashaLord = useMemo<DashaLord | null>(() => {
+    if (!birthInstant) return null;
+    try {
+      return computeVimshottariDashaFromBirth(birthInstant, 'lahiri').currentMahaDashaLord;
+    } catch {
+      return null;
+    }
+  }, [birthInstant]);
 
   // ── Sade Sati — surface a small banner when Saturn is in the 7.5y arc ────
   const sadeSatiPhase = useMemo<1 | 2 | 3 | null>(() => {
-    if (!userBirthDate) return null;
+    if (!birthInstant) return null;
     try {
-      const birth = new Date(userBirthDate + 'T12:00:00');
-      const moonRashi = computeJanmaRashiIndex(birth);
+      const moonRashi = computeJanmaRashiIndex(birthInstant);
       const info = computeSadeSatiCached(moonRashi, new Date(), 'lahiri');
       return info?.active ? info.phase : null;
     } catch {
       return null;
     }
-  }, [userBirthDate]);
+  }, [birthInstant]);
 
   // ── Walkthrough refs & measurement ────────────────────────────────────────
   const panchangCardRef = useRef<View>(null);

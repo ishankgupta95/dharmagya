@@ -11,6 +11,7 @@ import { useStore } from '@/store/useStore';
 import { borderRadius, darkColors, lightColors } from '@/config/theme';
 import { computeSadeSatiCached } from '@/services/astrology/kundliService';
 import { computeJanmaRashiIndex } from '@/services/astrology/panchangService';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 
 const RASHI_NAMES_EN = [
   'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
@@ -35,15 +36,20 @@ export function SadeSatiSection() {
   const isDarkMode = useStore((s) => s.isDarkMode);
   const userBirthDate = useStore((s) => s.userBirthDate);
   const userBirthTime = useStore((s) => s.userBirthTime);
+  const userBirthPlace = useStore((s) => s.userBirthPlace);
   const ayanamsa = useStore((s) => s.ayanamsa);
   const colors = isDarkMode ? darkColors : lightColors;
   const plinth = usePlinthColors();
 
   const birthDate = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
-    const timePart = userBirthTime ? `${userBirthTime}:00` : '12:00:00';
-    return new Date(`${userBirthDate}T${timePart}`);
-  }, [userBirthDate, userBirthTime]);
+    const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    try {
+      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+    } catch {
+      return null;
+    }
+  }, [userBirthDate, userBirthTime, userBirthPlace]);
 
   const natalMoonRashi = useMemo<number | null>(() => {
     if (!birthDate) return null;

@@ -139,8 +139,10 @@ interface AppStore {
   userBirthDate: string | null;
   /** HH:mm in 24h, or null if not set. Used to refine Vimshottari dasha balance. */
   userBirthTime: string | null;
-  /** Birth coordinates + label, or null if not set. */
-  userBirthPlace: { lat: number; lon: number; name: string } | null;
+  /** Birth coordinates + label + IANA timezone, or null if not set. The
+   *  timezone is required so panchang-ts compute interprets the birth time
+   *  in the *birthplace*'s local time, not the device's. */
+  userBirthPlace: { lat: number; lon: number; name: string; timezone: string } | null;
   /** Biological sex; required by Ashtakoot matching to assign Vara/Vadhu roles.
    *  Null until the user opts to set it (kept optional outside of matching). */
   userSex: Sex | null;
@@ -182,7 +184,7 @@ interface AppStore {
   setShowVikramSamvat: (val: boolean) => void;
   setUserBirthDate: (iso: string | null) => void;
   setUserBirthTime: (hhmm: string | null) => void;
-  setUserBirthPlace: (place: { lat: number; lon: number; name: string } | null) => void;
+  setUserBirthPlace: (place: { lat: number; lon: number; name: string; timezone: string } | null) => void;
   setUserSex: (sex: Sex | null) => void;
   setUserName: (name: string | null) => void;
   setWalkthroughStep: (step: number) => void;
@@ -285,7 +287,7 @@ export const useStore = create<AppStore>()(
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 10,
+      version: 11,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -425,6 +427,20 @@ export const useStore = create<AppStore>()(
         // existing users — only surfaces in match views when set.
         if (version < 10) {
           if (state.userName === undefined) state.userName = null;
+        }
+
+        // v10 → v11: userBirthPlace gained a `timezone` field so panchang-ts
+        // compute can interpret the birth time in the birthplace's tz instead
+        // of the device's. Backfill Asia/Kolkata — the only city list shipped
+        // is the Indian district headquarters, all in IST.
+        if (version < 11) {
+          const place = state.userBirthPlace as
+            | { lat: number; lon: number; name: string; timezone?: string }
+            | null
+            | undefined;
+          if (place && !place.timezone) {
+            state.userBirthPlace = { ...place, timezone: 'Asia/Kolkata' };
+          }
         }
 
         return state as AppStore;

@@ -33,8 +33,9 @@ import {
   matchAshtakoot,
   natalMoonFromChart,
 } from '@/services/astrology/kundliService';
-import { INDIAN_CITIES, type City } from '@/config/cities';
+import { INDIAN_CITIES, cityTimezone, type City } from '@/config/cities';
 import { ymd } from '@/utils/calendar';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 
 const RASHI_NAMES_EN = [
   'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
@@ -435,8 +436,14 @@ function usePartnerCompute(
         fromCache: true,
       };
     }
-    const date = new Date(`${partner.dateTimeIso}:00`);
-    if (Number.isNaN(date.getTime())) return null;
+    const [d, hhmm] = partner.dateTimeIso.split('T');
+    if (!d || !hhmm) return null;
+    let date: Date;
+    try {
+      date = wallclockInZoneToUtc(d, hhmm, partner.place.timezone);
+    } catch {
+      return null;
+    }
     const k = computeKundli({
       date,
       location: { lat: partner.place.lat, lon: partner.place.lon },
@@ -643,7 +650,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
   const [sex, setSex] = useState<Sex | null>(null);
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState('12:00');
-  const [place, setPlace] = useState<{ lat: number; lon: number; name: string } | null>(null);
+  const [place, setPlace] = useState<{ lat: number; lon: number; name: string; timezone: string } | null>(null);
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
@@ -668,7 +675,12 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
       // Default partner place to user's birthplace (most common case for
       // marriage matching) → fall back to current location.
       const fallback = userBirthPlace ?? (userLocation
-        ? { lat: userLocation.lat, lon: userLocation.lon, name: t('match.currentLocation') }
+        ? {
+            lat: userLocation.lat,
+            lon: userLocation.lon,
+            name: t('match.currentLocation'),
+            timezone: DEFAULT_BIRTH_TIMEZONE,
+          }
         : null);
       setPlace(fallback);
     }
@@ -841,7 +853,12 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
             visible={cityPickerOpen}
             onClose={() => setCityPickerOpen(false)}
             onPick={(c) => {
-              setPlace({ lat: c.lat, lon: c.lon, name: `${c.name}, ${c.state}` });
+              setPlace({
+                lat: c.lat,
+                lon: c.lon,
+                name: `${c.name}, ${c.state}`,
+                timezone: cityTimezone(c),
+              });
               setCityPickerOpen(false);
             }}
           />

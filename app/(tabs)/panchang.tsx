@@ -24,6 +24,7 @@ import {
 } from '@/config/theme';
 import { usePanchang } from '@/hooks/usePanchang';
 import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang } from '@/services/astrology/panchangService';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 import { resolveLanguage } from '@/i18n';
 import {
   localizeChandraMasa,
@@ -215,6 +216,7 @@ export default function PanchangScreen() {
   const ayanamsa = useStore(s => s.ayanamsa);
   const userBirthDate = useStore(s => s.userBirthDate);
   const userBirthTime = useStore(s => s.userBirthTime);
+  const userBirthPlace = useStore(s => s.userBirthPlace);
   const showVikramSamvat = useStore(s => s.showVikramSamvat);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
@@ -231,10 +233,13 @@ export default function PanchangScreen() {
   const panchangLang = resolveLanguage(language);
   const birthMoment = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
-    const timePart = userBirthTime ? `${userBirthTime}:00` : '12:00:00';
-    const birth = new Date(`${userBirthDate}T${timePart}`);
-    return Number.isNaN(birth.getTime()) ? null : birth;
-  }, [userBirthDate, userBirthTime]);
+    const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    try {
+      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+    } catch {
+      return null;
+    }
+  }, [userBirthDate, userBirthTime, userBirthPlace]);
   const janmaNakshatra = useMemo<number | undefined>(() => {
     if (!birthMoment) return undefined;
     try { return computeJanmaNakshatraIndex(birthMoment); } catch { return undefined; }

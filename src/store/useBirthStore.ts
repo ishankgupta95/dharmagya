@@ -23,10 +23,11 @@ export interface BirthChartEntry {
   /** Biological sex; required for Ashtakoot matching to correctly assign the
    *  Vara (boy) and Vadhu (girl) roles per classical convention. */
   sex: Sex;
-  /** ISO string in local time (e.g. "1995-08-15T05:30"). Stored without offset
-   *  so display is timezone-stable; service applies device offset for compute. */
+  /** ISO string in *birthplace* local time (e.g. "1995-08-15T05:30"). Stored
+   *  without offset so display is timezone-stable; the compute path converts
+   *  it to UTC using `place.timezone`. */
   dateTimeIso: string;
-  place: { lat: number; lon: number; name: string };
+  place: { lat: number; lon: number; name: string; timezone: string };
   /** Cached derived fields — lazily filled on first kundli/match access. */
   derived?: {
     moonRashi: number;       // 0..11
@@ -86,7 +87,7 @@ export const useBirthStore = create<BirthStore>()(
     {
       name: 'dharmagya-birth-charts',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       migrate: (persistedState, version) => {
         const state = persistedState as { charts?: BirthChartEntry[] } | null;
         if (!state?.charts) return persistedState as { charts: BirthChartEntry[] };
@@ -96,6 +97,22 @@ export const useBirthStore = create<BirthStore>()(
         // edit each one introduces a worse migration UX than starting clean.
         if (version < 2) {
           state.charts = state.charts.filter((c) => c.sex === 'male' || c.sex === 'female');
+        }
+
+        // v2 → v3: place gained a `timezone` field; the date+time stored on
+        // each chart was previously interpreted in the device tz, not the
+        // birthplace tz. Backfill Asia/Kolkata for the curated India city list
+        // and drop the cached `derived` (it was computed against the wrong
+        // UTC instant on any non-IST device).
+        if (version < 3) {
+          state.charts = state.charts.map((c) => {
+            const place = c.place as { lat: number; lon: number; name: string; timezone?: string };
+            return {
+              ...c,
+              place: { ...place, timezone: place.timezone ?? 'Asia/Kolkata' },
+              derived: undefined,
+            };
+          });
         }
 
         return state as { charts: BirthChartEntry[] };

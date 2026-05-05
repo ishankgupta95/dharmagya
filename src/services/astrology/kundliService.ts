@@ -23,6 +23,7 @@ import {
   type VimshottariDashaResult,
   type NatalMoon,
 } from 'panchang-ts';
+import { wallclockInZoneToUtc } from '@/utils/time';
 
 /** All inputs the library needs to compute any natal chart. */
 export interface BirthInputs {
@@ -216,19 +217,28 @@ export function natalMoonFromChart(chart: BirthChart): NatalMoon {
 
 /** Build a `BirthInputs` payload from the user's saved birth fields in
  *  `useStore` + the relevant ayanamsa/language/houseSystem prefs. Returns
- *  null if any required input is missing. */
+ *  null if any required input is missing.
+ *
+ *  The `birthPlace.timezone` (IANA, e.g. `Asia/Kolkata`) is used to convert
+ *  the wallclock birth time into the correct UTC instant — without it the
+ *  computation would silently use the *device's* tz, producing different
+ *  results on different devices. */
 export function buildBirthInputs(args: {
   birthDateIso: string | null;
   birthTimeHHmm: string | null;
-  birthPlace: { lat: number; lon: number; name: string } | null;
+  birthPlace: { lat: number; lon: number; name: string; timezone: string } | null;
   ayanamsa: AyanamsaType;
   language: Language;
   houseSystem: HouseSystem;
 }): BirthInputs | null {
   if (!args.birthDateIso || !args.birthPlace) return null;
   const time = args.birthTimeHHmm ?? '12:00';
-  const date = new Date(`${args.birthDateIso}T${time}:00`);
-  if (Number.isNaN(date.getTime())) return null;
+  let date: Date;
+  try {
+    date = wallclockInZoneToUtc(args.birthDateIso, time, args.birthPlace.timezone);
+  } catch {
+    return null;
+  }
   return {
     date,
     location: { lat: args.birthPlace.lat, lon: args.birthPlace.lon },

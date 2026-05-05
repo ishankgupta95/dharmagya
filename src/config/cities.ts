@@ -3,11 +3,21 @@
  * Sorted alphabetically by name within each state grouping.
  */
 
+import { DEFAULT_BIRTH_TIMEZONE } from '@/utils/time';
+
 export interface City {
   name: string;
   state: string;
   lat: number;
   lon: number;
+  /** IANA timezone of the city; defaults to `Asia/Kolkata` for the curated
+   *  Indian cities list. Read via `cityTimezone()` so callers don't have to
+   *  hardcode the fallback. */
+  timezone?: string;
+}
+
+export function cityTimezone(city: { timezone?: string } | null | undefined): string {
+  return city?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
 }
 
 export const INDIAN_CITIES: City[] = [

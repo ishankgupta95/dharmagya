@@ -26,6 +26,7 @@ import {
 } from '@/config/theme';
 import { computeDashaTimeline } from '@/services/astrology/kundliService';
 import { ymd } from '@/utils/calendar';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
   Sun: 'sun',
@@ -57,6 +58,7 @@ export function DashaSection() {
   const isDarkMode = useStore((s) => s.isDarkMode);
   const userBirthDate = useStore((s) => s.userBirthDate);
   const userBirthTime = useStore((s) => s.userBirthTime);
+  const userBirthPlace = useStore((s) => s.userBirthPlace);
   const setUserBirthDate = useStore((s) => s.setUserBirthDate);
   const ayanamsa = useStore((s) => s.ayanamsa);
   const colors = isDarkMode ? darkColors : lightColors;
@@ -68,9 +70,13 @@ export function DashaSection() {
 
   const birthDate = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
-    const timePart = userBirthTime ? `${userBirthTime}:00` : '12:00:00';
-    return new Date(`${userBirthDate}T${timePart}`);
-  }, [userBirthDate, userBirthTime]);
+    const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    try {
+      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+    } catch {
+      return null;
+    }
+  }, [userBirthDate, userBirthTime, userBirthPlace]);
 
   const timeline = useMemo(() => {
     if (!birthDate) return null;
