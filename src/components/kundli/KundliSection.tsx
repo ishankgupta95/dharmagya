@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, TextInput, useWindowDimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, TextInput, ScrollView, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import type { Dignity } from 'panchang-ts';
+import type { Dignity, Divisional, DivisionalChart } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
@@ -15,7 +15,15 @@ import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useStore, type Sex } from '@/store/useStore';
 import { borderRadius, darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
 import { resolveLanguage } from '@/i18n';
-import { computeKundli, buildBirthInputs } from '@/services/astrology/kundliService';
+import {
+  computeKundli,
+  computeDivisional,
+  computeShadbalaCached,
+  buildBirthInputs,
+  DIVISIONAL_CHARTS_BEYOND_D9,
+} from '@/services/astrology/kundliService';
+import { DoshaCard } from './DoshaCard';
+import { ShadbalaChart } from './ShadbalaChart';
 import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
 import { NorthChart } from './NorthChart';
@@ -54,7 +62,10 @@ export function KundliSection() {
   const { width } = useWindowDimensions();
   const { formatTime } = useLocaleFormatters();
 
-  const [showD9, setShowD9] = useState(false);
+  // 'D1' = natal rashi chart; everything else is a divisional (varga) chart
+  // computed lazily through `computeDivisional` so we don't pay the BPHS varga
+  // math up front for charts the user never opens.
+  const [activeChart, setActiveChart] = useState<'D1' | Divisional>('D1');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   // Local draft for the name TextInput so we only commit on blur, not on
@@ -214,7 +225,23 @@ export function KundliSection() {
 
   const lagna = bundle.d1.lagna;
   const lagnaRashiName = rashiNames[lagna.rashi.index];
-  const chartCells = showD9 ? cellsFromD9(bundle.d9, lang) : cellsFromD1(bundle.d1, lang);
+
+  // Build the cells for whichever chart the user is currently looking at.
+  // D1 and D9 are already in the bundle; the rest go through the lazy cache.
+  const activeDivisional: DivisionalChart | null =
+    activeChart === 'D1'
+      ? null
+      : activeChart === 'D9'
+        ? bundle.d9
+        : (inputs ? computeDivisional(inputs, activeChart) : null);
+  const chartCells =
+    activeChart === 'D1'
+      ? cellsFromD1(bundle.d1, lang)
+      : activeDivisional
+        ? cellsFromD9(activeDivisional, lang)
+        : cellsFromD1(bundle.d1, lang);
+
+  const shadbala = inputs ? computeShadbalaCached(inputs) : null;
 
   // Chart fills screen width minus screen padding.
   const chartSize = Math.min(width - spacing.screenH * 2, 360);
@@ -279,39 +306,42 @@ export function KundliSection() {
           </SegmentedChip>
         </View>
 
-        <View style={styles.divisionGroup}>
-          <SegmentedChip
-            active={!showD9}
-            onPress={() => setShowD9(false)}
-            inactiveBg="transparent"
-            activeBg={colors.surface}
-            inactiveBorder={colors.border}
-            activeBorder={colors.borderAccent}
-            style={styles.divChip}
-            accessibilityLabel="D1">
-            <Text
-              variant="mono-caps"
-              style={[styles.divChipText, { color: !showD9 ? colors.textPrimary : colors.textTertiary }]}>
-              D1
-            </Text>
-          </SegmentedChip>
-          <SegmentedChip
-            active={showD9}
-            onPress={() => setShowD9(true)}
-            inactiveBg="transparent"
-            activeBg={colors.surface}
-            inactiveBorder={colors.border}
-            activeBorder={colors.borderAccent}
-            style={styles.divChip}
-            accessibilityLabel="D9">
-            <Text
-              variant="mono-caps"
-              style={[styles.divChipText, { color: showD9 ? colors.textPrimary : colors.textTertiary }]}>
-              D9
-            </Text>
-          </SegmentedChip>
-        </View>
       </View>
+
+      {/* ── Divisional (varga) chart selector ────────────────────────────
+          D1 + D9 are pre-computed in the bundle; the rest are computed
+          lazily on first open. Horizontal scroll keeps it readable on small
+          screens since 8 chips wouldn't fit a single row. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.divScrollContent}
+        style={styles.divScroll}>
+        {(['D1', 'D9', ...DIVISIONAL_CHARTS_BEYOND_D9] as const).map((kind) => {
+          const active = activeChart === kind;
+          return (
+            <SegmentedChip
+              key={kind}
+              active={active}
+              onPress={() => setActiveChart(kind)}
+              inactiveBg="transparent"
+              activeBg={colors.surface}
+              inactiveBorder={colors.border}
+              activeBorder={colors.borderAccent}
+              style={styles.divChip}
+              accessibilityLabel={kind}>
+              <Text
+                variant="mono-caps"
+                style={[
+                  styles.divChipText,
+                  { color: active ? colors.textPrimary : colors.textTertiary },
+                ]}>
+                {kind}
+              </Text>
+            </SegmentedChip>
+          );
+        })}
+      </ScrollView>
 
       {/* ── Chart ────────────────────────────────────────────────────────── */}
       <View style={styles.chartWrap}>
@@ -322,53 +352,32 @@ export function KundliSection() {
         )}
       </View>
 
-      {/* ── Mangal Dosha card ────────────────────────────────────────────── */}
+      {/* ── Doshas (Mangal + Kaal Sarp + Pitru) ──────────────────────────── */}
       <SectionLabel style={styles.sectionLabelSpacing}>
-        {t('kundli.mangalSection')}
+        {t('kundli.doshasSection')}
       </SectionLabel>
-      <View style={[styles.mangalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.mangalHead}>
-          <Icon
-            name={bundle.mangal.afflicted ? 'alert-circle' : 'check-circle'}
-            size={20}
-            color={bundle.mangal.afflicted ? palette.sindoor : '#3FA37D'}
-          />
-          <Text variant="body" style={[styles.mangalStatus, { color: colors.textPrimary }]}>
-            {bundle.mangal.afflicted ? t('kundli.mangalAfflicted') : t('kundli.mangalNotAfflicted')}
-          </Text>
-        </View>
-        <View style={styles.mangalGrid}>
-          <MangalCut
-            label={t('kundli.fromLagna')}
-            house={bundle.mangal.fromLagna.house}
-            afflicted={bundle.mangal.fromLagna.afflicted}
-            colors={colors}
-          />
-          <MangalCut
-            label={t('kundli.fromMoon')}
-            house={bundle.mangal.fromMoon.house}
-            afflicted={bundle.mangal.fromMoon.afflicted}
-            colors={colors}
-          />
-          <MangalCut
-            label={t('kundli.fromVenus')}
-            house={bundle.mangal.fromVenus.house}
-            afflicted={bundle.mangal.fromVenus.afflicted}
-            colors={colors}
-          />
-        </View>
-        {bundle.mangal.cancellations.length > 0 && (
-          <Text variant="body-italic" style={[styles.mangalCancel, { color: colors.textMuted }]}>
-            {t('kundli.cancellation')}: {bundle.mangal.cancellations.join('; ')}
-          </Text>
-        )}
-      </View>
+      <DoshaCard
+        mangal={bundle.mangal}
+        kaalSarp={bundle.kaalSarp}
+        pitru={bundle.pitru}
+        colors={colors}
+      />
 
       {/* ── Dignity strip ────────────────────────────────────────────────── */}
       <SectionLabel style={styles.sectionLabelSpacing}>
         {t('kundli.dignitySection')}
       </SectionLabel>
       <PlanetaryDignityChart items={bundle.dignity} labelFor={dignityLabel} />
+
+      {/* ── Shadbala (six-fold strength) ─────────────────────────────────── */}
+      {shadbala && (
+        <>
+          <SectionLabel style={styles.sectionLabelSpacing}>
+            {t('kundli.shadbalaSection')}
+          </SectionLabel>
+          <ShadbalaChart shadbala={shadbala} />
+        </>
+      )}
 
       {/* ── Compatibility shortcuts ──────────────────────────────────────
           Two routes into Ashtakoot Guna Milan:
@@ -593,31 +602,6 @@ function MatchOthersCard({ colors, t }: MatchOthersCardProps) {
   );
 }
 
-interface MangalCutProps {
-  label: string;
-  house: number;
-  afflicted: boolean;
-  colors: ColorPalette;
-}
-
-function MangalCut({ label, house, afflicted, colors }: MangalCutProps) {
-  return (
-    <View style={[styles.mangalCol, { borderColor: colors.border }]}>
-      <Text variant="mono-caps" style={[styles.mangalColLabel, { color: colors.textTertiary }]}>
-        {label}
-      </Text>
-      <Text
-        variant="body"
-        style={[
-          styles.mangalColValue,
-          { color: afflicted ? palette.sindoor : colors.textPrimary },
-        ]}>
-        {house}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   sectionLabelSpacing: { marginTop: 24, marginBottom: 10 },
 
@@ -685,7 +669,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   styleGroup: { flexDirection: 'row', gap: 6 },
-  divisionGroup: { flexDirection: 'row', gap: 6 },
   styleChip: {
     paddingVertical: 8,
     paddingHorizontal: 14,
@@ -693,11 +676,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   styleChipText: { fontSize: 9 },
+  divScroll: { marginTop: 4 },
+  divScrollContent: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 0,
+    paddingBottom: 4,
+  },
   divChip: {
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: borderRadius.chip,
     borderWidth: 1,
+    minWidth: 48,
+    alignItems: 'center',
   },
   divChipText: { fontSize: 10 },
 
@@ -705,35 +697,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
   },
-
-  mangalCard: {
-    padding: 16,
-    borderRadius: borderRadius.card,
-    borderWidth: 1,
-  },
-  mangalHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  mangalStatus: { fontSize: 15, lineHeight: 21, flex: 1 },
-  mangalGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  mangalCol: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: borderRadius.cardInner,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  mangalColLabel: { fontSize: 9, letterSpacing: 1.4 },
-  mangalColValue: { fontSize: 18, lineHeight: 24 },
-  mangalCancel: { fontSize: 12, lineHeight: 18, marginTop: 12 },
 
   matchCard: {
     flexDirection: 'row',

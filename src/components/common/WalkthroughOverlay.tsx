@@ -280,7 +280,10 @@ export function WalkthroughSpotlight({
           ) : (
             <View style={[styles.tapHint, { borderColor: palette.sindoor }]}>
               <Icon name="hand" size={12} color={palette.sindoor} />
-              <Text variant="mono-caps" style={[styles.tapHintText, { color: palette.sindoor }]}>
+              <Text
+                variant="mono-caps"
+                numberOfLines={1}
+                style={[styles.tapHintText, { color: palette.sindoor }]}>
                 {t('walkthrough.tapHighlighted')}
               </Text>
             </View>
@@ -400,6 +403,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: borderRadius.chip,
     borderWidth: 1,
+    flexShrink: 1,
   },
   tapHintText: {
     fontSize: 9,

@@ -2,25 +2,33 @@
  * Pre-compute "auspicious anywhere in India" candidate dates for each muhurat
  * occasion and write them to src/data/static/muhurat-candidates.json.
  *
- * Why this exists: the muhurat rule reads tithi / nakshatra / yoga at LOCAL
+ * Why this exists: the muhurta rule reads tithi / nakshatra / yoga at LOCAL
  * sunrise, so a fully precomputed list at one city would be wrong for users
  * elsewhere (sunrise drifts ~30–40 min east-to-west across India). This file
  * is therefore a *candidate* list — dates that satisfy the rule at any of
  * 5 reference longitudes spanning India. The runtime validates each
  * candidate at the user's actual coords, replacing the 365-day scan with
- * ~50 panchang calls. See plan: are-muhurats-calculated-on-greedy-quiche.md
+ * ~50 panchang calls.
  *
- * IMPORTANT: The RULES + evaluator below MUST MATCH
- * src/services/astrology/muhurat.ts. They are intentionally duplicated
- * because mixing CommonJS scripts with TS source modules requires either
- * tsx/ts-node or a JSON rules file — both are bigger lifts than keeping
- * 30 lines of stable classical rules in two places. If you change one,
- * change the other.
+ * Source of rules: panchang-ts ships `STOCK_MUHURTA_RULES` and the named
+ * `*Rule` exports (vivahRule, grihaPraveshRule, …). This script imports
+ * those directly so there's a single source of truth across the whole
+ * pipeline — runtime validator, candidate generator, and lib stay aligned.
  *
  * Usage:  node scripts/generate-muhurat-candidates.js
  */
+/* eslint-env node */
 
-const { getDailyPanchang } = require('panchang-ts');
+const {
+  scoreMuhurta,
+  vivahRule,
+  grihaPraveshRule,
+  namakaranaRule,
+  vahanKharidiRule,
+  mundanRule,
+  annaprashanRule,
+  vidyarambhRule,
+} = require('panchang-ts');
 const fs = require('fs');
 const path = require('path');
 
@@ -42,129 +50,21 @@ const REFERENCES = [
 ];
 const TIMEZONE = 330; // IST = UTC+5:30 = 330 minutes
 
-// ─── Rules — MUST MATCH src/services/astrology/muhurat.ts ────────────────────
-
-const ALL_OCCASIONS = [
-  'vivah',
-  'griha-pravesh',
-  'namkaran',
-  'vahan',
-  'mundan',
-  'annaprashan',
-  'vidyarambh',
-];
-
-const TITHI_COMMON = ['Pratipada', 'Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Trayodashi'];
-
-const RULES = {
-  vivah: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Rohini', 'Mrigashirsha', 'Magha', 'Uttara Phalguni', 'Hasta', 'Swati',
-      'Anuradha', 'Mula', 'Uttara Ashadha', 'Uttara Bhadrapada', 'Revati',
-    ],
-    excludedVaras: ['Tuesday'],
-    excludedYogas: ['Vishkambha', 'Atiganda', 'Shula', 'Ganda', 'Vyaghata', 'Vajra', 'Vyatipata', 'Parigha', 'Vaidhriti'],
-    requiresShuklaPaksha: true,
-  },
-  'griha-pravesh': {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Dwadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Rohini', 'Mrigashirsha', 'Anuradha', 'Chitra', 'Uttara Phalguni',
-      'Uttara Ashadha', 'Uttara Bhadrapada', 'Revati', 'Dhanishta', 'Shatabhisha',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday', 'Sunday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Vishkambha', 'Ganda', 'Shula', 'Parigha'],
-    requiresShuklaPaksha: true,
-  },
-  namkaran: {
-    auspiciousTithis: ['Pratipada', ...TITHI_COMMON, 'Dwadashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Rohini', 'Mrigashirsha', 'Punarvasu', 'Pushya', 'Hasta',
-      'Chitra', 'Swati', 'Anuradha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha', 'Vajra'],
-    requiresShuklaPaksha: false,
-  },
-  vahan: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Shashthi', 'Saptami', 'Dashami', 'Ekadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Rohini', 'Mrigashirsha', 'Pushya', 'Punarvasu', 'Hasta',
-      'Chitra', 'Uttara Phalguni', 'Uttara Ashadha', 'Uttara Bhadrapada',
-      'Revati', 'Anuradha', 'Shravana', 'Dhanishta',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha'],
-    requiresShuklaPaksha: true,
-  },
-  mundan: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Ekadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Mrigashirsha', 'Pushya', 'Hasta', 'Chitra', 'Swati',
-      'Jyeshtha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Sunday', 'Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha', 'Vajra', 'Vishkambha'],
-    requiresShuklaPaksha: true,
-  },
-  annaprashan: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Dwadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Rohini', 'Mrigashirsha', 'Punarvasu', 'Pushya', 'Hasta', 'Chitra',
-      'Swati', 'Anuradha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha'],
-    requiresShuklaPaksha: false,
-  },
-  vidyarambh: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Shashthi', 'Dashami', 'Ekadashi', 'Dwadashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Rohini', 'Mrigashirsha', 'Ardra', 'Punarvasu', 'Pushya',
-      'Hasta', 'Chitra', 'Swati', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Sunday', 'Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha'],
-    requiresShuklaPaksha: false,
-  },
+// ─── Occasion → stock rule mapping ───────────────────────────────────────────
+// Mirror of `OCCASION_TO_RULE` in src/services/astrology/muhurat.ts. The two
+// exist independently because this script runs in plain Node (CommonJS) and
+// the runtime is TypeScript — but both pull from the same `panchang-ts`
+// exports so the *rule data* never duplicates.
+const OCCASION_RULES = {
+  vivah: vivahRule,
+  'griha-pravesh': grihaPraveshRule,
+  namkaran: namakaranaRule,
+  vahan: vahanKharidiRule,
+  mundan: mundanRule,
+  annaprashan: annaprashanRule,
+  vidyarambh: vidyarambhRule,
 };
-
-const VARA_SANSKRIT_TO_ENGLISH = {
-  raviwara: 'sunday',
-  somawara: 'monday',
-  mangalawara: 'tuesday',
-  budhawara: 'wednesday',
-  guruwara: 'thursday',
-  shukrawara: 'friday',
-  shaniwara: 'saturday',
-};
-
-function ciEq(a, b) {
-  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-}
-
-function endsWithCI(haystack, needle) {
-  return String(haystack).trim().toLowerCase().endsWith(String(needle).trim().toLowerCase());
-}
-
-// Mirror of evaluateDay from src/services/astrology/muhurat.ts
-function passesRule(panchang, rule) {
-  const tithi = panchang.tithis[0];
-  const tithiName = tithi?.name ?? '';
-  const paksha = tithi?.paksha ?? null;
-  const nakshatraName = panchang.nakshatras[0]?.name ?? '';
-  const yogaName = panchang.yogas[0]?.name ?? '';
-  const varaName = panchang.vara?.name ?? '';
-  const varaEnglish = VARA_SANSKRIT_TO_ENGLISH[varaName.trim().toLowerCase()] ?? varaName.toLowerCase();
-
-  if (rule.requiresShuklaPaksha && paksha !== 'Shukla') return false;
-  if (!rule.auspiciousTithis.some(t => endsWithCI(tithiName, t))) return false;
-  if (!rule.auspiciousNakshatras.some(n => ciEq(n, nakshatraName))) return false;
-  if (rule.excludedVaras.some(v => v.trim().toLowerCase() === varaEnglish)) return false;
-  if (rule.excludedYogas.some(y => ciEq(y, yogaName))) return false;
-  return true;
-}
+const ALL_OCCASIONS = Object.keys(OCCASION_RULES);
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
@@ -186,10 +86,6 @@ function generate() {
   const candidateSets = new Map();
   for (const occ of ALL_OCCASIONS) candidateSets.set(occ, new Set());
 
-  // Cache panchang per (refIdx, ymd) to avoid recomputing for each occasion.
-  // Memory bound: 5 refs × ~730 days × ~few KB each ≈ <50 MB transient. Fine.
-  const panchangCache = new Map();
-
   for (let dayIdx = 0; dayIdx < LOOKAHEAD_DAYS; dayIdx++) {
     const cursor = new Date(today);
     cursor.setDate(cursor.getDate() + dayIdx);
@@ -199,34 +95,30 @@ function generate() {
       process.stdout.write(`  day ${dayIdx + 1}/${LOOKAHEAD_DAYS} (${dayKey})\r`);
     }
 
-    // Compute panchang at each reference. Skip refs that error.
-    const refResults = [];
-    for (let r = 0; r < REFERENCES.length; r++) {
-      const ref = REFERENCES[r];
-      const cacheKey = `${r}|${dayKey}`;
-      let result = panchangCache.get(cacheKey);
-      if (result === undefined) {
+    for (const occ of ALL_OCCASIONS) {
+      const rule = OCCASION_RULES[occ];
+      // A date is a candidate iff scoreMuhurta passes at any reference. We
+      // short-circuit on the first ref that passes so the average cost per
+      // (day, occasion) stays close to one panchang compute, not five.
+      let isCandidate = false;
+      for (let r = 0; r < REFERENCES.length; r++) {
+        const ref = REFERENCES[r];
         try {
-          result = getDailyPanchang(
+          const result = scoreMuhurta(
             cursor,
             { latitude: ref.latitude, longitude: ref.longitude },
-            { timezone: TIMEZONE, computeEndTimes: false, region: 'all', language: 'en' },
+            rule,
+            { timezone: TIMEZONE },
           );
+          if (result.passes) {
+            isCandidate = true;
+            break;
+          }
         } catch {
-          result = null;
+          // skip problematic dates / refs
         }
-        panchangCache.set(cacheKey, result);
       }
-      if (result) refResults.push(result);
-    }
-
-    if (refResults.length === 0) continue;
-
-    for (const occ of ALL_OCCASIONS) {
-      const rule = RULES[occ];
-      if (refResults.some(p => passesRule(p, rule))) {
-        candidateSets.get(occ).add(dayKey);
-      }
+      if (isCandidate) candidateSets.get(occ).add(dayKey);
     }
   }
 
@@ -238,10 +130,11 @@ function generate() {
   }
 
   return {
-    version: 1,
+    version: 2,
     generatedAt,
     lookaheadDays: LOOKAHEAD_DAYS,
     references: REFERENCES.map(r => r.name),
+    ruleSource: 'panchang-ts STOCK_MUHURTA_RULES',
     candidates,
   };
 }

@@ -1,3 +1,14 @@
+import {
+  scoreMuhurta,
+  vivahRule,
+  grihaPraveshRule,
+  namakaranaRule,
+  vahanKharidiRule,
+  mundanRule,
+  annaprashanRule,
+  vidyarambhRule,
+  type MuhurtaRule,
+} from 'panchang-ts';
 import { fetchPanchang } from './panchangService';
 import type { IPanchangDay } from '@/types';
 
@@ -22,104 +33,25 @@ export const ALL_OCCASIONS: Occasion[] = [
   'vidyarambh',
 ];
 
-// ─── Rule-base types ──────────────────────────────────────────────────────────
-
-interface OccasionRule {
-  /** Allowed tithi names (after stripping paksha prefix). English names. */
-  auspiciousTithis: string[];
-  /** Nakshatra names (English) considered auspicious for this occasion. */
-  auspiciousNakshatras: string[];
-  /** Varas (English) that are forbidden. */
-  excludedVaras: string[];
-  /** Yoga names (English) that are forbidden. */
-  excludedYogas: string[];
-  /** Whether the rule requires Shukla paksha (waxing moon). */
-  requiresShuklaPaksha: boolean;
-}
-
-// ─── Canonical tithi / nakshatra names (English) ─────────────────────────────
-// These mirror what panchang-ts returns for language='en'. Values listed here
-// for maintainability; we match case-insensitively.
-
-const TITHI_COMMON = ['Pratipada', 'Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Trayodashi'];
-
-// ─── Per-occasion classical rules ─────────────────────────────────────────────
-// Sources: Brihat Parashara Hora Shastra, Muhurta Chintamani, Drik Panchang
-// rule tables. These are approximate — sufficient for MVP surfacing.
-
-const RULES: Record<Occasion, OccasionRule> = {
-  vivah: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Rohini', 'Mrigashirsha', 'Magha', 'Uttara Phalguni', 'Hasta', 'Swati',
-      'Anuradha', 'Mula', 'Uttara Ashadha', 'Uttara Bhadrapada', 'Revati',
-    ],
-    excludedVaras: ['Tuesday'],
-    excludedYogas: ['Vishkambha', 'Atiganda', 'Shula', 'Ganda', 'Vyaghata', 'Vajra', 'Vyatipata', 'Parigha', 'Vaidhriti'],
-    requiresShuklaPaksha: true,
-  },
-  'griha-pravesh': {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Dwadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Rohini', 'Mrigashirsha', 'Anuradha', 'Chitra', 'Uttara Phalguni',
-      'Uttara Ashadha', 'Uttara Bhadrapada', 'Revati', 'Dhanishta', 'Shatabhisha',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday', 'Sunday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Vishkambha', 'Ganda', 'Shula', 'Parigha'],
-    requiresShuklaPaksha: true,
-  },
-  namkaran: {
-    auspiciousTithis: ['Pratipada', ...TITHI_COMMON, 'Dwadashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Rohini', 'Mrigashirsha', 'Punarvasu', 'Pushya', 'Hasta',
-      'Chitra', 'Swati', 'Anuradha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha', 'Vajra'],
-    requiresShuklaPaksha: false,
-  },
-  vahan: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Shashthi', 'Saptami', 'Dashami', 'Ekadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Rohini', 'Mrigashirsha', 'Pushya', 'Punarvasu', 'Hasta',
-      'Chitra', 'Uttara Phalguni', 'Uttara Ashadha', 'Uttara Bhadrapada',
-      'Revati', 'Anuradha', 'Shravana', 'Dhanishta',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha'],
-    requiresShuklaPaksha: true,
-  },
-  mundan: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Ekadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Mrigashirsha', 'Pushya', 'Hasta', 'Chitra', 'Swati',
-      'Jyeshtha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Sunday', 'Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha', 'Vajra', 'Vishkambha'],
-    requiresShuklaPaksha: true,
-  },
-  annaprashan: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Saptami', 'Dashami', 'Ekadashi', 'Dwadashi', 'Trayodashi'],
-    auspiciousNakshatras: [
-      'Rohini', 'Mrigashirsha', 'Punarvasu', 'Pushya', 'Hasta', 'Chitra',
-      'Swati', 'Anuradha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha'],
-    requiresShuklaPaksha: false,
-  },
-  vidyarambh: {
-    auspiciousTithis: ['Dwitiya', 'Tritiya', 'Panchami', 'Shashthi', 'Dashami', 'Ekadashi', 'Dwadashi'],
-    auspiciousNakshatras: [
-      'Ashwini', 'Rohini', 'Mrigashirsha', 'Ardra', 'Punarvasu', 'Pushya',
-      'Hasta', 'Chitra', 'Swati', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Revati',
-    ],
-    excludedVaras: ['Sunday', 'Tuesday', 'Saturday'],
-    excludedYogas: ['Vyatipata', 'Vaidhriti', 'Parigha'],
-    requiresShuklaPaksha: false,
-  },
+// ─── Stock-rule mapping (panchang-ts is the source of truth) ──────────────────
+// Our occasion ids predate the library's stock rules. The mapping below is the
+// only place that translates between the two — drop a line here when the lib
+// adds new occasions we want to expose. Sources for the stock rules:
+// Muhurta-chintamani, Muhurta-darpana, BPHS Ch. 28, cross-checked against
+// drikpanchang (see panchang-ts dist for the per-rule citations).
+const OCCASION_TO_RULE: Record<Occasion, MuhurtaRule> = {
+  vivah: vivahRule,
+  'griha-pravesh': grihaPraveshRule,
+  namkaran: namakaranaRule,
+  vahan: vahanKharidiRule,
+  mundan: mundanRule,
+  annaprashan: annaprashanRule,
+  vidyarambh: vidyarambhRule,
 };
+
+// IST is the canonical Indian timezone the panchang is computed against;
+// matches the timezone used by `fetchPanchang` and the candidate generator.
+const IST_OFFSET_MIN = 330;
 
 // ─── Rule evaluation ──────────────────────────────────────────────────────────
 
@@ -194,7 +126,7 @@ export interface ValidateOptions {
 }
 
 export async function validateCandidates(opts: ValidateOptions): Promise<MuhuratMatch[]> {
-  const rule = RULES[opts.occasion];
+  const rule = OCCASION_TO_RULE[opts.occasion];
   const yieldEvery = opts.yieldEvery ?? 5;
   const out: MuhuratMatch[] = [];
   const totalDays = opts.candidates.length;
@@ -209,21 +141,10 @@ export async function validateCandidates(opts: ValidateOptions): Promise<Muhurat
     }
     date.setHours(12, 0, 0, 0); // noon avoids DST-boundary drift, mirrors scanAuspiciousDays
 
-    const panchang = await fetchPanchang(date, opts.coords ?? null, false, 'en');
-    if (panchang) {
-      const match = evaluateDay(panchang, rule);
-      if (match) {
-        const entry: MuhuratMatch = {
-          date,
-          tithi: match.tithi,
-          nakshatra: match.nakshatra,
-          yoga: match.yoga,
-          vara: match.vara,
-          panchang,
-        };
-        out.push(entry);
-        opts.onMatch?.(entry);
-      }
+    const match = await evaluateAndDescribe(date, rule, opts.coords ?? null);
+    if (match) {
+      out.push(match);
+      opts.onMatch?.(match);
     }
 
     scannedCount += 1;
@@ -253,7 +174,7 @@ function parseYmdLocal(s: string): Date | null {
  * high-stakes events.
  */
 export async function scanAuspiciousDays(opts: ScanOptions): Promise<MuhuratMatch[]> {
-  const rule = RULES[opts.occasion];
+  const rule = OCCASION_TO_RULE[opts.occasion];
   const yieldEvery = opts.yieldEvery ?? 5;
   const out: MuhuratMatch[] = [];
 
@@ -271,21 +192,10 @@ export async function scanAuspiciousDays(opts: ScanOptions): Promise<MuhuratMatc
   while (cursor.getTime() <= end.getTime()) {
     if (opts.signal?.aborted) return out;
 
-    const panchang = await fetchPanchang(new Date(cursor), opts.coords ?? null, false, 'en');
-    if (panchang) {
-      const match = evaluateDay(panchang, rule);
-      if (match) {
-        const entry: MuhuratMatch = {
-          date: new Date(cursor),
-          tithi: match.tithi,
-          nakshatra: match.nakshatra,
-          yoga: match.yoga,
-          vara: match.vara,
-          panchang,
-        };
-        out.push(entry);
-        opts.onMatch?.(entry);
-      }
+    const match = await evaluateAndDescribe(new Date(cursor), rule, opts.coords ?? null);
+    if (match) {
+      out.push(match);
+      opts.onMatch?.(match);
     }
 
     scannedCount += 1;
@@ -314,52 +224,48 @@ function ymdLocal(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-interface EvalMatch {
-  tithi: string;
-  nakshatra: string;
-  yoga: string;
-  vara: string;
-}
+/**
+ * Validate a single date against a stock rule and, when it passes, fetch the
+ * project-side `IPanchangDay` for display. We deliberately let `scoreMuhurta`
+ * own the rule logic — it knows about Bhadra / Panchaka / Adhika Maasa /
+ * eclipse / Ganda Mula exclusions that the prior local rules didn't cover.
+ *
+ * On a passing day we still need the project's `IPanchangDay` to render
+ * tithi / nakshatra / yoga / vara names through the existing localization
+ * pipeline, so we call `fetchPanchang` only after the score check passes —
+ * failing days cost one panchang compute (inside `scoreMuhurta`) instead of
+ * two.
+ */
+async function evaluateAndDescribe(
+  date: Date,
+  rule: MuhurtaRule,
+  coords: { lat: number; lon: number } | null,
+): Promise<MuhuratMatch | null> {
+  // The library normalizes `coords ?? null` to a fallback Indian location
+  // internally via `fetchPanchang`, but `scoreMuhurta` requires a real
+  // GeoLocation. Use Pune as the default — same fallback `fetchPanchang`
+  // applies so the two stay aligned.
+  const location = coords
+    ? { latitude: coords.lat, longitude: coords.lon }
+    : { latitude: 18.6298, longitude: 73.7997 };
 
-// panchang-ts returns Sanskrit vara names (Raviwara…Shaniwara), but the rule
-// tables above use English weekday names because that's how classical sources
-// list them. Map between the two for the excludedVaras check only — the
-// displayed vara passes through localizeVara so it must stay in panchang-ts form.
-const VARA_SANSKRIT_TO_ENGLISH: Record<string, string> = {
-  raviwara: 'sunday',
-  somawara: 'monday',
-  mangalawara: 'tuesday',
-  budhawara: 'wednesday',
-  guruwara: 'thursday',
-  shukrawara: 'friday',
-  shaniwara: 'saturday',
-};
+  let scored;
+  try {
+    scored = scoreMuhurta(date, location, rule, { timezone: IST_OFFSET_MIN });
+  } catch {
+    return null;
+  }
+  if (!scored.passes) return null;
 
-function evaluateDay(p: IPanchangDay, rule: OccasionRule): EvalMatch | null {
-  const tithi = p.tithis[0];
-  const tithiName = tithi?.name ?? '';
-  const paksha = tithi?.paksha ?? null;
-  const nakshatraName = p.nakshatras[0]?.name ?? '';
-  const yogaName = p.yogas[0]?.name ?? '';
-  const varaName = p.vara ?? '';
-  const varaEnglish = VARA_SANSKRIT_TO_ENGLISH[varaName.trim().toLowerCase()] ?? varaName.toLowerCase();
+  const panchang = await fetchPanchang(date, coords, false, 'en');
+  if (!panchang) return null;
 
-  if (rule.requiresShuklaPaksha && paksha !== 'Shukla') return null;
-  // Tithi names from panchang-ts (English) come paksha-prefixed (e.g. "Shukla
-  // Panchami") — match against the rule's bare name via endsWith. Purnima /
-  // Amavasya come through without a prefix and aren't in any rule's list.
-  if (!rule.auspiciousTithis.some(t => endsWithCI(tithiName, t))) return null;
-  if (!rule.auspiciousNakshatras.some(n => ciEq(n, nakshatraName))) return null;
-  if (rule.excludedVaras.some(v => v.trim().toLowerCase() === varaEnglish)) return null;
-  if (rule.excludedYogas.some(y => ciEq(y, yogaName))) return null;
-
-  return { tithi: tithiName, nakshatra: nakshatraName, yoga: yogaName, vara: varaName };
-}
-
-function ciEq(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
-}
-
-function endsWithCI(haystack: string, needle: string): boolean {
-  return haystack.trim().toLowerCase().endsWith(needle.trim().toLowerCase());
+  return {
+    date: new Date(date),
+    tithi: panchang.tithis[0]?.name ?? '',
+    nakshatra: panchang.nakshatras[0]?.name ?? '',
+    yoga: panchang.yogas[0]?.name ?? '',
+    vara: panchang.vara ?? '',
+    panchang,
+  };
 }

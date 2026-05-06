@@ -4,9 +4,12 @@ import { useTranslation } from 'react-i18next';
 import {
   computeVimshottariPratyantar,
   type AntarDasha,
+  type CharaDashaResult,
   type DashaLord,
   type MahaDasha,
   type PratyantarDasha,
+  type YoginiDashaResult,
+  type YoginiMahaDasha,
 } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
@@ -14,6 +17,7 @@ import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
+import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { useStore } from '@/store/useStore';
 import {
@@ -24,9 +28,30 @@ import {
   spacing,
   type ColorPalette,
 } from '@/config/theme';
-import { computeDashaTimeline } from '@/services/astrology/kundliService';
+import {
+  buildBirthInputs,
+  computeAshtottariCached,
+  computeCharaCached,
+  computeDashaTimeline,
+  computeKundli,
+  computeYoginiCached,
+  moonSiderealLonFromChart,
+  type DashaSystem,
+} from '@/services/astrology/kundliService';
+import { resolveLanguage } from '@/i18n';
 import { ymd } from '@/utils/calendar';
 import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
+
+const RASHI_NAMES_EN = [
+  'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
+  'Tula', 'Vrischika', 'Dhanu', 'Makara', 'Kumbha', 'Meena',
+];
+const RASHI_NAMES_HI = [
+  'मेष', 'वृषभ', 'मिथुन', 'कर्क', 'सिंह', 'कन्या',
+  'तुला', 'वृश्चिक', 'धनु', 'मकर', 'कुम्भ', 'मीन',
+];
+
+const DASHA_SYSTEMS: DashaSystem[] = ['vimshottari', 'ashtottari', 'yogini', 'chara'];
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
   Sun: 'sun',
@@ -56,17 +81,20 @@ function formatYears(years: number, t: (k: string, o?: Record<string, unknown>) 
 export function DashaSection() {
   const { t, i18n } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
+  const language = useStore((s) => s.language);
   const userBirthDate = useStore((s) => s.userBirthDate);
   const userBirthTime = useStore((s) => s.userBirthTime);
   const userBirthPlace = useStore((s) => s.userBirthPlace);
   const setUserBirthDate = useStore((s) => s.setUserBirthDate);
   const ayanamsa = useStore((s) => s.ayanamsa);
+  const houseSystem = useStore((s) => s.houseSystem);
   const colors = isDarkMode ? darkColors : lightColors;
   const plinth = usePlinthColors();
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [openAntardashaInsideMaha, setOpenAntardashaInsideMaha] = useState<number | null>(null);
+  const [system, setSystem] = useState<DashaSystem>('vimshottari');
 
   const birthDate = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
@@ -78,16 +106,73 @@ export function DashaSection() {
     }
   }, [userBirthDate, userBirthTime, userBirthPlace]);
 
-  const timeline = useMemo(() => {
-    if (!birthDate) return null;
-    return computeDashaTimeline(birthDate, ayanamsa);
-  }, [birthDate, ayanamsa]);
+  // Birth inputs for systems that need a full chart (Chara: lagna; Yogini /
+  // Ashtottari: sidereal moon longitude). All three only run when their tab
+  // is active so we don't pay for unused dashas on first mount.
+  const birthInputs = useMemo(
+    () =>
+      buildBirthInputs({
+        birthDateIso: userBirthDate,
+        birthTimeHHmm: userBirthTime,
+        birthPlace: userBirthPlace,
+        ayanamsa,
+        language: resolveLanguage(language),
+        houseSystem,
+      }),
+    [userBirthDate, userBirthTime, userBirthPlace, ayanamsa, language, houseSystem],
+  );
 
-  const dasha = timeline?.full ?? null;
-  const activeIndex = dasha?.currentIndex ?? null;
+  const timeline = useMemo(() => {
+    if (!birthDate || system !== 'vimshottari') return null;
+    return computeDashaTimeline(birthDate, ayanamsa);
+  }, [birthDate, ayanamsa, system]);
+
+  const ashtottari = useMemo(() => {
+    if (!birthDate || !birthInputs || system !== 'ashtottari') return null;
+    const bundle = computeKundli(birthInputs);
+    if (!bundle) return null;
+    const moonLon = moonSiderealLonFromChart(bundle.d1);
+    return computeAshtottariCached(birthDate, ayanamsa, moonLon);
+  }, [birthDate, birthInputs, ayanamsa, system]);
+
+  const yogini = useMemo(() => {
+    if (!birthDate || !birthInputs || system !== 'yogini') return null;
+    const bundle = computeKundli(birthInputs);
+    if (!bundle) return null;
+    const moonLon = moonSiderealLonFromChart(bundle.d1);
+    return computeYoginiCached(birthDate, ayanamsa, moonLon);
+  }, [birthDate, birthInputs, ayanamsa, system]);
+
+  const chara = useMemo(() => {
+    if (!birthInputs || system !== 'chara') return null;
+    return computeCharaCached(birthInputs);
+  }, [birthInputs, system]);
+
+  // Vimshottari and Ashtottari both return `VimshottariDashaResult`, so they
+  // share the same row UI. The only difference at this seam is which result
+  // the renderer feeds into MahadashaRow.
+  const dashaResult = system === 'vimshottari' ? (timeline?.full ?? null) : ashtottari;
+  const activeIndex = dashaResult?.currentIndex ?? null;
   const effectiveExpanded = expandedIndex ?? activeIndex;
-  const currentAntardasha = timeline?.currentAntardasha ?? null;
-  const currentPratyantars = timeline?.currentPratyantars ?? [];
+  const now = Date.now();
+  const currentMaha = dashaResult?.mahaDashas[dashaResult.currentIndex];
+  const currentAntardasha =
+    system === 'vimshottari'
+      ? (timeline?.currentAntardasha ?? null)
+      : (currentMaha?.antarDashas.find(
+          (ad) => ad.startDate.getTime() <= now && ad.endDate.getTime() > now,
+        ) ?? null);
+  const currentPratyantars = useMemo(() => {
+    if (system === 'vimshottari') return timeline?.currentPratyantars ?? [];
+    if (system === 'ashtottari' && currentAntardasha) {
+      try {
+        return computeVimshottariPratyantar(currentAntardasha);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [system, timeline, currentAntardasha]);
 
   const birthDateLabel = birthDate
     ? birthDate.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
@@ -151,7 +236,40 @@ export function DashaSection() {
         </Text>
       </TouchableOpacity>
 
-      {dasha && (
+      {/* ── Dasha system selector ─────────────────────────────────────────
+          Vimshottari is the headline; Ashtottari, Yogini, and Chara are
+          alternate classical timings the panchang-ts library now exposes.
+          Each system is computed lazily so we never pay for tabs the user
+          doesn't open. */}
+      <View style={styles.systemRow}>
+        {DASHA_SYSTEMS.map((sys) => (
+          <SegmentedChip
+            key={sys}
+            active={system === sys}
+            onPress={() => {
+              setSystem(sys);
+              setExpandedIndex(null);
+              setOpenAntardashaInsideMaha(null);
+            }}
+            inactiveBg="transparent"
+            activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+            inactiveBorder={colors.border}
+            activeBorder="transparent"
+            style={styles.systemChip}
+            accessibilityLabel={t(`dasha.system.${sys}`)}>
+            <Text
+              variant="mono-caps"
+              style={[
+                styles.systemChipText,
+                { color: system === sys ? palette.parchmentBright : colors.textSecondary },
+              ]}>
+              {t(`dasha.system.${sys}`)}
+            </Text>
+          </SegmentedChip>
+        ))}
+      </View>
+
+      {(system === 'vimshottari' || system === 'ashtottari') && dashaResult && (
         <>
           <View style={styles.currentWrap}>
             <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
@@ -159,10 +277,10 @@ export function DashaSection() {
                 {t('dasha.currentLabel')}
               </Kicker>
               <Text variant="display-italic" style={[styles.currentMahaLord, { color: plinth.text }]}>
-                {t(`dasha.planet.${DASHA_LORD_TO_KEY[dasha.currentMahaDashaLord]}`)} {t('dasha.mahadashaSuffix')}
+                {t(`dasha.planet.${DASHA_LORD_TO_KEY[dashaResult.currentMahaDashaLord]}`)} {t('dasha.mahadashaSuffix')}
               </Text>
               {(() => {
-                const md = dasha.mahaDashas[dasha.currentIndex];
+                const md = dashaResult.mahaDashas[dashaResult.currentIndex];
                 return md ? (
                   <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
                     {t('dasha.untilDate', { date: formatRangeDate(md.endDate, i18n.language) })}
@@ -197,7 +315,7 @@ export function DashaSection() {
           <SectionLabel style={styles.sectionLabelSpacing}>
             {t('dasha.fullCycle')}
           </SectionLabel>
-          {dasha.mahaDashas.map((md, i) => (
+          {dashaResult.mahaDashas.map((md, i) => (
             <MahadashaRow
               key={i}
               md={md}
@@ -221,6 +339,28 @@ export function DashaSection() {
             {t('dasha.approxNote')}
           </Text>
         </>
+      )}
+
+      {system === 'yogini' && yogini && (
+        <YoginiTimeline
+          result={yogini}
+          plinth={plinth}
+          colors={colors}
+          isDarkMode={isDarkMode}
+          lang={i18n.language}
+          t={t}
+        />
+      )}
+
+      {system === 'chara' && chara && (
+        <CharaTimeline
+          result={chara}
+          plinth={plinth}
+          colors={colors}
+          rashiNames={resolveLanguage(language) === 'hi' ? RASHI_NAMES_HI : RASHI_NAMES_EN}
+          lang={i18n.language}
+          t={t}
+        />
       )}
 
       <DatePickerModal
@@ -433,6 +573,193 @@ function AntardashaRow({ ad, lang, colors, t, expanded, onToggle }: AntardashaRo
   );
 }
 
+interface YoginiTimelineProps {
+  result: YoginiDashaResult;
+  plinth: ReturnType<typeof usePlinthColors>;
+  colors: ColorPalette;
+  isDarkMode: boolean;
+  lang: string;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}
+
+function YoginiTimeline({ result, plinth, colors, lang, t }: YoginiTimelineProps) {
+  const now = Date.now();
+  const currentMaha = result.mahaDashas[result.currentIndex];
+  const currentAntar =
+    currentMaha?.antarDashas.find(
+      (ad) => ad.startDate.getTime() <= now && ad.endDate.getTime() > now,
+    ) ?? null;
+  return (
+    <>
+      {currentMaha && (
+        <View style={styles.currentWrap}>
+          <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+            <Kicker color={plinth.accent} size={10}>
+              {t('dasha.currentLabel')}
+            </Kicker>
+            <Text variant="display-italic" style={[styles.currentMahaLord, { color: plinth.text }]}>
+              {t(`dasha.yoginiName.${currentMaha.yogini.toLowerCase()}`)} {t('dasha.mahadashaSuffix')}
+            </Text>
+            <Text variant="mono" style={[styles.yoginiSubtitle, { color: plinth.textSubdued }]}>
+              {t(`dasha.planet.${DASHA_LORD_TO_KEY[currentMaha.lord]}`)}
+            </Text>
+            <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
+              {t('dasha.untilDate', { date: formatRangeDate(currentMaha.endDate, lang) })}
+            </Text>
+            {currentAntar && (
+              <>
+                <View style={[styles.currentDivider, { backgroundColor: plinth.divider }]} />
+                <Text variant="body-italic" style={[styles.currentAntardasha, { color: plinth.text }]}>
+                  {t(`dasha.yoginiName.${currentAntar.yogini.toLowerCase()}`)} {t('dasha.antardashaSuffix')}
+                </Text>
+                <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
+                  {t('dasha.untilDate', { date: formatRangeDate(currentAntar.endDate, lang) })}
+                </Text>
+              </>
+            )}
+          </NightCard>
+        </View>
+      )}
+
+      <SectionLabel style={styles.sectionLabelSpacing}>
+        {t('dasha.yoginiFullCycle')}
+      </SectionLabel>
+      {result.mahaDashas.map((md, i) => (
+        <YoginiRow
+          key={i}
+          md={md}
+          isActive={i === result.currentIndex}
+          colors={colors}
+          lang={lang}
+          t={t}
+        />
+      ))}
+    </>
+  );
+}
+
+interface YoginiRowProps {
+  md: YoginiMahaDasha;
+  isActive: boolean;
+  colors: ColorPalette;
+  lang: string;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}
+
+function YoginiRow({ md, isActive, colors, lang, t }: YoginiRowProps) {
+  const yoginiLabel = t(`dasha.yoginiName.${md.yogini.toLowerCase()}`);
+  const planetLabel = t(`dasha.planet.${DASHA_LORD_TO_KEY[md.lord]}`);
+  return (
+    <View
+      style={[
+        styles.mahaCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: isActive ? colors.accent : colors.border,
+          borderWidth: isActive ? 1.5 : 1,
+        },
+      ]}>
+      <View style={styles.mahaRowHeader}>
+        <View style={[styles.spine, { backgroundColor: isActive ? colors.accent : palette.rule }]} />
+        <View style={{ flex: 1 }}>
+          <View style={styles.mahaTitleRow}>
+            <Text variant="body" style={[styles.mahaLord, { color: colors.textPrimary }]}>
+              {yoginiLabel}{' '}
+              <Text variant="body-italic" style={{ color: colors.textTertiary }}>
+                {planetLabel}
+              </Text>
+            </Text>
+            {isActive && <View style={[styles.activeChip, { backgroundColor: colors.accent }]} />}
+          </View>
+          <Text variant="mono" style={[styles.mahaMeta, { color: colors.textMuted }]}>
+            {t('dasha.dateRangeLong', {
+              start: formatRangeDate(md.startDate, lang),
+              end: formatRangeDate(md.endDate, lang),
+            })}{' '}
+            · {formatYears(md.years, t)}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+interface CharaTimelineProps {
+  result: CharaDashaResult;
+  plinth: ReturnType<typeof usePlinthColors>;
+  colors: ColorPalette;
+  rashiNames: string[];
+  lang: string;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}
+
+function CharaTimeline({ result, plinth, colors, rashiNames, lang, t }: CharaTimelineProps) {
+  const currentMaha = result.mahaDashas[result.currentIndex];
+  return (
+    <>
+      {currentMaha && (
+        <View style={styles.currentWrap}>
+          <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+            <Kicker color={plinth.accent} size={10}>
+              {t('dasha.currentLabel')}
+            </Kicker>
+            <Text variant="display-italic" style={[styles.currentMahaLord, { color: plinth.text }]}>
+              {rashiNames[currentMaha.rashi]} {t('dasha.mahadashaSuffix')}
+            </Text>
+            <Text variant="mono" style={[styles.yoginiSubtitle, { color: plinth.textSubdued }]}>
+              {t(`dasha.planet.${DASHA_LORD_TO_KEY[currentMaha.lord]}`)}
+            </Text>
+            <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
+              {t('dasha.untilDate', { date: formatRangeDate(currentMaha.endDate, lang) })}
+            </Text>
+          </NightCard>
+        </View>
+      )}
+
+      <SectionLabel style={styles.sectionLabelSpacing}>
+        {t('dasha.charaFullCycle')}
+      </SectionLabel>
+      {result.mahaDashas.map((md, i) => {
+        const isActive = i === result.currentIndex;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.mahaCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: isActive ? colors.accent : colors.border,
+                borderWidth: isActive ? 1.5 : 1,
+              },
+            ]}>
+            <View style={styles.mahaRowHeader}>
+              <View style={[styles.spine, { backgroundColor: isActive ? colors.accent : palette.rule }]} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.mahaTitleRow}>
+                  <Text variant="body" style={[styles.mahaLord, { color: colors.textPrimary }]}>
+                    {rashiNames[md.rashi]}{' '}
+                    <Text variant="body-italic" style={{ color: colors.textTertiary }}>
+                      {t(`dasha.planet.${DASHA_LORD_TO_KEY[md.lord]}`)}
+                    </Text>
+                  </Text>
+                  {isActive && <View style={[styles.activeChip, { backgroundColor: colors.accent }]} />}
+                </View>
+                <Text variant="mono" style={[styles.mahaMeta, { color: colors.textMuted }]}>
+                  {t('dasha.dateRangeLong', {
+                    start: formatRangeDate(md.startDate, lang),
+                    end: formatRangeDate(md.endDate, lang),
+                  })}{' '}
+                  · {formatYears(md.years, t)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   sectionLabelSpacing: { marginTop: 24, marginBottom: 10 },
   birthRow: {
@@ -524,4 +851,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.cardGap,
     paddingHorizontal: 8,
   },
+
+  systemRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 16,
+  },
+  systemChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
+  },
+  systemChipText: { fontSize: 9 },
+
+  yoginiSubtitle: { fontSize: 11, letterSpacing: 0.2, marginTop: 4 },
 });

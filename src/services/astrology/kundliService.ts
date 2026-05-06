@@ -2,18 +2,32 @@ import {
   computeRashiChart,
   computeNavamsa,
   computeAshtakoot,
+  computeAshtottariDasha,
+  computeAspects,
+  computeCharaDasha,
+  computeDivisionalChart,
+  computeKaalSarp,
   computeMangalDosha,
+  computePitruDosha,
   computeSadeSati,
+  computeShadbala,
   computeDignity,
   computeVimshottariDashaFromBirth,
   computeVimshottariPratyantar,
+  computeYoginiDasha,
   PanchangError,
+  type AspectMap,
   type AyanamsaType,
   type BirthChart,
+  type CharaDashaResult,
+  type Divisional,
   type DivisionalChart,
   type AshtakootResult,
+  type KaalSarpDoshaInfo,
   type MangalDoshaInfo,
+  type PitruDoshaInfo,
   type SadeSatiInfo,
+  type ShadbalaResult,
   type Dignity,
   type GrahaName,
   type HouseSystem,
@@ -21,6 +35,7 @@ import {
   type AntarDasha,
   type PratyantarDasha,
   type VimshottariDashaResult,
+  type YoginiDashaResult,
   type NatalMoon,
 } from 'panchang-ts';
 import { wallclockInZoneToUtc } from '@/utils/time';
@@ -39,8 +54,12 @@ export interface KundliBundle {
   d1: BirthChart;
   d9: DivisionalChart;
   mangal: MangalDoshaInfo;
+  kaalSarp: KaalSarpDoshaInfo;
+  pitru: PitruDoshaInfo;
   /** Per-graha dignity in the D1 chart (Sun..Saturn + Rahu/Ketu). */
   dignity: { graha: GrahaName; dignity: Dignity }[];
+  /** Houses (1..12) aspected by each graha; uses BPHS 7-only for nodes. */
+  aspects: AspectMap;
 }
 
 const GRAHAS: GrahaName[] = [
@@ -57,6 +76,14 @@ const DASHA_CACHE = new Map<string, VimshottariDashaResult>();
 const DASHA_CACHE_MAX = 8;
 const SADESATI_CACHE = new Map<string, SadeSatiInfo>();
 const SADESATI_CACHE_MAX = 8;
+const DIV_CHART_CACHE = new Map<string, DivisionalChart>();
+const DIV_CHART_CACHE_MAX = 16;
+const SHADBALA_CACHE = new Map<string, ShadbalaResult>();
+const SHADBALA_CACHE_MAX = 8;
+const ASHTOTTARI_CACHE = new Map<string, VimshottariDashaResult>();
+const YOGINI_CACHE = new Map<string, YoginiDashaResult>();
+const CHARA_CACHE = new Map<string, CharaDashaResult>();
+const ALT_DASHA_CACHE_MAX = 8;
 
 function lru<K, V>(map: Map<K, V>, key: K, value: V, max: number): V {
   if (map.has(key)) map.delete(key);
@@ -107,13 +134,16 @@ export function computeKundli(inp: BirthInputs): KundliBundle | null {
       { ayanamsa: inp.ayanamsa, language: inp.language },
     );
     const mangal = computeMangalDosha(d1);
+    const kaalSarp = computeKaalSarp(d1);
+    const pitru = computePitruDosha(d1);
+    const aspects = computeAspects(d1);
     // computeDignity is a pure lookup; safe to call inline per planet.
     const dignity = GRAHAS.map((graha) => {
       const planet = d1.planets.find((p) => p.planet === graha)!;
       return { graha, dignity: computeDignity(graha, planet.rashi.index) };
     });
 
-    const bundle: KundliBundle = { d1, d9, mangal, dignity };
+    const bundle: KundliBundle = { d1, d9, mangal, kaalSarp, pitru, dignity, aspects };
     return lru(KUNDLI_CACHE, key, bundle, KUNDLI_CACHE_MAX);
   } catch (e) {
     if (e instanceof PanchangError) {
@@ -202,6 +232,117 @@ export function matchAshtakoot(boy: NatalMoon, girl: NatalMoon): AshtakootResult
   }
 }
 
+// ── Divisional charts ────────────────────────────────────────────────────────
+// D1/D9 ride along in the main bundle; the rest are computed lazily because
+// most users never look at D2/D3/D7/D10/D12/D30, and BPHS varga math is non-
+// trivial to redo on every chart re-render.
+
+export const DIVISIONAL_CHARTS_BEYOND_D9: Divisional[] = [
+  'D2', 'D3', 'D7', 'D10', 'D12', 'D30',
+];
+
+export function computeDivisional(
+  inp: BirthInputs,
+  divisional: Divisional,
+): DivisionalChart | null {
+  const key = `${inputKey(inp)}|${divisional}`;
+  const hit = lruGet(DIV_CHART_CACHE, key);
+  if (hit) return hit;
+  try {
+    const chart = computeDivisionalChart(
+      inp.date,
+      { latitude: inp.location.lat, longitude: inp.location.lon },
+      divisional,
+      { ayanamsa: inp.ayanamsa, language: inp.language },
+    );
+    return lru(DIV_CHART_CACHE, key, chart, DIV_CHART_CACHE_MAX);
+  } catch (e) {
+    if (e instanceof PanchangError) {
+      console.warn('[kundli] divisional', divisional, e.code, e.message);
+    } else {
+      console.warn('[kundli] divisional compute failed', divisional, e);
+    }
+    return null;
+  }
+}
+
+// ── Shadbala (six-fold strength) ─────────────────────────────────────────────
+
+export function computeShadbalaCached(inp: BirthInputs): ShadbalaResult | null {
+  const key = inputKey(inp);
+  const hit = lruGet(SHADBALA_CACHE, key);
+  if (hit) return hit;
+  try {
+    const bala = computeShadbala(
+      inp.date,
+      { latitude: inp.location.lat, longitude: inp.location.lon },
+      { ayanamsa: inp.ayanamsa, language: inp.language, houseSystem: inp.houseSystem },
+    );
+    return lru(SHADBALA_CACHE, key, bala, SHADBALA_CACHE_MAX);
+  } catch (e) {
+    console.warn('[kundli] shadbala compute failed', e);
+    return null;
+  }
+}
+
+// ── Alternative dasha systems ────────────────────────────────────────────────
+// Vimshottari is the headline; Ashtottari, Yogini, and Chara are alternative
+// classical timings that the library now exposes. All three benefit from the
+// caching because each is a 36-120-year forward walk per render.
+
+export type DashaSystem = 'vimshottari' | 'ashtottari' | 'yogini' | 'chara';
+
+export function computeAshtottariCached(
+  birthDate: Date,
+  ayanamsa: AyanamsaType,
+  moonSiderealLon: number,
+): VimshottariDashaResult | null {
+  const key = `${birthDate.getTime()}|${ayanamsa}|${moonSiderealLon.toFixed(4)}`;
+  const hit = lruGet(ASHTOTTARI_CACHE, key);
+  if (hit) return hit;
+  try {
+    const result = computeAshtottariDasha(birthDate, moonSiderealLon);
+    return lru(ASHTOTTARI_CACHE, key, result, ALT_DASHA_CACHE_MAX);
+  } catch (e) {
+    console.warn('[kundli] ashtottari compute failed', e);
+    return null;
+  }
+}
+
+export function computeYoginiCached(
+  birthDate: Date,
+  ayanamsa: AyanamsaType,
+  moonSiderealLon: number,
+): YoginiDashaResult | null {
+  const key = `${birthDate.getTime()}|${ayanamsa}|${moonSiderealLon.toFixed(4)}`;
+  const hit = lruGet(YOGINI_CACHE, key);
+  if (hit) return hit;
+  try {
+    const result = computeYoginiDasha(birthDate, moonSiderealLon);
+    return lru(YOGINI_CACHE, key, result, ALT_DASHA_CACHE_MAX);
+  } catch (e) {
+    console.warn('[kundli] yogini compute failed', e);
+    return null;
+  }
+}
+
+export function computeCharaCached(inp: BirthInputs): CharaDashaResult | null {
+  const key = inputKey(inp);
+  const hit = lruGet(CHARA_CACHE, key);
+  if (hit) return hit;
+  try {
+    const result = computeCharaDasha(
+      inp.date,
+      { latitude: inp.location.lat, longitude: inp.location.lon },
+      inp.ayanamsa,
+    );
+    return lru(CHARA_CACHE, key, result, ALT_DASHA_CACHE_MAX);
+  } catch (e) {
+    console.warn('[kundli] chara compute failed', e);
+    return null;
+  }
+}
+
 // ── Helpers callers will need ────────────────────────────────────────────────
 
 /** Given a `BirthChart` (D1) extract the natal Moon's `(rashi, nakshatra)`
@@ -213,6 +354,14 @@ export function natalMoonFromChart(chart: BirthChart): NatalMoon {
   // PlanetPlacement. Derive nakshatra from longitude (27 nakshatras / 360°).
   const nakshatra = Math.floor(moon.longitude / (360 / 27));
   return { rashi: moon.rashi.index, nakshatra: ((nakshatra % 27) + 27) % 27 };
+}
+
+/** Sidereal moon longitude from the D1 chart — Ashtottari / Yogini both need
+ *  this and `BirthChart.planets[Moon].longitude` is already sidereal. */
+export function moonSiderealLonFromChart(chart: BirthChart): number {
+  const moon = chart.planets.find((p) => p.planet === 'Moon');
+  if (!moon) throw new Error('chart.planets missing Moon');
+  return moon.longitude;
 }
 
 /** Build a `BirthInputs` payload from the user's saved birth fields in
