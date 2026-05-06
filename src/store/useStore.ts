@@ -10,6 +10,9 @@ export type MasaSystem = 'purnimanta' | 'amanta';
 export type TimeFormat = 'auto' | '12h' | '24h';
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type Ayanamsa = AyanamsaType;
+export type ChartStyle = 'north' | 'south';
+export type HouseSystem = 'whole-sign' | 'equal' | 'placidus-kp';
+export type Sex = 'male' | 'female';
 
 /** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
  *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
@@ -105,6 +108,10 @@ interface AppStore {
   /** Sidereal-zodiac convention used for all panchang calculations.
    *  Lahiri = official Indian government standard; Raman / KP are alternatives. */
   ayanamsa: Ayanamsa;
+  /** North Indian (diamond) or South Indian (square) kundli chart layout. */
+  chartStyle: ChartStyle;
+  /** House system used by birth-chart APIs (lagna / bhava / D-charts). */
+  houseSystem: HouseSystem;
   dailyReminderEnabled: boolean;
   /** HH:mm in 24h. */
   dailyReminderTime: string;
@@ -132,8 +139,16 @@ interface AppStore {
   userBirthDate: string | null;
   /** HH:mm in 24h, or null if not set. Used to refine Vimshottari dasha balance. */
   userBirthTime: string | null;
-  /** Birth coordinates + label, or null if not set. */
-  userBirthPlace: { lat: number; lon: number; name: string } | null;
+  /** Birth coordinates + label + IANA timezone, or null if not set. The
+   *  timezone is required so panchang-ts compute interprets the birth time
+   *  in the *birthplace*'s local time, not the device's. */
+  userBirthPlace: { lat: number; lon: number; name: string; timezone: string } | null;
+  /** Biological sex; required by Ashtakoot matching to assign Vara/Vadhu roles.
+   *  Null until the user opts to set it (kept optional outside of matching). */
+  userSex: Sex | null;
+  /** Display name. Optional — only used to label "your" chart in match views.
+   *  Trimmed before save; null when the user hasn't entered anything. */
+  userName: string | null;
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
@@ -151,6 +166,8 @@ interface AppStore {
   setMasaSystem: (system: MasaSystem) => void;
   setRegion: (region: Region) => void;
   setAyanamsa: (a: Ayanamsa) => void;
+  setChartStyle: (s: ChartStyle) => void;
+  setHouseSystem: (h: HouseSystem) => void;
   setDailyReminderEnabled: (val: boolean) => void;
   setDailyReminderTime: (timeHHmm: string) => void;
   setSunriseAlertEnabled: (val: boolean) => void;
@@ -167,7 +184,9 @@ interface AppStore {
   setShowVikramSamvat: (val: boolean) => void;
   setUserBirthDate: (iso: string | null) => void;
   setUserBirthTime: (hhmm: string | null) => void;
-  setUserBirthPlace: (place: { lat: number; lon: number; name: string } | null) => void;
+  setUserBirthPlace: (place: { lat: number; lon: number; name: string; timezone: string } | null) => void;
+  setUserSex: (sex: Sex | null) => void;
+  setUserName: (name: string | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
 }
@@ -187,6 +206,8 @@ export const useStore = create<AppStore>()(
       masaSystem: 'purnimanta' as MasaSystem,
       region: 'all' as Region,
       ayanamsa: 'lahiri' as Ayanamsa,
+      chartStyle: 'north' as ChartStyle,
+      houseSystem: 'whole-sign' as HouseSystem,
       dailyReminderEnabled: false,
       dailyReminderTime: '07:00',
       sunriseAlertEnabled: false,
@@ -203,6 +224,8 @@ export const useStore = create<AppStore>()(
       userBirthDate: null,
       userBirthTime: null,
       userBirthPlace: null,
+      userSex: null,
+      userName: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
 
@@ -222,6 +245,8 @@ export const useStore = create<AppStore>()(
       setMasaSystem: (system) => set({ masaSystem: system }),
       setRegion: (region) => set({ region }),
       setAyanamsa: (a) => set({ ayanamsa: a }),
+      setChartStyle: (s) => set({ chartStyle: s }),
+      setHouseSystem: (h) => set({ houseSystem: h }),
       setDailyReminderEnabled: (val) => set({ dailyReminderEnabled: val }),
       setDailyReminderTime: (timeHHmm) => set({ dailyReminderTime: timeHHmm }),
       setSunriseAlertEnabled: (val) => set({ sunriseAlertEnabled: val }),
@@ -251,13 +276,18 @@ export const useStore = create<AppStore>()(
       setUserBirthDate: (iso) => set({ userBirthDate: iso }),
       setUserBirthTime: (hhmm) => set({ userBirthTime: hhmm }),
       setUserBirthPlace: (place) => set({ userBirthPlace: place }),
+      setUserSex: (sex) => set({ userSex: sex }),
+      setUserName: (name) => {
+        const trimmed = name?.trim() ?? '';
+        set({ userName: trimmed.length > 0 ? trimmed : null });
+      },
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
     }),
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 7,
+      version: 11,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -377,6 +407,39 @@ export const useStore = create<AppStore>()(
         if (version < 7) {
           if (state.ayanamsa === undefined) {
             state.ayanamsa = 'lahiri';
+          }
+        }
+
+        // v7 → v8: kundli surface introduced. Default chart layout to North
+        // Indian (diamond) and house system to whole-sign — both classical defaults.
+        if (version < 8) {
+          if (state.chartStyle === undefined) state.chartStyle = 'north';
+          if (state.houseSystem === undefined) state.houseSystem = 'whole-sign';
+        }
+
+        // v8 → v9: userSex added (required by Ashtakoot matching). Stays null
+        // for existing users — the match screen prompts them when first opened.
+        if (version < 9) {
+          if (state.userSex === undefined) state.userSex = null;
+        }
+
+        // v9 → v10: userName added (optional display label). Stays null for
+        // existing users — only surfaces in match views when set.
+        if (version < 10) {
+          if (state.userName === undefined) state.userName = null;
+        }
+
+        // v10 → v11: userBirthPlace gained a `timezone` field so panchang-ts
+        // compute can interpret the birth time in the birthplace's tz instead
+        // of the device's. Backfill Asia/Kolkata — the only city list shipped
+        // is the Indian district headquarters, all in IST.
+        if (version < 11) {
+          const place = state.userBirthPlace as
+            | { lat: number; lon: number; name: string; timezone?: string }
+            | null
+            | undefined;
+          if (place && !place.timezone) {
+            state.userBirthPlace = { ...place, timezone: 'Asia/Kolkata' };
           }
         }
 

@@ -24,6 +24,7 @@ import {
 } from '@/config/theme';
 import { usePanchang } from '@/hooks/usePanchang';
 import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang } from '@/services/astrology/panchangService';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 import { resolveLanguage } from '@/i18n';
 import {
   localizeChandraMasa,
@@ -215,6 +216,7 @@ export default function PanchangScreen() {
   const ayanamsa = useStore(s => s.ayanamsa);
   const userBirthDate = useStore(s => s.userBirthDate);
   const userBirthTime = useStore(s => s.userBirthTime);
+  const userBirthPlace = useStore(s => s.userBirthPlace);
   const showVikramSamvat = useStore(s => s.showVikramSamvat);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
@@ -231,10 +233,13 @@ export default function PanchangScreen() {
   const panchangLang = resolveLanguage(language);
   const birthMoment = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
-    const timePart = userBirthTime ? `${userBirthTime}:00` : '12:00:00';
-    const birth = new Date(`${userBirthDate}T${timePart}`);
-    return Number.isNaN(birth.getTime()) ? null : birth;
-  }, [userBirthDate, userBirthTime]);
+    const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    try {
+      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+    } catch {
+      return null;
+    }
+  }, [userBirthDate, userBirthTime, userBirthPlace]);
   const janmaNakshatra = useMemo<number | undefined>(() => {
     if (!birthMoment) return undefined;
     try { return computeJanmaNakshatraIndex(birthMoment); } catch { return undefined; }
@@ -275,12 +280,45 @@ export default function PanchangScreen() {
 
   // Walkthrough ref & measurement
   const panchaAngaRef = useRef<View>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
   const [panchaAngaRect, setPanchaAngaRect] = useState<SpotlightRect | null>(null);
 
+  // Bring the Pancha Anga card into the visible viewport before measuring its
+  // window position for the spotlight. On low-PPI / short phones the card sits
+  // far below the calendar grid and would otherwise be measured off-screen,
+  // leaving the user stranded mid-walkthrough.
   const measurePanchaAnga = useCallback(() => {
-    panchaAngaRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0) {
-        setPanchaAngaRect({ x, y, width, height: Math.min(height, 320) });
+    const target = panchaAngaRef.current;
+    const scroller = scrollRef.current;
+    if (!target) return;
+
+    const captureSpotlight = () => {
+      target.measureInWindow((x, y, width, height) => {
+        if (width > 0) {
+          setPanchaAngaRect({ x, y, width, height: Math.min(height, 320) });
+        }
+      });
+    };
+
+    if (!scroller) {
+      captureSpotlight();
+      return;
+    }
+
+    target.measureInWindow((tx, ty) => {
+      // Reserve ~80px from top of the screen for the header / tooltip arrow.
+      const desiredScreenY = 100;
+      const delta = ty - desiredScreenY;
+      const targetScroll = Math.max(0, scrollOffsetRef.current + delta);
+      const needsScroll = Math.abs(targetScroll - scrollOffsetRef.current) > 4;
+      if (needsScroll) {
+        scroller.scrollTo({ y: targetScroll, animated: true });
+        // Wait for the scroll-to-finish before measuring the spotlight rect;
+        // RN doesn't expose a scroll-end callback here, so we approximate.
+        setTimeout(captureSpotlight, 380);
+      } else {
+        captureSpotlight();
       }
     });
   }, []);
@@ -288,7 +326,7 @@ export default function PanchangScreen() {
   useFocusEffect(
     useCallback(() => {
       if (walkthroughStep === 2) {
-        const timer = setTimeout(measurePanchaAnga, 300);
+        const timer = setTimeout(measurePanchaAnga, 350);
         return () => clearTimeout(timer);
       }
     }, [walkthroughStep, measurePanchaAnga])
@@ -349,6 +387,11 @@ export default function PanchangScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
+        onScroll={(e) => {
+          scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={32}
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
@@ -1049,8 +1092,8 @@ const styles = StyleSheet.create({
   limbLabel: { fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 1, marginBottom: 4 },
   limbElement: {},
   limbSecondary: { marginTop: 6 },
-  limbNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  limbNameLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 },
+  limbNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  limbNameLeft: { flexDirection: 'row', alignItems: 'baseline', columnGap: 8, rowGap: 2, flex: 1, flexWrap: 'wrap', minWidth: 0 },
   limbValue: { fontSize: 17, fontFamily: 'NotoSerifDevanagari_700Bold' },
   limbEndTime: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
   limbActiveBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },

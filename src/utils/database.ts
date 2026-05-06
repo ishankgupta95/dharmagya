@@ -34,10 +34,14 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // 1: 1.5.0 — excludedVaras rule was a no-op before (English weekday vs.
   // panchang-ts Sanskrit name), so cached scans may include forbidden
   // weekdays. Drop them once so the next open recomputes correctly.
+  // 2: panchang-ts 3.1.0 — runtime now validates muhurats with the library's
+  // stock rules + scoreMuhurta (Bhadra / Panchaka / Adhika Maasa / eclipse /
+  // Ganda Mula exclusions added vs. the prior local rules). Old caches will
+  // contain days the new rules now reject, so wipe once on upgrade.
   const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
-  if (version < 1) {
+  if (version < 2) {
     db.execSync('DELETE FROM muhurat_cache');
-    db.execSync('PRAGMA user_version = 1');
+    db.execSync('PRAGMA user_version = 2');
   }
 }

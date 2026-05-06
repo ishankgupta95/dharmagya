@@ -265,7 +265,7 @@ export default function FestivalsScreen() {
         <Text variant="display-italic" style={[styles.screenTitle, { color: colors.textPrimary }]}>
           {t('festivals.title')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       {/* ── Year selector ──────────────────────────────────────────── */}

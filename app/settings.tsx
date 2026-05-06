@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, StyleSheet, Alert, Linking } from 'react-native';
+import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, StyleSheet, Alert, Linking, TextInput } from 'react-native';
 import Constants from 'expo-constants';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type Ayanamsa, type FontSize, type MasaSystem, type Region, type ThemeMode, type TimeFormat } from '@/store/useStore';
+import { useStore, type Ayanamsa, type ChartStyle, type FontSize, type HouseSystem, type MasaSystem, type Region, type Sex, type ThemeMode, type TimeFormat } from '@/store/useStore';
 import { requestRating, shareApp } from '@/utils/share';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
@@ -48,6 +48,10 @@ export default function SettingsScreen() {
     setLanguage,
     ayanamsa,
     setAyanamsa,
+    chartStyle,
+    setChartStyle,
+    houseSystem,
+    setHouseSystem,
     dailyReminderEnabled,
     setDailyReminderEnabled,
     dailyReminderTime,
@@ -77,6 +81,10 @@ export default function SettingsScreen() {
     userBirthTime,
     setUserBirthTime,
     userBirthPlace,
+    userSex,
+    setUserSex,
+    userName,
+    setUserName,
     setWalkthroughStep,
     selectedDeities,
   } = useStore();
@@ -101,6 +109,7 @@ export default function SettingsScreen() {
   const [timeFormatSheetOpen, setTimeFormatSheetOpen] = useState(false);
   const [quietStartPickerOpen, setQuietStartPickerOpen] = useState(false);
   const [quietEndPickerOpen, setQuietEndPickerOpen] = useState(false);
+  const [nameSheetOpen, setNameSheetOpen] = useState(false);
 
   const timeFormatOptions: OptionSheetItem<TimeFormat>[] = [
     { key: 'auto', label: t('settings.timeFormatAuto'), desc: t('settings.timeFormatAutoDesc') },
@@ -127,14 +136,53 @@ export default function SettingsScreen() {
     { key: 'lahiri', label: t('settings.ayanamsa.lahiri'), desc: t('settings.ayanamsa.lahiriDesc') },
     { key: 'raman', label: t('settings.ayanamsa.raman') },
     { key: 'krishnamurti', label: t('settings.ayanamsa.kp') },
+    { key: 'true-chitra', label: t('settings.ayanamsa.trueChitra') },
+    { key: 'thirukanitham', label: t('settings.ayanamsa.thirukanitham') },
   ];
   const ayanamsaLabel =
     ayanamsa === 'raman'
       ? t('settings.ayanamsa.raman')
       : ayanamsa === 'krishnamurti'
         ? t('settings.ayanamsa.kp')
-        : t('settings.ayanamsa.lahiri');
+        : ayanamsa === 'true-chitra'
+          ? t('settings.ayanamsa.trueChitra')
+          : ayanamsa === 'thirukanitham'
+            ? t('settings.ayanamsa.thirukanitham')
+            : t('settings.ayanamsa.lahiri');
   const [ayanamsaSheetOpen, setAyanamsaSheetOpen] = useState(false);
+
+  const chartStyleOptions: OptionSheetItem<ChartStyle>[] = [
+    { key: 'north', label: t('settings.chartStyle.north'), desc: t('settings.chartStyle.northDesc') },
+    { key: 'south', label: t('settings.chartStyle.south'), desc: t('settings.chartStyle.southDesc') },
+  ];
+  const chartStyleLabel =
+    chartStyle === 'south' ? t('settings.chartStyle.south') : t('settings.chartStyle.north');
+  const [chartStyleSheetOpen, setChartStyleSheetOpen] = useState(false);
+
+  const sexOptions: OptionSheetItem<Sex>[] = [
+    { key: 'male', label: t('settings.sex.male') },
+    { key: 'female', label: t('settings.sex.female') },
+  ];
+  const sexLabel =
+    userSex === 'male'
+      ? t('settings.sex.male')
+      : userSex === 'female'
+        ? t('settings.sex.female')
+        : t('settings.sex.notSet');
+  const [sexSheetOpen, setSexSheetOpen] = useState(false);
+
+  const houseSystemOptions: OptionSheetItem<HouseSystem>[] = [
+    { key: 'whole-sign', label: t('settings.houseSystem.wholeSign'), desc: t('settings.houseSystem.wholeSignDesc') },
+    { key: 'equal', label: t('settings.houseSystem.equal') },
+    { key: 'placidus-kp', label: t('settings.houseSystem.placidusKp') },
+  ];
+  const houseSystemLabel =
+    houseSystem === 'equal'
+      ? t('settings.houseSystem.equal')
+      : houseSystem === 'placidus-kp'
+        ? t('settings.houseSystem.placidusKp')
+        : t('settings.houseSystem.wholeSign');
+  const [houseSystemSheetOpen, setHouseSystemSheetOpen] = useState(false);
 
   const themeOptions: OptionSheetItem<ThemeMode>[] = [
     { key: 'system', label: t('settings.themeSystem'), desc: t('settings.themeSystemDesc') },
@@ -415,6 +463,26 @@ export default function SettingsScreen() {
         {/* ── Horoscope ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.horoscope')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <PickerRow
+            icon="person"
+            label={t('settings.name')}
+            value={userName ?? t('settings.nameNotSet')}
+            onPress={() => setNameSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="person"
+            label={t('settings.sex.label')}
+            value={sexLabel}
+            onPress={() => setSexSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setDobPickerOpen(true)}
@@ -446,6 +514,26 @@ export default function SettingsScreen() {
             label={t('settings.birthPlace')}
             value={userBirthPlace?.name ?? t('settings.birthPlaceNotSet')}
             onPress={() => router.push('/settings/birth-place')}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="diamond"
+            label={t('settings.chartStyle.label')}
+            value={chartStyleLabel}
+            onPress={() => setChartStyleSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="apps"
+            label={t('settings.houseSystem.label')}
+            value={houseSystemLabel}
+            onPress={() => setHouseSystemSheetOpen(true)}
             colors={colors}
           />
         </View>
@@ -748,6 +836,36 @@ export default function SettingsScreen() {
       />
 
       <OptionSheet
+        visible={chartStyleSheetOpen}
+        onClose={() => setChartStyleSheetOpen(false)}
+        title={t('settings.chartStyle.pickerTitle')}
+        options={chartStyleOptions}
+        value={chartStyle}
+        onChange={(next) => setChartStyle(next as ChartStyle)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={houseSystemSheetOpen}
+        onClose={() => setHouseSystemSheetOpen(false)}
+        title={t('settings.houseSystem.pickerTitle')}
+        options={houseSystemOptions}
+        value={houseSystem}
+        onChange={(next) => setHouseSystem(next as HouseSystem)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={sexSheetOpen}
+        onClose={() => setSexSheetOpen(false)}
+        title={t('settings.sex.pickerTitle')}
+        options={sexOptions}
+        value={userSex ?? 'male'}
+        onChange={(next) => setUserSex(next as Sex)}
+        colors={colors}
+      />
+
+      <OptionSheet
         visible={themeSheetOpen}
         onClose={() => setThemeSheetOpen(false)}
         title={t('settings.themePickerTitle')}
@@ -814,8 +932,82 @@ export default function SettingsScreen() {
         title={t('settings.quietHoursEndPickerTitle')}
       />
 
+      <NameSheet
+        visible={nameSheetOpen}
+        onClose={() => setNameSheetOpen(false)}
+        value={userName ?? ''}
+        onSave={(next) => {
+          setUserName(next);
+          setNameSheetOpen(false);
+        }}
+        colors={colors}
+      />
+
     </SafeAreaView>
     </ScreenMount>
+  );
+}
+
+// ─── Name Sheet (free-text input) ───────────────────────────────────────────
+
+interface NameSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  value: string;
+  onSave: (next: string) => void;
+  colors: ColorPalette;
+}
+
+function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(value);
+
+  // Re-sync the draft each time the sheet opens, so re-opens show the latest
+  // saved value rather than a stale one. Local edits stay local until Save.
+  useEffect(() => {
+    if (visible) setDraft(value);
+  }, [visible, value]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {t('settings.namePickerTitle')}
+          </Text>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={t('settings.namePlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            autoFocus
+            returnKeyType="done"
+            maxLength={40}
+            onSubmitEditing={() => onSave(draft)}
+            style={[styles.nameInput, { color: colors.textPrimary, backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}
+            accessibilityLabel={t('settings.name')}
+          />
+          <TouchableOpacity
+            onPress={() => onSave(draft)}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.save')}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+              {t('common.save')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.nameCancel}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}>
+            <Text variant="mono-caps" style={[styles.nameCancelText, { color: colors.textMuted }]}>
+              {t('common.close')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1148,12 +1340,23 @@ interface SettingRowProps {
 }
 
 function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
+  // Two opposing layouts share this component, so shrink direction is
+  // conditional on whether a sublabel is present:
+  //   - With sublabel (toggle / nav rows): the long content is in the LEFT
+  //     column (sublabel) and the right is a fixed widget (Switch / chevron).
+  //     rowText must shrink so the sublabel truncates; rowRight must NOT
+  //     shrink or the Switch gets clipped.
+  //   - Without sublabel (PickerRow style): the long content is in the RIGHT
+  //     column (value text) and rowText only holds the label. rowRight must
+  //     shrink so the value truncates; rowText must NOT shrink or the label
+  //     wraps character-per-line.
+  const hasSublabel = !!sublabel;
   return (
     <View style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
         <Icon name={icon} size={16} color={colors.accent} />
       </View>
-      <View style={styles.rowText}>
+      <View style={[styles.rowText, hasSublabel && styles.rowTextShrinkable]}>
         <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
         {sublabel && (
           <Text variant="body-italic" style={[styles.rowSublabel, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -1161,7 +1364,11 @@ function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
           </Text>
         )}
       </View>
-      {right && <View style={styles.rowRight}>{right}</View>}
+      {right && (
+        <View style={[styles.rowRight, hasSublabel && styles.rowRightFixed]}>
+          {right}
+        </View>
+      )}
     </View>
   );
 }
@@ -1226,10 +1433,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rowText: { flex: 1 },
+  // flexGrow:1 (NOT flex:1) so flexBasis stays 'auto'. SettingRow toggles
+  // rowTextShrinkable / rowRightFixed below depending on which column is
+  // expected to carry the long content — see the comment in SettingRow.
+  rowText: { flexGrow: 1, minWidth: 0 },
+  rowTextShrinkable: { flexShrink: 1 },
   rowLabel: { fontSize: 15, lineHeight: 20 },
   rowSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
-  rowRight: { alignItems: 'flex-end' },
+  rowRight: { alignItems: 'flex-end', flexShrink: 1, minWidth: 0 },
+  rowRightFixed: { flexShrink: 0 },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
 
@@ -1238,8 +1450,8 @@ const styles = StyleSheet.create({
   locationRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // Region picker
-  regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  regionValue: { fontSize: 13 },
+  regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
+  regionValue: { fontSize: 13, flexShrink: 1 },
   regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   regionSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, maxHeight: '75%' },
   regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
@@ -1282,6 +1494,19 @@ const styles = StyleSheet.create({
   sheetItemText: { flex: 1 },
   sheetItemLabel: { fontSize: 15 },
   sheetItemDesc: { fontSize: 12, marginTop: 2 },
+
+  // Name sheet
+  nameInput: {
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: borderRadius.button,
+    borderWidth: 1,
+    fontSize: 15,
+    fontFamily: 'Fraunces_400Regular',
+  },
+  nameCancel: { alignItems: 'center', marginTop: 10, paddingVertical: 6 },
+  nameCancelText: { fontSize: 10 },
 
   // Font size sheet
   previewWrap: {

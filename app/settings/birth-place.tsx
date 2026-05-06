@@ -17,7 +17,8 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
-import { INDIAN_CITIES, type City } from '@/config/cities';
+import { INDIAN_CITIES, cityTimezone, type City } from '@/config/cities';
+import { DEFAULT_BIRTH_TIMEZONE } from '@/utils/time';
 import { Ornament } from '@/components/common/Ornament';
 
 /**
@@ -51,6 +52,7 @@ export default function BirthPlacePickerScreen() {
       lat: city.lat,
       lon: city.lon,
       name: `${city.name}, ${city.state}`,
+      timezone: cityTimezone(city),
     });
     router.back();
   }
@@ -61,6 +63,7 @@ export default function BirthPlacePickerScreen() {
       lat: userLocation.lat,
       lon: userLocation.lon,
       name: locationName ?? `${userLocation.lat.toFixed(2)}, ${userLocation.lon.toFixed(2)}`,
+      timezone: DEFAULT_BIRTH_TIMEZONE,
     });
     router.back();
   }
@@ -111,7 +114,7 @@ export default function BirthPlacePickerScreen() {
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('settings.birthPlacePickerTitle')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       {/* ── Current Birth Place ─────────────────────────────────────── */}
