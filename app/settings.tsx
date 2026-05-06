@@ -1340,12 +1340,23 @@ interface SettingRowProps {
 }
 
 function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
+  // Two opposing layouts share this component, so shrink direction is
+  // conditional on whether a sublabel is present:
+  //   - With sublabel (toggle / nav rows): the long content is in the LEFT
+  //     column (sublabel) and the right is a fixed widget (Switch / chevron).
+  //     rowText must shrink so the sublabel truncates; rowRight must NOT
+  //     shrink or the Switch gets clipped.
+  //   - Without sublabel (PickerRow style): the long content is in the RIGHT
+  //     column (value text) and rowText only holds the label. rowRight must
+  //     shrink so the value truncates; rowText must NOT shrink or the label
+  //     wraps character-per-line.
+  const hasSublabel = !!sublabel;
   return (
     <View style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
         <Icon name={icon} size={16} color={colors.accent} />
       </View>
-      <View style={styles.rowText}>
+      <View style={[styles.rowText, hasSublabel && styles.rowTextShrinkable]}>
         <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
         {sublabel && (
           <Text variant="body-italic" style={[styles.rowSublabel, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -1353,7 +1364,11 @@ function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
           </Text>
         )}
       </View>
-      {right && <View style={styles.rowRight}>{right}</View>}
+      {right && (
+        <View style={[styles.rowRight, hasSublabel && styles.rowRightFixed]}>
+          {right}
+        </View>
+      )}
     </View>
   );
 }
@@ -1418,10 +1433,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rowText: { flex: 1 },
+  // flexGrow:1 (NOT flex:1) so flexBasis stays 'auto'. SettingRow toggles
+  // rowTextShrinkable / rowRightFixed below depending on which column is
+  // expected to carry the long content — see the comment in SettingRow.
+  rowText: { flexGrow: 1, minWidth: 0 },
+  rowTextShrinkable: { flexShrink: 1 },
   rowLabel: { fontSize: 15, lineHeight: 20 },
   rowSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
-  rowRight: { alignItems: 'flex-end' },
+  rowRight: { alignItems: 'flex-end', flexShrink: 1, minWidth: 0 },
+  rowRightFixed: { flexShrink: 0 },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
 
@@ -1430,8 +1450,8 @@ const styles = StyleSheet.create({
   locationRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // Region picker
-  regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  regionValue: { fontSize: 13 },
+  regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
+  regionValue: { fontSize: 13, flexShrink: 1 },
   regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   regionSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, maxHeight: '75%' },
   regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },

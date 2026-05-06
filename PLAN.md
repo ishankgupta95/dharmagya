@@ -608,3 +608,10 @@ Each phase ships as its own production release. Do not bundle phases. Measure da
 ### Where to start (mobile)
 
 The mobile app is **blocked on the library** — start library Phase 28 first. Once `panchang-ts` v2.2 is published with Tarabala alone, ship a tiny dharmagya release that adds the Tarabala card to the Panchang tab. That's the smallest possible end-to-end loop and exercises the full publish → bump → render pipeline. After that, batch the rest of P8.1 fields together for v2.4.
+
+
+
+Bugs I found today, needs to be fixed today urgently:
+1. Muhurat calculation is very slow in low end phones, We need to cache it just like we did for festivals list if muhurats do not change, this will work
+2. the flow after onboarding flow can cause the elements to appear off screen and block the user from going forward
+3. need to update screenshots

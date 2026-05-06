@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, useWindowDimensions } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
@@ -58,6 +58,7 @@ export function WalkthroughSpotlight({
   onSkip,
 }: WalkthroughSpotlightProps) {
   const { t } = useTranslation();
+  const dims = useWindowDimensions();
   const [tooltipHeight, setTooltipHeight] = useState(0);
 
   // Measure the overlay's own screen position so we can offset spotlight
@@ -97,12 +98,42 @@ export function WalkthroughSpotlight({
 
   const arrowLeft = Math.max(10, s.x + s.w / 2 - 20 - 10);
 
-  const tooltipTop =
-    tooltipPosition === 'below'
+  // ── Tooltip placement with screen clamping + auto-flip ───────────────────
+  // On short / low-PPI phones the requested side ('above' or 'below') may not
+  // have room for the tooltip, leaving Next / Skip off-screen and stranding
+  // the user. Auto-flip when the requested side doesn't fit, then clamp into
+  // the visible area as a final safety net.
+  const SAFE_MARGIN = 16;
+  const rootHeight = dims.height; // root is StyleSheet.absoluteFillObject — close enough
+  const spaceAbove = s.y;
+  const spaceBelow = rootHeight - oy - (s.y + s.h);
+  const requiredSpace = (tooltipHeight || 220) + TOOLTIP_GAP + SAFE_MARGIN;
+
+  const fitsRequested =
+    tooltipPosition === 'above' ? spaceAbove >= requiredSpace : spaceBelow >= requiredSpace;
+  const fitsOther =
+    tooltipPosition === 'above' ? spaceBelow >= requiredSpace : spaceAbove >= requiredSpace;
+  const effectivePosition: 'above' | 'below' = fitsRequested
+    ? tooltipPosition
+    : fitsOther
+      ? tooltipPosition === 'above'
+        ? 'below'
+        : 'above'
+      : tooltipPosition;
+
+  const tooltipTopRaw =
+    effectivePosition === 'below'
       ? s.y + s.h + TOOLTIP_GAP
       : s.y - TOOLTIP_GAP - tooltipHeight;
 
-  const tooltipReady = tooltipPosition === 'below' || tooltipHeight > 0;
+  // Clamp into root coords so the tooltip card always stays on-screen even
+  // when neither side fits. The arrow may then visually disconnect from the
+  // spotlight, but a usable tooltip beats a stranded user.
+  const tooltipMaxTop = rootHeight - oy - tooltipHeight - SAFE_MARGIN;
+  const tooltipMinTop = SAFE_MARGIN - oy;
+  const tooltipTop = Math.max(tooltipMinTop, Math.min(tooltipTopRaw, tooltipMaxTop));
+
+  const tooltipReady = effectivePosition === 'below' || tooltipHeight > 0;
   const overlayReady = containerOffset !== null;
 
   // Tooltip card: always on parchment-bright with paperEdge border + gold
@@ -178,7 +209,9 @@ export function WalkthroughSpotlight({
           },
         ]}
         onLayout={(e) => {
-          if (tooltipPosition === 'above' && tooltipHeight === 0) {
+          // Capture height once we have it so we can pre-flip / clamp on the
+          // next render — measure for either requested direction.
+          if (tooltipHeight === 0) {
             setTooltipHeight(e.nativeEvent.layout.height);
           }
         }}
@@ -187,7 +220,7 @@ export function WalkthroughSpotlight({
         <CornerBrackets color={palette.goldLeaf} inset={8} length={14} />
 
         {/* Arrow pointing to spotlight */}
-        {tooltipPosition === 'below' && (
+        {effectivePosition === 'below' && (
           <View
             style={[styles.arrowUp, { borderBottomColor: arrowColor, left: arrowLeft }]}
           />
@@ -254,7 +287,7 @@ export function WalkthroughSpotlight({
           )}
         </View>
 
-        {tooltipPosition === 'above' && (
+        {effectivePosition === 'above' && (
           <View
             style={[styles.arrowDown, { borderTopColor: arrowColor, left: arrowLeft }]}
           />

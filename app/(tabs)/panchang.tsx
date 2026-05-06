@@ -280,12 +280,45 @@ export default function PanchangScreen() {
 
   // Walkthrough ref & measurement
   const panchaAngaRef = useRef<View>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
   const [panchaAngaRect, setPanchaAngaRect] = useState<SpotlightRect | null>(null);
 
+  // Bring the Pancha Anga card into the visible viewport before measuring its
+  // window position for the spotlight. On low-PPI / short phones the card sits
+  // far below the calendar grid and would otherwise be measured off-screen,
+  // leaving the user stranded mid-walkthrough.
   const measurePanchaAnga = useCallback(() => {
-    panchaAngaRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0) {
-        setPanchaAngaRect({ x, y, width, height: Math.min(height, 320) });
+    const target = panchaAngaRef.current;
+    const scroller = scrollRef.current;
+    if (!target) return;
+
+    const captureSpotlight = () => {
+      target.measureInWindow((x, y, width, height) => {
+        if (width > 0) {
+          setPanchaAngaRect({ x, y, width, height: Math.min(height, 320) });
+        }
+      });
+    };
+
+    if (!scroller) {
+      captureSpotlight();
+      return;
+    }
+
+    target.measureInWindow((tx, ty) => {
+      // Reserve ~80px from top of the screen for the header / tooltip arrow.
+      const desiredScreenY = 100;
+      const delta = ty - desiredScreenY;
+      const targetScroll = Math.max(0, scrollOffsetRef.current + delta);
+      const needsScroll = Math.abs(targetScroll - scrollOffsetRef.current) > 4;
+      if (needsScroll) {
+        scroller.scrollTo({ y: targetScroll, animated: true });
+        // Wait for the scroll-to-finish before measuring the spotlight rect;
+        // RN doesn't expose a scroll-end callback here, so we approximate.
+        setTimeout(captureSpotlight, 380);
+      } else {
+        captureSpotlight();
       }
     });
   }, []);
@@ -293,7 +326,7 @@ export default function PanchangScreen() {
   useFocusEffect(
     useCallback(() => {
       if (walkthroughStep === 2) {
-        const timer = setTimeout(measurePanchaAnga, 300);
+        const timer = setTimeout(measurePanchaAnga, 350);
         return () => clearTimeout(timer);
       }
     }, [walkthroughStep, measurePanchaAnga])
@@ -354,6 +387,11 @@ export default function PanchangScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
+        onScroll={(e) => {
+          scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={32}
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 

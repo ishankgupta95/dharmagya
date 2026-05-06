@@ -168,6 +168,82 @@ export interface ScanOptions {
 }
 
 /**
+ * Streaming, cancellable validator for a pre-computed candidate-date list.
+ * Used on the first-ever open of an occasion screen, when the SQLite cache is
+ * empty: instead of scanning all 365 days at the user's location (~365
+ * panchang calls), we only validate the candidate dates produced by
+ * scripts/generate-muhurat-candidates.js (~50 calls). Each candidate is a
+ * date that satisfied the rule at *some* Indian reference longitude;
+ * sunrise drifts ~30–40 minutes east-to-west across India, so a date that's
+ * auspicious at one longitude might not be at the user's actual location.
+ * The validator re-checks each candidate at user coords and filters.
+ *
+ * Same surface as `scanAuspiciousDays` so callers can swap implementations
+ * without changing UI / progress-streaming code.
+ */
+export interface ValidateOptions {
+  occasion: Occasion;
+  /** YYYY-MM-DD strings, sorted ascending — output of generate-muhurat-candidates.js */
+  candidates: string[];
+  coords?: { lat: number; lon: number } | null;
+  signal?: AbortSignal;
+  onMatch?: (match: MuhuratMatch) => void;
+  onProgress?: (p: ScanProgress) => void;
+  /** Yield to the event loop every N candidates. Defaults to 5. */
+  yieldEvery?: number;
+}
+
+export async function validateCandidates(opts: ValidateOptions): Promise<MuhuratMatch[]> {
+  const rule = RULES[opts.occasion];
+  const yieldEvery = opts.yieldEvery ?? 5;
+  const out: MuhuratMatch[] = [];
+  const totalDays = opts.candidates.length;
+  let scannedCount = 0;
+
+  for (const ymd of opts.candidates) {
+    if (opts.signal?.aborted) return out;
+    const date = parseYmdLocal(ymd);
+    if (!date) {
+      scannedCount += 1;
+      continue;
+    }
+    date.setHours(12, 0, 0, 0); // noon avoids DST-boundary drift, mirrors scanAuspiciousDays
+
+    const panchang = await fetchPanchang(date, opts.coords ?? null, false, 'en');
+    if (panchang) {
+      const match = evaluateDay(panchang, rule);
+      if (match) {
+        const entry: MuhuratMatch = {
+          date,
+          tithi: match.tithi,
+          nakshatra: match.nakshatra,
+          yoga: match.yoga,
+          vara: match.vara,
+          panchang,
+        };
+        out.push(entry);
+        opts.onMatch?.(entry);
+      }
+    }
+
+    scannedCount += 1;
+    opts.onProgress?.({ day: ymd, scannedCount, totalDays });
+
+    if (scannedCount % yieldEvery === 0) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+  }
+
+  return out;
+}
+
+function parseYmdLocal(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/**
  * Streaming, cancellable scan for auspicious days. Walks the date range one
  * day at a time, computing the panchang and evaluating the occasion's rule.
  * Yields to the event loop periodically so touches / taps aren't blocked,

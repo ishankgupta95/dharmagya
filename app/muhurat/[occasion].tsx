@@ -21,6 +21,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import {
   ALL_OCCASIONS,
   scanAuspiciousDays,
+  validateCandidates,
   type MuhuratMatch,
   type Occasion,
 } from '@/services/astrology/muhurat';
@@ -29,6 +30,7 @@ import {
   writeMuhuratCache,
   clearMuhuratCache,
 } from '@/services/astrology/muhuratCache';
+import muhuratCandidatesData from '@/data/static/muhurat-candidates.json';
 import {
   localizeTithi,
   localizeNakshatra,
@@ -40,6 +42,22 @@ import {
 const SCAN_DAYS = 365;
 const PERSIST_EVERY = 15; // flush partial scan to SQLite every N days
 const UPCOMING_WINDOW_DAYS = 14; // matches within this window get the "upcoming" highlight
+
+// If the bundled candidate JSON was generated more than this many days ago,
+// fall back to the full on-device scan so we don't ship stale dates after a
+// missed release. 18 months gives ~6 months of buffer past the JSON's own
+// 24-month lookahead window.
+const CANDIDATES_STALE_AFTER_DAYS = 540;
+
+interface MuhuratCandidatesFile {
+  version: number;
+  generatedAt: string; // YYYY-MM-DD
+  lookaheadDays: number;
+  references: string[];
+  candidates: Record<string, string[]>;
+}
+
+const CANDIDATES: MuhuratCandidatesFile = muhuratCandidatesData;
 
 type Status = 'loading' | 'scanning' | 'complete' | 'cancelled' | 'error';
 
@@ -101,6 +119,7 @@ export default function OccasionDetailScreen() {
 
     let existing: MuhuratMatch[] = [];
     let scanFrom = new Date(today);
+    let cachedThrough: Date | null = null;
 
     if (mode === 'refresh') {
       clearMuhuratCache(db, occasion, userLocation);
@@ -111,6 +130,7 @@ export default function OccasionDetailScreen() {
         if (cached.scannedThrough) {
           const parsed = parseYmd(cached.scannedThrough);
           if (parsed) {
+            cachedThrough = parsed;
             const next = new Date(parsed);
             next.setDate(next.getDate() + 1);
             if (next.getTime() > scanFrom.getTime()) scanFrom = next;
@@ -128,12 +148,103 @@ export default function OccasionDetailScreen() {
       return;
     }
 
+    // Treat the cache as authoritative as long as it has visible matches
+    // covering today onward — render those instantly and top up the trailing
+    // days silently in the background. This makes repeat opens feel instant
+    // on low-end phones, where a 365-day rescan was the most visible perf
+    // cost. When the cache covers a forward window but found no matches yet,
+    // we still show the scan UI so the user understands work is in progress.
+    // Refresh mode always re-shows live progress since the user explicitly
+    // asked to recompute.
+    const hasUsefulCache =
+      mode === 'auto' &&
+      existing.length > 0 &&
+      cachedThrough != null &&
+      cachedThrough.getTime() >= today.getTime();
+
+    // ── First-open fast path: validate bundled candidate dates ─────────────
+    // When the SQLite cache has nothing, instead of scanning all SCAN_DAYS
+    // at the user's location (~365 panchang calls on a low-end phone), we
+    // validate only the dates from the bundled candidate JSON (~50 calls).
+    // The candidate set is the union of dates that pass the rule at any of
+    // 5 reference longitudes spanning India, so it covers the user's actual
+    // location subject to the per-location validation pass. See
+    // scripts/generate-muhurat-candidates.js.
+    const candidatesAreFresh = isCandidatesFresh(today);
+    // Gate on `cachedThrough == null` so we don't re-validate candidates for a
+    // user who already scanned their location in full and found zero matches
+    // (rare — restrictive rules in edge-of-India locations). For that case the
+    // existing scanFrom-from-scannedThrough logic below produces the right
+    // result (early return if cache covers the target, otherwise resume).
+    const useCandidatePath =
+      mode === 'auto' &&
+      existing.length === 0 &&
+      cachedThrough == null &&
+      candidatesAreFresh;
+
+    if (useCandidatePath) {
+      const candidatesForOccasion = CANDIDATES.candidates[occasion] ?? [];
+      const candidates = candidatesForOccasion.filter(s => {
+        const d = parseYmd(s);
+        return d != null && d.getTime() >= today.getTime() && d.getTime() <= targetEnd.getTime();
+      });
+
+      matchesRef.current = [];
+      setMatches([]);
+      setScannedCount(0);
+      setTotalDays(candidates.length);
+      setStatus(candidates.length === 0 ? 'complete' : 'scanning');
+
+      validateCandidates({
+        occasion,
+        candidates,
+        coords: userLocation,
+        signal: controller.signal,
+        onMatch: (m) => {
+          if (runIdRef.current !== myRun) return;
+          matchesRef.current = [...matchesRef.current, m];
+          setMatches(matchesRef.current);
+        },
+        onProgress: (p) => {
+          if (runIdRef.current !== myRun) return;
+          scannedThroughRef.current = p.day;
+          setScannedCount(p.scannedCount);
+        },
+      })
+        .then(() => {
+          if (runIdRef.current !== myRun) return;
+          // The candidate path covers the full target window by construction
+          // (candidates are filtered to [today, targetEnd]). Persist with
+          // scanned_through = targetEnd so subsequent opens hit the
+          // instant-cache path.
+          const targetEndYmd = ymdLocal(targetEnd);
+          writeMuhuratCache(db, occasion, userLocation, matchesRef.current, targetEndYmd);
+          scannedThroughRef.current = targetEndYmd;
+          if (controller.signal.aborted) {
+            setStatus('cancelled');
+          } else {
+            setStatus('complete');
+          }
+        })
+        .catch(() => {
+          if (runIdRef.current !== myRun) return;
+          // Don't persist a partial candidate scan as if it covered the full
+          // window — that would mask the failure on next open. Persist what
+          // we have but leave scanned_through untouched.
+          if (matchesRef.current.length > 0) {
+            writeMuhuratCache(db, occasion, userLocation, matchesRef.current, null);
+          }
+          setStatus('error');
+        });
+      return;
+    }
+
     matchesRef.current = existing;
     setMatches(existing);
     setScannedCount(0);
     const days = Math.round((targetEnd.getTime() - scanFrom.getTime()) / 86_400_000) + 1;
     setTotalDays(days);
-    setStatus('scanning');
+    setStatus(hasUsefulCache ? 'complete' : 'scanning');
 
     scanAuspiciousDays({
       occasion,
@@ -149,7 +260,7 @@ export default function OccasionDetailScreen() {
       onProgress: (p) => {
         if (runIdRef.current !== myRun) return;
         scannedThroughRef.current = p.day;
-        setScannedCount(p.scannedCount);
+        if (!hasUsefulCache) setScannedCount(p.scannedCount);
         if (p.scannedCount % PERSIST_EVERY === 0) {
           writeMuhuratCache(db, occasion, userLocation, matchesRef.current, p.day);
         }
@@ -158,6 +269,7 @@ export default function OccasionDetailScreen() {
       .then(() => {
         if (runIdRef.current !== myRun) return;
         writeMuhuratCache(db, occasion, userLocation, matchesRef.current, scannedThroughRef.current);
+        if (hasUsefulCache) return; // already 'complete' — silent extension done
         if (controller.signal.aborted) {
           setStatus('cancelled');
         } else {
@@ -167,6 +279,7 @@ export default function OccasionDetailScreen() {
       .catch(() => {
         if (runIdRef.current !== myRun) return;
         writeMuhuratCache(db, occasion, userLocation, matchesRef.current, scannedThroughRef.current);
+        if (hasUsefulCache) return; // a silent top-up failure isn't worth a banner
         setStatus('error');
       });
   }
@@ -366,6 +479,20 @@ export default function OccasionDetailScreen() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function ymdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isCandidatesFresh(today: Date): boolean {
+  const generated = parseYmd(CANDIDATES.generatedAt);
+  if (!generated) return false;
+  const ageDays = Math.round((today.getTime() - generated.getTime()) / 86_400_000);
+  return ageDays <= CANDIDATES_STALE_AFTER_DAYS;
+}
 
 function parseYmd(s: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
