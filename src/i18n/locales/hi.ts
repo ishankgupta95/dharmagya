@@ -253,6 +253,31 @@ export default {
     chalisaBadge: 'चालीसा',
   },
 
+  // ── Calendar Screen (P9 — fullscreen month view) ────────────────────────
+  calendar: {
+    title: 'पंचांग',
+    expandFromPanchang: 'पूरे महीने का दृश्य खोलें',
+    legendTitle: 'चिह्न',
+    legendEkadashi: 'एकादशी',
+    legendSankranti: 'संक्रांति',
+    legendPournami: 'पूर्णिमा',
+    legendAmavasya: 'अमावस्या',
+    legendPradosh: 'प्रदोष',
+    legendEclipse: 'ग्रहण',
+    legendDeity: 'आपके देवता',
+    filterAll: 'सभी',
+    filterEkadashi: 'एकादशी',
+    filterSankranti: 'संक्रांतियाँ',
+    filterEclipse: 'ग्रहण',
+    drilldownEkadashiTitle: 'एकादशियाँ · {{year}}',
+    drilldownSankrantiTitle: 'संक्रांतियाँ · {{year}}',
+    drilldownEclipseTitle: 'आगामी ग्रहण',
+    drilldownEmpty: 'इस अवधि में कुछ निर्धारित नहीं',
+    a11yOpen: 'पूरे महीने का दृश्य खोलें',
+    a11yClose: 'कैलेंडर बंद करें',
+    a11ySwipe: 'महीना बदलने के लिए क्षैतिज स्वाइप करें',
+  },
+
   // ── Festivals Screen ────────────────────────────────────────────────────
   festivals: {
     title: 'त्योहार और व्रत',

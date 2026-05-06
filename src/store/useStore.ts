@@ -152,6 +152,12 @@ interface AppStore {
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
+  /**
+   * Transient hand-off from the fullscreen calendar (`app/calendar.tsx`) to
+   * the Panchang tab. ISO `YYYY-MM-DD`. The Panchang screen reads + clears
+   * this on focus and applies it as the selected date.
+   */
+  pendingPanchangDate: string | null;
 
   // Actions (not persisted)
   setThemeMode: (mode: ThemeMode) => void;
@@ -189,6 +195,7 @@ interface AppStore {
   setUserName: (name: string | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
+  setPendingPanchangDate: (iso: string | null) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -228,6 +235,7 @@ export const useStore = create<AppStore>()(
       userName: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
+      pendingPanchangDate: null,
 
       setThemeMode: (mode) => set({ themeMode: mode }),
       setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
@@ -283,6 +291,7 @@ export const useStore = create<AppStore>()(
       },
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
+      setPendingPanchangDate: (iso) => set({ pendingPanchangDate: iso }),
     }),
     {
       name: 'dharmagya-store',

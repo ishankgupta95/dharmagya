@@ -229,6 +229,8 @@ export default function PanchangScreen() {
     new Date(today.getFullYear(), today.getMonth(), 1),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pendingPanchangDate = useStore(s => s.pendingPanchangDate);
+  const setPendingPanchangDate = useStore(s => s.setPendingPanchangDate);
 
   const panchangLang = resolveLanguage(language);
   const birthMoment = useMemo<Date | null>(() => {
@@ -330,6 +332,21 @@ export default function PanchangScreen() {
         return () => clearTimeout(timer);
       }
     }, [walkthroughStep, measurePanchaAnga])
+  );
+
+  // Hand-off from the fullscreen calendar (`app/calendar.tsx`): if a date was
+  // queued there, apply it here on focus and clear the slot.
+  useFocusEffect(
+    useCallback(() => {
+      if (!pendingPanchangDate) return;
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(pendingPanchangDate);
+      if (m) {
+        const picked = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        setSelectedDate(picked);
+        setCalMonth(new Date(picked.getFullYear(), picked.getMonth(), 1));
+      }
+      setPendingPanchangDate(null);
+    }, [pendingPanchangDate, setPendingPanchangDate]),
   );
 
   const goPrevMonth = useCallback(() => {
@@ -504,6 +521,20 @@ export default function PanchangScreen() {
             );
           })}
         </View>
+
+        {/* ── Open fullscreen calendar (P9 entry) ──────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.push('/calendar')}
+          style={[styles.expandCalBtn, { borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('calendar.a11yOpen')}>
+          <Icon name="calendar" size={13} color={colors.textTertiary} />
+          <Text variant="mono-caps" style={[styles.expandCalText, { color: colors.textTertiary }]}>
+            {t('calendar.expandFromPanchang')}
+          </Text>
+          <Icon name="chevron-right" size={12} color={colors.textTertiary} />
+        </TouchableOpacity>
 
         <Ornament variant="double-rule" style={styles.postCalRule} />
 
@@ -1072,6 +1103,20 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
   },
   postCalRule: { marginTop: 10, marginBottom: 12 },
+
+  expandCalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 10,
+    alignSelf: 'center',
+  },
+  expandCalText: { fontSize: 9 },
 
   // Selected-day line
   selectedLine: {

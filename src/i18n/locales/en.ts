@@ -253,6 +253,31 @@ export default {
     chalisaBadge: 'Chalisa',
   },
 
+  // ── Calendar Screen (P9 — fullscreen month view) ────────────────────────
+  calendar: {
+    title: 'Calendar',
+    expandFromPanchang: 'Open fullscreen calendar',
+    legendTitle: 'Markers',
+    legendEkadashi: 'Ekadashi',
+    legendSankranti: 'Sankranti',
+    legendPournami: 'Pournami',
+    legendAmavasya: 'Amavasya',
+    legendPradosh: 'Pradosh',
+    legendEclipse: 'Eclipse',
+    legendDeity: 'Your deity',
+    filterAll: 'All',
+    filterEkadashi: 'Ekadashi',
+    filterSankranti: 'Sankrantis',
+    filterEclipse: 'Eclipses',
+    drilldownEkadashiTitle: 'Ekadashis · {{year}}',
+    drilldownSankrantiTitle: 'Sankrantis · {{year}}',
+    drilldownEclipseTitle: 'Upcoming eclipses',
+    drilldownEmpty: 'Nothing scheduled in this window',
+    a11yOpen: 'Open fullscreen calendar',
+    a11yClose: 'Close calendar',
+    a11ySwipe: 'Swipe horizontally to change month',
+  },
+
   // ── Festivals Screen ────────────────────────────────────────────────────
   festivals: {
     title: 'Festivals & Vrats',
