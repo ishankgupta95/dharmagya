@@ -57,7 +57,8 @@
       ],
       "expo-localization",
       "react-native-edge-to-edge",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/withTodayPanchangWidget"
     ],
     "experiments": {
       "typedRoutes": true,

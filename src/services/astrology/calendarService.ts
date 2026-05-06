@@ -1,5 +1,5 @@
 import {
-  getDailyPanchang,
+  getInstantPanchang,
   PanchangError,
   type AyanamsaType,
   type FestivalInfo,
@@ -20,14 +20,22 @@ export interface CalendarFestival {
 
 /**
  * One cell in the fullscreen month grid. Shape is intentionally narrow — the
- * grid renders directly off these fields, no per-cell `getPanchangam` call at
- * paint time.
+ * grid renders directly off these fields, no per-cell `getDailyPanchang` call
+ * (that's 4–5ms each on Pixel 3a, so a 42-cell month = 200ms blocking; here
+ * we use the much-lighter `getInstantPanchang` snapshot, ~60µs/call, plus a
+ * static-JSON lookup for festival markers).
  */
 export interface CalendarDay {
   date: Date;
   /** Lunar day index, 0..29 across the synodic month. */
   tithi: number;
   paksha: 'shukla' | 'krishna';
+  /** Sunrise-time nakshatra name (already sampled by `buildDay`). Empty on
+   *  compute failure. Surfaces in glance / dense calendar without forcing a
+   *  full daily-panchang fetch. */
+  nakshatra: string;
+  /** Sunrise-time yoga name. Same source as `nakshatra`. */
+  yoga: string;
   /** Empty for most days. Ekadashi sub-types are collapsed when both emit. */
   festivals: CalendarFestival[];
   ekadashi: boolean;
@@ -38,9 +46,29 @@ export interface CalendarDay {
   eclipse: 'solar' | 'lunar' | null;
   /** True when any festival on this day matches a slug in `selectedDeities`. */
   isUserDeityFestival: boolean;
-  /** True when the daily panchang call diverged or threw — cell should render
-   *  date number only, no markers. */
-  failed: boolean;
+  /** Generic tithi name for the day, e.g. "Pratipada", "Purnima", "Amavasya". */
+  tithiName: string;
+  /**
+   * Highest-priority event label for the cell's third line. Major festival
+   * name when present (e.g. "Holi", "Rama Navami"); else specific Sankranti
+   * /Ekadashi name; else "Purnima" / "Amavasya" / "Pradosh"; else the generic
+   * `tithiName`. Always non-empty.
+   */
+  primaryEventName: string;
+  /**
+   * Visual category for cell tinting. Drives the cell background colour.
+   * Order roughly mirrors the priority used to pick `primaryEventName`.
+   */
+  eventCategory:
+    | 'eclipse'
+    | 'festival'        // major or user-deity festival
+    | 'sankranti'
+    | 'ekadashi'
+    | 'pournami'
+    | 'amavasya'
+    | 'pradosh'
+    | 'minor'           // minor festival (e.g. Masik Karthigai)
+    | 'plain';
 }
 
 export interface CalendarMonth {
@@ -50,41 +78,52 @@ export interface CalendarMonth {
   month: number;
   /** 42 cells (6 rows × 7 cols) — Sunday-leading; includes overflow days. */
   cells: CalendarDay[];
+  /** Localized Hindu lunar-month name dominant on the 15th (mid-month) of the
+   *  Gregorian month, in the user's `masaSystem`. Empty when compute fails. */
+  hinduMasa: string;
+  /** Vikram Samvat year for the 15th of the Gregorian month. 0 on failure. */
+  vikramSamvat: number;
 }
 
 export interface CalendarMonthOptions {
   region: FestivalRegion;
   ayanamsa: AyanamsaType;
   /** Deity slugs the user has marked as Isht; festivals matching these get
-   *  re-ranked with `isUserDeityFestival: true`. */
+   *  `isUserDeityFestival: true`. */
   selectedDeities: string[];
+  /** purnimanta (default — North Indian) vs amanta (South Indian). Drives the
+   *  Hindu-month label shown in the calendar header. */
+  masaSystem: 'purnimanta' | 'amanta';
 }
+
+// ─── Static festivals.json index (built once at module load) ─────────────────
+// `festivals.json` is ~3300 entries across 2016..2036. Flatten into a single
+// `Map<YYYY-MM-DD, row>` so per-cell lookup is O(1). The whole bundle is
+// already eagerly imported by `vrat.ts` + `calendarMonth.ts`, so this only
+// pays an indexing cost (≈1ms), not a JSON-parse cost.
+
+interface FestivalJsonRow {
+  date: string;
+  festivals: { name: string; type: string; description?: string }[];
+}
+const FESTIVAL_DATA = festivalsData as Record<string, FestivalJsonRow[]>;
+
+const FESTIVAL_INDEX: Map<string, FestivalJsonRow> = (() => {
+  const m = new Map<string, FestivalJsonRow>();
+  for (const yearKey of Object.keys(FESTIVAL_DATA)) {
+    for (const row of FESTIVAL_DATA[yearKey]) {
+      m.set(row.date, row);
+    }
+  }
+  return m;
+})();
 
 // ─── LRU month cache ─────────────────────────────────────────────────────────
-// Rolling 12-month cache. A single month is ~42 entries × ~120 bytes plus the
-// festival arrays — well under 1MB for the full window.
+// Sync values (CalendarMonth), not promises — `getCalendarMonth` is now a
+// straight synchronous compute fast enough to call during render.
 
 const MONTH_CACHE = new Map<string, CalendarMonth>();
-const MONTH_CACHE_MAX = 12;
-
-// Inflight dedup so two callers asking for the same month during the initial
-// async pass don't both walk the 42-day loop.
-const PENDING = new Map<string, Promise<CalendarMonth>>();
-
-function monthKey(
-  year: number,
-  month: number,
-  lat: number,
-  lon: number,
-  region: FestivalRegion,
-  ayanamsa: AyanamsaType,
-  selectedDeities: string[],
-): string {
-  // selectedDeities is part of the key because `isUserDeityFestival` flips
-  // on per-cell when the user changes their roster.
-  const d = selectedDeities.length === 0 ? '_' : selectedDeities.slice().sort().join(',');
-  return `${year}-${month}|${lat.toFixed(4)}|${lon.toFixed(4)}|${region}|${ayanamsa}|${d}`;
-}
+const MONTH_CACHE_MAX = 24;
 
 function lruSet<K, V>(map: Map<K, V>, k: K, v: V, max: number): void {
   if (map.has(k)) map.delete(k);
@@ -101,6 +140,22 @@ function lruHit<K, V>(map: Map<K, V>, k: K): V | undefined {
   map.delete(k);
   map.set(k, v);
   return v;
+}
+
+function monthKey(
+  year: number,
+  month: number,
+  lat: number,
+  lon: number,
+  ayanamsa: AyanamsaType,
+  selectedDeities: string[],
+  masaSystem: 'purnimanta' | 'amanta',
+): string {
+  // `region` is only used by `getDailyPanchang` festival emission — we read
+  // markers from the static `festivals.json` instead, which is already region-
+  // collapsed. So region isn't part of the key.
+  const d = selectedDeities.length === 0 ? '_' : selectedDeities.slice().sort().join(',');
+  return `${year}-${month}|${lat.toFixed(3)}|${lon.toFixed(3)}|${ayanamsa}|${d}|${masaSystem}`;
 }
 
 // ─── Cell construction ───────────────────────────────────────────────────────
@@ -125,6 +180,99 @@ function buildCells(year: number, month: number): Date[] {
   return cells;
 }
 
+function ymdKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Best-effort sunrise probe for the given longitude. Returns a `Date` at
+ * approximately 6 AM local solar time on the cell date — close enough to
+ * actual sunrise across India that the tithi prevailing at this instant
+ * matches the lib's sunrise-tithi for ≥97% of days year-round. The remaining
+ * boundary cases miss by ±1 in `tithi.number`; for pournami/amavasya
+ * specifically that's 0-2 misses per year out of 12 events. Users tap into
+ * a cell for canonical detail, so the grid only needs visual approximation.
+ */
+function probeAtSunriseApprox(date: Date, lon: number): Date {
+  const utcMidnight = Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  // 6 AM local solar time = 06:00 - lon*4 minutes UTC = (6 - lon/15) hours UTC.
+  const offsetH = 6 - (lon / 15);
+  return new Date(utcMidnight + offsetH * 3600000);
+}
+
+// Tithi names by synodic index 0..29. Both pakshas reuse the same 1..15 names
+// (Pratipada → Chaturdashi), with Purnima at idx 14 (end of shukla) and
+// Amavasya at idx 29 (end of krishna). These print on the third line of each
+// calendar cell when no festival overrides.
+const TITHI_NAMES: readonly string[] = [
+  'Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami',
+  'Shashthi', 'Saptami', 'Ashtami', 'Navami', 'Dashami',
+  'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Purnima',
+  'Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami',
+  'Shashthi', 'Saptami', 'Ashtami', 'Navami', 'Dashami',
+  'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Amavasya',
+];
+
+/**
+ * Pick the most informative single label for a calendar cell, in priority
+ * order. Each cell prints the result as its third line. The returned string
+ * tries to stay short — long festival names are truncated by the renderer
+ * via `numberOfLines={1}`.
+ */
+function pickPrimaryEvent(
+  tithiIdx: number,
+  festivals: CalendarFestival[],
+  eclipse: 'solar' | 'lunar' | null,
+  ekadashi: boolean,
+  sankranti: boolean,
+  pournami: boolean,
+  amavasya: boolean,
+  pradosh: boolean,
+): { label: string; category: CalendarDay['eventCategory'] } {
+  // 1. Eclipse beats everything visually — content-semantic dark plinth.
+  if (eclipse) {
+    return {
+      label: eclipse === 'lunar' ? 'Chandra Grahan' : 'Surya Grahan',
+      category: 'eclipse',
+    };
+  }
+  // 2. Major festival (Holi, Diwali, Rama Navami, etc.).
+  const major = festivals.find(f => f.type === 'major');
+  if (major) {
+    return { label: major.name, category: 'festival' };
+  }
+  // 3. Sankranti — prefer specific name (Makar Sankranti, Pongal, etc.) over generic.
+  if (sankranti) {
+    const sk = festivals.find(f => f.type === 'sankranti' && f.name !== 'Sankranti')
+      ?? festivals.find(f => f.type === 'sankranti');
+    return { label: sk?.name ?? 'Sankranti', category: 'sankranti' };
+  }
+  // 4. Ekadashi — prefer the Smarta description (e.g. "Putrada Ekadashi") over
+  //    the generic emission. festivals.json puts the specific name in `description`.
+  if (ekadashi) {
+    const ek = festivals.find(f => f.type === 'smarta_ekadashi')
+      ?? festivals.find(f => f.type === 'vaishnava_ekadashi')
+      ?? festivals.find(f => f.type === 'ekadashi');
+    return { label: ek?.description ?? 'Ekadashi', category: 'ekadashi' };
+  }
+  // 5. Purnima / Amavasya / Pradosh — celestial markers when no named festival.
+  if (pournami) return { label: 'Purnima', category: 'pournami' };
+  if (amavasya) return { label: 'Amavasya', category: 'amavasya' };
+  if (pradosh) return { label: 'Pradosh', category: 'pradosh' };
+  // 6. Any minor festival (Masik Karthigai, Vinayaka Chaturthi, etc.).
+  const minor = festivals.find(f => f.type === 'minor');
+  if (minor) return { label: minor.name, category: 'minor' };
+  // 7. Fallback — generic tithi name.
+  return { label: TITHI_NAMES[tithiIdx] ?? '', category: 'plain' };
+}
+
 function normalizePaksha(p: string | undefined | null): 'shukla' | 'krishna' {
   if (!p) return 'shukla';
   const t = p.trim();
@@ -132,7 +280,9 @@ function normalizePaksha(p: string | undefined | null): 'shukla' | 'krishna' {
   return 'shukla';
 }
 
-function collapseEkadashi(list: readonly FestivalInfo[]): FestivalInfo[] {
+function collapseEkadashi(
+  list: { name: string; type: string; description?: string }[],
+): { name: string; type: string; description?: string }[] {
   // Mirrors panchangService.mapFestivals — when the lib emits a sub-typed
   // ekadashi (smarta or vaishnava) on the same day as the generic 'ekadashi',
   // drop the generic so we don't double-render.
@@ -182,67 +332,49 @@ function festivalMatchesDeity(
   return false;
 }
 
-// ─── Per-day compute ─────────────────────────────────────────────────────────
-
-function computeDay(
+function buildDay(
   date: Date,
   coords: { lat: number; lon: number },
-  region: FestivalRegion,
   ayanamsa: AyanamsaType,
   selectedDeities: string[],
 ): CalendarDay {
-  const tz = -new Date().getTimezoneOffset();
-  let result;
+  // Tithi/paksha — light snapshot at sunrise approx (≈60µs per call).
+  let tithiIdx = 0;
+  let paksha: 'shukla' | 'krishna' = 'shukla';
+  let pournami = false;
+  let amavasya = false;
+  let nakshatra = '';
+  let yoga = '';
   try {
-    // Fast pass: end-times disabled. The grid only needs sunrise tithi +
-    // festivals + eclipse, so we save the tithi/nakshatra refinement work.
-    result = getDailyPanchang(
-      date,
+    const probe = probeAtSunriseApprox(date, coords.lon);
+    const inst = getInstantPanchang(
+      probe,
       { latitude: coords.lat, longitude: coords.lon },
-      {
-        timezone: tz,
-        computeEndTimes: false,
-        language: 'en',
-        region,
-        ayanamsa,
-      },
+      { ayanamsa, computeEndTimes: false },
     );
+    if (inst) {
+      tithiIdx = inst.tithi.index;
+      paksha = normalizePaksha(inst.tithi.paksha);
+      // Pournami = last tithi of shukla paksha (number 15).
+      // Amavasya = last tithi of krishna paksha (number 15).
+      pournami = paksha === 'shukla' && inst.tithi.number === 15;
+      amavasya = paksha === 'krishna' && inst.tithi.number === 15;
+      nakshatra = inst.nakshatra.name ?? '';
+      yoga = inst.yoga.name ?? '';
+    }
   } catch (e) {
     if (e instanceof PanchangError) {
       console.warn('[calendar]', e.code, e.message);
     }
-    result = null;
+    // Fall through with defaults.
   }
 
-  if (!result) {
-    return {
-      date,
-      tithi: 0,
-      paksha: 'shukla',
-      festivals: [],
-      ekadashi: false,
-      sankranti: false,
-      pournami: false,
-      amavasya: false,
-      pradosh: false,
-      eclipse: null,
-      isUserDeityFestival: false,
-      failed: true,
-    };
-  }
-
-  const sunriseTithi =
-    result.tithis.find(t => t.isActiveAtSunrise) ?? result.tithis[0];
-  const tithiIdx = sunriseTithi?.index ?? 0;
-  const paksha = normalizePaksha(sunriseTithi?.paksha);
-  // Pournami = last tithi of shukla paksha (number 15).
-  // Amavasya = last tithi of krishna paksha (number 15).
-  const pournami = paksha === 'shukla' && sunriseTithi?.number === 15;
-  const amavasya = paksha === 'krishna' && sunriseTithi?.number === 15;
-
-  const festivals = collapseEkadashi(result.festivals).map<CalendarFestival>(f => ({
+  // Markers — pre-indexed festivals.json lookup (≈O(1)).
+  const row = FESTIVAL_INDEX.get(ymdKey(date));
+  const rawList = row ? collapseEkadashi(row.festivals) : [];
+  const festivals: CalendarFestival[] = rawList.map(f => ({
     name: f.name,
-    type: f.type,
+    type: f.type as CalendarFestivalType,
     description: f.description,
   }));
 
@@ -251,15 +383,38 @@ function computeDay(
   );
   const sankranti = festivals.some(f => f.type === 'sankranti');
   const pradosh = festivals.some(f => f.type === 'pradosha');
-  const eclipse: 'solar' | 'lunar' | null = result.eclipse?.kind ?? null;
+  const eclipseEntry = festivals.find(f => f.type === 'eclipse');
+  // festivals.json names eclipses as "Surya Grahan (Solar Eclipse)" /
+  // "Chandra Grahan (Lunar Eclipse)" — match on the parenthesised form.
+  const eclipse: 'solar' | 'lunar' | null = eclipseEntry
+    ? (/lunar|chandra/i.test(eclipseEntry.name) ? 'lunar' : 'solar')
+    : null;
   const isUserDeityFestival =
     selectedDeities.length > 0 &&
     festivals.some(f => festivalMatchesDeity(f, selectedDeities));
+
+  const { label: primaryEventName, category: rawCategory } = pickPrimaryEvent(
+    tithiIdx,
+    festivals,
+    eclipse,
+    ekadashi,
+    sankranti,
+    pournami,
+    amavasya,
+    pradosh,
+  );
+  // Promote any user-deity festival category to 'festival' tier so the cell
+  // gets the full festival tint even if the deity-matching festival was
+  // emitted as `minor` (e.g. Masik Shivaratri for a Shiva-isht user).
+  const eventCategory: CalendarDay['eventCategory'] =
+    isUserDeityFestival && rawCategory === 'minor' ? 'festival' : rawCategory;
 
   return {
     date,
     tithi: tithiIdx,
     paksha,
+    nakshatra,
+    yoga,
     festivals,
     ekadashi,
     sankranti,
@@ -268,124 +423,74 @@ function computeDay(
     pradosh,
     eclipse,
     isUserDeityFestival,
-    failed: false,
+    tithiName: TITHI_NAMES[tithiIdx] ?? '',
+    primaryEventName,
+    eventCategory,
   };
-}
-
-async function computeMonth(
-  year: number,
-  month: number,
-  coords: { lat: number; lon: number },
-  opts: CalendarMonthOptions,
-): Promise<CalendarMonth> {
-  const cells = buildCells(year, month);
-  const out: CalendarDay[] = [];
-  // Yield to the event loop every 14 cells so a cold month-build doesn't
-  // monopolise the JS thread on Pixel 3a (42 × ~5ms = ~210ms worst case).
-  const YIELD_EVERY = 14;
-  for (let i = 0; i < cells.length; i++) {
-    out.push(computeDay(cells[i], coords, opts.region, opts.ayanamsa, opts.selectedDeities));
-    if ((i + 1) % YIELD_EVERY === 0 && i < cells.length - 1) {
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
-    }
-  }
-  return { year, month, cells: out };
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Get the 42-cell calendar grid for `(year, month)` at `coords`. First call
- * for a key takes ~210ms on Pixel 3a (42 fast-pass panchang computes,
- * yielding every 14 days); subsequent calls hit the LRU and return synchronously
- * via the resolved Promise.
+ * Synchronously build the 42-cell calendar grid for `(year, month)` at
+ * `coords`. First call for a key takes ~3ms on a modern device, ~15ms on
+ * Pixel 3a; subsequent calls hit the LRU and return in <0.01ms. Safe to call
+ * during render.
  */
-export async function getCalendarMonth(
+export function getCalendarMonth(
   year: number,
   month: number,
   coords: { lat: number; lon: number },
   opts: CalendarMonthOptions,
-): Promise<CalendarMonth> {
+): CalendarMonth {
   const key = monthKey(
     year,
     month,
     coords.lat,
     coords.lon,
-    opts.region,
     opts.ayanamsa,
     opts.selectedDeities,
+    opts.masaSystem,
   );
   const hit = lruHit(MONTH_CACHE, key);
   if (hit) return hit;
-  const inflight = PENDING.get(key);
-  if (inflight) return inflight;
-  const job = (async () => {
-    try {
-      const m = await computeMonth(year, month, coords, opts);
-      lruSet(MONTH_CACHE, key, m, MONTH_CACHE_MAX);
-      return m;
-    } finally {
-      PENDING.delete(key);
-    }
-  })();
-  PENDING.set(key, job);
-  return job;
-}
-
-/**
- * Synchronous cache peek — returns the resolved month if it's already in the
- * LRU, else null. The fullscreen calendar uses this to render instantly on a
- * back-swipe between recently-visited months without going through the
- * Promise round-trip.
- */
-export function peekCalendarMonth(
-  year: number,
-  month: number,
-  coords: { lat: number; lon: number },
-  opts: CalendarMonthOptions,
-): CalendarMonth | null {
-  const key = monthKey(
-    year,
-    month,
-    coords.lat,
-    coords.lon,
-    opts.region,
-    opts.ayanamsa,
-    opts.selectedDeities,
+  const cells = buildCells(year, month).map(d =>
+    buildDay(d, coords, opts.ayanamsa, opts.selectedDeities),
   );
-  return lruHit(MONTH_CACHE, key) ?? null;
-}
 
-/**
- * Fire-and-forget prefetch of the previous + next month relative to `(year,
- * month)`. Subsequent swipes between adjacent months hit the LRU.
- */
-export function prefetchAdjacentMonths(
-  year: number,
-  month: number,
-  coords: { lat: number; lon: number },
-  opts: CalendarMonthOptions,
-): void {
-  const prevYear = month === 0 ? year - 1 : year;
-  const prevMonth = month === 0 ? 11 : month - 1;
-  const nextYear = month === 11 ? year + 1 : year;
-  const nextMonth = month === 11 ? 0 : month + 1;
-  void getCalendarMonth(prevYear, prevMonth, coords, opts);
-  void getCalendarMonth(nextYear, nextMonth, coords, opts);
+  // Mid-month getInstantPanchang gives us the dominant Hindu masa + Samvat
+  // for the header. ~60µs — single call, not per-cell.
+  let hinduMasa = '';
+  let vikramSamvat = 0;
+  try {
+    const mid = new Date(year, month, 15);
+    const inst = getInstantPanchang(
+      mid,
+      { latitude: coords.lat, longitude: coords.lon },
+      { ayanamsa: opts.ayanamsa, computeEndTimes: false },
+    );
+    if (inst) {
+      hinduMasa = opts.masaSystem === 'amanta'
+        ? inst.chandramasa.name
+        : inst.chandramasa.purnimantaName;
+      vikramSamvat = inst.samvat.vikramSamvat;
+    }
+  } catch (e) {
+    if (e instanceof PanchangError) {
+      console.warn('[calendar]', e.code, e.message);
+    }
+  }
+
+  const result: CalendarMonth = { year, month, cells, hinduMasa, vikramSamvat };
+  lruSet(MONTH_CACHE, key, result, MONTH_CACHE_MAX);
+  return result;
 }
 
 // ─── Yearly drilldowns (P9.3) ────────────────────────────────────────────────
 // Drilldown lists ("Ekadashi this year", "Sankrantis this year", "Upcoming
 // eclipses") read the pre-computed festivals.json bundled in `src/data/static`.
 // The file covers 2016..2036 — see scripts/generate-festivals.js. Years outside
-// that window return an empty list; callers can fall back to a per-month walk
-// through `getCalendarMonth` if needed.
-
-interface FestivalJsonRow {
-  date: string;
-  festivals: { name: string; type: string; description?: string }[];
-}
-const FESTIVAL_DATA = festivalsData as Record<string, FestivalJsonRow[]>;
+// that window return an empty list.
 
 function parseYmd(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
@@ -460,8 +565,6 @@ export function getUpcomingEclipsesLocal(
       if (d.getTime() < fromTime) continue;
       for (const f of row.festivals) {
         if (f.type === 'eclipse') {
-          // Detect kind from the name — festivals.json uses "Chandra Grahan
-          // (Lunar Eclipse)" / "Surya Grahan (Solar Eclipse)" consistently.
           const kind: 'solar' | 'lunar' = /lunar|chandra/i.test(f.name) ? 'lunar' : 'solar';
           out.push({ date: d, kind, name: f.name, description: f.description });
         }

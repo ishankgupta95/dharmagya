@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   useFonts,
   Fraunces_300Light,
@@ -30,6 +31,7 @@ import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
 import { preloadInterstitial, showInterstitial } from '@/services/interstitialAds';
 import { scheduleDailyReminder } from '@/services/notifications';
 import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
+import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 
 SplashScreen.preventAutoHideAsync();
@@ -103,6 +105,10 @@ export default function RootLayout() {
     if (appReady) {
       initFirstOpen();
       SplashScreen.hideAsync();
+      // Cold-start widget refresh — covers the case where the user tapped
+      // the widget to launch the app and we want fresh values written back
+      // before they ever look at the home screen again.
+      void refreshTodayWidget();
     }
   }, [appReady, initFirstOpen]);
 
@@ -142,6 +148,9 @@ export default function RootLayout() {
             quietHours,
           );
         }
+        // Foreground refresh of the home-screen widget. Debounced inside the
+        // service so multiple resumes per minute don't recompute panchang.
+        void refreshTodayWidget();
       }
     });
     return () => sub.remove();
@@ -163,20 +172,22 @@ export default function RootLayout() {
   if (!appReady) return null;
 
   return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <Suspense fallback={null}>
-        <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
-              animation: 'slide_from_right',
-            }}>
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        </SQLiteProvider>
-      </Suspense>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <Suspense fallback={null}>
+          <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
+                animation: 'slide_from_right',
+              }}>
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+          </SQLiteProvider>
+        </Suspense>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

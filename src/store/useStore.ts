@@ -135,6 +135,16 @@ interface AppStore {
   quietHoursEnd: string;
   /** Show the Vikram Samvat year in panchang headers. */
   showVikramSamvat: boolean;
+  /** 'compact' = the original Sun-leading 7-col grid. 'dense' = transposed
+   *  view with 7 weekday rows × 6 week cols, each cell carrying tithi+paksha
+   *  and the day's primary event. Toggle is exposed in the month strip. */
+  panchangLayout: 'compact' | 'dense';
+  /** Open/closed state for each category accordion on the panchang day-detail.
+   *  Keyed by category slug; absent = closed. Persisted so a user who always
+   *  opens "Inauspicious Times" doesn't have to re-expand it daily. The
+   *  accordion drives lazy compute — no daily-panchang fetch fires until the
+   *  first category is expanded for the selected date. */
+  panchangCategoriesOpen: Record<string, boolean>;
   /** ISO YYYY-MM-DD, or null if not set. */
   userBirthDate: string | null;
   /** HH:mm in 24h, or null if not set. Used to refine Vimshottari dasha balance. */
@@ -152,12 +162,6 @@ interface AppStore {
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
-  /**
-   * Transient hand-off from the fullscreen calendar (`app/calendar.tsx`) to
-   * the Panchang tab. ISO `YYYY-MM-DD`. The Panchang screen reads + clears
-   * this on focus and applies it as the selected date.
-   */
-  pendingPanchangDate: string | null;
 
   // Actions (not persisted)
   setThemeMode: (mode: ThemeMode) => void;
@@ -188,6 +192,8 @@ interface AppStore {
   setQuietHoursStart: (timeHHmm: string) => void;
   setQuietHoursEnd: (timeHHmm: string) => void;
   setShowVikramSamvat: (val: boolean) => void;
+  setPanchangLayout: (layout: 'compact' | 'dense') => void;
+  togglePanchangCategory: (key: string) => void;
   setUserBirthDate: (iso: string | null) => void;
   setUserBirthTime: (hhmm: string | null) => void;
   setUserBirthPlace: (place: { lat: number; lon: number; name: string; timezone: string } | null) => void;
@@ -195,7 +201,6 @@ interface AppStore {
   setUserName: (name: string | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
-  setPendingPanchangDate: (iso: string | null) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -228,6 +233,8 @@ export const useStore = create<AppStore>()(
       quietHoursStart: '22:00',
       quietHoursEnd: '06:00',
       showVikramSamvat: true,
+      panchangLayout: 'compact',
+      panchangCategoriesOpen: {},
       userBirthDate: null,
       userBirthTime: null,
       userBirthPlace: null,
@@ -235,7 +242,6 @@ export const useStore = create<AppStore>()(
       userName: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
-      pendingPanchangDate: null,
 
       setThemeMode: (mode) => set({ themeMode: mode }),
       setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
@@ -267,6 +273,13 @@ export const useStore = create<AppStore>()(
       setQuietHoursStart: (timeHHmm) => set({ quietHoursStart: timeHHmm }),
       setQuietHoursEnd: (timeHHmm) => set({ quietHoursEnd: timeHHmm }),
       setShowVikramSamvat: (val) => set({ showVikramSamvat: val }),
+      setPanchangLayout: (layout) => set({ panchangLayout: layout }),
+      togglePanchangCategory: (key) => set((s) => ({
+        panchangCategoriesOpen: {
+          ...s.panchangCategoriesOpen,
+          [key]: !s.panchangCategoriesOpen[key],
+        },
+      })),
       setTithiReminder: (key, val) =>
         set((s) => ({
           reminderPrefs: {
@@ -291,7 +304,6 @@ export const useStore = create<AppStore>()(
       },
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
-      setPendingPanchangDate: (iso) => set({ pendingPanchangDate: iso }),
     }),
     {
       name: 'dharmagya-store',
