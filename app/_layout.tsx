@@ -112,6 +112,14 @@ export default function RootLayout() {
     }
   }, [appReady, initFirstOpen]);
 
+  // In-app changes that affect widget rendering (theme, language) need to
+  // bypass the foreground-refresh debounce so the widget repaints immediately
+  // when the user toggles a setting and tabs to home.
+  useEffect(() => {
+    if (!appReady) return;
+    void refreshTodayWidget({ force: true });
+  }, [appReady, isDarkMode, language]);
+
   useEffect(() => {
     if (appReady && !hasOnboarded) {
       router.replace('/onboarding/step1');

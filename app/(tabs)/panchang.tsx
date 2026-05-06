@@ -599,8 +599,16 @@ export default function PanchangScreen() {
     return parts.join(' · ');
   }, [selectedCell, panchangLang]);
 
+  // Pancha Anga is the canonical "what is this day?" view, so it defaults
+  // to open when the user hasn't yet interacted with it. An explicit collapse
+  // by the user is still honoured (the persisted `false` overrides this
+  // default). Other categories default to closed — lazy until requested.
   const isCategoryOpen = useCallback(
-    (key: string) => Boolean(panchangCategoriesOpen[key]),
+    (key: string) => {
+      const stored = panchangCategoriesOpen[key];
+      if (stored !== undefined) return stored;
+      return key === CATEGORY_KEYS.panchaAnga;
+    },
     [panchangCategoriesOpen],
   );
   const onAnyAccordionFirstOpen = useCallback(() => {

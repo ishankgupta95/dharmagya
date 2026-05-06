@@ -165,6 +165,7 @@ const layoutMediumXml = `<?xml version="1.0" encoding="utf-8"?>
             android:layout_alignParentEnd="true"
             android:background="@drawable/widget_refresh_background">
             <TextView
+                android:id="@+id/refresh_icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
@@ -245,7 +246,8 @@ const layoutMediumXml = `<?xml version="1.0" encoding="utf-8"?>
             android:fontFamily="sans-serif" />
     </LinearLayout>
 
-    <View
+    <LinearLayout
+        android:id="@+id/divider_line"
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="10dp"
@@ -315,6 +317,15 @@ const widgetBgDrawableXml = `<?xml version="1.0" encoding="utf-8"?>
 </shape>
 `;
 
+const widgetBgLightDrawableXml = `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_bg_light" />
+    <corners android:radius="20dp" />
+    <stroke android:width="1dp" android:color="@color/widget_border_light" />
+</shape>
+`;
+
 const refreshBgDrawableXml = `<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
@@ -323,8 +334,17 @@ const refreshBgDrawableXml = `<?xml version="1.0" encoding="utf-8"?>
 </shape>
 `;
 
+const refreshBgLightDrawableXml = `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_refresh_bg_light" />
+    <corners android:radius="11dp" />
+</shape>
+`;
+
 const widgetColorsXml = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Dark register (Sacred Editorial deep ink) — default. -->
     <color name="widget_bg">#1A1008</color>
     <color name="widget_border">#33F3E5C8</color>
     <color name="widget_refresh_bg">#262B1A0F</color>
@@ -333,6 +353,17 @@ const widgetColorsXml = `<?xml version="1.0" encoding="utf-8"?>
     <color name="widget_text_secondary">#A8F3E5C8</color>
     <color name="widget_text_tertiary">#7AF3E5C8</color>
     <color name="widget_divider">#33F3E5C8</color>
+
+    <!-- Light register (parchment + ink + sindoor). Applied at runtime by
+         TodayPanchangWidget.kt when payload.isDarkMode is false. -->
+    <color name="widget_bg_light">#F4E9CE</color>
+    <color name="widget_border_light">#2D1B140A</color>
+    <color name="widget_refresh_bg_light">#1FA5301C</color>
+    <color name="widget_accent_light">#A5301C</color>
+    <color name="widget_text_primary_light">#1B140A</color>
+    <color name="widget_text_secondary_light">#B03A2F1F</color>
+    <color name="widget_text_tertiary_light">#806A5A40</color>
+    <color name="widget_divider_light">#B8A670</color>
 </resources>
 `;
 
@@ -405,39 +436,69 @@ class TodayPanchangWidget : AppWidgetProvider() {
         val sunrise = payload.optString("sunrise", "—")
         val rahuKalam = payload.optString("rahuKalam", "—")
         val todayLabel = payload.optString("todayLabel", "Today")
+        // Layouts default to dark colors at compile time. Light mode overrides
+        // backgrounds + every text colour at render time.
+        val isDark = payload.optBoolean("isDarkMode", true)
+        val accent = context.getColor(if (isDark) R.color.widget_accent else R.color.widget_accent_light)
+        val textPrimary = context.getColor(if (isDark) R.color.widget_text_primary else R.color.widget_text_primary_light)
+        val textSecondary = context.getColor(if (isDark) R.color.widget_text_secondary else R.color.widget_text_secondary_light)
+        val textTertiary = context.getColor(if (isDark) R.color.widget_text_tertiary else R.color.widget_text_tertiary_light)
+        val divider = context.getColor(if (isDark) R.color.widget_divider else R.color.widget_divider_light)
+
+        if (!isDark) {
+            views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background_light)
+        }
 
         views.setTextViewText(R.id.today_label, todayLabel.uppercase())
+        views.setTextColor(R.id.today_label, accent)
 
         if (isMedium) {
             views.setTextViewText(R.id.date_long, payload.optString("dateLong", ""))
+            views.setTextColor(R.id.date_long, textSecondary)
             views.setTextViewText(
                 R.id.tithi_label,
                 (labels?.optString("tithi", "Tithi") ?: "Tithi").uppercase()
             )
+            views.setTextColor(R.id.tithi_label, textTertiary)
             views.setTextViewText(R.id.tithi_value, tithiName)
+            views.setTextColor(R.id.tithi_value, textPrimary)
             views.setTextViewText(
                 R.id.tithi_until,
                 if (tithiEnd.isNotEmpty()) "$untilLabel $tithiEnd" else ""
             )
+            views.setTextColor(R.id.tithi_until, textTertiary)
             views.setTextViewText(
                 R.id.nakshatra_label,
                 (labels?.optString("nakshatra", "Nakshatra") ?: "Nakshatra").uppercase()
             )
+            views.setTextColor(R.id.nakshatra_label, textTertiary)
             views.setTextViewText(R.id.nakshatra_value, nakshatraName)
+            views.setTextColor(R.id.nakshatra_value, textPrimary)
             views.setTextViewText(
                 R.id.nakshatra_until,
                 if (nakshatraEnd.isNotEmpty()) "$untilLabel $nakshatraEnd" else ""
             )
+            views.setTextColor(R.id.nakshatra_until, textTertiary)
             views.setTextViewText(
                 R.id.sunrise_label,
                 (labels?.optString("sunrise", "Sunrise") ?: "Sunrise").uppercase()
             )
+            views.setTextColor(R.id.sunrise_label, textTertiary)
             views.setTextViewText(R.id.sunrise_value, sunrise)
+            views.setTextColor(R.id.sunrise_value, textPrimary)
             views.setTextViewText(
                 R.id.rahu_label,
                 (labels?.optString("rahuKalam", "Rahu Kalam") ?: "Rahu Kalam").uppercase()
             )
+            views.setTextColor(R.id.rahu_label, textTertiary)
             views.setTextViewText(R.id.rahu_value, rahuKalam)
+            views.setTextColor(R.id.rahu_value, textPrimary)
+
+            views.setInt(R.id.divider_line, "setBackgroundColor", divider)
+            views.setTextColor(R.id.refresh_icon, accent)
+            if (!isDark) {
+                views.setInt(R.id.refresh_zone, "setBackgroundResource", R.drawable.widget_refresh_background_light)
+            }
 
             views.setOnClickPendingIntent(
                 R.id.refresh_zone,
@@ -445,12 +506,14 @@ class TodayPanchangWidget : AppWidgetProvider() {
             )
         } else {
             views.setTextViewText(R.id.tithi_line, tithiName)
+            views.setTextColor(R.id.tithi_line, textPrimary)
             val sub = StringBuilder()
                 .append(nakshatraName)
                 .append("  ·  ")
                 .append(sunrise)
                 .toString()
             views.setTextViewText(R.id.footer_line, sub)
+            views.setTextColor(R.id.footer_line, textSecondary)
         }
 
         views.setOnClickPendingIntent(
@@ -526,7 +589,9 @@ const withTodayPanchangWidget = (config) => {
       writeFile(path.join(resLayout, 'widget_today_small.xml'), layoutSmallXml);
       writeFile(path.join(resLayout, 'widget_today_medium.xml'), layoutMediumXml);
       writeFile(path.join(resDrawable, 'widget_background.xml'), widgetBgDrawableXml);
+      writeFile(path.join(resDrawable, 'widget_background_light.xml'), widgetBgLightDrawableXml);
       writeFile(path.join(resDrawable, 'widget_refresh_background.xml'), refreshBgDrawableXml);
+      writeFile(path.join(resDrawable, 'widget_refresh_background_light.xml'), refreshBgLightDrawableXml);
       // Sidecar files — Android merges all *.xml under res/values, so we don't
       // touch the stock colors.xml / strings.xml that other plugins also write.
       writeFile(path.join(resValues, 'widget_colors.xml'), widgetColorsXml);

@@ -23,14 +23,14 @@ class WidgetDataModule : Module() {
     Name("WidgetData")
 
     Function("write") { json: String ->
-      val ctx = appContext.reactContext ?: return@Function
-      val prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      prefs.edit().putString(KEY_PAYLOAD, json).apply()
+      appContext.reactContext?.let { ctx ->
+        val prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_PAYLOAD, json).apply()
+      }
     }
 
     Function("notifyAll") {
-      val ctx = appContext.reactContext ?: return@Function
-      notifyTodayWidget(ctx)
+      appContext.reactContext?.let { ctx -> notifyTodayWidget(ctx) }
     }
   }
 

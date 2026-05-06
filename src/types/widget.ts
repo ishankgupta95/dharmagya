@@ -42,6 +42,8 @@ export interface WidgetPayload {
   rahuKalam: string;
   /** Optional location label (e.g. "Pune") shown on medium widget when present. */
   locationLabel: string | null;
+  /** Resolved theme mirror — Kotlin picks light vs dark colors at render time. */
+  isDarkMode: boolean;
 }
 
 /** Sentinel payload rendered when no panchang data has ever been written. */
@@ -66,4 +68,5 @@ export const WIDGET_PLACEHOLDER: WidgetPayload = {
   sunrise: '—',
   rahuKalam: '—',
   locationLabel: null,
+  isDarkMode: true,
 };

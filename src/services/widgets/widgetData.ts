@@ -77,19 +77,15 @@ export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
 
   const day = await fetchPanchangForToday(coords, lang as Language, region, ayanamsa);
   if (!day) {
-    return { ...WIDGET_PLACEHOLDER, lang, todayLabel: labelBundle.today };
+    return { ...WIDGET_PLACEHOLDER, lang, todayLabel: labelBundle.today, isDarkMode: state.isDarkMode };
   }
 
   const tithi = pickActive(day.tithis);
   const nakshatra = pickActive(day.nakshatras);
 
-  const tithiName = tithi?.name ?? '—';
-  const tithiPaksha = tithi?.paksha
-    ? lang === 'hi'
-      ? tithi.paksha === 'Shukla' ? 'शुक्ल पक्ष ' : 'कृष्ण पक्ष '
-      : tithi.paksha === 'Shukla' ? 'Shukla ' : 'Krishna '
-    : '';
-  const tithiDisplay = `${tithiPaksha}${tithiName}`.trim();
+  // panchang-ts returns the paksha-prefixed name (e.g. "Krishna Panchami" /
+  // "कृष्ण पञ्चमी"). Don't prepend paksha again — duplicates the word.
+  const tithiDisplay = tithi?.name ?? '—';
 
   const today = new Date();
   return {
@@ -116,5 +112,6 @@ export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
         ? applyDigits(`${day.rahuKalamStart} – ${day.rahuKalamEnd}`, useDevanagari)
         : '—',
     locationLabel: state.locationName ?? null,
+    isDarkMode: state.isDarkMode,
   };
 }
