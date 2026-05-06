@@ -344,7 +344,7 @@ export default function OccasionDetailScreen() {
             <Icon name="refresh" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : (
-          <View style={styles.backPill} />
+          <View style={[styles.backPill, { borderWidth: 0 }]} />
         )}
       </View>
 

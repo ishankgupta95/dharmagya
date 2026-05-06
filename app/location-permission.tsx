@@ -154,7 +154,7 @@ export default function LocationPickerScreen() {
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('locationPermission.title')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       {/* ── Current Location ──────────────────────────────────────────── */}

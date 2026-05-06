@@ -210,7 +210,7 @@ export default function KundliMatchScreen() {
           <Text variant="display-italic" style={[styles.title, { color: colors.textPrimary }]}>
             {isOthersMode ? t('match.titleOthers') : t('match.title')}
           </Text>
-          <View style={styles.backPill} />
+          <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
 
         <ScrollView

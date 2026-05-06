@@ -41,7 +41,7 @@ export default function ManageDeitiesScreen() {
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('settings.manageDeitiesTitle')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       <View style={[styles.intro, { paddingHorizontal: spacing.screenH }]}>

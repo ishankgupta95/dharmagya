@@ -39,7 +39,7 @@ export default function OnboardingStep2() {
         <Text variant="mono-caps" style={[styles.headerStep, { color: palette.inkQuiet }]}>
           {t('onboarding.step2of3')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       <View style={[styles.titleBlock, { paddingHorizontal: spacing.screenH }]}>

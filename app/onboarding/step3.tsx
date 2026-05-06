@@ -54,7 +54,7 @@ export default function OnboardingStep3() {
         <Text variant="mono-caps" style={[styles.headerStep, { color: colors.textMuted }]}>
           {t('onboarding.step3of3')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       <ScrollView

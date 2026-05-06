@@ -97,7 +97,7 @@ export default function FavoritesScreen() {
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('favorites.title')}
         </Text>
-        <View style={styles.backPill} />
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       {items.length === 0 ? (
