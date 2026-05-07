@@ -194,6 +194,8 @@ export default {
     layoutToggleHint: 'Toggle calendar layout',
     layoutCompact: 'Default',
     layoutDense: 'Detailed',
+    layoutChipSuffix: 'View',
+    layoutSettingLabel: 'Calendar layout',
     glanceTitle: 'AT A GLANCE',
     panchaAngaSection: 'PANCHA ANGA',
     sunMoonSection: 'SUN & MOON',

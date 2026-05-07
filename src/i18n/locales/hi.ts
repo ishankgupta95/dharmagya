@@ -192,6 +192,8 @@ export default {
     layoutToggleHint: 'कैलेंडर लेआउट बदलें',
     layoutCompact: 'सामान्य',
     layoutDense: 'विस्तृत',
+    layoutChipSuffix: 'दृश्य',
+    layoutSettingLabel: 'पंचांग लेआउट',
     glanceTitle: 'मुख्य',
     panchaAngaSection: 'पंच अंग',
     sunMoonSection: 'सूर्य व चंद्र',

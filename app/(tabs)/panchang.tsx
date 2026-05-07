@@ -351,24 +351,27 @@ const FlagStrip = memo(function FlagStrip({ items, colors }: FlagStripProps) {
 });
 
 // ─── Layout toggle (header) ────────────────────────────────────────────────
-// Two-state segmented mini-button. Lives in the header on the left so the
-// month strip stays clean. Single icon-only target — no labels — to save
-// horizontal space; the icon itself reads "switch grid orientation". Dense
-// state shows a filled background so the active mode is unambiguous.
+// Action-labeled chip — shows where the next tap takes you ("→ DETAILED" /
+// "→ DEFAULT"), not the current state. The arrow + target name fits the
+// tight 90pt header slot and tells the user what tapping does instead of
+// what the current mode is (a11y label still spells out the full action).
 interface LayoutToggleProps {
   layout: 'compact' | 'dense';
   onToggle: () => void;
   a11yLabel: string;
+  /** Display label — should already be the *target* view's name (i.e. the
+   *  view the user gets when they tap), prefixed with "→ ". */
+  label: string;
   colors: ColorPalette;
 }
 
-const LayoutToggle = memo(function LayoutToggle({ layout, onToggle, a11yLabel, colors }: LayoutToggleProps) {
+const LayoutToggle = memo(function LayoutToggle({ layout, onToggle, a11yLabel, label, colors }: LayoutToggleProps) {
   const isDense = layout === 'dense';
   return (
     <TouchableOpacity
       onPress={onToggle}
       activeOpacity={0.7}
-      hitSlop={10}
+      hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
       accessibilityState={{ selected: isDense }}
@@ -379,7 +382,12 @@ const LayoutToggle = memo(function LayoutToggle({ layout, onToggle, a11yLabel, c
           borderColor: isDense ? colors.accent + '66' : colors.border,
         },
       ]}>
-      <Icon name="apps" size={14} color={isDense ? colors.accent : colors.textTertiary} />
+      <Text
+        variant="mono-caps"
+        style={[styles.layoutToggleText, { color: isDense ? colors.accent : colors.textTertiary }]}
+        numberOfLines={1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 });
@@ -644,6 +652,7 @@ export default function PanchangScreen() {
             layout={panchangLayout}
             onToggle={handleToggleLayout}
             a11yLabel={t('panchang.layoutToggleHint')}
+            label={`${panchangLayout === 'dense' ? t('panchang.layoutCompact') : t('panchang.layoutDense')} ${t('panchang.layoutChipSuffix')}`}
             colors={colors}
           />
         </View>
@@ -1253,13 +1262,13 @@ const styles = StyleSheet.create({
   locText: { fontSize: 8.5 },
 
   layoutToggle: {
-    width: 30,
     height: 26,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
+    paddingHorizontal: 8,
     justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
   },
+  layoutToggleText: { fontSize: 8.5 },
 
   monthStrip: {
     flexDirection: 'row',

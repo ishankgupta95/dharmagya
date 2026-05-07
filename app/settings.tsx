@@ -74,6 +74,8 @@ export default function SettingsScreen() {
     setShowVikramSamvat,
     masaSystem,
     setMasaSystem,
+    panchangLayout,
+    setPanchangLayout,
     region,
     setRegion,
     userBirthDate,
@@ -102,6 +104,7 @@ export default function SettingsScreen() {
   const [fontSheetOpen, setFontSheetOpen] = useState(false);
   const [langSheetOpen, setLangSheetOpen] = useState(false);
   const [masaSheetOpen, setMasaSheetOpen] = useState(false);
+  const [layoutSheetOpen, setLayoutSheetOpen] = useState(false);
   const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [dailyTimePickerOpen, setDailyTimePickerOpen] = useState(false);
   const [sunriseOffsetSheetOpen, setSunriseOffsetSheetOpen] = useState(false);
@@ -131,6 +134,12 @@ export default function SettingsScreen() {
     { key: 'purnimanta', label: t('panchang.purnimanta'), desc: t('settings.masaSystemPurnimantaDesc') },
     { key: 'amanta', label: t('panchang.amanta'), desc: t('settings.masaSystemAmantaDesc') },
   ];
+
+  const layoutOptions: OptionSheetItem<'compact' | 'dense'>[] = [
+    { key: 'compact', label: t('panchang.layoutCompact') },
+    { key: 'dense', label: t('panchang.layoutDense') },
+  ];
+  const layoutLabel = t(`panchang.layout${panchangLayout.charAt(0).toUpperCase() + panchangLayout.slice(1)}` as 'panchang.layoutCompact' | 'panchang.layoutDense');
 
   const ayanamsaOptions: OptionSheetItem<Ayanamsa>[] = [
     { key: 'lahiri', label: t('settings.ayanamsa.lahiri'), desc: t('settings.ayanamsa.lahiriDesc') },
@@ -396,6 +405,14 @@ export default function SettingsScreen() {
         {/* ── Calendar ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.calendar')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <PickerRow
+            icon="apps"
+            label={t('panchang.layoutSettingLabel')}
+            value={layoutLabel}
+            onPress={() => setLayoutSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
           <PickerRow
             icon="calendar"
             label={t('settings.masaSystem')}
@@ -822,6 +839,16 @@ export default function SettingsScreen() {
         options={masaOptions}
         value={masaSystem}
         onChange={(next) => setMasaSystem(next as MasaSystem)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={layoutSheetOpen}
+        onClose={() => setLayoutSheetOpen(false)}
+        title={t('panchang.layoutSettingLabel')}
+        options={layoutOptions}
+        value={panchangLayout}
+        onChange={(next) => setPanchangLayout(next as 'compact' | 'dense')}
         colors={colors}
       />
 
