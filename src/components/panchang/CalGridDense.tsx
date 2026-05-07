@@ -3,9 +3,39 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { palette, type ColorPalette } from '@/config/theme';
+import { localizeTithi } from '@/i18n/panchangNames';
 import type { CalendarDay } from '@/services/astrology/calendarService';
 
 import { eventDotColor } from './calendarColors';
+
+// Hindi mappings for the generic almanac fallbacks that `pickPrimaryEvent`
+// emits when there's no specific festival name for a cell. Tithi-based names
+// (Pratipada, Purnima, Amavasya, etc.) flow through `localizeTithi`; the
+// remaining generics live here. Festival descriptions / names from
+// festivals.json stay in their bundled language — translating those is a
+// content task, not a UI one.
+const HI_GENERIC_EVENT: Record<string, string> = {
+  Ekadashi: 'एकादशी',
+  Sankranti: 'संक्रांति',
+  Pradosh: 'प्रदोष',
+  'Surya Grahan': 'सूर्य ग्रहण',
+  'Chandra Grahan': 'चन्द्र ग्रहण',
+};
+
+function localizePrimaryEvent(name: string, lang: string): string {
+  if (lang !== 'hi' || !name) return name;
+  const tithiHit = localizeTithi(name, lang);
+  if (tithiHit !== name) return tithiHit;
+  return HI_GENERIC_EVENT[name] ?? name;
+}
+
+// Single-letter paksha tag rendered after the tithi name in each cell.
+// English uses 'S'/'K'; Hindi uses 'शु'/'कृ' (Devanagari short forms of
+// शुक्ल/कृष्ण). Keeping the abbreviation prevents the cell from wrapping.
+function pakshaTag(paksha: 'shukla' | 'krishna', lang: string): string {
+  if (lang === 'hi') return paksha === 'shukla' ? 'शु' : 'कृ';
+  return paksha === 'shukla' ? 'S' : 'K';
+}
 
 const CELLS_PER_WEEK = 7;
 const WEEKS_PER_MONTH = 6;
@@ -23,6 +53,12 @@ interface CalGridDenseProps {
   colors: ColorPalette;
   /** 7 short weekday labels, Sunday-first. Same array as the compact header. */
   dayHeaders: string[];
+  /** Active panchang language ('en' | 'hi') — drives tithi / paksha / event
+   *  localisation. Cell content is stored canonical-English in `CalendarDay`;
+   *  display strings get localised at render time. */
+  panchangLang: string;
+  /** Devanagari-or-Latin numeral formatter from `useLocaleFormatters`. */
+  digits: (s: string) => string;
   onPickDay: (d: Date) => void;
 }
 
@@ -57,6 +93,8 @@ export const CalGridDense = memo(function CalGridDense({
   isDarkMode,
   colors,
   dayHeaders,
+  panchangLang,
+  digits,
   onPickDay,
 }: CalGridDenseProps) {
   // Re-shape from row-major (week-rows) to column-major (weekday-rows).
@@ -106,7 +144,10 @@ export const CalGridDense = memo(function CalGridDense({
                 && day.primaryEventName.length > 0;
 
               const tithiLabel = day
-                ? `${day.tithiName} ${day.paksha === 'shukla' ? 'S' : 'K'}`
+                ? `${localizeTithi(day.tithiName, panchangLang)} ${pakshaTag(day.paksha, panchangLang)}`
+                : '';
+              const eventLabel = day && hasNamedEvent
+                ? localizePrimaryEvent(day.primaryEventName, panchangLang)
                 : '';
 
               const dayNumColor = isSelected
@@ -142,7 +183,7 @@ export const CalGridDense = memo(function CalGridDense({
                   accessibilityLabel={cellDate.toDateString()}
                   accessibilityState={{ selected: isSelected }}>
                   <Text style={[styles.dayNum, { color: dayNumColor }]}>
-                    {cellDate.getDate()}
+                    {digits(String(cellDate.getDate()))}
                   </Text>
                   {inMonth && tithiLabel ? (
                     <Text
@@ -151,11 +192,11 @@ export const CalGridDense = memo(function CalGridDense({
                       {tithiLabel}
                     </Text>
                   ) : null}
-                  {hasNamedEvent ? (
+                  {eventLabel ? (
                     <Text
                       style={[styles.eventText, { color: eventTextColor }]}
                       numberOfLines={1}>
-                      {day.primaryEventName}
+                      {eventLabel}
                     </Text>
                   ) : null}
                 </TouchableOpacity>

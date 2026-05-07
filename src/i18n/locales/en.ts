@@ -319,8 +319,6 @@ export default {
     fontSizeNormal: 'Default',
     fontSizeMedium: 'Medium',
     fontSizeLarge: 'Large',
-    fontSizeXl: 'Extra Large',
-    fontSizeXxl: 'Largest',
     fontSizePickerTitle: 'Font Size',
     fontSizePreview: 'May this day be auspicious for you and your loved ones.',
     languagePickerTitle: 'App Language',

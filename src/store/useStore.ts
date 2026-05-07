@@ -5,7 +5,7 @@ import type { AyanamsaType } from 'panchang-ts';
 
 import type { AppLanguage } from '@/i18n';
 
-export type FontSize = 'small' | 'normal' | 'medium' | 'large' | 'xl' | 'xxl';
+export type FontSize = 'small' | 'normal' | 'medium' | 'large';
 export type MasaSystem = 'purnimanta' | 'amanta';
 export type TimeFormat = 'auto' | '12h' | '24h';
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -308,7 +308,7 @@ export const useStore = create<AppStore>()(
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 11,
+      version: 13,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -408,11 +408,15 @@ export const useStore = create<AppStore>()(
         }
 
         // v4 → v5: font size scale was re-graded with finer mid-steps. The old
-        // 'large' (1.5) is now 'xl', and old 'xl' (1.9) is closest to new 'xxl' (1.75).
+        // 'large' (1.5) became 'xl', and old 'xl' (1.9) → 'xxl'. Both 'xl' and
+        // 'xxl' were dropped in v13, so any value emitted here is intermediate
+        // and gets clamped back to 'large' by the v12→v13 step below. We keep
+        // the assignment so the historical migration chain stays correct;
+        // casts are required because 'xl'/'xxl' aren't valid `FontSize` now.
         if (version < 5) {
           const f = state.fontSize as string | undefined;
-          if (f === 'large') state.fontSize = 'xl';
-          else if (f === 'xl') state.fontSize = 'xxl';
+          if (f === 'large') state.fontSize = 'xl' as unknown as FontSize;
+          else if (f === 'xl') state.fontSize = 'xxl' as unknown as FontSize;
         }
 
         // v5 → v6: themeMode introduced. Carry forward the user's existing
@@ -462,6 +466,25 @@ export const useStore = create<AppStore>()(
           if (place && !place.timezone) {
             state.userBirthPlace = { ...place, timezone: 'Asia/Kolkata' };
           }
+        }
+
+        // v11 → v12: Pancha Anga accordion default-open behaviour. Earlier
+        // builds let the panchang screen toggle accordions open; users who
+        // tested ended up with several `true` values stuck in storage. Reset
+        // the open-set so the new "only Pancha Anga open by default" rule
+        // applies cleanly. Users who actively want other categories open will
+        // re-toggle them; their preferences then persist normally.
+        if (version < 12) {
+          state.panchangCategoriesOpen = {};
+        }
+
+        // v12 → v13: 'xl' and 'xxl' font-size steps removed (they over-scaled
+        // hero typography on the Sacred Editorial design). Anyone who landed
+        // on those gets clamped to 'large' so existing reading flows stay
+        // readable; they can re-pick if they want.
+        if (version < 13) {
+          const f = state.fontSize as string | undefined;
+          if (f === 'xl' || f === 'xxl') state.fontSize = 'large';
         }
 
         return state as AppStore;

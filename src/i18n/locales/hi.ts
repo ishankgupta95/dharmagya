@@ -317,8 +317,6 @@ export default {
     fontSizeNormal: 'सामान्य',
     fontSizeMedium: 'मध्यम',
     fontSizeLarge: 'बड़ा',
-    fontSizeXl: 'अतिरिक्त बड़ा',
-    fontSizeXxl: 'सबसे बड़ा',
     fontSizePickerTitle: 'अक्षर का आकार',
     fontSizePreview: 'यह दिन आपके और आपके प्रियजनों के लिए शुभ हो।',
     languagePickerTitle: 'ऐप भाषा',

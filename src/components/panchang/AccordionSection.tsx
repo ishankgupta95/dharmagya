@@ -99,7 +99,7 @@ export const AccordionSection = memo(function AccordionSection({
           </AppText>
         )}
         <Animated.View style={chevronStyle}>
-          <Icon name="chevron-down" size={14} color={accentColor ?? colors.textTertiary} />
+          <Icon name="chevron-down" size={16} color={accentColor ?? colors.textTertiary} />
         </Animated.View>
       </TouchableOpacity>
 
@@ -123,20 +123,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   title: {
-    fontSize: 9.5,
-    letterSpacing: 1.2,
+    fontSize: 12.5,
+    letterSpacing: 1.5,
   },
   rule: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
   },
   hint: {
-    fontSize: 9.5,
+    fontSize: 11,
     letterSpacing: 0.6,
   },
   body: {

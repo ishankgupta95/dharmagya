@@ -740,6 +740,8 @@ export default function PanchangScreen() {
               isDarkMode={isDarkMode}
               colors={colors}
               dayHeaders={dayHeaders}
+              panchangLang={panchangLang}
+              digits={digits}
               onPickDay={handlePickDay}
             />
           </View>
@@ -790,7 +792,7 @@ export default function PanchangScreen() {
                         !isSelected && isTodayCell && { borderColor: colors.accent, borderWidth: 1 },
                       ]}>
                       <Text style={[styles.calDayNum, { color: baseNumColor }]}>
-                        {cellDate.getDate()}
+                        {digits(String(cellDate.getDate()))}
                       </Text>
                       {dotColor && !isSelected && (
                         <View style={[styles.festivalDot, { backgroundColor: dotColor }]} />

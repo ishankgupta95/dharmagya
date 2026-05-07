@@ -1139,8 +1139,6 @@ const FONT_SIZE_STEPS: { key: FontSize; tKey: string; sample: number }[] = [
   { key: 'normal', tKey: 'settings.fontSizeNormal', sample: 13 },
   { key: 'medium', tKey: 'settings.fontSizeMedium', sample: 15 },
   { key: 'large',  tKey: 'settings.fontSizeLarge',  sample: 17 },
-  { key: 'xl',     tKey: 'settings.fontSizeXl',     sample: 20 },
-  { key: 'xxl',    tKey: 'settings.fontSizeXxl',    sample: 23 },
 ];
 
 function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSheetProps) {
