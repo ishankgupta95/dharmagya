@@ -28,13 +28,9 @@ export type IconName =
   | 'search'
   | 'close'
   | 'check'
-  | 'play'
-  | 'pause'
   | 'sun'
   | 'moon'
   | 'flame'
-  | 'bookmark'
-  | 'dots'
   | 'location'
   | 'text'
   | 'diamond'
@@ -70,7 +66,6 @@ export type IconName =
   | 'return-back'
   | 'ribbon'
   | 'school'
-  | 'sparkles'
   | 'star'
   | 'star-half'
   | 'stop-circle'
@@ -237,15 +232,6 @@ function Glyph({ name, color }: GlyphProps) {
           strokeLinejoin="round"
         />
       );
-    case 'play':
-      return <Polygon points="8,5 19,12 8,19" fill={color} />;
-    case 'pause':
-      return (
-        <G fill={color}>
-          <Rect x={7} y={5} width={3.5} height={14} />
-          <Rect x={13.5} y={5} width={3.5} height={14} />
-        </G>
-      );
     case 'sun':
       return (
         <G fill="none" stroke={color} strokeWidth={1.4}>
@@ -280,24 +266,6 @@ function Glyph({ name, color }: GlyphProps) {
           strokeWidth={1.4}
           strokeLinejoin="round"
         />
-      );
-    case 'bookmark':
-      return (
-        <Path
-          d="M6 3 H18 V21 L12 16 L6 21 Z"
-          fill="none"
-          stroke={color}
-          strokeWidth={1.5}
-          strokeLinejoin="round"
-        />
-      );
-    case 'dots':
-      return (
-        <G fill={color}>
-          <Circle cx={6} cy={12} r={1.6} />
-          <Circle cx={12} cy={12} r={1.6} />
-          <Circle cx={18} cy={12} r={1.6} />
-        </G>
       );
     case 'location':
       return (
@@ -553,15 +521,6 @@ function Glyph({ name, color }: GlyphProps) {
           <Polygon points="12,5 22,10 12,15 2,10" />
           <Path d="M6 12 V16 C6 17.5 9 18.5 12 18.5 C15 18.5 18 17.5 18 16 V12" />
           <Line x1={22} y1={10} x2={22} y2={15} strokeLinecap="round" />
-        </G>
-      );
-    case 'sparkles':
-      // Three star-bursts at 10/4/18 positions.
-      return (
-        <G fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
-          <Path d="M12 3 L13 8 L18 9 L13 10 L12 15 L11 10 L6 9 L11 8 Z" />
-          <Path d="M5 15 L5.6 17 L7.5 17.5 L5.6 18 L5 20 L4.4 18 L2.5 17.5 L4.4 17 Z" />
-          <Path d="M19 14 L19.6 16 L21.5 16.5 L19.6 17 L19 19 L18.4 17 L16.5 16.5 L18.4 16 Z" />
         </G>
       );
     case 'star':

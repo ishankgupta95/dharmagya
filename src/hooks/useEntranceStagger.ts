@@ -15,7 +15,9 @@ import { useReducedMotion } from './useReducedMotion';
 /**
  * Staggered entrance for list / grid items. Given a zero-based index, returns
  * an animated style that delays the shared entrance transform by
- * `index * stagger.base`, capped at 400ms so late items never feel forgotten.
+ * `index * stagger.base`, capped at `STAGGER_CAP_MS` (120ms post-P11.2) so
+ * the cascade is a brief polish on top of compute that's already done — no
+ * item is ever delayed long enough to read as a content delay.
  *
  * `enabled` snapshots on first render — flipping it later never retriggers
  * the animation and never halts one mid-flight. Callers use this to skip

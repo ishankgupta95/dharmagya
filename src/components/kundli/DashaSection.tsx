@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
@@ -154,6 +154,23 @@ export function DashaSection() {
   const dashaResult = system === 'vimshottari' ? (timeline?.full ?? null) : ashtottari;
   const activeIndex = dashaResult?.currentIndex ?? null;
   const effectiveExpanded = expandedIndex ?? activeIndex;
+
+  // Stable toggles so memoized rows don't re-render on every parent state
+  // churn. Each row receives its `index` and calls these with that index, so
+  // we don't have to allocate a new closure per row per render.
+  const handleMahaToggle = useCallback(
+    (i: number) => {
+      setExpandedIndex((prev) => {
+        const eff = prev ?? activeIndex;
+        return eff === i ? -1 : i;
+      });
+      setOpenAntardashaInsideMaha(null);
+    },
+    [activeIndex],
+  );
+  const handleAntardashaToggle = useCallback((adIdx: number) => {
+    setOpenAntardashaInsideMaha((prev) => (prev === adIdx ? null : adIdx));
+  }, []);
   const now = Date.now();
   const currentMaha = dashaResult?.mahaDashas[dashaResult.currentIndex];
   const currentAntardasha =
@@ -318,18 +335,14 @@ export function DashaSection() {
           {dashaResult.mahaDashas.map((md, i) => (
             <MahadashaRow
               key={i}
+              index={i}
               md={md}
               expanded={effectiveExpanded === i}
               isActive={i === activeIndex}
               lang={i18n.language}
-              onToggle={() => {
-                setExpandedIndex(effectiveExpanded === i ? -1 : i);
-                setOpenAntardashaInsideMaha(null);
-              }}
+              onToggle={handleMahaToggle}
               openAntardashaIndex={effectiveExpanded === i ? openAntardashaInsideMaha : null}
-              onAntardashaToggle={(adIdx) =>
-                setOpenAntardashaInsideMaha(openAntardashaInsideMaha === adIdx ? null : adIdx)
-              }
+              onAntardashaToggle={handleAntardashaToggle}
               colors={colors}
               t={t}
             />
@@ -384,7 +397,12 @@ interface CurrentPratyantarStripProps {
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function CurrentPratyantarStrip({ pratyantars, plinth, lang, t }: CurrentPratyantarStripProps) {
+const CurrentPratyantarStrip = memo(function CurrentPratyantarStrip({
+  pratyantars,
+  plinth,
+  lang,
+  t,
+}: CurrentPratyantarStripProps) {
   const now = Date.now();
   const activePratyantara =
     pratyantars.find((p) => p.startDate.getTime() <= now && p.endDate.getTime() > now) ?? null;
@@ -400,21 +418,23 @@ function CurrentPratyantarStrip({ pratyantars, plinth, lang, t }: CurrentPratyan
       </Text>
     </>
   );
-}
+});
 
 interface MahadashaRowProps {
+  index: number;
   md: MahaDasha;
   expanded: boolean;
   isActive: boolean;
   lang: string;
-  onToggle: () => void;
+  onToggle: (index: number) => void;
   openAntardashaIndex: number | null;
   onAntardashaToggle: (idx: number) => void;
   colors: ColorPalette;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function MahadashaRow({
+const MahadashaRow = memo(function MahadashaRow({
+  index,
   md,
   expanded,
   isActive,
@@ -430,6 +450,9 @@ function MahadashaRow({
     start: formatRangeDate(md.startDate, lang),
     end: formatRangeDate(md.endDate, lang),
   });
+  // Bind row index into the stable parent handler so we can pass a closure-
+  // free `onPress` down without breaking memoization.
+  const handlePress = useCallback(() => onToggle(index), [onToggle, index]);
   return (
     <View
       style={[
@@ -442,7 +465,7 @@ function MahadashaRow({
       ]}>
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={onToggle}
+        onPress={handlePress}
         style={styles.mahaRowHeader}
         accessibilityRole="button"
         accessibilityLabel={`${lordLabel} ${t('dasha.mahadashaSuffix')}`}
@@ -473,41 +496,52 @@ function MahadashaRow({
           {md.antarDashas.map((ad, j) => (
             <AntardashaRow
               key={j}
+              index={j}
               ad={ad}
               lang={lang}
               colors={colors}
               t={t}
               expanded={openAntardashaIndex === j}
-              onToggle={() => onAntardashaToggle(j)}
+              onToggle={onAntardashaToggle}
             />
           ))}
         </View>
       )}
     </View>
   );
-}
+});
 
 interface AntardashaRowProps {
+  index: number;
   ad: AntarDasha;
   lang: string;
   colors: ColorPalette;
   t: (k: string, o?: Record<string, unknown>) => string;
   expanded: boolean;
-  onToggle: () => void;
+  onToggle: (index: number) => void;
 }
 
-function AntardashaRow({ ad, lang, colors, t, expanded, onToggle }: AntardashaRowProps) {
+const AntardashaRow = memo(function AntardashaRow({
+  index,
+  ad,
+  lang,
+  colors,
+  t,
+  expanded,
+  onToggle,
+}: AntardashaRowProps) {
   const now = Date.now();
   const adActive = ad.startDate.getTime() <= now && ad.endDate.getTime() > now;
   // Pratyantars are computed lazily on expand to avoid 9×9×9 work for the
   // full 120-year cycle. Memo per-row keeps re-renders cheap.
   const pratyantars = useMemo(() => (expanded ? computeVimshottariPratyantar(ad) : []), [expanded, ad]);
+  const handlePress = useCallback(() => onToggle(index), [onToggle, index]);
 
   return (
     <View>
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={onToggle}
+        onPress={handlePress}
         style={styles.antarRow}
         accessibilityRole="button"
         accessibilityState={{ expanded }}>
@@ -571,7 +605,7 @@ function AntardashaRow({ ad, lang, colors, t, expanded, onToggle }: AntardashaRo
       )}
     </View>
   );
-}
+});
 
 interface YoginiTimelineProps {
   result: YoginiDashaResult;
@@ -646,7 +680,7 @@ interface YoginiRowProps {
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function YoginiRow({ md, isActive, colors, lang, t }: YoginiRowProps) {
+const YoginiRow = memo(function YoginiRow({ md, isActive, colors, lang, t }: YoginiRowProps) {
   const yoginiLabel = t(`dasha.yoginiName.${md.yogini.toLowerCase()}`);
   const planetLabel = t(`dasha.planet.${DASHA_LORD_TO_KEY[md.lord]}`);
   return (
@@ -682,7 +716,7 @@ function YoginiRow({ md, isActive, colors, lang, t }: YoginiRowProps) {
       </View>
     </View>
   );
-}
+});
 
 interface CharaTimelineProps {
   result: CharaDashaResult;

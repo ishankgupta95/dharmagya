@@ -5,17 +5,29 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  InteractionManager,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 import { useStore } from '@/store/useStore';
 import { useLocaleFormatters } from '@/utils/format';
 import {
   darkColors,
   lightColors,
+  MONO_FONT,
   palette,
   semanticColors,
   borderRadius,
@@ -37,6 +49,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { Ornament } from '@/components/common/Ornament';
+import { CalendarGridSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { WheelDatePickerModal } from '@/components/common/WheelDatePickerModal';
 import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
@@ -44,8 +57,16 @@ import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositions
 import { AccordionSection } from '@/components/panchang/AccordionSection';
 import { CalGridDense } from '@/components/panchang/CalGridDense';
 import { AUSPICIOUS_GREEN, eventDotColor } from '@/components/panchang/calendarColors';
-import { getCalendarMonth, type CalendarDay } from '@/services/astrology/calendarService';
+import {
+  getCalendarMonth,
+  peekCalendarMonth,
+  type CalendarDay,
+  type CalendarMonth,
+} from '@/services/astrology/calendarService';
 import type { IInstantPanchang, IPanchangElement } from '@/types';
+import { pmark, pAccordionResetCount } from '@/utils/perfProfile';
+import { durations, easings } from '@/config/motion';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 function isSameDay(a: Date, b: Date) {
   return a.getDate() === b.getDate() &&
@@ -350,51 +371,74 @@ const FlagStrip = memo(function FlagStrip({ items, colors }: FlagStripProps) {
   );
 });
 
-// ─── Layout toggle (header) ────────────────────────────────────────────────
-// Action-labeled chip — shows where the next tap takes you ("→ DETAILED" /
-// "→ DEFAULT"), not the current state. The arrow + target name fits the
-// tight 90pt header slot and tells the user what tapping does instead of
-// what the current mode is (a11y label still spells out the full action).
-interface LayoutToggleProps {
+// ─── Calendar view toggle ──────────────────────────────────────────────────
+// Editorial-style segmented control that lives directly above the calendar
+// grid. Both states are always visible — current state is communicated by an
+// accent-colour label/icon plus a hairline gold underline rule beneath the
+// selected option. Outer hairline rules + a centre divider frame the pair as
+// a deliberate editorial stop between the month strip and the grid (replaces
+// the old action-labelled chip in the header, which was cramped + cropped +
+// confusing because it advertised the destination, not the current state).
+interface CalendarViewToggleProps {
   layout: 'compact' | 'dense';
-  onToggle: () => void;
-  a11yLabel: string;
-  /** Display label — should already be the *target* view's name (i.e. the
-   *  view the user gets when they tap), prefixed with "→ ". */
-  label: string;
+  onSelect: (next: 'compact' | 'dense') => void;
+  a11yHint: string;
+  defaultLabel: string;
+  detailedLabel: string;
   colors: ColorPalette;
 }
 
-const LayoutToggle = memo(function LayoutToggle({ layout, onToggle, a11yLabel, label, colors }: LayoutToggleProps) {
-  const isDense = layout === 'dense';
+const CalendarViewToggle = memo(function CalendarViewToggle({
+  layout, onSelect, a11yHint, defaultLabel, detailedLabel, colors,
+}: CalendarViewToggleProps) {
+  const renderOption = (
+    key: 'compact' | 'dense',
+    iconName: 'apps' | 'text',
+    label: string,
+  ) => {
+    const isSelected = layout === key;
+    const tone = isSelected ? colors.accent : colors.textTertiary;
+    return (
+      <TouchableOpacity
+        onPress={() => onSelect(key)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} · ${a11yHint}`}
+        accessibilityState={{ selected: isSelected }}
+        style={styles.viewToggleOption}>
+        <View style={styles.viewToggleLabelRow}>
+          <Icon name={iconName} size={13} color={tone} />
+          <Text variant="mono-caps" style={[styles.viewToggleText, { color: tone }]}>
+            {label}
+          </Text>
+        </View>
+        {/* Always reserve underline space so layout doesn't jump on switch.
+            Color flips between gold and transparent. */}
+        <View
+          style={[
+            styles.viewToggleUnderline,
+            { backgroundColor: isSelected ? palette.gold : 'transparent' },
+          ]}
+        />
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.7}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={a11yLabel}
-      accessibilityState={{ selected: isDense }}
-      style={[
-        styles.layoutToggle,
-        {
-          backgroundColor: isDense ? colors.accent + '22' : colors.surface,
-          borderColor: isDense ? colors.accent + '66' : colors.border,
-        },
-      ]}>
-      <Text
-        variant="mono-caps"
-        style={[styles.layoutToggleText, { color: isDense ? colors.accent : colors.textTertiary }]}
-        numberOfLines={1}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+    <View style={styles.viewToggleRow}>
+      <View style={[styles.viewToggleOuterRule, { backgroundColor: colors.divider }]} />
+      {renderOption('compact', 'apps', defaultLabel)}
+      <View style={[styles.viewToggleCenterDivider, { backgroundColor: colors.divider }]} />
+      {renderOption('dense', 'text', detailedLabel)}
+      <View style={[styles.viewToggleOuterRule, { backgroundColor: colors.divider }]} />
+    </View>
   );
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function PanchangScreen() {
+  pmark('panchangScreen:render');
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const userLocation = useStore(s => s.userLocation);
@@ -451,6 +495,19 @@ export default function PanchangScreen() {
     selectedDate, userLocation, panchangLang, region, janmaNakshatra, janmaRashi, ayanamsa,
   );
 
+  useEffect(() => {
+    pAccordionResetCount();
+    pmark('panchangScreen:firstEffect');
+  }, []);
+
+  const firstRealDataMarkedRef = useRef(false);
+  useEffect(() => {
+    if (panchang && !firstRealDataMarkedRef.current) {
+      firstRealDataMarkedRef.current = true;
+      pmark('panchangScreen:firstPaint:realData');
+    }
+  }, [panchang]);
+
   // ── Instant snapshot — only relevant when viewing today ─────────────────
   const [instant, setInstant] = useState<IInstantPanchang | null>(null);
   const isViewingToday = isSameDay(selectedDate, today);
@@ -472,8 +529,10 @@ export default function PanchangScreen() {
   const calMonthIdx = calMonth.getMonth();
   const calLat = userLocation?.lat ?? 25.3176;
   const calLon = userLocation?.lon ?? 83.0103;
-  const monthData = useMemo(
-    () => getCalendarMonth(calYear, calMonthIdx, { lat: calLat, lon: calLon }, {
+  // Peek the cache synchronously; on miss the screen paints first, then a
+  // `useEffect` runs the ~80–120ms build off the render path (P11.1).
+  const cachedMonth = useMemo(
+    () => peekCalendarMonth(calYear, calMonthIdx, { lat: calLat, lon: calLon }, {
       region,
       ayanamsa,
       selectedDeities: [],
@@ -481,9 +540,31 @@ export default function PanchangScreen() {
     }),
     [calYear, calMonthIdx, calLat, calLon, region, ayanamsa, masaSystem],
   );
-  const cells: (Date | null)[] = useMemo(() => monthData.cells.map(c => c.date), [monthData]);
+  const [computedMonth, setComputedMonth] = useState<CalendarMonth | null>(null);
+  useEffect(() => {
+    if (cachedMonth) return;
+    let cancelled = false;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (cancelled) return;
+      const built = getCalendarMonth(calYear, calMonthIdx, { lat: calLat, lon: calLon }, {
+        region,
+        ayanamsa,
+        selectedDeities: [],
+        masaSystem,
+      });
+      if (!cancelled) setComputedMonth(built);
+    });
+    return () => { cancelled = true; handle.cancel(); };
+  }, [cachedMonth, calYear, calMonthIdx, calLat, calLon, region, ayanamsa, masaSystem]);
+  const monthData = cachedMonth ?? computedMonth;
+
+  const cells: (Date | null)[] = useMemo(
+    () => monthData ? monthData.cells.map(c => c.date) : [],
+    [monthData],
+  );
   const cellLookup = useMemo(() => {
     const m = new Map<string, CalendarDay>();
+    if (!monthData) return m;
     for (const c of monthData.cells) {
       m.set(ymdKey(c.date), c);
     }
@@ -538,6 +619,7 @@ export default function PanchangScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      pmark('panchangScreen:focused');
       if (walkthroughStep === 2) {
         const timer = setTimeout(measurePanchaAnga, 350);
         return () => clearTimeout(timer);
@@ -558,6 +640,7 @@ export default function PanchangScreen() {
   }, []);
 
   const handlePickDay = useCallback((d: Date) => {
+    Haptics.selectionAsync().catch(() => { /* non-critical */ });
     setSelectedDate(d);
     if (!isSameMonth(d, calMonth)) {
       setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -569,8 +652,75 @@ export default function PanchangScreen() {
     setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
 
-  const handleToggleLayout = useCallback(() => {
-    setPanchangLayout(panchangLayout === 'compact' ? 'dense' : 'compact');
+  // ── Date-change crossfade + horizontal swipe gesture (P11.6) ──────────────
+  // Date changes (tap, swipe, picker) trigger a 140ms fade-out, the underlying
+  // useLazyDailyPanchang re-fetches during that window, then a 220ms fade-in
+  // with a 4px upward translate. The swipe gesture lives on the same wrapper:
+  // |dx| > 80 OR |v| > 400 commits the day change, otherwise spring-back.
+  // `activeOffsetX` lets vertical scroll win; the inner ScrollView's pan stays
+  // dominant for any motion that's more vertical than horizontal.
+  const { dur } = useReducedMotion();
+  const transitionProgress = useSharedValue(1);
+  const swipeX = useSharedValue(0);
+  const prevDateKeyRef = useRef(ymdKey(selectedDate));
+
+  useEffect(() => {
+    const key = ymdKey(selectedDate);
+    if (prevDateKeyRef.current === key) return;
+    prevDateKeyRef.current = key;
+    transitionProgress.value = withSequence(
+      withTiming(0, { duration: dur(140), easing: easings.standard }),
+      withTiming(1, { duration: dur(durations.base), easing: easings.standard }),
+    );
+  }, [selectedDate, dur, transitionProgress]);
+
+  const goToDay = useCallback((deltaDays: number) => {
+    Haptics.selectionAsync().catch(() => { /* non-critical */ });
+    setSelectedDate(prev => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + deltaDays);
+      // Roll the calendar month if we crossed a boundary.
+      setCalMonth(m =>
+        isSameMonth(next, m) ? m : new Date(next.getFullYear(), next.getMonth(), 1),
+      );
+      return next;
+    });
+  }, []);
+
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-15, 15])
+        .failOffsetY([-15, 15])
+        .onUpdate(e => {
+          swipeX.value = e.translationX;
+        })
+        .onEnd(e => {
+          'worklet';
+          const committed =
+            Math.abs(e.translationX) > 80 || Math.abs(e.velocityX) > 400;
+          if (committed) {
+            // Negative dx → swipe left → next day; positive dx → previous day.
+            const delta = e.translationX < 0 ? 1 : -1;
+            runOnJS(goToDay)(delta);
+          }
+          swipeX.value = withSpring(0, { damping: 18, stiffness: 200 });
+        }),
+    [swipeX, goToDay],
+  );
+
+  const contentAnimStyle = useAnimatedStyle(() => ({
+    opacity: transitionProgress.value,
+    transform: [
+      { translateX: swipeX.value },
+      { translateY: (1 - transitionProgress.value) * 4 },
+    ],
+  }));
+
+  const handleSelectLayout = useCallback((next: 'compact' | 'dense') => {
+    if (next === panchangLayout) return;
+    Haptics.selectionAsync().catch(() => { /* non-critical */ });
+    setPanchangLayout(next);
   }, [panchangLayout, setPanchangLayout]);
 
   const monthNames = t('panchang.monthNames', { returnObjects: true }) as string[];
@@ -646,16 +796,12 @@ export default function PanchangScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
       {/* ── Editorial Header ──────────────────────────────────────────────── */}
+      {/* Left slot is intentionally empty — the calendar-view toggle now
+          lives directly above the grid it controls. The empty 90pt View
+          balances the right-side location pill so the centred title stays
+          centred. */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
-        <View style={styles.headerSide}>
-          <LayoutToggle
-            layout={panchangLayout}
-            onToggle={handleToggleLayout}
-            a11yLabel={t('panchang.layoutToggleHint')}
-            label={`${panchangLayout === 'dense' ? t('panchang.layoutCompact') : t('panchang.layoutDense')} ${t('panchang.layoutChipSuffix')}`}
-            colors={colors}
-          />
-        </View>
+        <View style={styles.headerSide} />
         <View style={styles.headerCenter}>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
             {t('panchang.headerTitle')}
@@ -733,95 +879,125 @@ export default function PanchangScreen() {
           </View>
         )}
 
+        {/* ── Calendar view toggle ──────────────────────────────────────────── */}
+        <CalendarViewToggle
+          layout={panchangLayout}
+          onSelect={handleSelectLayout}
+          a11yHint={t('panchang.layoutToggleHint')}
+          defaultLabel={t('panchang.layoutCompact')}
+          detailedLabel={t('panchang.layoutDense')}
+          colors={colors}
+        />
+
         {/* ── Calendar grid (compact OR dense) ─────────────────────────────── */}
-        {panchangLayout === 'dense' ? (
-          // Dense grid breaks out of the screen's 24pt horizontal padding so
-          // the 6 week-columns + weekday rail get an extra ~32pt total — each
-          // cell goes from ~50pt to ~58pt wide. Compact grid keeps the parent
-          // padding (smaller, breathable on tighter cells).
-          <View style={styles.denseGridWrap}>
-            <CalGridDense
-              cells={cells}
-              cellLookup={cellLookup}
-              selectedDate={selectedDate}
-              today={today}
-              calMonthIdx={calMonthIdx}
-              isDarkMode={isDarkMode}
+        {/* On cold cache `peekCalendarMonth` returns null and the grid sits
+            empty until `getCalendarMonth` runs after-interactions (~80–120ms
+            on a Pixel 3a). Crossfade a same-shape skeleton until monthData
+            lands so the calendar slot keeps its dimensions and the user sees
+            shimmer placeholders instead of an empty void. */}
+        <SkeletonCrossfade
+          ready={monthData !== null}
+          skeleton={
+            <CalendarGridSkeleton
+              layout={panchangLayout}
               colors={colors}
               dayHeaders={dayHeaders}
-              panchangLang={panchangLang}
-              digits={digits}
-              onPickDay={handlePickDay}
+              isDarkMode={isDarkMode}
             />
-          </View>
-        ) : (
-          <>
-            <View style={styles.calHeaderRow}>
-              {dayHeaders.map((d, i) => (
-                <Text
-                  key={i}
-                  variant="mono-caps"
-                  style={[styles.calDayHeader, { color: colors.textMuted }]}>
-                  {d}
-                </Text>
-              ))}
+          }>
+          {panchangLayout === 'dense' ? (
+            // Dense grid breaks out of the screen's 24pt horizontal padding so
+            // the 6 week-columns + weekday rail get an extra ~32pt total —
+            // each cell goes from ~50pt to ~58pt wide. Compact grid keeps the
+            // parent padding (smaller, breathable on tighter cells).
+            <View style={styles.denseGridWrap}>
+              <CalGridDense
+                cells={cells}
+                cellLookup={cellLookup}
+                selectedDate={selectedDate}
+                today={today}
+                calMonthIdx={calMonthIdx}
+                isDarkMode={isDarkMode}
+                colors={colors}
+                dayHeaders={dayHeaders}
+                panchangLang={panchangLang}
+                digits={digits}
+                onPickDay={handlePickDay}
+              />
             </View>
-            <View style={styles.calGrid}>
-              {cells.map((cellDate, idx) => {
-                if (!cellDate) return <View key={`blank-${idx}`} style={styles.calCell} />;
-                const inCurrentMonth = cellDate.getMonth() === calMonthIdx;
-                const isTodayCell = isSameDay(cellDate, today);
-                const isSelected = isSameDay(cellDate, selectedDate);
-                const dayInfo = cellLookup.get(ymdKey(cellDate));
-                const dotColor = inCurrentMonth ? eventDotColor(dayInfo, isDarkMode, colors) : null;
-                const isMajorEvent = dotColor !== null && dayInfo?.eventCategory === 'festival';
+          ) : (
+            <>
+              <View style={styles.calHeaderRow}>
+                {dayHeaders.map((d, i) => (
+                  <Text
+                    key={i}
+                    variant="mono-caps"
+                    style={[styles.calDayHeader, { color: colors.textMuted }]}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
+              <View style={styles.calGrid}>
+                {cells.map((cellDate, idx) => {
+                  if (!cellDate) return <View key={`blank-${idx}`} style={styles.calCell} />;
+                  const inCurrentMonth = cellDate.getMonth() === calMonthIdx;
+                  const isTodayCell = isSameDay(cellDate, today);
+                  const isSelected = isSameDay(cellDate, selectedDate);
+                  const dayInfo = cellLookup.get(ymdKey(cellDate));
+                  const dotColor = inCurrentMonth ? eventDotColor(dayInfo, isDarkMode, colors) : null;
+                  const isMajorEvent = dotColor !== null && dayInfo?.eventCategory === 'festival';
 
-                const baseNumColor = isSelected
-                  ? palette.parchmentBright
-                  : !inCurrentMonth
-                    ? colors.textDisabled
-                    : isMajorEvent
-                      ? colors.accent
-                      : colors.textPrimary;
+                  const baseNumColor = isSelected
+                    ? palette.parchmentBright
+                    : !inCurrentMonth
+                      ? colors.textDisabled
+                      : isMajorEvent
+                        ? colors.accent
+                        : colors.textPrimary;
 
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    activeOpacity={0.7}
-                    onPress={() => handlePickDay(cellDate)}
-                    style={styles.calCell}
-                    accessibilityRole="button"
-                    accessibilityLabel={cellDate.toDateString()}
-                    accessibilityState={{ selected: isSelected }}>
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      activeOpacity={0.7}
+                      onPress={() => handlePickDay(cellDate)}
+                      style={styles.calCell}
+                      accessibilityRole="button"
+                      accessibilityLabel={cellDate.toDateString()}
+                      accessibilityState={{ selected: isSelected }}>
 
-                    <View
-                      style={[
-                        styles.calCellInner,
-                        isSelected && { backgroundColor: palette.sindoor },
-                        !isSelected && isTodayCell && { borderColor: colors.accent, borderWidth: 1 },
-                      ]}>
-                      <Text style={[styles.calDayNum, { color: baseNumColor }]}>
-                        {digits(String(cellDate.getDate()))}
-                      </Text>
-                      {dotColor && !isSelected && (
-                        <View style={[styles.festivalDot, { backgroundColor: dotColor }]} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
-        )}
+                      <View
+                        style={[
+                          styles.calCellInner,
+                          isSelected && { backgroundColor: palette.sindoor },
+                          !isSelected && isTodayCell && { borderColor: colors.accent, borderWidth: 1 },
+                        ]}>
+                        <Text style={[styles.calDayNum, { color: baseNumColor }]}>
+                          {digits(String(cellDate.getDate()))}
+                        </Text>
+                        {dotColor && !isSelected && (
+                          <View style={[styles.festivalDot, { backgroundColor: dotColor }]} />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+        </SkeletonCrossfade>
 
         <Ornament variant="double-rule" style={styles.postCalRule} />
+
+        {/* ── Date-dependent content (fades on date change, swipe-able) ──── */}
+        <GestureDetector gesture={swipeGesture}>
+        <Animated.View style={contentAnimStyle}>
 
         {/* ── Selected-day line ────────────────────────────────────────────── */}
         <View style={styles.selectedLine}>
           <Text variant="mono-caps" style={[styles.selectedKicker, { color: colors.accent }]}>
             {isViewingToday ? t('panchang.todayChip') : selectedGregorian}
           </Text>
-          {monthData.vikramSamvat > 0 && showVikramSamvat && (
+          {monthData && monthData.vikramSamvat > 0 && showVikramSamvat && (
             <Text variant="body-italic" style={[styles.selectedSamvat, { color: colors.textTertiary }]}>
               {t('panchang.vsSamvat', { year: digits(String(monthData.vikramSamvat)) })}
             </Text>
@@ -1200,6 +1376,9 @@ export default function PanchangScreen() {
           )}
         </AccordionSection>
 
+        </Animated.View>
+        </GestureDetector>
+
       </ScrollView>
 
       {/* ── Walkthrough Step 2: Spotlight Pancha Anga accordion header ── */}
@@ -1261,14 +1440,43 @@ const styles = StyleSheet.create({
   },
   locText: { fontSize: 8.5 },
 
-  layoutToggle: {
-    height: 26,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
+  // Editorial segmented toggle — sits directly above the calendar grid.
+  // Outer hairline rules + a centre divider frame the two options as a
+  // chapter-selector-style stop. Selected option gets a 1pt gold underline.
+  viewToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 8,
   },
-  layoutToggleText: { fontSize: 8.5 },
+  viewToggleOuterRule: {
+    width: 24,
+    height: StyleSheet.hairlineWidth,
+  },
+  viewToggleOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  viewToggleLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewToggleText: {
+    fontSize: 11,
+    letterSpacing: 1.0,
+  },
+  viewToggleUnderline: {
+    height: 1,
+    width: 36,
+    marginTop: 5,
+  },
+  viewToggleCenterDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 14,
+  },
 
   monthStrip: {
     flexDirection: 'row',
@@ -1414,7 +1622,8 @@ const styles = StyleSheet.create({
   primaryEndTime: {
     fontSize: 12.5,
     lineHeight: 15,
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     letterSpacing: 0.2,
   },
 
@@ -1436,7 +1645,7 @@ const styles = StyleSheet.create({
   secondaryEndTime: {
     fontSize: 11.5,
     lineHeight: 14,
-    fontFamily: 'JetBrainsMono_400Regular',
+    fontFamily: MONO_FONT,
     letterSpacing: 0.2,
   },
 
@@ -1516,7 +1725,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   sunMoonLabel: { fontSize: 7.5, letterSpacing: 0.8 },
-  sunMoonTime: { fontSize: 11.5, fontFamily: 'JetBrainsMono_500Medium' },
+  sunMoonTime: { fontSize: 11.5, fontFamily: MONO_FONT, fontWeight: '500' },
 
   flagStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   flag: {
@@ -1552,7 +1761,8 @@ const styles = StyleSheet.create({
   },
   muhuratTime: {
     fontSize: 11.5,
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     letterSpacing: 0.2,
   },
   muhuratDivider: { height: StyleSheet.hairlineWidth, opacity: 0.5 },
@@ -1592,7 +1802,7 @@ const styles = StyleSheet.create({
   durationCell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   durationDivider: { width: 0.5, height: 16 },
   durationText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
-  durationValue: { fontSize: 13, fontFamily: 'JetBrainsMono_500Medium' },
+  durationValue: { fontSize: 13, fontFamily: MONO_FONT, fontWeight: '500' },
 
   // Accordion body placeholder when daily compute hasn't completed yet.
   placeholder: {

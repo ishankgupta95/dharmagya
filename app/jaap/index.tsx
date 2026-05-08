@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, spacing, borderRadius, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, MONO_FONT, spacing, borderRadius, type ColorPalette } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
@@ -29,6 +30,12 @@ import {
   type Mantra,
 } from '@/services/content';
 import { getJaapStats, type JaapStats } from '@/services/jaapSessions';
+import {
+  type CustomMantra,
+  deleteCustomMantra,
+  listCustomMantras,
+  saveCustomMantra,
+} from '@/services/customMantras';
 
 export default function JaapPickerScreen() {
   const { t } = useTranslation();
@@ -38,11 +45,14 @@ export default function JaapPickerScreen() {
   const lang: ContentLang = resolveLanguage(appLanguage);
   const db = useSQLiteContext();
 
-  // Stats refresh on focus — re-reads after the user completes a session.
+  // Stats + saved customs refresh on focus — re-reads after the user
+  // completes a session or saves a new custom mantra on the counter screen.
   const [stats, setStats] = useState<JaapStats>(() => getJaapStats(db));
+  const [savedCustoms, setSavedCustoms] = useState<CustomMantra[]>(() => listCustomMantras(db));
   useFocusEffect(
     useCallback(() => {
       setStats(getJaapStats(db));
+      setSavedCustoms(listCustomMantras(db));
     }, [db]),
   );
 
@@ -59,12 +69,43 @@ export default function JaapPickerScreen() {
   function openCustom() {
     const trimmed = customDraft.trim();
     if (trimmed.length === 0) return;
+    // Persist so the user doesn't have to retype next time. Save returns the
+    // id (or bumps last_used_at if the text already exists).
+    saveCustomMantra(db, trimmed);
+    setCustomDraft('');
+    setCustomExpanded(false);
     // Mantra body may contain newlines / Devanagari, so use the object form to
     // get automatic URL-encoding for the `text` query param.
     router.push({
       pathname: '/jaap/[slug]',
       params: { slug: 'custom', text: trimmed },
     });
+  }
+
+  function openSavedCustom(m: CustomMantra) {
+    saveCustomMantra(db, m.text); // bumps last_used_at
+    router.push({
+      pathname: '/jaap/[slug]',
+      params: { slug: 'custom', text: m.text },
+    });
+  }
+
+  function confirmDeleteCustom(m: CustomMantra) {
+    Alert.alert(
+      t('jaap.customDeleteConfirm'),
+      undefined,
+      [
+        { text: t('jaap.discardNo'), style: 'cancel' },
+        {
+          text: t('jaap.historyDeleteYes'),
+          style: 'destructive',
+          onPress: () => {
+            deleteCustomMantra(db, m.id);
+            setSavedCustoms(listCustomMantras(db));
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -148,9 +189,28 @@ export default function JaapPickerScreen() {
             </TouchableOpacity>
           )}
 
+          {/* ── Saved custom mantras ───────────────────────────────────────── */}
+          {savedCustoms.length > 0 && (
+            <View style={styles.block}>
+              <SectionLabel settle>{t('jaap.savedCustomMantras')}</SectionLabel>
+              {savedCustoms.map((m) => (
+                <SavedCustomCard
+                  key={m.id}
+                  mantra={m}
+                  onPress={() => openSavedCustom(m)}
+                  onDelete={() => confirmDeleteCustom(m)}
+                  colors={colors}
+                  t={t}
+                />
+              ))}
+            </View>
+          )}
+
           {/* ── Custom mantra ──────────────────────────────────────────────── */}
           <View style={styles.block}>
-            <SectionLabel settle>{t('jaap.customMantra')}</SectionLabel>
+            <SectionLabel settle>
+              {savedCustoms.length > 0 ? t('jaap.addCustomMantra') : t('jaap.customMantra')}
+            </SectionLabel>
             <TouchableOpacity
               activeOpacity={customExpanded ? 1 : 0.85}
               onPress={() => setCustomExpanded(true)}
@@ -164,7 +224,7 @@ export default function JaapPickerScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text variant="deva-bold" style={[styles.customTitle, { color: colors.textPrimary }]}>
-                      {t('jaap.customMantra')}
+                      {savedCustoms.length > 0 ? t('jaap.addCustomMantra') : t('jaap.customMantra')}
                     </Text>
                     <Text variant="body-italic" style={[styles.customDesc, { color: colors.textTertiary }]}>
                       {t('jaap.customMantraDesc')}
@@ -303,6 +363,52 @@ function MantraCard({ mantra, lang, onPress, colors, t }: MantraCardProps) {
   );
 }
 
+interface SavedCustomCardProps {
+  mantra: CustomMantra;
+  onPress: () => void;
+  onDelete: () => void;
+  colors: ColorPalette;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}
+
+function SavedCustomCard({ mantra, onPress, onDelete, colors, t }: SavedCustomCardProps) {
+  // Devanagari-friendly snippet — show the first ~80 chars on at most 2 lines
+  // so the card stays compact regardless of mantra length.
+  const snippet = mantra.text.length <= 80 ? mantra.text : `${mantra.text.slice(0, 78)}…`;
+  return (
+    <MotionPressable
+      onPress={onPress}
+      style={[styles.mantraCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${t('jaap.customMantra')} — ${t('a11y.openJaap')}`}>
+      <View style={styles.mantraRow}>
+        <View style={[styles.mantraGlyph, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
+          <Icon name="text" size={18} color={colors.accent} />
+        </View>
+        <View style={styles.mantraBody}>
+          <Text
+            variant="deva"
+            style={[styles.savedCustomBody, { color: colors.textPrimary }]}
+            numberOfLines={2}>
+            {snippet}
+          </Text>
+          <Text variant="mono-caps" style={[styles.mantraMeta, { color: colors.accent }]}>
+            {t('jaap.customMantra')}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onDelete}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('jaap.customDeleteConfirm')}
+          style={styles.savedCustomDelete}>
+          <Icon name="close" size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+    </MotionPressable>
+  );
+}
+
 interface SectionedMantras {
   universal: Mantra[];
   deity: Mantra[];
@@ -360,7 +466,8 @@ const styles = StyleSheet.create({
   statsCol: { flex: 1, alignItems: 'flex-start' },
   statsKicker: { fontSize: 9.5, marginBottom: 4 },
   statsValue: {
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     fontSize: 26,
     letterSpacing: 0.4,
   },
@@ -424,4 +531,12 @@ const styles = StyleSheet.create({
   mantraTitleHi: { fontSize: 17 },
   mantraTitleEn: { fontSize: 12.5, marginTop: 2 },
   mantraMeta: { fontSize: 9, marginTop: 6, letterSpacing: 2.0 },
+
+  savedCustomBody: { fontSize: 15, lineHeight: 22 },
+  savedCustomDelete: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

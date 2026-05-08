@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 import { type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { useAnimatedMount } from '@/hooks/useAnimatedMount';
+import { durations } from '@/config/motion';
 
 interface ScreenMountProps {
   children: ReactNode;
@@ -10,15 +10,26 @@ interface ScreenMountProps {
 }
 
 /**
- * Thin `Animated.View` wrapper that applies the shared screen entrance
- * (opacity 0→1 + translateY 8→0, durations.base, easings.standard). Drop
- * this as the outermost element of any tab or detail screen so every screen
- * inherits the same cadence without re-importing the hook at each call site.
+ * House screen entrance. Wraps the screen body in an `Animated.View` whose
+ * `entering={FadeIn}` is scheduled by Reanimated at native mount — the worklet
+ * starts on the UI thread the moment the view is added to the tree, without
+ * waiting for a post-commit `useEffect` on a busy JS thread.
+ *
+ * This implements the P11.2 compute-behind-animation pattern: the 220ms fade
+ * is the budget for any compute the screen kicks off in its own mount effects
+ * (panchang day fetch, kundli compute, etc.). Compute runs in parallel with
+ * the fade, not serially after it. If compute lands before the fade settles,
+ * `SkeletonCrossfade` picks up the data swap inside this fade window.
+ *
+ * Reduced motion: layout animations default to `ReduceMotion.System`, so the
+ * fade collapses to instant when the OS setting is on. No per-component
+ * gating needed.
  */
 export function ScreenMount({ children, style }: ScreenMountProps) {
-  const mountStyle = useAnimatedMount();
   return (
-    <Animated.View style={[{ flex: 1 }, style, mountStyle]}>
+    <Animated.View
+      style={[{ flex: 1 }, style]}
+      entering={FadeIn.duration(durations.base)}>
       {children}
     </Animated.View>
   );

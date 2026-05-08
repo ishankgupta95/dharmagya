@@ -28,7 +28,7 @@ export default function OnboardingStep1() {
       <View style={styles.content}>
 
         <Image
-          source={require('../../assets/images/dharmagya_logo.png')}
+          source={require('../../assets/images/dharmagya_logo.webp')}
           style={styles.appIcon}
           resizeMode="contain"
           accessibilityIgnoresInvertColors

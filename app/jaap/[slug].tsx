@@ -6,6 +6,10 @@ import {
   Alert,
   BackHandler,
   Pressable,
+  Modal,
+  Platform,
+  TextInput,
+  Vibration,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, palette, spacing, borderRadius } from '@/config/theme';
+import { darkColors, lightColors, MONO_FONT, palette, spacing, borderRadius } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
@@ -42,9 +46,14 @@ import {
   type Mantra,
 } from '@/services/content';
 
-const MALA_SIZES = [27, 54, 108, 216, 1008] as const;
-type MalaSize = typeof MALA_SIZES[number];
+// 7 is a common short-jaap count (e.g. quick saptaha). 1008 is the maximum
+// any classical text recommends. The list stays sorted ascending so the chip
+// row reads naturally.
+const MALA_SIZES = [7, 27, 54, 108, 216, 1008] as const;
+type MalaSize = number;
 const DEFAULT_MALA_SIZE: MalaSize = 108;
+const CUSTOM_MIN = 1;
+const CUSTOM_MAX = 100000;
 
 // Ring shrunk to 180dp to free up vertical space for a more readable mantra
 // block — the user is reading + tapping simultaneously, so the Devanagari
@@ -75,7 +84,7 @@ interface ResolvedMantra {
   label: string;
   /** "for {{deity}}" chip text, or "universal" / "custom". */
   chipLabel: string;
-  recommendedCount: 27 | 54 | 108 | 216 | 1008;
+  recommendedCount: number;
 }
 
 function buildResolved(
@@ -83,7 +92,7 @@ function buildResolved(
   lang: ContentLang,
   t: (k: string, opts?: Record<string, unknown>) => string,
 ): ResolvedMantra {
-  const recommendedCount = (mantra.recommendedCount ?? 108) as ResolvedMantra['recommendedCount'];
+  const recommendedCount = mantra.recommendedCount ?? 108;
   const chipLabel = mantra.deity
     ? t('jaap.deityChip', { name: t(`deities.${mantra.deity}.displayName`) })
     : t('jaap.universalMantra');
@@ -159,8 +168,10 @@ export default function JaapCounterScreen() {
   const [count, setCount] = useState(0); // current within-mala count [0..malaSize-1]
   const [malaCount, setMalaCount] = useState(0); // completed malas
   const [malaSize, setMalaSize] = useState<MalaSize>(
-    () => (resolved?.recommendedCount ?? DEFAULT_MALA_SIZE) as MalaSize,
+    () => resolved?.recommendedCount ?? DEFAULT_MALA_SIZE,
   );
+  const [customSizeModalVisible, setCustomSizeModalVisible] = useState(false);
+  const [customSizeDraft, setCustomSizeDraft] = useState('');
   const startedAtRef = useRef<number>(Date.now());
 
   // Reset starts-at when mantra resolved (covers re-mount)
@@ -208,10 +219,29 @@ export default function JaapCounterScreen() {
 
     const next = count + 1;
     if (next >= malaSize) {
-      // Mala complete — Success notification is a 3-pulse pattern on iOS and
-      // a longer buzz on Android, distinct from the per-tap Medium impact so
-      // the user feels the boundary unmistakably.
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      // Mala complete — extended boundary haptic so the milestone is
+      // unmistakable (often the phone is face-down and the user is eyes-
+      // closed). Roughly double the length of the per-tap Heavy and the
+      // previous Success notification, at full motor amplitude.
+      //
+      // Android: `Vibration.vibrate(ms)` runs the motor at max amplitude for
+      // the requested duration. 500ms is ~3× Success and reads as a clear,
+      // strong buzz without crossing into "alarm" territory. (We can't bump
+      // amplitude beyond max without VibrationEffect, which Expo doesn't
+      // expose.)
+      //
+      // iOS: the taptic engine has no "long pulse" mode, so we chain Success
+      // (3-tap pattern) with a follow-up Heavy impact ~220ms later. The
+      // result is a noticeably extended, denser cue compared to Success
+      // alone.
+      if (Platform.OS === 'android') {
+        Vibration.vibrate(500);
+      } else {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        setTimeout(() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+        }, 220);
+      }
       completionSV.value = withSequence(
         withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) }),
         withTiming(0, { duration: 480, easing: Easing.in(Easing.cubic) }),
@@ -341,29 +371,37 @@ export default function JaapCounterScreen() {
   const ringTrackColor = isDarkMode ? 'rgba(243,229,200,0.10)' : 'rgba(27,20,10,0.12)';
   const ringFillColor = colors.accent;
 
-  function handleMalaSizeChange(size: MalaSize) {
-    if (hasCounted && size !== malaSize) {
-      Alert.alert(
-        t('jaap.discardConfirm'),
-        t('jaap.discardConfirmDesc', { count: totalCount }),
-        [
-          { text: t('jaap.discardNo'), style: 'cancel' },
-          {
-            text: t('jaap.discardYes'),
-            style: 'destructive',
-            onPress: () => {
-              setCount(0);
-              setMalaCount(0);
-              setMalaSize(size);
-              startedAtRef.current = Date.now();
-            },
-          },
-        ],
-      );
+  // Preserve the user's progress across size changes — the user has been
+  // chanting; the *total* repetitions are what matters spiritually, the
+  // mala/count split is just how we present it. Recompute the split from
+  // totalCount so the running session continues uninterrupted.
+  function handleMalaSizeChange(size: number) {
+    if (size === malaSize) return;
+    const total = totalCount;
+    setMalaSize(size);
+    setMalaCount(Math.floor(total / size));
+    setCount(total % size);
+  }
+
+  function openCustomSizeModal() {
+    setCustomSizeDraft(String(malaSize));
+    setCustomSizeModalVisible(true);
+  }
+
+  function handleCustomSizeSubmit() {
+    const parsed = parseInt(customSizeDraft, 10);
+    if (!Number.isFinite(parsed) || parsed < CUSTOM_MIN || parsed > CUSTOM_MAX) {
+      // Soft fail — keep the modal open so the user can correct.
       return;
     }
-    setMalaSize(size);
+    handleMalaSizeChange(parsed);
+    setCustomSizeModalVisible(false);
   }
+
+  // Custom chip is "active" whenever the current size is not in the standard
+  // preset list. In that case it shows the active value; otherwise it shows a
+  // "+" affordance.
+  const isCustomSize = !MALA_SIZES.includes(malaSize as typeof MALA_SIZES[number]);
 
   // The whole region below the header is the tap target. Children that need to
   // own their own taps (mala-size chips, decrement / reset buttons) are
@@ -465,6 +503,24 @@ export default function JaapCounterScreen() {
                 </Text>
               </SegmentedChip>
             ))}
+            <SegmentedChip
+              active={isCustomSize}
+              onPress={openCustomSizeModal}
+              inactiveBg={colors.surface}
+              activeBg={palette.ink}
+              inactiveBorder={colors.border}
+              activeBorder={palette.ink}
+              style={styles.malaSizeChip}
+              accessibilityLabel={t('jaap.customMalaSize')}>
+              <Text
+                variant="mono"
+                style={[
+                  styles.malaSizeChipText,
+                  { color: isCustomSize ? palette.parchmentBright : colors.textSecondary },
+                ]}>
+                {isCustomSize ? malaSize : '+'}
+              </Text>
+            </SegmentedChip>
           </View>
 
           {/* ── Counter centerpiece ───────────────────────────────────────── */}
@@ -567,9 +623,84 @@ export default function JaapCounterScreen() {
             </View>
           </View>
         </Pressable>
+
+        {/* ── Custom mala size modal ─────────────────────────────────────── */}
+        <Modal
+          visible={customSizeModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCustomSizeModalVisible(false)}>
+          <TouchableOpacity
+            style={styles.customSizeOverlay}
+            activeOpacity={1}
+            onPress={() => setCustomSizeModalVisible(false)}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.close')}>
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+              accessible={false}
+              style={[
+                styles.customSizeSheet,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}>
+              <Text variant="display-italic" style={[styles.customSizeTitle, { color: colors.textPrimary }]}>
+                {t('jaap.customMalaSizeTitle')}
+              </Text>
+              <Text variant="body-italic" style={[styles.customSizeDesc, { color: colors.textTertiary }]}>
+                {t('jaap.customMalaSizeDesc')}
+              </Text>
+              <TextInput
+                value={customSizeDraft}
+                onChangeText={(v) => setCustomSizeDraft(v.replace(/[^0-9]/g, ''))}
+                placeholder="108"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleCustomSizeSubmit}
+                maxLength={6}
+                autoFocus
+                style={[
+                  styles.customSizeInput,
+                  { color: colors.textPrimary, borderColor: colors.border },
+                ]}
+              />
+              <View style={styles.customSizeActions}>
+                <TouchableOpacity
+                  onPress={() => setCustomSizeModalVisible(false)}
+                  style={[styles.customSizeBtn, { borderColor: colors.border }]}
+                  accessibilityRole="button">
+                  <Text variant="mono-caps" style={[styles.customSizeBtnText, { color: colors.textSecondary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleCustomSizeSubmit}
+                  disabled={!isValidCustomDraft(customSizeDraft)}
+                  style={[
+                    styles.customSizeBtn,
+                    {
+                      borderColor: isValidCustomDraft(customSizeDraft) ? colors.accent : colors.border,
+                      opacity: isValidCustomDraft(customSizeDraft) ? 1 : 0.5,
+                    },
+                  ]}
+                  accessibilityRole="button">
+                  <Text variant="mono-caps" style={[styles.customSizeBtnText, { color: colors.accent }]}>
+                    {t('common.done')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
     </ScreenMount>
   );
+}
+
+function isValidCustomDraft(draft: string): boolean {
+  const n = parseInt(draft, 10);
+  return Number.isFinite(n) && n >= CUSTOM_MIN && n <= CUSTOM_MAX;
 }
 
 const styles = StyleSheet.create({
@@ -695,7 +826,8 @@ const styles = StyleSheet.create({
   },
   counterKicker: { fontSize: 9.5, marginBottom: 4 },
   counterValue: {
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     fontSize: 56,
     lineHeight: 60,
     letterSpacing: -1,
@@ -717,7 +849,8 @@ const styles = StyleSheet.create({
   },
   summaryInlineKicker: { fontSize: 9.5 },
   summaryInlineValue: {
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     fontSize: 18,
     letterSpacing: 0.3,
   },
@@ -745,4 +878,46 @@ const styles = StyleSheet.create({
   notFoundText: { fontSize: 15, textAlign: 'center' },
   notFoundBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
   notFoundBtnText: { fontSize: 10 },
+
+  customSizeOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(20,10,4,0.55)',
+    paddingHorizontal: 28,
+  },
+  customSizeSheet: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    paddingVertical: 22,
+    paddingHorizontal: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  customSizeTitle: { fontSize: 22, lineHeight: 28, textAlign: 'center', marginBottom: 4 },
+  customSizeDesc: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 14 },
+  customSizeInput: {
+    fontFamily: MONO_FONT,
+    fontSize: 22,
+    letterSpacing: 0.6,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.cardInner,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  customSizeActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
+  customSizeBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: borderRadius.button,
+    borderWidth: 1.5,
+  },
+  customSizeBtnText: { fontSize: 10 },
 });

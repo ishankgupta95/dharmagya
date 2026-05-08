@@ -81,10 +81,12 @@ Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typ
 - Transform + opacity only — never `width`/`height`/`borderRadius`/raw `color`.
 - Worklets always (`react-native-reanimated` 4.1). Never the legacy `Animated` API or `setInterval`-driven animation.
 - 220ms default duration, `Easing.out(Easing.cubic)`. Max 320ms for interaction feedback.
-- Stagger cap 400ms total; max 6 simultaneous animations per screen.
+- Stagger cap **120ms total** (post-P11.2; was 400ms); max 6 simultaneous animations per screen.
 - Reduced motion respected via `useReducedMotion()` hook in every animated component.
 - Haptics paired: `Selection` on state change, `Light` on confirmation. Never `Heavy`.
 - Ambient loops > 2s pause off-screen.
+
+**Compute-behind-animation rule (P11.2, durable — see `memory/feedback_animation_kept_when.md`):** an animation is kept iff (a) it runs on the UI thread without JS jank AND (b) its duration is used to mask compute (cache fetch, kundli compute, route mount, validateCandidates) OR it pairs with an action the user just took (haptic, press, toggle). Cut only if neither holds. Decorative-only animations are OK only if they're *free* — never if they delay content the user is asking for. Concretely: schedule masking animations with Reanimated's native-side primitives (`entering={FadeIn…}`, layout animations, gestures) so they start at mount without waiting for a post-commit `useEffect` to schedule the worklet on a busy JS thread. `ScreenMount` is the canonical example.
 
 ---
 
@@ -149,59 +151,15 @@ Half-day of work. **Deferred until staged rollout reaches 100%** — Play Vitals
 
 ---
 
-## 8. Pending — Phase 7 finishing (P7.4–P7.6)
+## 8. Pending — Phase 7 finishing — subsumed into Phase 11 (2026-05-08)
 
-P7.1–P7.3 shipped; conventions established (see §4 above). P7.4–P7.6 remain. **Not blocking shipping more features** — these are polish + verification phases. Pick up once feature velocity has slowed.
+P7.1–P7.3 shipped (see §6). Remaining sub-phases reorganized:
 
-### P7.4 — Screen-level transitions ⏳
+- **P7.4 Screen-level transitions → P11.6** — lifted with compute-masking framing (panchang date crossfade, swipe gesture, muhurat detail fade, god hero fade). The transition's duration becomes the budget for the new-context compute.
+- **P7.5 Signature moments → dropped** — mandala drift = continuous animation with no compute window (battery cost on low-end Android), DeityAvatar Pranam = 700ms with nothing to mask. Both contradict the compute-behind-animation principle. Not deferred — out of scope.
+- **P7.6 Pixel 3a perf gate → P11.5** — full thresholds + artifact specced inside Phase 11.
 
-Sacred Editorial demands **crossfades over slides** — context swaps with held type.
-
-- **Panchang date change** ([`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx)) — content area `opacity 1→0` (140ms), new content `opacity 0→1 + translateY 4→0` (220ms). Calendar cells reuse P7.2 chip interpolation. Haptic `Selection` on cell tap.
-- **Panchang horizontal swipe** — pan-gesture day change. Commit if `|dx| > 80px` OR `|v| > 400px/s`; spring back otherwise. `useAnimatedGestureHandler` worklet. `activeOffsetX` so vertical scroll wins on scrollable bodies.
-- **Muhurat occasion → detail delayed fade** — title + icon fade in over 220ms after route mount completes. **Not** a true shared-element transition (those crash on Android + Fabric in RN 0.81).
-- **God detail hero image fade** — hero photo `opacity 0→1` over 320ms once loaded. Deity-gradient scrim at full opacity underneath.
-
-**Exit:** date changes feel cohesive (no flash); swipe doesn't hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a.
-
-### P7.5 — Signature moments ⏳
-
-The few animations that define the app's character. Restrained, sacred, memorable.
-
-- **DeityAvatar "Pranam" arrival** ([`src/components/common/DeityAvatar.tsx`](src/components/common/DeityAvatar.tsx)) — outer ring `scale 0.92→1 + opacity 0→1` (320ms, `easings.emphasized`), inner ring same +120ms delay, portrait `opacity 0→1` at +240ms. Total ~700ms. Used on route-level surfaces only; library grid uses cheaper `useAnimatedMount` fade.
-- **Mandala watermark drift** ([`src/components/common/MandalaWatermark.tsx`](src/components/common/MandalaWatermark.tsx)) — `withRepeat(withTiming('360deg', { duration: loop.drift, easing: linear }), -1)` on UI thread. Pauses when off-screen via `useIsFocused`. Disabled under reduced motion.
-- **Muhurat result card verdict** ([`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx)) — result `NightCard` `translateY 16→0 + opacity 0→1` (320ms). P7.3 CornerBrackets draw-in fires immediately after.
-
-**Exit:** Pranam reads intentional on Pixel 3a screen capture; mandala drift invisible at first glance, noticeable on second look; reduced-motion toggle stills every animation instantly.
-
-### P7.6 — Perf QA + low-end Android gate (no new code) ⏳
-
-**Device matrix:** Pixel 3a (Android 12, 4GB) is the gate. Samsung A14 secondary. Pixel 7 / iPhone reference only.
-
-**Profile per screen** with RN Performance Monitor + Hermes CPU sampling on the 5 most-animated interactions: reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
-
-**Acceptance thresholds:**
-- UI FPS ≥ 58 avg, ≥ 55 p95 during animation on Pixel 3a.
-- JS FPS ≥ 55 avg.
-- No single dropped-frame event > 50ms.
-- Cold-start to tab-bar-visible unchanged from pre-P7 baseline ± 50ms.
-
-**Regression rule:** offending animation is **removed**, not "optimized later." Frame rate is essential; motion isn't.
-
-**Reduced-motion E2E:** toggle Android "Remove animations" → every Phase 7 animation collapses to instant. Recorded on device video.
-
-**Battery:** mandala drift is the only continuous animation. 30-min foreground drain delta vs. pre-P7 baseline ≤ 2%.
-
-**Artifact:** `motion-perf.md` with per-screen FPS + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
-
-### Phase 7 Exit Criteria
-
-- ✅ P7.1–P7.3 shipped.
-- ⏳ P7.4 panchang crossfade + swipe gesture without scroll conflict.
-- ⏳ P7.5 signature moments record well on 60fps capture.
-- ⏳ P7.6 Pixel 3a perf gate passed; no frame drop > 50ms.
-- ⏳ Reduced-motion respected E2E.
-- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings.
+Phase 7 conventions in §4 (UI thread / transform+opacity / 220ms / reduced-motion / haptics) remain forward-applicable. Phase 11 adds: animations must mask compute or be free; never delay content the user is asking for.
 
 ---
 
@@ -282,7 +240,119 @@ Shipped: `AspectsCard` collapsible inside `KundliSection` (default-closed via `A
 
 ---
 
-## 11. Deferred — iOS widget + Phase 5
+## 11. Phase 11 — Lean Pass: cleanup + low-end perf ⏳
+
+**Why now (2026-05-08):** App has accumulated 10 phases of feature work. User reports the **Panchang screen takes ~1s on cold open** (instant once warm), and wants the codebase trimmed for low-end Android (Pixel 3a target). High-priority polish phase — no new features, just cleanup + perf.
+
+**Animation principle (Phase 11 convention, durable):** Animations are kept if (a) they run on UI thread without JS jank AND (b) the animation duration is used to mask compute. Cut only if neither holds. Decorative-only animations are OK if they're free; never if they delay content the user is asking for.
+
+### P11.1 — Panchang cold-start fix ⏳ (highest user-perceived win)
+
+**Symptom:** First open of Panchang tab after cold-start takes ~1s. Subsequent opens instant. Day 2 cold-start re-pays the full cost (today's date is new each day).
+
+**Suspected stack** (needs profiling to confirm — do not fix what isn't broken):
+1. SQLite cache miss on today's date → first compute + first DB write.
+2. First Reanimated UI thread spin-up (~50–100ms one-time).
+3. `PanchangScreen` first paint — multiple `AccordionSection` mounts (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), each measuring even if collapsed.
+4. First Devanagari glyph paint + layout reflow.
+5. Zustand SQLite-kv hydration tail.
+
+**Plan:**
+- **Pre-warm cache during splash → first-paint window**: in [`app/_layout.tsx`](app/_layout.tsx) after splash hide, fire `getCachedPanchangDay()` for today + user's lat/lon as fire-and-forget. By the time user taps Panchang tab from Home, Pass 1 cache is warm.
+- **Same on app foreground (`AppState` change)** if last warm > 6 hours ago.
+- **Lazy-mount accordion bodies**: confirm `AccordionSection` only renders header until expanded; if not, defer body subtree.
+- **Skeleton on first paint, fade in real data** as Pass 1 lands (the compute-behind-animation pattern applied here).
+- **Persist tomorrow's panchang from today**: at end-of-session or alongside reminder scheduling, precompute tomorrow's row and write to SQLite. Day 2 cold-start lands hot.
+
+**Target:** cold-start Panchang from ~1s to ≤250ms perceived.
+
+**First action:** profile the cold path on Pixel 3a (or release build on emulator) with `console.time` markers at SQLite open, panchang-ts call, AccordionSection mount counts, first paint. Confirm the dominant contributor before patching.
+
+### P11.2 — Compute-behind-animation pattern + decorative-stagger removal ✅
+
+Audit ran across every `useSharedValue` / `withTiming` / `useAnimatedStyle` / `Animated.View` / `useEntranceStagger` / `ScreenMount` site in `src/` + `app/`.
+
+**Cuts shipped:**
+- `STAGGER_CAP_MS` 400 → 120 in [`src/config/motion.ts`](src/config/motion.ts). `useEntranceStagger` and `useRefrainHighlight` consume the new cap; aarti / chalisa verse cascades and refrain settle are now bounded under 120ms regardless of `VERSE_STAGGER_MAX`.
+- `ScreenMount` rewritten ([`src/components/common/ScreenMount.tsx`](src/components/common/ScreenMount.tsx)) on Reanimated's `entering={FadeIn.duration(durations.base)}` layout-animation primitive. Native-side scheduled at mount, no longer dependent on a post-commit `useEffect` that gets queued behind cold-start compute. The 220ms fade now actually masks the screen's mount-time compute window. `useAnimatedMount` deleted (only consumer was `ScreenMount`).
+
+**Keeps (audit verified):**
+- `FavoriteHeart` pulse / `MotionPressable` press / `SegmentedChip` color+scale — paired with user action.
+- `SkeletonCrossfade` + `SkeletonBlock` shimmer — masks load.
+- Mantra counter ring (`useAnimatedProps`) + tap scale + completion flash — masks tap feedback compute.
+- `useRefrainHighlight` — fires once per reader instance, doesn't delay content (only changes refrain emphasis post-stagger).
+- `CornerBrackets` draw-in, `SectionLabel` settle — one-shot worklets, do not delay content.
+- `AccordionSection` chevron rotation — paired with toggle.
+- Aarti / chalisa scroll-driven hero parallax — gesture-bound only.
+- `WalkthroughOverlay` spotlight pulse — overlay attention cue, runs only during walkthrough.
+
+**Documented:** §4 Phase 7 conventions extended with the compute-behind-animation rule + pointer to `memory/feedback_animation_kept_when.md`.
+
+### P11.3 — State surface + memoization ⏳
+
+- [`src/components/kundli/KundliSection.tsx:47-61`](src/components/kundli/KundliSection.tsx#L47-L61) — collapse 16 individual Zustand selectors into one `useShallow()` selector. Single re-render instead of 16 on theme/language toggle.
+- DashaSection rows ([`src/components/astrology/DashaSection.tsx`](src/components/astrology/DashaSection.tsx)) — add `React.memo` to row/leaf components (currently re-render on parent state churn).
+- Slice the panchang state — instead of holding full `IPanchangDay` in `usePanchang` ([`src/hooks/usePanchang.ts`](src/hooks/usePanchang.ts)), store only the fields a screen reads. Cuts memory pressure on Pixel 3a.
+- Fix unmemoed `computeShadbalaCached` call ([`src/components/kundli/KundliSection.tsx:247`](src/components/kundli/KundliSection.tsx#L247)) — currently fires on every parent render.
+- Sweep inline style arrays/object literals in hot paths (KundliSection chip strip lines 285–308).
+
+### P11.4 — Dependency + asset trim ⏳
+
+- **Drop `@expo-google-fonts/jetbrains-mono`** — only used for kickers/timestamps; system mono on Android renders identically. Update typeScale to fall back.
+- **`assets/dharmagya_logo.png` (144 KB) → SVG component or webp.** Same for `dharmagya_logo_small.png` (60 KB).
+- **Sweep unused i18n keys** in [`src/i18n/locales/en.ts`](src/i18n/locales/en.ts) + [`hi.ts`](src/i18n/locales/hi.ts) (grown organically through 10 phases).
+- **Sweep unused glyphs** in custom Icon component ([`src/components/common/Icon.tsx`](src/components/common/Icon.tsx)) — verify all 60 glyphs are still referenced.
+- **Audit `package.json`** for any dep that's no longer imported anywhere.
+
+### P11.5 — Pixel 3a perf gate (replaces P7.6) ⏳
+
+**Device matrix:** Pixel 3a (Android 12, 4GB) is the gate. Samsung A14 secondary. Pixel 7 / iPhone reference only.
+
+**Profile per screen** with RN Performance Monitor + Hermes CPU sampling on the most-impactful interactions: cold-start Home → Panchang tab tap, reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
+
+**Acceptance thresholds:**
+- Cold-start Home → Panchang tab tap → first paint of real data ≤ 350ms.
+- UI FPS ≥ 58 avg, ≥ 55 p95 during animation on Pixel 3a.
+- JS FPS ≥ 55 avg.
+- No single dropped-frame event > 50ms.
+- Cold-start to tab-bar-visible unchanged from pre-Phase-11 baseline ± 50ms.
+- Memory: full 5-tab traversal does not exceed pre-P11 baseline by > 5MB.
+
+**Regression rule:** offending animation/component is **removed**, not "optimized later." Frame rate is essential.
+
+**Reduced-motion E2E:** toggle Android "Remove animations" → every animation collapses to instant. Recorded on device video.
+
+**Battery:** any continuous animation gets 30-min foreground drain delta vs pre-P11 baseline ≤ 2%.
+
+**Artifact:** `perf-baseline.md` with per-screen FPS + memory + cold-start + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
+
+### P11.6 — Custom screen transitions with compute-masking (lifts P7.4) ⏳
+
+Reanimated v4.1.1 + gesture-handler v2.28 already installed. Today they're used for **in-screen** animation only — screen-to-screen transitions are still default `expo-router` / `react-native-screens`. Make transitions richer + functional:
+
+- **Panchang date change** ([`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx)) — content area `opacity 1→0` (140ms), kick off `getCachedPanchangDay()` for new date during the fade-out, new content `opacity 0→1 + translateY 4→0` (220ms) when ready. Skeleton fallback if compute exceeds 350ms. Calendar cells reuse P7.2 chip interpolation. Haptic `Selection` on cell tap.
+- **Panchang horizontal swipe** — pan-gesture day change. Commit if `|dx| > 80px` OR `|v| > 400px/s`; spring back otherwise. Worklet via `useAnimatedGestureHandler`. `activeOffsetX` so vertical scroll wins on scrollable bodies.
+- **Custom `expo-router` screen options** per route — modal slide-up for sub-screens like Settings → Birth Place; fade for content swaps. Configure via `<Stack.Screen options={{ animation, presentation }} />`.
+- **Muhurat occasion → detail** ([`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx)) — title + icon fade in over 220ms after route mount. Compute (validateCandidates if needed) fires during the fade.
+- **God detail hero image fade** — hero photo `opacity 0→1` over 320ms once loaded. Deity-gradient scrim at full opacity underneath.
+
+**Skip:** `react-native-shared-element` — crashes on Android + Fabric in RN 0.81 (existing PLAN.md note retained).
+
+**Exit:** date changes feel cohesive (no flash); swipe doesn't hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a; transitions actually mask compute (skeleton fallback rarely visible on warm cache).
+
+### Phase 11 Exit Criteria
+
+- ⏳ Panchang cold-start ≤ 250ms perceived (from current ~1s).
+- ⏳ Decorative stagger removed; compute-behind-animation pattern documented in §4.
+- ⏳ KundliSection + DashaSection + panchang state surface trimmed; no measurable re-render regressions on theme/language toggle.
+- ⏳ JetBrainsMono dropped, logo PNGs optimized, i18n + Icon glyph sweeps complete.
+- ⏳ Pixel 3a perf gate passed; `perf-baseline.md` checked in.
+- ⏳ P7.4 transitions shipped as P11.6 with compute-masking.
+- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings.
+
+---
+
+## 12. Deferred — iOS widget + Phase 5
 
 ### iOS WidgetKit (originally P4.2 second half) ⏸
 
@@ -298,7 +368,7 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 
 ---
 
-## 12. Out-of-Scope / Explicitly Not Doing
+## 13. Out-of-Scope / Explicitly Not Doing
 
 - Paid subscription tier.
 - Live streaming temple darshan.
@@ -308,14 +378,14 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 
 ---
 
-## 13. Phase Dependencies Summary
+## 14. Phase Dependencies Summary
 
 **Sequencing principle:** ship optimizations + features first, language support last.
 
 ```
 Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅ → Phase 10 ✅
                                                                                                                               ↓
-                                                                                                  Phase 7.4–7.6 (motion finish — when feature velocity slows)
+                                                                                                  Phase 11 (Lean Pass — high priority NEXT)
                                                                                                                               ↓
                                                                                                   Phase 3 (P3.1 languages — separate PR)
                                                                                                                               ↓

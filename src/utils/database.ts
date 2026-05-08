@@ -1,8 +1,11 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
+import { pmark, ptime } from '@/utils/perfProfile';
 
 // Called via SQLiteProvider's onInit — receives the same connection
 // that will be provided to all children, so no second connection is opened.
 export async function initDatabase(db: SQLiteDatabase): Promise<void> {
+  pmark('db:initDatabase:start');
+  const end = ptime('db:initDatabase');
   // Aartis/chalisas/kathas were previously seeded into SQLite; they now come
   // from the `hindu-devotional-texts` package at runtime. Kathas are removed
   // from the app entirely. Rashifal was a 30-day pilot that has been removed.
@@ -56,6 +59,23 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       ON jaap_sessions(started_at DESC);
   `);
 
+  // Custom mantras the user typed in the jaap picker. We persist them so they
+  // don't have to retype — listed by `last_used_at DESC` in the picker.
+  // `text` is the natural key (UNIQUE) so retyping the same mantra just bumps
+  // recency rather than creating a dupe.
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS custom_mantras (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER NOT NULL
+    );
+  `);
+  db.execSync(`
+    CREATE INDEX IF NOT EXISTS idx_custom_mantras_last_used_at
+      ON custom_mantras(last_used_at DESC);
+  `);
+
   // 1: 1.5.0 — excludedVaras rule was a no-op before (English weekday vs.
   // panchang-ts Sanskrit name), so cached scans may include forbidden
   // weekdays. Drop them once so the next open recomputes correctly.
@@ -65,6 +85,8 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // contain days the new rules now reject, so wipe once on upgrade.
   // 3: 1.6.0 — jaap_sessions table introduced. No old data to migrate; the
   // bump just records that the schema reached version 3.
+  // 4: custom_mantras table introduced. No old data to migrate; bump records
+  // that the schema reached version 4.
   const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version < 2) {
@@ -74,4 +96,8 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   if (version < 3) {
     db.execSync('PRAGMA user_version = 3');
   }
+  if (version < 4) {
+    db.execSync('PRAGMA user_version = 4');
+  }
+  end();
 }

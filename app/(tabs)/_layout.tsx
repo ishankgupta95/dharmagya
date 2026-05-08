@@ -9,6 +9,7 @@ import { AppText } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { darkColors, lightColors, palette } from '@/config/theme';
 import { useStore } from '@/store/useStore';
+import { pmark } from '@/utils/perfProfile';
 
 const ACTIVE_DARK = palette.goldLeaf;
 const INACTIVE_DARK = 'rgba(243,229,200,0.55)';
@@ -16,6 +17,7 @@ const ACTIVE_LIGHT = palette.sindoor;
 const INACTIVE_LIGHT = palette.inkQuiet;
 
 export default function TabLayout() {
+  pmark('tabs:_layout:render');
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const isDark = useStore((s) => s.isDarkMode);

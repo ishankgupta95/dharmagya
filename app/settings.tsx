@@ -19,7 +19,10 @@ import {
   scheduleSunriseAlert,
   cancelSunriseAlert,
 } from '@/services/notifications';
-import { fetchPanchangForToday } from '@/services/astrology/panchangService';
+import {
+  deriveJanmaIndicesFromStore,
+  fetchPanchangForToday,
+} from '@/services/astrology/panchangService';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useLocaleFormatters } from '@/utils/format';
@@ -209,11 +212,16 @@ export default function SettingsScreen() {
   // Also captures the numeric ayanamsa value for the diagnostic row.
   const [ayanamsaValue, setAyanamsaValue] = useState<number | null>(null);
   useEffect(() => {
-    fetchPanchangForToday(userLocation, resolveLanguage(language), region, ayanamsa).then((p) => {
+    const { janmaNakshatra, janmaRashi } = deriveJanmaIndicesFromStore({
+      userBirthDate, userBirthTime, userBirthPlace,
+    });
+    fetchPanchangForToday(
+      userLocation, resolveLanguage(language), region, ayanamsa, janmaNakshatra, janmaRashi,
+    ).then((p) => {
       if (p?.sunrise && p.sunrise !== '—') setSunriseTime(p.sunrise);
       if (typeof p?.ayanamsa === 'number') setAyanamsaValue(p.ayanamsa);
     });
-  }, [userLocation, language, region, ayanamsa]);
+  }, [userLocation, language, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace]);
 
   const locationText = locationName
     ? locationName

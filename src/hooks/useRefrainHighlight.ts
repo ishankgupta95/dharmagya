@@ -17,9 +17,9 @@ const REFRAIN_HIGHLIGHT_MS = 600;
 
 /**
  * Quiet one-shot refrain cue for the Aarti reader. After the verse stagger
- * settles (STAGGER_CAP_MS = 400ms), refrain lines fade from 0.55 → 1.0 over
- * 600ms, once per reader instance. No loop, no audio dep, no re-run on
- * re-render — the hook runs only on mount.
+ * settles (STAGGER_CAP_MS = 120ms post-P11.2), refrain lines fade from
+ * 0.55 → 1.0 over 600ms, once per reader instance. No loop, no audio dep,
+ * no re-run on re-render — the hook runs only on mount.
  *
  * Reduced motion: progress starts at 1 so refrain opacity is full from the
  * first frame.

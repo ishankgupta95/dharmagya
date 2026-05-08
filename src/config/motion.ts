@@ -30,4 +30,7 @@ export const loop = {
   drift: 90000,
 } as const;
 
-export const STAGGER_CAP_MS = 400;
+// Total stagger window for entrance cascades. Capped at 120ms (P11.2) so
+// list/grid items never appear more than ~140ms after the first one — the
+// cascade is a polish layer, never a content delay.
+export const STAGGER_CAP_MS = 120;

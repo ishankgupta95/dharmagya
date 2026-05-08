@@ -19,10 +19,6 @@ import {
   NotoSerifDevanagari_500Medium,
   NotoSerifDevanagari_700Bold,
 } from '@expo-google-fonts/noto-serif-devanagari';
-import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_500Medium,
-} from '@expo-google-fonts/jetbrains-mono';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
@@ -33,10 +29,14 @@ import { scheduleDailyReminder } from '@/services/notifications';
 import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
 import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
+import { pmark } from '@/utils/perfProfile';
+
+pmark('app:_layout:moduleEval');
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  pmark('app:RootLayout:render');
   const {
     isDarkMode,
     themeMode,
@@ -81,15 +81,18 @@ export default function RootLayout() {
     NotoSerifDevanagari_400Regular,
     NotoSerifDevanagari_500Medium,
     NotoSerifDevanagari_700Bold,
-    // Sacred Editorial — JetBrains Mono (kickers, timestamps).
-    JetBrainsMono_400Regular,
-    JetBrainsMono_500Medium,
   });
 
   // Wait for Zustand persistence to rehydrate from AsyncStorage
   useEffect(() => {
-    if (storeHydrated) return;
-    return useStore.persist.onFinishHydration(() => setStoreHydrated(true));
+    if (storeHydrated) {
+      pmark('app:zustand:alreadyHydrated');
+      return;
+    }
+    return useStore.persist.onFinishHydration(() => {
+      pmark('app:zustand:hydrated');
+      setStoreHydrated(true);
+    });
   }, [storeHydrated]);
   // Sync i18n language whenever the persisted preference changes
   useEffect(() => {
@@ -102,8 +105,15 @@ export default function RootLayout() {
   const appReady = (fontsLoaded || !!fontError) && storeHydrated;
 
   useEffect(() => {
+    if (fontsLoaded) pmark('app:fonts:loaded');
+    else if (fontError) pmark('app:fonts:error');
+  }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
     if (appReady) {
+      pmark('app:appReady');
       initFirstOpen();
+      pmark('app:splash:hide:call');
       SplashScreen.hideAsync();
       // Cold-start widget refresh — covers the case where the user tapped
       // the widget to launch the app and we want fresh values written back
@@ -191,6 +201,24 @@ export default function RootLayout() {
                 animation: 'slide_from_right',
               }}>
               <Stack.Screen name="(tabs)" />
+              {/* Settings sub-screens slide up as modals (P11.6). They're
+                  short-lived configuration sheets — modal presentation matches
+                  the user mental model better than the default deep-link push. */}
+              <Stack.Screen
+                name="settings/birth-place"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="settings/deities"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="settings/reminders"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              {/* Search swaps in/out as a content overlay rather than a push,
+                  so a fade reads more "search dialog" than "drilldown". */}
+              <Stack.Screen name="search" options={{ animation: 'fade' }} />
             </Stack>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
           </SQLiteProvider>

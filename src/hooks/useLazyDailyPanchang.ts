@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { InteractionManager } from 'react-native';
 import type { AyanamsaType, FestivalRegion, Language } from 'panchang-ts';
 
 import {
@@ -11,7 +10,8 @@ import type { IPanchangDay } from '@/types';
 
 interface UseLazyDailyPanchangResult {
   panchang: IPanchangDay | null;
-  /** True once end-times (pass 2) have been computed. */
+  /** True once the daily panchang has rendered (kept for API parity with
+   *  callers that previously distinguished fast/full passes). */
   isFullyLoaded: boolean;
   loading: boolean;
   error: boolean;
@@ -26,9 +26,9 @@ interface UseLazyDailyPanchangResult {
 }
 
 /**
- * Lazy variant of `usePanchang`. The full daily-panchang fetch (~5ms on Pixel
- * 3a, computes all muhurtas / time-quality slots / planetary positions) does
- * not fire on day-tap — only after `request()` is called. This honors the
+ * Lazy daily-panchang hook. The full daily-panchang fetch (~5ms on Pixel 3a,
+ * computes all muhurtas / time-quality slots / planetary positions) does not
+ * fire on day-tap — only after `request()` is called. This honors the
  * panchang screen's "categorise + expand on demand" UX, where the glance
  * section reads from the cheap `CalendarDay` snapshot and each accordion
  * triggers `request()` on first expand.
@@ -37,6 +37,11 @@ interface UseLazyDailyPanchangResult {
  * refetches automatically — so a user who has expanded "Auspicious Times" and
  * then navigates to a different day still sees the (newly fetched) data
  * without re-tapping.
+ *
+ * The fetch is a single full-pass (`computeEndTimes: true`). An earlier two-
+ * pass design (fast + full) was dropped in P11.1 because the fast pass barely
+ * beat full (~301ms vs ~312ms on Pixel 4 emulator) and on cache-miss it
+ * doubled the work without changing perceived latency.
  */
 export function useLazyDailyPanchang(
   date: Date,
@@ -68,54 +73,34 @@ export function useLazyDailyPanchang(
       // when requested === true.
       return;
     }
-    let cancelled = false;
     setError(false);
     setLoading(true);
     setIsFullyLoaded(false);
 
     const coords = { lat, lon };
 
-    // ── Pass 1: fast path (or cache hit) ──────────────────────────────────────
-    let fast: IPanchangDay | null;
+    let full: IPanchangDay | null;
     try {
-      fast = getCachedPanchangDay(date, coords, { computeEndTimes: false, language, region, janmaNakshatra, janmaRashi, ayanamsa });
+      full = getCachedPanchangDay(date, coords, {
+        computeEndTimes: true, language, region, janmaNakshatra, janmaRashi, ayanamsa,
+      });
     } catch {
       setError(true);
       setLoading(false);
       return;
     }
-    if (!fast) {
+    if (!full) {
       setError(true);
       setLoading(false);
       return;
     }
-    setPanchang(fast);
+    if (!full.planetaryPositions) {
+      try { full.planetaryPositions = getCachedGrahaPositions(date, language, ayanamsa); }
+      catch { /* non-critical */ }
+    }
+    setPanchang(full);
+    setIsFullyLoaded(true);
     setLoading(false);
-
-    // ── Pass 2: full + planetary positions, after interactions ───────────────
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (cancelled) return;
-      try {
-        const full = getCachedPanchangDay(date, coords, { computeEndTimes: true, language, region, janmaNakshatra, janmaRashi, ayanamsa });
-        if (!full) return;
-        let positions = full.planetaryPositions;
-        if (!positions) {
-          try { positions = getCachedGrahaPositions(date, language, ayanamsa); } catch { /* non-critical */ }
-        }
-        if (positions) full.planetaryPositions = positions;
-        if (!cancelled) {
-          setPanchang(full);
-          setIsFullyLoaded(true);
-        }
-      } catch {
-        // Keep the fast pass — end times just won't appear.
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      handle.cancel();
-    };
   }, [requested, date, lat, lon, language, region, janmaNakshatra, janmaRashi, ayanamsa, retryCount]);
 
   return { panchang, isFullyLoaded, loading, error, requested, request, retry };

@@ -15,6 +15,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
+
+import { durations, easings } from '@/config/motion';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
@@ -30,6 +38,8 @@ import {
   type Recitation,
   type Chalisa,
 } from '@/services/content';
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 type ListItem =
   | { type: 'aarti'; data: Recitation }
@@ -179,6 +189,13 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
   const { t } = useTranslation();
   const meta = DEITY_BY_ID[deityId];
   const initial = meta?.initial ?? 'ॐ';
+  // Hero photo fades 0→1 over 320ms once decoded (P11.6). Deity-color gradient
+  // sits at full opacity underneath as the always-visible scrim, so the user
+  // never sees a blank container — only the gradient, then the photo settling
+  // in on top of it.
+  const { dur } = useReducedMotion();
+  const heroOpacity = useSharedValue(0);
+  const heroAnimStyle = useAnimatedStyle(() => ({ opacity: heroOpacity.value }));
 
   return (
     <View style={styles.heroWrap}>
@@ -191,7 +208,17 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         />
         {image ? (
           <>
-            <Image source={image} style={styles.heroImage} resizeMode="cover" />
+            <AnimatedImage
+              source={image}
+              style={[styles.heroImage, heroAnimStyle]}
+              resizeMode="cover"
+              onLoad={() => {
+                heroOpacity.value = withTiming(1, {
+                  duration: dur(durations.slow),
+                  easing: easings.standard,
+                });
+              }}
+            />
             <LinearGradient
               colors={['transparent', 'rgba(20,10,4,0.55)']}
               style={styles.heroImageShade}

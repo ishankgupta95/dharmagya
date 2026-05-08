@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { AppText as Text } from '@/components/common/AppText';
-import { palette, type ColorPalette } from '@/config/theme';
+import { MONO_FONT, palette, type ColorPalette } from '@/config/theme';
 import { localizeTithi } from '@/i18n/panchangNames';
 import type { CalendarDay } from '@/services/astrology/calendarService';
 
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   tithiText: {
-    fontFamily: 'JetBrainsMono_400Regular',
+    fontFamily: MONO_FONT,
     fontSize: 7.5,
     letterSpacing: 0.2,
     marginTop: 1,

@@ -17,7 +17,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
 }
-import { borderRadius, type ColorPalette } from '@/config/theme';
+import { borderRadius, MONO_FONT, type ColorPalette } from '@/config/theme';
 
 /**
  * Reusable date-picker modal. Same visual pattern as the Panchang date picker
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 8,
   },
-  yearChipText: { fontSize: 13, fontFamily: 'JetBrainsMono_500Medium' },
+  yearChipText: { fontSize: 13, fontFamily: MONO_FONT, fontWeight: '500' },
 
   calRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   dayHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontFamily: 'NotoSerifDevanagari_500Medium', letterSpacing: 0.5 },
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   calRowGrid: { flexDirection: 'row' },
   cell: { flex: 1, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
   cellInner: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  dayNum: { fontSize: 14, fontFamily: 'JetBrainsMono_500Medium' },
+  dayNum: { fontSize: 14, fontFamily: MONO_FONT, fontWeight: '500' },
 
   bottomRow: { flexDirection: 'row', gap: 12 },
   bottomBtn: {

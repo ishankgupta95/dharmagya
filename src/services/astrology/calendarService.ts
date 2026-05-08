@@ -7,6 +7,7 @@ import {
 } from 'panchang-ts';
 
 import festivalsData from '@/data/static/festivals.json';
+import { pmark, ptime } from '@/utils/perfProfile';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -453,10 +454,16 @@ export function getCalendarMonth(
     opts.masaSystem,
   );
   const hit = lruHit(MONTH_CACHE, key);
-  if (hit) return hit;
+  if (hit) {
+    pmark('calendar:getCalendarMonth:hit', `${year}-${month + 1}`);
+    return hit;
+  }
+  pmark('calendar:getCalendarMonth:miss', `${year}-${month + 1}`);
+  const endBuild = ptime('calendar:getCalendarMonth:build');
   const cells = buildCells(year, month).map(d =>
     buildDay(d, coords, opts.ayanamsa, opts.selectedDeities),
   );
+  endBuild();
 
   // Mid-month getInstantPanchang gives us the dominant Hindu masa + Samvat
   // for the header. ~60µs — single call, not per-cell.
@@ -484,6 +491,30 @@ export function getCalendarMonth(
   const result: CalendarMonth = { year, month, cells, hinduMasa, vikramSamvat };
   lruSet(MONTH_CACHE, key, result, MONTH_CACHE_MAX);
   return result;
+}
+
+/**
+ * Cache-only peek — returns the cached `CalendarMonth` if present, or `null`.
+ * Lets the panchang screen render immediately on warm caches and defer the
+ * ~80–120ms build to a `useEffect` on miss (P11.1 first-paint optimization).
+ * Does not promote LRU order; the next `getCalendarMonth` call will.
+ */
+export function peekCalendarMonth(
+  year: number,
+  month: number,
+  coords: { lat: number; lon: number },
+  opts: CalendarMonthOptions,
+): CalendarMonth | null {
+  const key = monthKey(
+    year,
+    month,
+    coords.lat,
+    coords.lon,
+    opts.ayanamsa,
+    opts.selectedDeities,
+    opts.masaSystem,
+  );
+  return MONTH_CACHE.get(key) ?? null;
 }
 
 // ─── Yearly drilldowns (P9.3) ────────────────────────────────────────────────

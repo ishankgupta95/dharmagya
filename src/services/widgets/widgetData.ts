@@ -1,6 +1,10 @@
 import type { Language } from 'panchang-ts';
 
-import { fetchPanchangForToday, FALLBACK_COORDS } from '@/services/astrology/panchangService';
+import {
+  fetchPanchangForToday,
+  FALLBACK_COORDS,
+  deriveJanmaIndicesFromStore,
+} from '@/services/astrology/panchangService';
 import { useStore } from '@/store/useStore';
 import { resolveLanguage } from '@/i18n';
 import { toDevanagariDigits } from '@/utils/format';
@@ -74,8 +78,11 @@ export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
   const coords = state.userLocation ?? FALLBACK_COORDS;
   const region = state.region ?? 'all';
   const ayanamsa = state.ayanamsa ?? 'lahiri';
+  const { janmaNakshatra, janmaRashi } = deriveJanmaIndicesFromStore(state);
 
-  const day = await fetchPanchangForToday(coords, lang as Language, region, ayanamsa);
+  const day = await fetchPanchangForToday(
+    coords, lang as Language, region, ayanamsa, janmaNakshatra, janmaRashi,
+  );
   if (!day) {
     return { ...WIDGET_PLACEHOLDER, lang, todayLabel: labelBundle.today, isDarkMode: state.isDarkMode };
   }

@@ -6,6 +6,7 @@ import { AppText } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { durations, easings } from '@/config/motion';
 import { type ColorPalette } from '@/config/theme';
+import { pAccordionMount } from '@/utils/perfProfile';
 
 interface AccordionSectionProps {
   /** Stable slug used as the persisted-state key on the store. */
@@ -55,6 +56,11 @@ export const AccordionSection = memo(function AccordionSection({
 }: AccordionSectionProps) {
   const firedRef = useRef(false);
   const rotation = useSharedValue(open ? 1 : 0);
+
+  useEffect(() => {
+    pAccordionMount(title);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     rotation.value = withTiming(open ? 1 : 0, {
