@@ -19,6 +19,30 @@
     "festivals": {
       "android": "ca-app-pub-3940256099942544/6300978111",
       "ios": "ca-app-pub-3940256099942544/2934735716"
+    },
+    "astrologyInline": {
+      "android": "ca-app-pub-3940256099942544/6300978111",
+      "ios": "ca-app-pub-3940256099942544/2934735716"
+    },
+    "jaapListInline": {
+      "android": "ca-app-pub-3940256099942544/6300978111",
+      "ios": "ca-app-pub-3940256099942544/2934735716"
+    },
+    "favoritesInline": {
+      "android": "ca-app-pub-3940256099942544/6300978111",
+      "ios": "ca-app-pub-3940256099942544/2934735716"
+    },
+    "searchInline": {
+      "android": "ca-app-pub-3940256099942544/6300978111",
+      "ios": "ca-app-pub-3940256099942544/2934735716"
+    },
+    "godDetailInline": {
+      "android": "ca-app-pub-3940256099942544/6300978111",
+      "ios": "ca-app-pub-3940256099942544/2934735716"
+    },
+    "muhuratInline": {
+      "android": "ca-app-pub-3940256099942544/6300978111",
+      "ios": "ca-app-pub-3940256099942544/2934735716"
     }
   },
   "interstitial": {

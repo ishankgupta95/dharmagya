@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
 import { ALL_OCCASIONS, type Occasion } from '@/services/astrology/muhurat';
+import { AdBanner } from '@/components/common/AdBanner';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
 const OCCASION_ICON: Record<Occasion, IconName> = {
@@ -74,6 +75,10 @@ export default function MuhuratIndexScreen() {
           ))}
         </View>
 
+        <View style={styles.adWrap}>
+          <AdBanner colors={colors} placement="muhuratInline" inline />
+        </View>
+
         <Text variant="body-italic" style={[styles.footer, { color: colors.textMuted }]}>
           {t('muhurat.footer')}
         </Text>
@@ -128,5 +133,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18, lineHeight: 22, marginBottom: 4 },
   cardDesc: { fontSize: 12, lineHeight: 16 },
 
-  footer: { fontSize: 12, lineHeight: 17, marginTop: 24, textAlign: 'center', paddingHorizontal: 16 },
+  adWrap: { marginTop: 22 },
+  footer: { fontSize: 12, lineHeight: 17, marginTop: 18, textAlign: 'center', paddingHorizontal: 16 },
 });

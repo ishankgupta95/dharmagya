@@ -3,6 +3,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { AdBanner } from '@/components/common/AdBanner';
 import { AppText as Text } from '@/components/common/AppText';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
@@ -69,6 +70,10 @@ export default function AstrologyTab() {
           {section === 'dasha' && <DashaSection />}
           {section === 'sadeSati' && <SadeSatiSection />}
 
+          <View style={styles.adWrap}>
+            <AdBanner colors={colors} placement="astrologyInline" inline />
+          </View>
+
           {/* Bottom space so the last card clears the floating tab bar. */}
           <View style={{ height: 96 }} />
         </ScrollView>
@@ -104,4 +109,6 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 32,
   },
+
+  adWrap: { marginTop: 16 },
 });

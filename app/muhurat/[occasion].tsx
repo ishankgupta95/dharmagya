@@ -18,6 +18,7 @@ import { darkColors, lightColors, borderRadius, palette, spacing, semanticColors
 import { Kicker } from '@/components/common/Kicker';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import {
   ALL_OCCASIONS,
   scanAuspiciousDays,
@@ -70,6 +71,8 @@ export default function OccasionDetailScreen() {
   const db = useSQLiteContext();
 
   const occasion: Occasion | null = ALL_OCCASIONS.includes(raw as Occasion) ? (raw as Occasion) : null;
+
+  useInterstitialOnExit();
 
   const [matches, setMatches] = useState<MuhuratMatch[]>([]);
   const [status, setStatus] = useState<Status>('loading');

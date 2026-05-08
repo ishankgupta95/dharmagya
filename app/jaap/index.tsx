@@ -15,6 +15,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, MONO_FONT, spacing, borderRadius, type ColorPalette } from '@/config/theme';
+import { AdBanner } from '@/components/common/AdBanner';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
@@ -301,6 +302,10 @@ export default function JaapPickerScreen() {
             </View>
           )}
 
+          <View style={styles.adWrap}>
+            <AdBanner colors={colors} placement="jaapListInline" inline />
+          </View>
+
           <View style={{ height: 32 }} />
         </ScrollView>
       </SafeAreaView>
@@ -539,4 +544,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  adWrap: { marginTop: 4, marginBottom: 8 },
 });

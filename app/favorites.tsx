@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { AdBanner } from '@/components/common/AdBanner';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
@@ -110,6 +111,11 @@ export default function FavoritesScreen() {
           contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={ItemSeparator}
+          ListFooterComponent={
+            <View style={styles.adWrap}>
+              <AdBanner colors={colors} placement="favoritesInline" inline />
+            </View>
+          }
         />
       )}
 
@@ -244,4 +250,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   browseBtnText: { fontSize: 10 },
+  adWrap: { marginTop: 16 },
 });

@@ -26,11 +26,13 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { AdBanner } from '@/components/common/AdBanner';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
+import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { getDeityImage } from '@/config/deityImages';
 import {
   getAartiForDeity,
@@ -61,6 +63,8 @@ export default function GodDetailScreen() {
   const toggleFavorite = useStore(s => s.toggleFavorite);
   const colors = isDarkMode ? darkColors : lightColors;
   const deity = DEITY_BY_ID[id ?? ''];
+
+  useInterstitialOnExit();
 
   const aarti = useMemo(() => (deity ? getAartiForDeity(deity.id) : undefined), [deity]);
   const chalisa = useMemo(() => (deity ? getChalisaForDeity(deity.id) : undefined), [deity]);
@@ -168,6 +172,11 @@ export default function GodDetailScreen() {
           <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
             {t('god.noContent')}
           </Text>
+        }
+        ListFooterComponent={
+          <View style={styles.adWrap}>
+            <AdBanner colors={colors} placement="godDetailInline" inline />
+          </View>
         }
       />
     </SafeAreaView>
@@ -442,4 +451,6 @@ const styles = StyleSheet.create({
   metaKicker: { fontSize: 9 },
   metaDot: { width: 3, height: 3, borderRadius: 1.5 },
   metaSecondary: { fontSize: 12, flexShrink: 1 },
+
+  adWrap: { marginHorizontal: spacing.screenH, marginTop: 20 },
 });
