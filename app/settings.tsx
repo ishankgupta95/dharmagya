@@ -438,6 +438,24 @@ export default function SettingsScreen() {
           />
         </View>
 
+        {/* ── Home Screen Widget ──────────────────────────────────────── */}
+        <SectionHeader label={t('settings.widgetSection')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/widget')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.widgetCustomize')}>
+            <SettingRow
+              icon="apps"
+              label={t('settings.widgetCustomize')}
+              sublabel={t('settings.widgetCustomizeDesc')}
+              colors={colors}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+        </View>
+
         {/* ── Location ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.location')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

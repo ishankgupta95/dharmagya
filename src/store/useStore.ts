@@ -4,6 +4,11 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 import type { AyanamsaType } from 'panchang-ts';
 
 import type { AppLanguage } from '@/i18n';
+import {
+  DEFAULT_WIDGET_SLOTS,
+  WIDGET_FIELD_IDS,
+  type WidgetFieldId,
+} from '@/services/widgets/widgetFields';
 
 export type FontSize = 'small' | 'normal' | 'medium' | 'large';
 export type MasaSystem = 'purnimanta' | 'amanta';
@@ -162,6 +167,10 @@ interface AppStore {
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
+  /** Today's-Panchang home-screen widget — the four user-pickable info slots
+   *  (top-main, mid-main, footer-left, footer-right). Each entry is a field
+   *  ID from the widget catalog (tithi/yoga/sunset/...). */
+  widgetSlots: [WidgetFieldId, WidgetFieldId, WidgetFieldId, WidgetFieldId];
 
   // Actions (not persisted)
   setThemeMode: (mode: ThemeMode) => void;
@@ -201,6 +210,7 @@ interface AppStore {
   setUserName: (name: string | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
+  setWidgetSlot: (index: 0 | 1 | 2 | 3, fieldId: WidgetFieldId) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -242,6 +252,7 @@ export const useStore = create<AppStore>()(
       userName: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
+      widgetSlots: [...DEFAULT_WIDGET_SLOTS],
 
       setThemeMode: (mode) => set({ themeMode: mode }),
       setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
@@ -304,11 +315,19 @@ export const useStore = create<AppStore>()(
       },
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
+      setWidgetSlot: (index, fieldId) =>
+        set((s) => {
+          const next = [...s.widgetSlots] as [
+            WidgetFieldId, WidgetFieldId, WidgetFieldId, WidgetFieldId,
+          ];
+          next[index] = fieldId;
+          return { widgetSlots: next };
+        }),
     }),
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 13,
+      version: 14,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -485,6 +504,19 @@ export const useStore = create<AppStore>()(
         if (version < 13) {
           const f = state.fontSize as string | undefined;
           if (f === 'xl' || f === 'xxl') state.fontSize = 'large';
+        }
+
+        // v13 → v14: home-screen widget gained user-configurable slots. Seed
+        // existing installs with the four fields the widget shipped with so
+        // their content doesn't change on upgrade.
+        if (version < 14) {
+          const slots = state.widgetSlots as unknown[] | undefined;
+          const valid = Array.isArray(slots)
+            && slots.length === 4
+            && slots.every((id) => typeof id === 'string' && (WIDGET_FIELD_IDS as string[]).includes(id));
+          if (!valid) {
+            state.widgetSlots = [...DEFAULT_WIDGET_SLOTS];
+          }
         }
 
         return state as AppStore;

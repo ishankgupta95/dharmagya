@@ -110,16 +110,23 @@ export default function RootLayout() {
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
-    if (appReady) {
-      pmark('app:appReady');
-      initFirstOpen();
+    if (!appReady) return;
+    pmark('app:appReady');
+    initFirstOpen();
+    // Defer the splash hide one frame. If the user is unboarded, the
+    // declarative Redirect in (tabs)/_layout.tsx kicks in this same render
+    // commit; one rAF gives the navigator time to mount onboarding/step1
+    // before the splash dissolves, otherwise on Android the user sees a
+    // blank background between splash-gone and onboarding-mounted.
+    const id = requestAnimationFrame(() => {
       pmark('app:splash:hide:call');
       SplashScreen.hideAsync();
-      // Cold-start widget refresh — covers the case where the user tapped
-      // the widget to launch the app and we want fresh values written back
-      // before they ever look at the home screen again.
-      void refreshTodayWidget();
-    }
+    });
+    // Cold-start widget refresh — covers the case where the user tapped
+    // the widget to launch the app and we want fresh values written back
+    // before they ever look at the home screen again.
+    void refreshTodayWidget();
+    return () => cancelAnimationFrame(id);
   }, [appReady, initFirstOpen]);
 
   // In-app changes that affect widget rendering (theme, language) need to
@@ -214,6 +221,10 @@ export default function RootLayout() {
               />
               <Stack.Screen
                 name="settings/reminders"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="settings/widget"
                 options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
               />
               {/* Search swaps in/out as a content overlay rather than a push,

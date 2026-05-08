@@ -8,38 +8,20 @@ import {
 import { useStore } from '@/store/useStore';
 import { resolveLanguage } from '@/i18n';
 import { toDevanagariDigits } from '@/utils/format';
-import type { IPanchangElement } from '@/types';
-import { type WidgetPayload, WIDGET_PLACEHOLDER } from '@/types/widget';
+import type { IPanchangDay } from '@/types';
+import { type WidgetPayload, type WidgetSlot, WIDGET_PLACEHOLDER } from '@/types/widget';
 
-/** Localised label bundle. Mirrors the Sacred Editorial section labels but
- *  small-cap-styled in the widget XML, so we keep them plain here. */
-const LABELS: Record<'en' | 'hi', WidgetPayload['labels'] & { today: string }> = {
-  en: {
-    today: 'Today',
-    tithi: 'Tithi',
-    nakshatra: 'Nakshatra',
-    sunrise: 'Sunrise',
-    rahuKalam: 'Rahu Kalam',
-    until: 'until',
-  },
-  hi: {
-    today: 'आज',
-    tithi: 'तिथि',
-    nakshatra: 'नक्षत्र',
-    sunrise: 'सूर्योदय',
-    rahuKalam: 'राहु काल',
-    until: 'तक',
-  },
+import { DEFAULT_WIDGET_SLOTS, getWidgetField, type WidgetFieldId } from './widgetFields';
+
+const TODAY_LABEL: Record<'en' | 'hi', string> = {
+  en: 'Today',
+  hi: 'आज',
 };
 
-function pickActive(elements: IPanchangElement[]): IPanchangElement | null {
-  if (elements.length === 0) return null;
-  return elements.find((e) => e.isActiveAtSunrise) ?? elements[0];
-}
-
-function applyDigits(s: string, useDevanagari: boolean): string {
-  return useDevanagari ? toDevanagariDigits(s) : s;
-}
+const UNTIL_LABEL: Record<'en' | 'hi', string> = {
+  en: 'until',
+  hi: 'तक',
+};
 
 function formatDateLong(d: Date, lang: 'en' | 'hi', useDevanagari: boolean): string {
   // Hindi locale already produces Devanagari digits via Intl. English locale
@@ -67,13 +49,33 @@ function ymdOf(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function buildSlot(
+  fieldId: WidgetFieldId,
+  day: IPanchangDay,
+  lang: 'en' | 'hi',
+  useDevanagari: boolean,
+): WidgetSlot {
+  const field = getWidgetField(fieldId);
+  if (!field) {
+    return { id: fieldId, label: '—', value: '—', until: null };
+  }
+  const value = field.getValue(day, lang, useDevanagari);
+  const rawUntil = field.getUntil ? field.getUntil(day, useDevanagari) : null;
+  const until = rawUntil ? `${UNTIL_LABEL[lang]} ${rawUntil}` : null;
+  return {
+    id: field.id,
+    label: field.label(lang),
+    value,
+    until,
+  };
+}
+
 /** Compose today's widget payload from the store + panchang-ts. Returns the
  *  placeholder if panchang compute fails (network-less, but library can still
  *  return null on extreme inputs). */
 export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
   const state = useStore.getState();
   const lang: 'en' | 'hi' = resolveLanguage(state.language);
-  const labelBundle = LABELS[lang];
   const useDevanagari = state.useDevanagariNumerals;
   const coords = state.userLocation ?? FALLBACK_COORDS;
   const region = state.region ?? 'all';
@@ -84,40 +86,31 @@ export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
     coords, lang as Language, region, ayanamsa, janmaNakshatra, janmaRashi,
   );
   if (!day) {
-    return { ...WIDGET_PLACEHOLDER, lang, todayLabel: labelBundle.today, isDarkMode: state.isDarkMode };
+    return {
+      ...WIDGET_PLACEHOLDER,
+      lang,
+      todayLabel: TODAY_LABEL[lang],
+      isDarkMode: state.isDarkMode,
+    };
   }
 
-  const tithi = pickActive(day.tithis);
-  const nakshatra = pickActive(day.nakshatras);
-
-  // panchang-ts returns the paksha-prefixed name (e.g. "Krishna Panchami" /
-  // "कृष्ण पञ्चमी"). Don't prepend paksha again — duplicates the word.
-  const tithiDisplay = tithi?.name ?? '—';
+  const userSlots = state.widgetSlots ?? DEFAULT_WIDGET_SLOTS;
+  const slots = [
+    buildSlot(userSlots[0], day, lang, useDevanagari),
+    buildSlot(userSlots[1], day, lang, useDevanagari),
+    buildSlot(userSlots[2], day, lang, useDevanagari),
+    buildSlot(userSlots[3], day, lang, useDevanagari),
+  ] as WidgetPayload['slots'];
 
   const today = new Date();
   return {
-    v: 1,
+    v: 2,
     ymd: ymdOf(today),
     writtenAtMs: Date.now(),
     lang,
-    todayLabel: labelBundle.today,
+    todayLabel: TODAY_LABEL[lang],
     dateLong: formatDateLong(today, lang, useDevanagari),
-    labels: {
-      tithi: labelBundle.tithi,
-      nakshatra: labelBundle.nakshatra,
-      sunrise: labelBundle.sunrise,
-      rahuKalam: labelBundle.rahuKalam,
-      until: labelBundle.until,
-    },
-    tithiName: tithiDisplay,
-    tithiEndTime: tithi?.endTime ? applyDigits(tithi.endTime, useDevanagari) : null,
-    nakshatraName: nakshatra?.name ?? '—',
-    nakshatraEndTime: nakshatra?.endTime ? applyDigits(nakshatra.endTime, useDevanagari) : null,
-    sunrise: applyDigits(day.sunrise ?? '—', useDevanagari),
-    rahuKalam:
-      day.rahuKalamStart && day.rahuKalamEnd
-        ? applyDigits(`${day.rahuKalamStart} – ${day.rahuKalamEnd}`, useDevanagari)
-        : '—',
+    slots,
     locationLabel: state.locationName ?? null,
     isDarkMode: state.isDarkMode,
   };

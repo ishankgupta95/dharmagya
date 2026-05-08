@@ -443,6 +443,26 @@ export default {
     shareAppMessage: 'Try Dharmagya — a daily panchang, aarti, and chalisa companion.',
     privacyPolicy: 'Privacy Policy',
     privacyPolicyDesc: 'How we handle your data',
+    widgetSection: 'HOME SCREEN WIDGET',
+    widgetCustomize: 'Customize Widget',
+    widgetCustomizeDesc: 'Pick which panchang fields show on the home-screen widget',
+  },
+
+  // ── Widget Settings Screen ──────────────────────────────────────────────
+  widgetSettings: {
+    title: 'Widget',
+    intro: 'The home-screen widget has four info slots — two main rows and two footer cells. Pick what each one shows.',
+    mainSection: 'MAIN ROWS',
+    footerSection: 'FOOTER',
+    slot1Label: 'Top row',
+    slot1Desc: 'Largest line — shown first',
+    slot2Label: 'Middle row',
+    slot2Desc: 'Second main line',
+    slot3Label: 'Footer left',
+    slot3Desc: 'Compact value, lower-left',
+    slot4Label: 'Footer right',
+    slot4Desc: 'Compact value, lower-right',
+    footerHint: 'Changes apply the next time the widget refreshes (or instantly when you tap the ↻ icon on it).',
   },
 
   // ── Reminders Screen ────────────────────────────────────────────────────
