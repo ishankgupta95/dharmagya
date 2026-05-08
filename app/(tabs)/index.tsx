@@ -631,10 +631,7 @@ export default function HomeScreen() {
           tooltipPosition="below"
           stepIndex={3}
           totalSteps={4}
-          onSpotlightTap={() => {
-            setWalkthroughStep(0);
-            router.push('/settings');
-          }}
+          onSpotlightTap={() => setWalkthroughStep(0)}
           onSkip={skipWalkthrough}
         />
       )}
