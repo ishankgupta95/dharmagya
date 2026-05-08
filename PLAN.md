@@ -284,23 +284,24 @@ Pick (b) — keeps initial paint snappy, and progressive fill on a 6-row grid re
 
 **Localisation:** house numbers are numeric (digits via `useLocaleFormatters`), graha + rashi names via existing `localizeRashi` / planet localisation maps.
 
-### Step P10.3 — Mantra Counter (P4.3 lifted) ⏳
+### Step P10.3 — Mantra Counter (P4.3 lifted) ✅ 2026-05-08
 
-**Same scope as the originally-scoped P4.3 in the previous Phase 4 grouping:**
+**Content dependency:** mantra text + transliteration + meaning is consumed from the `hindu-devotional-texts` package. The 0.2.0 release expanded the original 6-mantra plan to 21 mantras spanning the full deity roster (Om Namah Shivaya, Om Namo Narayanaya, Gayatri, Maha Mrityunjaya, Hare Krishna mahamantra, Om Gan Ganapataye Namah, Hanuman, Lakshmi, Rama Taraka, Durga, Saraswati, Parvati, Kali, Surya Gayatri, Brahma, Sai Ram, Santoshi, Sita, Khatu Shyam, Vaishno Devi, Narasimha). App calls `getMantra(slug)` / `getAllAppMantras()` (filtered to roster) — content lives in the package, not the app.
 
-**Content dependency:** mantra text + transliteration + meaning is consumed from the `hindu-devotional-texts` package. Initial 6 presets: Om Namah Shivaya, Om Namo Narayanaya, Gayatri, Maha Mrityunjaya, Hare Krishna mahamantra, Om Gan Ganapataye Namah. App calls `getMantra(slug)` / `getAllMantras()`; do not duplicate mantra text in the app.
+**Shipped:**
+- Routes: `app/jaap/index.tsx` (picker), `app/jaap/[slug].tsx` (counter), `app/jaap/history.tsx`.
+- Picker groups mantras into "Universal" (Gayatri, Mahamrityunjaya) + deity-tagged sections; expandable Custom-mantra card; lifetime stats card (only when there's history) routes to history.
+- Counter: 240px tap circle with reanimated SVG progress ring (UI-thread `useAnimatedProps` strokeDashoffset), `expo-haptics` Selection on each tap, Success haptic + 800ms accent flash on mala completion.
+- Mala size selector: 27 / 54 / 108 / 216 / 1008 chips; mid-session size change prompts to discard count.
+- Decrement (-1) underflows into the previous mala; Reset asks before clearing.
+- SQLite `jaap_sessions(id, started_at, ended_at, mantra_slug, mantra_label, mala_size, mala_count, total_count)` with `idx_jaap_sessions_started_at` for the history query — gated by `PRAGMA user_version` bump v2 → v3.
+- Save flow: hardware/UI back prompts "Save this session?" when count > 0; checkmark in nav saves immediately. `mantra_label` snapshots the title at write time so custom mantras persist intact.
+- History screen: last 30 sessions grouped by date (newest first); each row shows time, mantra label, total count, mala count, mala size, duration; per-row delete with confirmation; empty state with CTA.
+- **No ads on the counter screen.** AdBanner kept on history (banner OK there per plan).
+- Entry points: Home tab QuickRow (replaced "Search" tile, lotus glyph) + Settings → Deities section row.
+- i18n: full `jaap.*` namespace in en + hi (~50 keys).
 
-**Implementation:**
-- New route: `app/jaap.tsx`.
-- Large tappable circle in center; each tap = +1 with `expo-haptics` `Selection`.
-- Configurable mala size (108 default, 27, 54, 216, 1008).
-- Progress ring filling around the tap circle as user approaches mala completion.
-- On completion: celebratory animation + "108 completed" toast + auto-increment mala counter.
-- SQLite session table: `jaap_sessions(id, started_at, ended_at, mantra_slug, mala_count, total_count)` — gated by `PRAGMA user_version` bump (v2 → v3).
-- Mantra picker: presets from the text package (Devanagari + IAST + meaning) + "Custom" text input.
-- History screen with sessions by date.
-- **No ads during active jaap session.** Banner OK on history screen.
-- Entry point: home tab tile + settings → jaap shortcut.
+**Schema notes:** Uses an autoincrementing `id` and stores `mantra_label` text at insert time so the history list never has to re-resolve via `getMantra()` — this means renamed package slugs won't break old rows.
 
 ### Phase 10 Exit Criteria
 

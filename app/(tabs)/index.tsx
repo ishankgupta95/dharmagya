@@ -563,7 +563,7 @@ export default function HomeScreen() {
         <View style={styles.quickRow}>
           <QuickCard icon="heart-outline" label={t('home.favorites')}  onPress={() => router.push('/favorites')} colors={colors} />
           <QuickCard icon="flame" label={t('home.festivals')} onPress={() => router.push('/festivals')} colors={colors} />
-          <QuickCard icon="search" label={t('common.search')} onPress={() => router.push('/search')} colors={colors} />
+          <QuickCard icon="flower" label={t('home.jaap')} onPress={() => router.push('/jaap')} colors={colors} />
         </View>
 
         {/* ── Find Auspicious Date ──────────────────────────────────────── */}

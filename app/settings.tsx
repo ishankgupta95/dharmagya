@@ -475,6 +475,20 @@ export default function SettingsScreen() {
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
           </TouchableOpacity>
+          <Divider colors={colors} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/jaap')}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.openJaap')}>
+            <SettingRow
+              icon="circle-outline"
+              label={t('jaap.title')}
+              sublabel={t('jaap.homeBody')}
+              colors={colors}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* ── Horoscope ─────────────────────────────────────────────── */}
