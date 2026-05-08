@@ -901,7 +901,6 @@ export default function PanchangScreen() {
             <CalendarGridSkeleton
               layout={panchangLayout}
               colors={colors}
-              dayHeaders={dayHeaders}
               isDarkMode={isDarkMode}
             />
           }>

@@ -194,15 +194,14 @@ export function PanchangSkeleton({ colors }: { colors: ColorPalette }) {
 }
 
 // ─── Calendar grid skeleton (panchang tab) ────────────────────────────────────
-// Mirrors the dimensions of the real calendar so the layout doesn't jump when
-// `monthData` lands. Two layouts: compact (6×7 day-cells with header rail)
-// and dense (7 weekday rows × 6 week-cols transposed grid with side label).
+// Roughly mirrors the vertical footprint of the real calendar so layout
+// doesn't jump when `monthData` lands, but uses a small set of horizontal
+// shimmer lines (one per week-row) instead of per-cell squares — quieter
+// loading state that reads as "page warming up" rather than "loading 30+ tiles".
 
 interface CalendarGridSkeletonProps {
   layout: 'compact' | 'dense';
   colors: ColorPalette;
-  /** Sunday-first 7-letter weekday labels — same array passed to CalGridDense. */
-  dayHeaders: string[];
   /** True when the surrounding screen is in dark mode. Drives the default
    *  base/shimmer overlay tones — in dark mode `colors.surfaceRecessed`
    *  equals `colors.base`, so blocks would be invisible without a lighter
@@ -210,106 +209,47 @@ interface CalendarGridSkeletonProps {
   isDarkMode: boolean;
 }
 
-export function CalendarGridSkeleton({ layout, colors, dayHeaders, isDarkMode }: CalendarGridSkeletonProps) {
+// Width variation per row so the stack reads as loading paragraph text
+// rather than identical bars. Indexed mod row-count.
+const LINE_WIDTHS: `${number}%`[] = ['90%', '76%', '92%', '82%', '88%', '94%', '78%'];
+
+export function CalendarGridSkeleton({ layout, colors, isDarkMode }: CalendarGridSkeletonProps) {
   // Dark mode: surfaceRecessed === base, so default fill is invisible. Use a
   // lifted-white overlay matching the home card skeleton tones.
   const baseColor = isDarkMode ? 'rgba(255,255,255,0.07)' : undefined;
   const shimmerColor = isDarkMode ? 'rgba(255,255,255,0.14)' : undefined;
   const blockProps = { colors, baseColor, shimmerColor };
-  if (layout === 'dense') {
-    return (
-      <View style={[cal.denseWrap]}>
-        <View style={[cal.denseGrid, { borderColor: colors.border }]}>
-          {Array.from({ length: 7 }, (_, weekdayIdx) => {
-            const isLast = weekdayIdx === 6;
-            return (
-              <View
-                key={weekdayIdx}
-                style={[
-                  cal.denseRow,
-                  !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
-                ]}>
-                <View style={[cal.denseLabelCell, { borderRightColor: colors.divider }]}>
-                  {/* Use a tiny block instead of the real letter to keep the
-                      visual rhythm uniform; the real grid drops the weekday
-                      letter in here. */}
-                  <SkeletonBlock width={14} height={9} borderRadius={3} {...blockProps} />
-                </View>
-                {Array.from({ length: 6 }, (_, weekIdx) => (
-                  <View
-                    key={weekIdx}
-                    style={[
-                      cal.denseCell,
-                      weekIdx > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.divider },
-                    ]}>
-                    <SkeletonBlock width={20} height={14} borderRadius={3} {...blockProps} />
-                    <SkeletonBlock width="70%" height={7} borderRadius={2} {...blockProps} />
-                  </View>
-                ))}
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    );
-  }
+
+  // Row count + height matches the real calendar so total vertical footprint
+  // is close enough that the crossfade doesn't visibly shift surrounding
+  // content. Compact = 6 weeks × ~52pt; dense = 7 weekday rows × 64pt.
+  const rowCount = layout === 'dense' ? 7 : 6;
+  const rowHeight = layout === 'dense' ? 64 : 52;
 
   return (
-    <View>
-      <View style={cal.compactHeaderRow}>
-        {dayHeaders.map((d, i) => (
-          <View key={i} style={cal.compactHeaderCell}>
-            <SkeletonBlock width={16} height={8} borderRadius={3} {...blockProps} />
-          </View>
-        ))}
-      </View>
-      <View style={cal.compactGrid}>
-        {Array.from({ length: 42 }, (_, i) => (
-          <View key={i} style={cal.compactCell}>
-            <View style={cal.compactCellInner}>
-              <SkeletonBlock width={20} height={14} borderRadius={4} {...blockProps} />
-            </View>
-          </View>
-        ))}
-      </View>
+    <View style={layout === 'dense' ? cal.denseWrap : undefined}>
+      {Array.from({ length: rowCount }, (_, i) => (
+        <View key={i} style={[cal.lineRow, { height: rowHeight }]}>
+          <SkeletonBlock
+            width={LINE_WIDTHS[i % LINE_WIDTHS.length]}
+            height={14}
+            borderRadius={4}
+            {...blockProps}
+          />
+        </View>
+      ))}
     </View>
   );
 }
 
 const cal = StyleSheet.create({
-  // Compact 6×7 grid — mirrors styles.calCell / calGrid in panchang.tsx so
-  // height matches the real grid exactly.
-  compactHeaderRow: { flexDirection: 'row', paddingVertical: 6 },
-  compactHeaderCell: { flex: 1, alignItems: 'center' },
-  compactGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  compactCell: { width: `${100 / 7}%`, aspectRatio: 1 / 1.05, padding: 1.5 },
-  compactCellInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Dense board — mirrors CalGridDense's outer styles and the parent's
-  // -16pt horizontal extension.
+  // Mirrors the dense calendar's -16pt horizontal extension so the skeleton
+  // and the real grid occupy the same width slot.
   denseWrap: { marginHorizontal: -16 },
-  denseGrid: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  denseRow: { flexDirection: 'row', minHeight: 64 },
-  denseLabelCell: {
-    width: 26,
+  lineRow: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRightWidth: StyleSheet.hairlineWidth,
-  },
-  denseCell: {
-    flex: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 3,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 4,
+    paddingHorizontal: 16,
   },
 });
 
