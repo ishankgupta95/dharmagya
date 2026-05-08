@@ -135,6 +135,7 @@ All phase decisions and per-sub-phase notes live in `memory/project_*.md`.
 - **1.7.0 Play Store launch** ✅. Screenshots, AAB, staged rollout. Bug fixes flagged 2026-05-06 all resolved (muhurat low-end perf, walkthrough off-screen clamp, screenshots).
 - **Phase 9 — Panchang Densification** ✅ (2026-05-06 → 2026-05-07). The originally-scoped fullscreen calendar route was reversed; instead the Panchang tab was densified into a "Sacred Almanac" ledger. Shipped: layout toggle (compact ↔ dense transposed grid) persisted in Zustand, lazy `useLazyDailyPanchang` hook (daily compute deferred until first accordion expand), category accordions (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), glance section reading from `CalendarDay` snapshot only, Pancha Anga "Sacred Almanac entry" redesign (italic Fraunces kickers replacing 96pt mono-caps label column; auto static/dynamic limb modes), full Hi localisation in dense cells (tithi / paksha / event / Devanagari numerals), default-open Pancha Anga, store v12/v13 migrations (`panchangCategoriesOpen` reset, `xl`/`xxl` font sizes dropped). Yearly drilldown lists (Ekadashi / Sankranti / Upcoming Eclipses) bundled into [`src/services/astrology/calendarService.ts`](src/services/astrology/calendarService.ts).
 - **P4.2 — Today's Panchang widget (Android scaffold)** ✅ (2026-05-06). Android-only AppWidgetProvider drop with system fonts + dark register + foreground+tap-refresh. **iOS WidgetKit deferred** (see §11).
+- **Phase 10 — Aspects + Mantra Counter** ✅ (2026-05-08). P10.3 Mantra Counter (jaap routes + 21 mantras + history; SQLite `jaap_sessions`, user_version 2 → 3) and P10.2 Aspects view (Drishti card inside Kundli, default-closed AccordionSection, surfaces existing `bundle.aspects`). P10.1 (landscape calendar) dropped, not deferred.
 
 ---
 
@@ -226,48 +227,15 @@ The few animations that define the app's character. Restrained, sacred, memorabl
 
 ---
 
-## 10. Active — Phase 10 — Detailed Calendar + Aspects + Mantra Counter (this PR, scoped 2026-05-07)
+## 10. Phase 10 — Aspects + Mantra Counter ✅ (2026-05-08)
 
-**Why now:** Following the Phase 9 panchang densification (see §6), three high-impact features remain that pair well into a single release: a landscape "see whole month with rich cells" calendar surface, a planetary aspects (Drishti) view that finally surfaces `bundle.aspects` data, and the long-pending mantra counter (originally P4.3). All three are app-internal, no native modules, no platform asymmetry.
+**Why now:** Following the Phase 9 panchang densification (see §6), two high-impact features remain that pair well into a single release: a planetary aspects (Drishti) view that finally surfaces `bundle.aspects` data, and the long-pending mantra counter (originally P4.3). Both are app-internal, no native modules, no platform asymmetry.
 
-### Step P10.1 — Landscape detailed calendar route (~half day) ⏳
+**Removed from this phase (2026-05-08):** Landscape detailed calendar route was originally P10.1. Dropped per user — the dense Panchang grid (Phase 9) is sufficient for the almanac-page use case, and the orientation-lock complexity (`expo-screen-orientation`, portrait→landscape→portrait flicker, "Auto-rotate off" handling) wasn't worth the marginal info density gain over the existing in-tab densified grid. Not deferred — out of scope.
 
-**File:** new route `app/calendar-detail.tsx`.
+### Step P10.2 — Aspects view in Astrology tab ✅ 2026-05-08
 
-**Why:** the dense Panchang grid (transposed, 7 weekday rows × 6 week cols) shows whole-month at a glance but each cell can only carry day# + tithi + 1 event line. A separate landscape route gives the desktop-style 7-col × 6-row monthly grid where each cell is wide enough to carry day# + tithi until-time + nakshatra + yoga + sunrise/sunset + Rahu kalam + festival pip — the "complete printed almanac page" experience.
-
-**Orientation strategy:**
-- App stays `"orientation": "portrait"` in [app.json](app.json) (current).
-- Add `expo-screen-orientation` package.
-- The detail-calendar route locks `LANDSCAPE` on mount (`ScreenOrientation.lockAsync(LANDSCAPE)`), restores `PORTRAIT_UP` on unmount.
-- One-line hint in route header (`"Rotate for best view"` / `"बेहतर दृश्य के लिए घुमाएँ"`) if the device is held portrait; respect system "Auto-rotate off" — content renders in landscape regardless of phone orientation in that case.
-
-**Layout (landscape viewport, ~810pt × 360pt typical):**
-- Editorial month header (display-italic, lang-aware month name + Vikram Samvat + "Based on {{location}}" footer chip).
-- Weekday column headers across the top (SUN..SAT), Sunday-first; Sunday header in sindoor red.
-- 7 columns × 6 rows; cells ~115pt wide × ~52pt tall.
-- Per-cell content (top → bottom, all from `CalendarDay` + on-tap daily compute):
-  - **Day number** — large Fraunces, sindoor for Sundays, accent for primary-event days.
-  - **Tithi name + until-time** — `Krishna Panchami · until 10:17 AM` ; `↑` arrow if the tithi extends past next sunrise.
-  - **Nakshatra name** — small NotoSerifDevanagari muted.
-  - **Yoga name** — same treatment.
-  - **Sunrise + sunset times** — JetBrainsMono mini icons, single line.
-  - **Rahu kalam window** — JetBrainsMono with skull-marker icon, single line.
-  - **Festival pip** — small dot + abbreviated name when present (uses existing `eventDotColor` palette from [`src/components/panchang/calendarColors.ts`](src/components/panchang/calendarColors.ts)).
-- Today's cell: yellow ring + filled day-number badge.
-- Selected cell: sindoor outline.
-- Out-of-month cells: dimmed.
-- Tap cell → returns to portrait Panchang tab with `selectedDate` set (cross-route state via Zustand or route param).
-
-**Entry point:** small "expand" icon in the existing Panchang tab's month strip (next to the layout-toggle button), routes to `/calendar-detail`.
-
-**Data layer:** reuse existing `getCalendarMonth()`. The cell content extension (sunrise / sunset / Rahu kalam per cell) requires the daily compute — not the instant snapshot. Two options:
-- **(a) On-demand per-cell daily fetch** — fires `getDailyPanchang` for each visible cell on mount. 42 × ~5ms = ~210ms blocking. Acceptable as a one-shot cost on a route the user has explicitly entered.
-- **(b) Background batch with skeleton** — render cells with day# + tithi (sync from `CalendarDay`) immediately, then progressively fill in sunrise/sunset/Rahu kalam as the daily computes complete (chunked to 4–8 per `runAfterInteractions` tick).
-
-Pick (b) — keeps initial paint snappy, and progressive fill on a 6-row grid reads as "loading detail" not "broken cells".
-
-### Step P10.2 — Aspects view in Astrology tab (~1–2 hours) ⏳
+Shipped: `AspectsCard` collapsible inside `KundliSection` (default-closed via `AccordionSection`, after the Shadbala block). One row per graha (Sun..Ketu) with the GRAHA_ABBR text label, "From {{rashi}} (House {{n}})" subtitle (`localizeRashi` + `useLocaleFormatters` for Devanagari digits when the language is Hindi), `aspects[graha]` rendered as a comma-separated mono house list, and a "Sits with" chip strip listing every other planet that occupies an aspected house (`{GRAHA_ABBR} · {house}` per chip). Empty `sitsWith` collapses gracefully — chips block hides instead of printing a placeholder. Aspect data comes straight from `bundle.aspects: AspectMap` (already returned by `computeKundli`); no recompute. `aspects.*` i18n namespace added to en + hi (4 keys).
 
 **Why:** `bundle.aspects: AspectMap` is already returned by `computeKundli` and currently unused in the UI. Aspects (Drishti) describe how planets influence other houses beyond the one they sit in: all planets aspect the 7th from themselves; Mars also aspects 4th + 8th; Jupiter also 5th + 9th; Saturn also 3rd + 10th. Surfacing this is standard Vedic chart-reading depth — competitors all show it.
 
@@ -291,7 +259,8 @@ Pick (b) — keeps initial paint snappy, and progressive fill on a 6-row grid re
 **Shipped:**
 - Routes: `app/jaap/index.tsx` (picker), `app/jaap/[slug].tsx` (counter), `app/jaap/history.tsx`.
 - Picker groups mantras into "Universal" (Gayatri, Mahamrityunjaya) + deity-tagged sections; expandable Custom-mantra card; lifetime stats card (only when there's history) routes to history.
-- Counter: 240px tap circle with reanimated SVG progress ring (UI-thread `useAnimatedProps` strokeDashoffset), `expo-haptics` Selection on each tap, Success haptic + 800ms accent flash on mala completion.
+- Counter: whole-screen tap zone (mantra at top stays visible during chanting; the entire body below the header is the tap target — chips and ±buttons capture their own taps via the standard responder chain). Reanimated SVG progress ring (UI-thread `useAnimatedProps` strokeDashoffset), `expo-haptics` `impactAsync(Heavy)` on each tap (revised up from Selection then Medium after user feedback that vibration was too weak), Success notification haptic + 800ms accent flash on mala completion.
+- Adaptive mantra typography: 22pt Devanagari for 1–2 line mantras (most), 19pt for 3-line, 17pt for 4-line (Gayatri); IAST scales 13 → 11pt similarly. Body height budgeted against worst case (Gayatri + IAST + chips + bottom bar) on a Pixel 3a (~590dp). Ring is 180dp.
 - Mala size selector: 27 / 54 / 108 / 216 / 1008 chips; mid-session size change prompts to discard count.
 - Decrement (-1) underflows into the previous mala; Reset asks before clearing.
 - SQLite `jaap_sessions(id, started_at, ended_at, mantra_slug, mantra_label, mala_size, mala_count, total_count)` with `idx_jaap_sessions_started_at` for the history query — gated by `PRAGMA user_version` bump v2 → v3.
@@ -303,13 +272,13 @@ Pick (b) — keeps initial paint snappy, and progressive fill on a 6-row grid re
 
 **Schema notes:** Uses an autoincrementing `id` and stores `mantra_label` text at insert time so the history list never has to re-resolve via `getMantra()` — this means renamed package slugs won't break old rows.
 
-### Phase 10 Exit Criteria
+**Post-ship iteration (2026-05-08):** First counter draft used a ScrollView with the mantra above the counter — user reported the mantra scrolled out of view during tapping, and the Selection-strength haptic was too weak to feel. Redesigned to (a) drop the ScrollView and pin the mantra at the top of a whole-screen Pressable tap zone so reading + tapping happen on the same surface, (b) bump haptic to `impactAsync(Heavy)` for unmistakable per-tap feedback, (c) enlarge mantra typography with adaptive sizing per line count and shrink the ring 240 → 180dp to give the mantra clear visual primacy.
 
-- Landscape calendar route renders all 6 visible months without orientation flicker on Pixel 3a; entering/leaving the route correctly toggles screen orientation.
-- All festival/ekadashi/sankranti/pournami/amavasya/pradosh/eclipse markers verified against drikpanchang.com for 3 sample months in the detailed calendar.
-- Aspects view renders for all 9 grahas with correct house references against a known reference chart.
-- Mantra counter: 6 presets pickable, 5 mala sizes selectable, session writes to SQLite, history shows last 30 sessions.
-- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings.
+### Phase 10 Exit Criteria ✅
+
+- Aspects view renders for all 9 grahas with correct house references against a known reference chart. ✅
+- Mantra counter: presets pickable from package, 5 mala sizes selectable, session writes to SQLite, history shows last 30 sessions. ✅
+- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings. ✅
 
 ---
 
@@ -335,6 +304,7 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 - Live streaming temple darshan.
 - AI chat astrologer (hallucination risk on religious content).
 - Cryptocurrency / NFTs / Web3.
+- Landscape detailed calendar route (originally P10.1, dropped 2026-05-08). Densified Panchang grid from Phase 9 covers the almanac-page use case; not worth the orientation-lock complexity.
 
 ---
 
@@ -343,17 +313,15 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 **Sequencing principle:** ship optimizations + features first, language support last.
 
 ```
-Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅
-                                                                                                          ↓
-                                                                                       Phase 10 (this PR) — calendar + aspects + mantra
-                                                                                                          ↓
-                                                                                       Phase 7.4–7.6 (motion finish — when feature velocity slows)
-                                                                                                          ↓
-                                                                                       Phase 3 (P3.1 languages — separate PR)
-                                                                                                          ↓
-                                                                                       Sentry (post-rollout) + iOS widget (after iOS launch)
-                                                                                                          ↓
-                                                                                       Phase 5 (on hold)
+Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅ → Phase 10 ✅
+                                                                                                                              ↓
+                                                                                                  Phase 7.4–7.6 (motion finish — when feature velocity slows)
+                                                                                                                              ↓
+                                                                                                  Phase 3 (P3.1 languages — separate PR)
+                                                                                                                              ↓
+                                                                                                  Sentry (post-rollout) + iOS widget (after iOS launch)
+                                                                                                                              ↓
+                                                                                                  Phase 5 (on hold)
 ```
 
 **Release cadence:** the user decides when to ship. Bundle multiple phases into one larger release rather than shipping each phase independently — the user prefers one substantive update over many small ones.

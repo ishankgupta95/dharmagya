@@ -748,6 +748,14 @@ export default {
     yourDetailsLabel: 'YOUR DETAILS',
   },
 
+  // ── Aspects (Drishti) — surfaced inside the Kundli view ────────────────
+  aspects: {
+    sectionTitle: 'ASPECTS · DRISHTI',
+    from: 'From {{rashi}} (House {{house}})',
+    aspectsLabel: 'ASPECTS',
+    sitsWithLabel: 'SITS WITH',
+  },
+
   sadeSati: {
     title: 'Sade Sati Status',
     natalMoonLabel: 'YOUR NATAL MOON',

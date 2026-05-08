@@ -742,6 +742,14 @@ export default {
     yourDetailsLabel: 'आपके विवरण',
   },
 
+  // ── Aspects (Drishti) — surfaced inside the Kundli view ────────────────
+  aspects: {
+    sectionTitle: 'दृष्टि',
+    from: '{{rashi}} से (भाव {{house}})',
+    aspectsLabel: 'दृष्टि',
+    sitsWithLabel: 'साथ',
+  },
+
   sadeSati: {
     title: 'साढ़े साती की स्थिति',
     natalMoonLabel: 'आपका जन्म चंद्र',

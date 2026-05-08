@@ -24,6 +24,8 @@ import {
 } from '@/services/astrology/kundliService';
 import { DoshaCard } from './DoshaCard';
 import { ShadbalaChart } from './ShadbalaChart';
+import { AspectsCard } from './AspectsCard';
+import { AccordionSection } from '@/components/panchang/AccordionSection';
 import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
 import { NorthChart } from './NorthChart';
@@ -68,6 +70,7 @@ export function KundliSection() {
   const [activeChart, setActiveChart] = useState<'D1' | Divisional>('D1');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [aspectsOpen, setAspectsOpen] = useState(false);
   // Local draft for the name TextInput so we only commit on blur, not on
   // every keystroke (avoids re-renders + per-key store writes).
   const [nameDraft, setNameDraft] = useState<string>(userName ?? '');
@@ -378,6 +381,18 @@ export function KundliSection() {
           <ShadbalaChart shadbala={shadbala} />
         </>
       )}
+
+      {/* ── Aspects (Drishti) — collapsible, default-closed ────────────── */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.aspects"
+          title={t('aspects.sectionTitle')}
+          open={aspectsOpen}
+          onToggle={() => setAspectsOpen((o) => !o)}
+          colors={colors}>
+          <AspectsCard d1={bundle.d1} aspects={bundle.aspects} colors={colors} />
+        </AccordionSection>
+      </View>
 
       {/* ── Compatibility shortcuts ──────────────────────────────────────
           Two routes into Ashtakoot Guna Milan:
@@ -717,4 +732,6 @@ const styles = StyleSheet.create({
   },
   matchKicker: { fontSize: 9, marginBottom: 2 },
   matchBody: { fontSize: 14, lineHeight: 20 },
+
+  aspectsWrap: { marginTop: 14 },
 });
