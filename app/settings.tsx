@@ -19,7 +19,10 @@ import {
   scheduleSunriseAlert,
   cancelSunriseAlert,
 } from '@/services/notifications';
-import { fetchPanchangForToday } from '@/services/astrology/panchangService';
+import {
+  deriveJanmaIndicesFromStore,
+  fetchPanchangForToday,
+} from '@/services/astrology/panchangService';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useLocaleFormatters } from '@/utils/format';
@@ -74,6 +77,8 @@ export default function SettingsScreen() {
     setShowVikramSamvat,
     masaSystem,
     setMasaSystem,
+    panchangLayout,
+    setPanchangLayout,
     region,
     setRegion,
     userBirthDate,
@@ -102,6 +107,7 @@ export default function SettingsScreen() {
   const [fontSheetOpen, setFontSheetOpen] = useState(false);
   const [langSheetOpen, setLangSheetOpen] = useState(false);
   const [masaSheetOpen, setMasaSheetOpen] = useState(false);
+  const [layoutSheetOpen, setLayoutSheetOpen] = useState(false);
   const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [dailyTimePickerOpen, setDailyTimePickerOpen] = useState(false);
   const [sunriseOffsetSheetOpen, setSunriseOffsetSheetOpen] = useState(false);
@@ -131,6 +137,12 @@ export default function SettingsScreen() {
     { key: 'purnimanta', label: t('panchang.purnimanta'), desc: t('settings.masaSystemPurnimantaDesc') },
     { key: 'amanta', label: t('panchang.amanta'), desc: t('settings.masaSystemAmantaDesc') },
   ];
+
+  const layoutOptions: OptionSheetItem<'compact' | 'dense'>[] = [
+    { key: 'compact', label: t('panchang.layoutCompact') },
+    { key: 'dense', label: t('panchang.layoutDense') },
+  ];
+  const layoutLabel = t(`panchang.layout${panchangLayout.charAt(0).toUpperCase() + panchangLayout.slice(1)}` as 'panchang.layoutCompact' | 'panchang.layoutDense');
 
   const ayanamsaOptions: OptionSheetItem<Ayanamsa>[] = [
     { key: 'lahiri', label: t('settings.ayanamsa.lahiri'), desc: t('settings.ayanamsa.lahiriDesc') },
@@ -200,11 +212,16 @@ export default function SettingsScreen() {
   // Also captures the numeric ayanamsa value for the diagnostic row.
   const [ayanamsaValue, setAyanamsaValue] = useState<number | null>(null);
   useEffect(() => {
-    fetchPanchangForToday(userLocation, resolveLanguage(language), region, ayanamsa).then((p) => {
+    const { janmaNakshatra, janmaRashi } = deriveJanmaIndicesFromStore({
+      userBirthDate, userBirthTime, userBirthPlace,
+    });
+    fetchPanchangForToday(
+      userLocation, resolveLanguage(language), region, ayanamsa, janmaNakshatra, janmaRashi,
+    ).then((p) => {
       if (p?.sunrise && p.sunrise !== '—') setSunriseTime(p.sunrise);
       if (typeof p?.ayanamsa === 'number') setAyanamsaValue(p.ayanamsa);
     });
-  }, [userLocation, language, region, ayanamsa]);
+  }, [userLocation, language, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace]);
 
   const locationText = locationName
     ? locationName
@@ -397,6 +414,14 @@ export default function SettingsScreen() {
         <SectionHeader label={t('settings.calendar')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <PickerRow
+            icon="apps"
+            label={t('panchang.layoutSettingLabel')}
+            value={layoutLabel}
+            onPress={() => setLayoutSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <PickerRow
             icon="calendar"
             label={t('settings.masaSystem')}
             value={masaLabel}
@@ -411,6 +436,24 @@ export default function SettingsScreen() {
             onPress={() => setAyanamsaSheetOpen(true)}
             colors={colors}
           />
+        </View>
+
+        {/* ── Home Screen Widget ──────────────────────────────────────── */}
+        <SectionHeader label={t('settings.widgetSection')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/settings/widget')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.widgetCustomize')}>
+            <SettingRow
+              icon="apps"
+              label={t('settings.widgetCustomize')}
+              sublabel={t('settings.widgetCustomizeDesc')}
+              colors={colors}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* ── Location ──────────────────────────────────────────────── */}
@@ -454,6 +497,20 @@ export default function SettingsScreen() {
                   ? t('settings.manageDeitiesCount', { count: selectedDeities.length })
                   : t('settings.manageDeitiesNone')
               }
+              colors={colors}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+            />
+          </TouchableOpacity>
+          <Divider colors={colors} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push('/jaap')}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.openJaap')}>
+            <SettingRow
+              icon="circle-outline"
+              label={t('jaap.title')}
+              sublabel={t('jaap.homeBody')}
               colors={colors}
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
@@ -826,6 +883,16 @@ export default function SettingsScreen() {
       />
 
       <OptionSheet
+        visible={layoutSheetOpen}
+        onClose={() => setLayoutSheetOpen(false)}
+        title={t('panchang.layoutSettingLabel')}
+        options={layoutOptions}
+        value={panchangLayout}
+        onChange={(next) => setPanchangLayout(next as 'compact' | 'dense')}
+        colors={colors}
+      />
+
+      <OptionSheet
         visible={ayanamsaSheetOpen}
         onClose={() => setAyanamsaSheetOpen(false)}
         title={t('settings.ayanamsa.pickerTitle')}
@@ -1139,8 +1206,6 @@ const FONT_SIZE_STEPS: { key: FontSize; tKey: string; sample: number }[] = [
   { key: 'normal', tKey: 'settings.fontSizeNormal', sample: 13 },
   { key: 'medium', tKey: 'settings.fontSizeMedium', sample: 15 },
   { key: 'large',  tKey: 'settings.fontSizeLarge',  sample: 17 },
-  { key: 'xl',     tKey: 'settings.fontSizeXl',     sample: 20 },
-  { key: 'xxl',    tKey: 'settings.fontSizeXxl',    sample: 23 },
 ];
 
 function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSheetProps) {

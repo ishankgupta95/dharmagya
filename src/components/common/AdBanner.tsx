@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
 import type { ColorPalette } from '@/config/theme';
-import { getAdsModule, getBannerUnitId } from '@/config/ads';
+import { getAdsModule, getBannerUnitId, type BannerPlacement } from '@/config/ads';
 const AdsModule = getAdsModule();
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-type BannerPlacement = 'home' | 'panchangInline' | 'libraryGodsInline' | 'festivals';
 
 interface AdBannerProps {
   colors: ColorPalette;

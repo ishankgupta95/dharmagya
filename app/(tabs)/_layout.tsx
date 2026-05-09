@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { AppText } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { darkColors, lightColors, palette } from '@/config/theme';
 import { useStore } from '@/store/useStore';
+import { pmark } from '@/utils/perfProfile';
 
 const ACTIVE_DARK = palette.goldLeaf;
 const INACTIVE_DARK = 'rgba(243,229,200,0.55)';
@@ -16,11 +17,21 @@ const ACTIVE_LIGHT = palette.sindoor;
 const INACTIVE_LIGHT = palette.inkQuiet;
 
 export default function TabLayout() {
+  pmark('tabs:_layout:render');
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const isDark = useStore((s) => s.isDarkMode);
+  const hasOnboarded = useStore((s) => s.hasOnboarded);
   const walkthroughStep = useStore((s) => s.walkthroughStep);
   const walkthroughActive = walkthroughStep > 0;
+
+  // Declarative redirect short-circuits the (tabs) layout before its children
+  // mount on cold start. The effect-based redirect in app/_layout.tsx fires
+  // AFTER (tabs)/index has already started mounting and after the splash has
+  // dismissed — leaving the user staring at a half-mounted Home until the
+  // queued navigation commits (often only after a touch event drains the
+  // layout queue on Android).
+  if (!hasOnboarded) return <Redirect href="/onboarding/step1" />;
 
   const activeColor = isDark ? ACTIVE_DARK : ACTIVE_LIGHT;
   const inactiveColor = isDark ? INACTIVE_DARK : INACTIVE_LIGHT;

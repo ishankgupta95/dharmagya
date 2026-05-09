@@ -1,4 +1,4 @@
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 // ─── Color Palette type (shared interface for dark & light) ──────────────────
 
@@ -148,7 +148,12 @@ export const borderRadius = {
 // Screens should call `...typeScale.displayItalic` instead of hard-coding
 // font family + style so P6.9 can retune everything in one place.
 
-type TypeToken = Pick<TextStyle, 'fontFamily' | 'fontStyle' | 'fontVariant' | 'letterSpacing' | 'textTransform'>;
+type TypeToken = Pick<TextStyle, 'fontFamily' | 'fontStyle' | 'fontVariant' | 'fontWeight' | 'letterSpacing' | 'textTransform'>;
+
+// Platform mono — Menlo on iOS, 'monospace' on Android. Replaces JetBrainsMono
+// (P11.4 drop). System mono on Android renders identically for kicker /
+// timestamp use; iOS Menlo is the editorial mono alternative.
+export const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
 
 export const typeScale = {
   // 30–88px editorial headlines. Light-weight Fraunces with tight tracking.
@@ -184,12 +189,13 @@ export const typeScale = {
   },
   // Mono data — timestamps, astronomical figures, kickers.
   mono: {
-    fontFamily: 'JetBrainsMono_400Regular',
+    fontFamily: MONO_FONT,
     letterSpacing: 0.3,
   },
   // Small-caps mono kicker — "Aarti № XX", section labels.
   monoCaps: {
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     letterSpacing: 2.4,
     textTransform: 'uppercase',
   },

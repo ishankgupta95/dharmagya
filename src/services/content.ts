@@ -3,16 +3,20 @@ import {
   getChalisa as pkgGetChalisa,
   getAllAartis as pkgGetAllAartis,
   getAllChalisas as pkgGetAllChalisas,
+  getAllMantras as pkgGetAllMantras,
+  getMantra as pkgGetMantra,
   type Deity,
   type Recitation,
   type Chalisa,
   type RecitationVerse,
+  type Mantra,
+  type MantraSlug,
 } from 'hindu-devotional-texts';
 
 import i18n from '@/i18n';
 import { ALL_DEITIES } from '@/config/deities';
 
-export type { Recitation, Chalisa, RecitationVerse, Deity };
+export type { Recitation, Chalisa, RecitationVerse, Deity, Mantra, MantraSlug };
 
 /** Locales the package ships content in for aartis/chalisas. */
 export type ContentLang = 'en' | 'hi';
@@ -88,4 +92,30 @@ export function chalisaSections(chalisa: Chalisa, lang: ContentLang): ChalisaSec
     sections.push({ type: 'doha', label: sectionLabel('doha', lang), verses: chalisa.closingDoha[key].map(v => v.text) });
   }
   return sections;
+}
+
+// ─── Mantras ─────────────────────────────────────────────────────────────────
+
+/** Mantras available in the app. A mantra without a `deity` is universal
+ *  (Gayatri, Maha Mrityunjaya etc.) and always included. Deity-tagged mantras
+ *  are filtered to the app's roster so adding/removing a deity in
+ *  [config/deities.ts](src/config/deities.ts) flows through automatically. */
+export function getAllAppMantras(): Mantra[] {
+  return pkgGetAllMantras().filter(m => !m.deity || APP_DEITY_SLUGS.has(m.deity));
+}
+
+/** Look up a mantra by slug. Returns `undefined` if the slug doesn't exist
+ *  (typed slugs make this rare, but the picker may receive a stale slug from
+ *  history). */
+export function getMantraBySlug(slug: string): Mantra | undefined {
+  try {
+    return pkgGetMantra(slug as MantraSlug);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Pick the right meaning for a given content language. */
+export function mantraMeaning(mantra: Mantra, lang: ContentLang): string {
+  return lang === 'hi' ? mantra.meaning.hi : mantra.meaning.en;
 }

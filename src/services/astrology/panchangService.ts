@@ -33,6 +33,8 @@ import type {
   IChandraBalam,
   FestivalType,
 } from '@/types';
+import { pmark, ptime } from '@/utils/perfProfile';
+import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 
 export const FALLBACK_COORDS = { lat: 25.3176, lon: 83.0103 }; // Varanasi (Kashi)
 
@@ -59,6 +61,34 @@ export function computeJanmaRashiIndex(birth: Date): number {
   const lon = getSiderealMoonLongitude(birth, 'lahiri');
   const idx = Math.floor(lon / 30);
   return ((idx % 12) + 12) % 12;
+}
+
+/**
+ * Derive the janma indices used as panchang-ts cache options from the user's
+ * stored birth fields. Returns empty when the user hasn't entered birth data —
+ * downstream callers pass `undefined` through to `getCachedPanchangDay`.
+ *
+ * Important for cache cohesion: every today's-panchang fetch (widget refresh,
+ * home tab, panchang screen) must compute janma the same way, otherwise their
+ * cache keys diverge and the screen does its own ~300ms compute on cold open
+ * even though the widget already pre-warmed.
+ */
+export function deriveJanmaIndicesFromStore(state: {
+  userBirthDate: string | null;
+  userBirthTime: string | null;
+  userBirthPlace: { timezone?: string } | null;
+}): { janmaNakshatra?: number; janmaRashi?: number } {
+  if (!state.userBirthDate) return {};
+  const tz = state.userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+  try {
+    const birthMoment = wallclockInZoneToUtc(state.userBirthDate, state.userBirthTime ?? '12:00', tz);
+    return {
+      janmaNakshatra: computeJanmaNakshatraIndex(birthMoment),
+      janmaRashi: computeJanmaRashiIndex(birthMoment),
+    };
+  } catch {
+    return {};
+  }
 }
 
 // Name tables for computePlanetaryPositions (which uses callbacks, not a language option)
@@ -416,8 +446,13 @@ export function getCachedPanchangDay(
   const ayanamsa = opts.ayanamsa ?? 'lahiri';
   const key = dayCacheKey(date, coords.lat, coords.lon, opts.language, opts.region, opts.janmaNakshatra, opts.janmaRashi, ayanamsa);
   const hit = lruHit(DAY_CACHE, key);
-  if (hit && (hit.full || !opts.computeEndTimes)) return hit.day;
+  if (hit && (hit.full || !opts.computeEndTimes)) {
+    pmark('panchang:cache:hit', `endTimes=${opts.computeEndTimes} ${ymdLocal(date)}`);
+    return hit.day;
+  }
 
+  pmark('panchang:cache:miss', `endTimes=${opts.computeEndTimes} ${ymdLocal(date)}`);
+  const endLib = ptime(`panchang:getDailyPanchang endTimes=${opts.computeEndTimes}`);
   const timezone = -new Date().getTimezoneOffset();
   const raw = getDailyPanchang(
     date,
@@ -432,8 +467,11 @@ export function getCachedPanchangDay(
       ayanamsa,
     },
   );
+  endLib();
   if (!raw) return null;
+  const endMap = ptime('panchang:mapToPanchangDay');
   const mapped = mapToPanchangDay(raw);
+  endMap();
   lruSet(DAY_CACHE, key, { day: mapped, full: opts.computeEndTimes }, DAY_CACHE_MAX);
   return mapped;
 }
@@ -542,10 +580,14 @@ export async function fetchPanchangForToday(
   language: Language = 'en',
   region: FestivalRegion = 'all',
   ayanamsa: AyanamsaType = 'lahiri',
+  janmaNakshatra?: number,
+  janmaRashi?: number,
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
-    return getCachedPanchangDay(new Date(), coords, { computeEndTimes: true, language, region, ayanamsa });
+    return getCachedPanchangDay(new Date(), coords, {
+      computeEndTimes: true, language, region, ayanamsa, janmaNakshatra, janmaRashi,
+    });
   } catch (e) {
     if (e instanceof PanchangError) {
       console.warn('[panchang]', e.code, e.message);

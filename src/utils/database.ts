@@ -1,8 +1,11 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
+import { pmark, ptime } from '@/utils/perfProfile';
 
 // Called via SQLiteProvider's onInit — receives the same connection
 // that will be provided to all children, so no second connection is opened.
 export async function initDatabase(db: SQLiteDatabase): Promise<void> {
+  pmark('db:initDatabase:start');
+  const end = ptime('db:initDatabase');
   // Aartis/chalisas/kathas were previously seeded into SQLite; they now come
   // from the `hindu-devotional-texts` package at runtime. Kathas are removed
   // from the app entirely. Rashifal was a 30-day pilot that has been removed.
@@ -31,6 +34,48 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // Jaap (mantra) sessions — written when a user completes a counter session.
+  // mantra_slug is either a slug from hindu-devotional-texts or the literal
+  // "custom" for free-form mantras. mantra_label snapshots the title at write
+  // time so the history list renders without re-resolving the package (and so
+  // a custom mantra's typed text persists). mala_size is the bead count the
+  // user picked (108 default). total_count = mala_count * mala_size + extras
+  // — written once on session end; we deliberately don't store live progress
+  // (sessions are sealed, the app is the source of truth for the running count).
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS jaap_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER NOT NULL,
+      mantra_slug TEXT NOT NULL,
+      mantra_label TEXT NOT NULL,
+      mala_size INTEGER NOT NULL,
+      mala_count INTEGER NOT NULL,
+      total_count INTEGER NOT NULL
+    );
+  `);
+  db.execSync(`
+    CREATE INDEX IF NOT EXISTS idx_jaap_sessions_started_at
+      ON jaap_sessions(started_at DESC);
+  `);
+
+  // Custom mantras the user typed in the jaap picker. We persist them so they
+  // don't have to retype — listed by `last_used_at DESC` in the picker.
+  // `text` is the natural key (UNIQUE) so retyping the same mantra just bumps
+  // recency rather than creating a dupe.
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS custom_mantras (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER NOT NULL
+    );
+  `);
+  db.execSync(`
+    CREATE INDEX IF NOT EXISTS idx_custom_mantras_last_used_at
+      ON custom_mantras(last_used_at DESC);
+  `);
+
   // 1: 1.5.0 — excludedVaras rule was a no-op before (English weekday vs.
   // panchang-ts Sanskrit name), so cached scans may include forbidden
   // weekdays. Drop them once so the next open recomputes correctly.
@@ -38,10 +83,21 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // stock rules + scoreMuhurta (Bhadra / Panchaka / Adhika Maasa / eclipse /
   // Ganda Mula exclusions added vs. the prior local rules). Old caches will
   // contain days the new rules now reject, so wipe once on upgrade.
+  // 3: 1.6.0 — jaap_sessions table introduced. No old data to migrate; the
+  // bump just records that the schema reached version 3.
+  // 4: custom_mantras table introduced. No old data to migrate; bump records
+  // that the schema reached version 4.
   const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version < 2) {
     db.execSync('DELETE FROM muhurat_cache');
     db.execSync('PRAGMA user_version = 2');
   }
+  if (version < 3) {
+    db.execSync('PRAGMA user_version = 3');
+  }
+  if (version < 4) {
+    db.execSync('PRAGMA user_version = 4');
+  }
+  end();
 }

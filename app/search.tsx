@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { AdBanner } from '@/components/common/AdBanner';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
@@ -206,6 +207,11 @@ export default function SearchScreen() {
           maxToRenderPerBatch={10}
           windowSize={5}
           stickySectionHeadersEnabled={false}
+          ListFooterComponent={
+            <View style={styles.adWrap}>
+              <AdBanner colors={colors} placement="searchInline" inline />
+            </View>
+          }
         />
       )}
 
@@ -391,4 +397,6 @@ const styles = StyleSheet.create({
   emptyOrnament: { width: 140, marginBottom: 8 },
   emptyTitle: { fontSize: 26 },
   emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+
+  adWrap: { marginTop: 14 },
 });

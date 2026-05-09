@@ -20,8 +20,8 @@ export function getAdsModule() {
   return AdsModule;
 }
 
-type BannerPlacement = keyof typeof AD_UNITS.banner;
-type InterstitialPlacement = keyof typeof AD_UNITS.interstitial;
+export type BannerPlacement = keyof typeof AD_UNITS.banner;
+export type InterstitialPlacement = keyof typeof AD_UNITS.interstitial;
 
 export function getBannerUnitId(placement: BannerPlacement): string {
   if (!AdsModule) return '';

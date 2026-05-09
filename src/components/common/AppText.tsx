@@ -10,8 +10,6 @@ export const FONT_SCALE: Record<FontSize, number> = {
   normal: 1.0,
   medium: 1.15,
   large: 1.3,
-  xl: 1.5,
-  xxl: 1.75,
 };
 
 const fontSizeSelector = (s: { fontSize: FontSize }) => s.fontSize;

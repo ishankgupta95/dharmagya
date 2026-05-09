@@ -21,6 +21,13 @@ interface SkeletonBlockProps {
   height: number;
   borderRadius?: number;
   colors: ColorPalette;
+  /** Override the block's base fill — use when the parent surface (e.g. a
+   *  NightCard plinth) differs from the screen base, otherwise the block
+   *  blends into its container. */
+  baseColor?: string;
+  /** Override the shimmer highlight colour (default rgba(255,255,255,0.07)).
+   *  Crank this up on dark plinths where the default barely registers. */
+  shimmerColor?: string;
 }
 
 export function SkeletonBlock({
@@ -28,6 +35,8 @@ export function SkeletonBlock({
   height,
   borderRadius = 8,
   colors,
+  baseColor,
+  shimmerColor = 'rgba(255,255,255,0.07)',
 }: SkeletonBlockProps) {
   const [blockWidth, setBlockWidth] = useState(0);
   const shimmerX = useSharedValue(-300);
@@ -50,14 +59,14 @@ export function SkeletonBlock({
 
   return (
     <View
-      style={{ width: width as number, height, borderRadius, backgroundColor: colors.surfaceRecessed, overflow: 'hidden' }}
+      style={{ width: width as number, height, borderRadius, backgroundColor: baseColor ?? colors.surfaceRecessed, overflow: 'hidden' }}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
         if (w > 0 && w !== blockWidth) setBlockWidth(w);
       }}>
       <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
         <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.07)', 'transparent']}
+          colors={['transparent', shimmerColor, 'transparent']}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={{ width: 200, height: '100%' }}
@@ -68,34 +77,62 @@ export function SkeletonBlock({
 }
 
 // ─── Home screen panchang card skeleton ──────────────────────────────────────
-// Mirrors the 2×2 grid + divider + sunrise/sunset row inside the home panchang card.
+// Mirrors the 4-row ledger + divider + sunrise/sunset row inside the home
+// panchang card. Lives on a NightCard plinth, so it takes its own base /
+// shimmer tones rather than the screen's surfaceRecessed (which blends into
+// the dark plinth bg).
 
-export function HomePanchangSkeleton({ colors }: { colors: ColorPalette }) {
+interface HomePanchangSkeletonProps {
+  colors: ColorPalette;
+  /** Tone used for the skeleton block fill — defaults match a dark plinth.
+   *  Pass plinth-derived overlays for light mode. */
+  baseColor?: string;
+  shimmerColor?: string;
+  dividerColor?: string;
+}
+
+export function HomePanchangSkeleton({
+  colors,
+  baseColor,
+  shimmerColor,
+  dividerColor,
+}: HomePanchangSkeletonProps) {
+  const blockProps = { colors, baseColor, shimmerColor };
+  const divider = dividerColor ?? colors.divider;
   return (
     <View>
-      {/* 2×2 grid cells */}
-      <View style={home.grid}>
-        {[80, 100, 70, 90].map((valueW, i) => (
-          <View key={i} style={home.cell}>
-            <SkeletonBlock width={52} height={10} borderRadius={4} colors={colors} />
-            <SkeletonBlock width={valueW} height={17} borderRadius={5} colors={colors} />
+      {/* 4 limb rows — tithi / nakshatra / yoga / karana */}
+      <View style={home.rows}>
+        {[120, 140, 110, 130].map((valW, i) => (
+          <View key={i} style={[home.row, i < 3 && { borderBottomColor: divider, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+            <SkeletonBlock width={56} height={9} borderRadius={4} {...blockProps} />
+            <View style={home.rowMid}>
+              <SkeletonBlock width={valW} height={14} borderRadius={4} {...blockProps} />
+            </View>
+            <SkeletonBlock width={42} height={10} borderRadius={4} {...blockProps} />
           </View>
         ))}
       </View>
 
       {/* Divider */}
-      <View style={[home.divider, { backgroundColor: colors.divider }]} />
+      <View style={[home.divider, { backgroundColor: divider }]} />
 
       {/* Sunrise / sunset row */}
       <View style={home.sunRow}>
         <View style={home.sunItem}>
-          <SkeletonBlock width={14} height={14} borderRadius={7} colors={colors} />
-          <SkeletonBlock width={90} height={12} borderRadius={4} colors={colors} />
+          <SkeletonBlock width={26} height={26} borderRadius={13} {...blockProps} />
+          <View style={home.sunStack}>
+            <SkeletonBlock width={50} height={9} borderRadius={4} {...blockProps} />
+            <SkeletonBlock width={70} height={12} borderRadius={4} {...blockProps} />
+          </View>
         </View>
-        <View style={[home.sunSep, { backgroundColor: colors.divider }]} />
+        <View style={[home.sunSep, { backgroundColor: divider }]} />
         <View style={home.sunItem}>
-          <SkeletonBlock width={14} height={14} borderRadius={7} colors={colors} />
-          <SkeletonBlock width={90} height={12} borderRadius={4} colors={colors} />
+          <SkeletonBlock width={26} height={26} borderRadius={13} {...blockProps} />
+          <View style={home.sunStack}>
+            <SkeletonBlock width={50} height={9} borderRadius={4} {...blockProps} />
+            <SkeletonBlock width={70} height={12} borderRadius={4} {...blockProps} />
+          </View>
         </View>
       </View>
     </View>
@@ -103,12 +140,19 @@ export function HomePanchangSkeleton({ colors }: { colors: ColorPalette }) {
 }
 
 const home = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14 },
-  cell: { width: '50%', paddingVertical: 6, gap: 6 },
-  divider: { height: 0.5, marginVertical: 12 },
-  sunRow: { flexDirection: 'row', alignItems: 'center' },
-  sunItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sunSep: { width: 0.5, height: 20, marginHorizontal: 12 },
+  rows: { marginTop: 2 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 10,
+  },
+  rowMid: { flex: 1 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
+  sunRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
+  sunItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sunStack: { gap: 4 },
+  sunSep: { width: StyleSheet.hairlineWidth, height: 28, marginHorizontal: 12 },
 });
 
 // ─── Full panchang screen skeleton ────────────────────────────────────────────
@@ -148,6 +192,66 @@ export function PanchangSkeleton({ colors }: { colors: ColorPalette }) {
     </View>
   );
 }
+
+// ─── Calendar grid skeleton (panchang tab) ────────────────────────────────────
+// Roughly mirrors the vertical footprint of the real calendar so layout
+// doesn't jump when `monthData` lands, but uses a small set of horizontal
+// shimmer lines (one per week-row) instead of per-cell squares — quieter
+// loading state that reads as "page warming up" rather than "loading 30+ tiles".
+
+interface CalendarGridSkeletonProps {
+  layout: 'compact' | 'dense';
+  colors: ColorPalette;
+  /** True when the surrounding screen is in dark mode. Drives the default
+   *  base/shimmer overlay tones — in dark mode `colors.surfaceRecessed`
+   *  equals `colors.base`, so blocks would be invisible without a lighter
+   *  overlay. */
+  isDarkMode: boolean;
+}
+
+// Width variation per row so the stack reads as loading paragraph text
+// rather than identical bars. Indexed mod row-count.
+const LINE_WIDTHS: `${number}%`[] = ['90%', '76%', '92%', '82%', '88%', '94%', '78%'];
+
+export function CalendarGridSkeleton({ layout, colors, isDarkMode }: CalendarGridSkeletonProps) {
+  // Dark mode: surfaceRecessed === base, so default fill is invisible. Use a
+  // lifted-white overlay matching the home card skeleton tones.
+  const baseColor = isDarkMode ? 'rgba(255,255,255,0.07)' : undefined;
+  const shimmerColor = isDarkMode ? 'rgba(255,255,255,0.14)' : undefined;
+  const blockProps = { colors, baseColor, shimmerColor };
+
+  // Row count + height matches the real calendar so total vertical footprint
+  // is close enough that the crossfade doesn't visibly shift surrounding
+  // content. Compact = 6 weeks × ~52pt; dense = 7 weekday rows × 64pt.
+  const rowCount = layout === 'dense' ? 7 : 6;
+  const rowHeight = layout === 'dense' ? 64 : 52;
+
+  return (
+    <View style={layout === 'dense' ? cal.denseWrap : undefined}>
+      {Array.from({ length: rowCount }, (_, i) => (
+        <View key={i} style={[cal.lineRow, { height: rowHeight }]}>
+          <SkeletonBlock
+            width={LINE_WIDTHS[i % LINE_WIDTHS.length]}
+            height={14}
+            borderRadius={4}
+            {...blockProps}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const cal = StyleSheet.create({
+  // Mirrors the dense calendar's -16pt horizontal extension so the skeleton
+  // and the real grid occupy the same width slot.
+  denseWrap: { marginHorizontal: -16 },
+  lineRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+});
 
 // ─── Skeleton → content crossfade wrapper ─────────────────────────────────────
 // Mounts skeleton + content simultaneously and crossfades them when `ready`

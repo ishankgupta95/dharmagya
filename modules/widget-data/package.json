@@ -1,0 +1,7 @@
+{
+  "name": "widget-data",
+  "version": "0.1.0",
+  "description": "Local Expo module: bridges JS to Android SharedPreferences for the Today's Panchang home-screen widget. iOS surface stubbed for follow-up.",
+  "main": "index.ts",
+  "private": true
+}

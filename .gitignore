@@ -41,6 +41,10 @@ app-example
 # generated native folders
 /ios
 /android
+# Local Expo modules: keep source, drop build output
+modules/*/android/build/
+modules/*/android/.cxx/
+modules/*/android/.gradle/
 
 # Metro bundler temp files
 .com.facebook.react.*

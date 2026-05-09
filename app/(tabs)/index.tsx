@@ -22,12 +22,17 @@ import { useStore } from '@/store/useStore';
 import {
   darkColors,
   lightColors,
+  MONO_FONT,
   palette,
   spacing,
   borderRadius,
   type ColorPalette,
 } from '@/config/theme';
-import { computeJanmaRashiIndex, fetchPanchangForToday } from '@/services/astrology/panchangService';
+import {
+  computeJanmaRashiIndex,
+  deriveJanmaIndicesFromStore,
+  fetchPanchangForToday,
+} from '@/services/astrology/panchangService';
 import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 import { resolveLanguage } from '@/i18n';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
@@ -139,10 +144,15 @@ export default function HomeScreen() {
     if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
     lastFetchRef.current = now;
     if (showSpinner) setPanchangLoading(true);
-    fetchPanchangForToday(userLocation, panchangLang, region, ayanamsa)
+    const { janmaNakshatra, janmaRashi } = deriveJanmaIndicesFromStore({
+      userBirthDate, userBirthTime, userBirthPlace,
+    });
+    fetchPanchangForToday(
+      userLocation, panchangLang, region, ayanamsa, janmaNakshatra, janmaRashi,
+    )
       .then(p => { if (p) setPanchang(p); })
       .finally(() => setPanchangLoading(false));
-  }, [userLocation, panchangLang, region, ayanamsa]);
+  }, [userLocation, panchangLang, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace]);
 
   useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
   useFocusEffect(useCallback(() => { refreshPanchang(); }, [refreshPanchang]));
@@ -352,7 +362,14 @@ export default function HomeScreen() {
 
             <SkeletonCrossfade
               ready={!panchangLoading}
-              skeleton={<HomePanchangSkeleton colors={colors} />}>
+              skeleton={
+                <HomePanchangSkeleton
+                  colors={colors}
+                  baseColor={isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}
+                  shimmerColor={isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.45)'}
+                  dividerColor={plinth.divider}
+                />
+              }>
               {panchang ? (
                 <>
                   <View style={styles.phRows}>
@@ -563,7 +580,7 @@ export default function HomeScreen() {
         <View style={styles.quickRow}>
           <QuickCard icon="heart-outline" label={t('home.favorites')}  onPress={() => router.push('/favorites')} colors={colors} />
           <QuickCard icon="flame" label={t('home.festivals')} onPress={() => router.push('/festivals')} colors={colors} />
-          <QuickCard icon="search" label={t('common.search')} onPress={() => router.push('/search')} colors={colors} />
+          <QuickCard icon="flower" label={t('home.jaap')} onPress={() => router.push('/jaap')} colors={colors} />
         </View>
 
         {/* ── Find Auspicious Date ──────────────────────────────────────── */}
@@ -614,10 +631,7 @@ export default function HomeScreen() {
           tooltipPosition="below"
           stepIndex={3}
           totalSteps={4}
-          onSpotlightTap={() => {
-            setWalkthroughStep(0);
-            router.push('/settings');
-          }}
+          onSpotlightTap={() => setWalkthroughStep(0)}
           onSkip={skipWalkthrough}
         />
       )}
@@ -697,7 +711,11 @@ const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: Quic
       accessibilityRole="button"
       accessibilityLabel={label}>
       <Icon name={icon} size={20} color={colors.accent} />
-      <Text variant="body-italic" style={[styles.quickLabel, { color: colors.textSecondary }]}>
+      <Text
+        variant="body-italic"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        style={[styles.quickLabel, { color: colors.textSecondary }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -725,7 +743,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   dateNum: {
-    fontFamily: 'JetBrainsMono_500Medium',
+    fontFamily: MONO_FONT,
+    fontWeight: '500',
     fontSize: 22,
     letterSpacing: 0.2,
   },

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
-import { borderRadius, type ColorPalette } from '@/config/theme';
+import { borderRadius, MONO_FONT, type ColorPalette } from '@/config/theme';
 import type { IHoraSlot } from '@/types';
 
 const PLANET_COLOR: Record<string, string> = {
@@ -70,5 +70,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   name: { fontSize: 15, fontFamily: 'Fraunces_400Regular', flex: 1 },
-  time: { fontSize: 12, fontFamily: 'JetBrainsMono_400Regular' },
+  time: { fontSize: 12, fontFamily: MONO_FONT },
 });

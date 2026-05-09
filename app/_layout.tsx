@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   useFonts,
   Fraunces_300Light,
@@ -18,10 +19,6 @@ import {
   NotoSerifDevanagari_500Medium,
   NotoSerifDevanagari_700Bold,
 } from '@expo-google-fonts/noto-serif-devanagari';
-import {
-  JetBrainsMono_400Regular,
-  JetBrainsMono_500Medium,
-} from '@expo-google-fonts/jetbrains-mono';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors } from '@/config/theme';
@@ -30,11 +27,16 @@ import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
 import { preloadInterstitial, showInterstitial } from '@/services/interstitialAds';
 import { scheduleDailyReminder } from '@/services/notifications';
 import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
+import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
+import { pmark } from '@/utils/perfProfile';
+
+pmark('app:_layout:moduleEval');
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  pmark('app:RootLayout:render');
   const {
     isDarkMode,
     themeMode,
@@ -79,15 +81,18 @@ export default function RootLayout() {
     NotoSerifDevanagari_400Regular,
     NotoSerifDevanagari_500Medium,
     NotoSerifDevanagari_700Bold,
-    // Sacred Editorial — JetBrains Mono (kickers, timestamps).
-    JetBrainsMono_400Regular,
-    JetBrainsMono_500Medium,
   });
 
   // Wait for Zustand persistence to rehydrate from AsyncStorage
   useEffect(() => {
-    if (storeHydrated) return;
-    return useStore.persist.onFinishHydration(() => setStoreHydrated(true));
+    if (storeHydrated) {
+      pmark('app:zustand:alreadyHydrated');
+      return;
+    }
+    return useStore.persist.onFinishHydration(() => {
+      pmark('app:zustand:hydrated');
+      setStoreHydrated(true);
+    });
   }, [storeHydrated]);
   // Sync i18n language whenever the persisted preference changes
   useEffect(() => {
@@ -100,11 +105,37 @@ export default function RootLayout() {
   const appReady = (fontsLoaded || !!fontError) && storeHydrated;
 
   useEffect(() => {
-    if (appReady) {
-      initFirstOpen();
+    if (fontsLoaded) pmark('app:fonts:loaded');
+    else if (fontError) pmark('app:fonts:error');
+  }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    if (!appReady) return;
+    pmark('app:appReady');
+    initFirstOpen();
+    // Defer the splash hide one frame. If the user is unboarded, the
+    // declarative Redirect in (tabs)/_layout.tsx kicks in this same render
+    // commit; one rAF gives the navigator time to mount onboarding/step1
+    // before the splash dissolves, otherwise on Android the user sees a
+    // blank background between splash-gone and onboarding-mounted.
+    const id = requestAnimationFrame(() => {
+      pmark('app:splash:hide:call');
       SplashScreen.hideAsync();
-    }
+    });
+    // Cold-start widget refresh — covers the case where the user tapped
+    // the widget to launch the app and we want fresh values written back
+    // before they ever look at the home screen again.
+    void refreshTodayWidget();
+    return () => cancelAnimationFrame(id);
   }, [appReady, initFirstOpen]);
+
+  // In-app changes that affect widget rendering (theme, language) need to
+  // bypass the foreground-refresh debounce so the widget repaints immediately
+  // when the user toggles a setting and tabs to home.
+  useEffect(() => {
+    if (!appReady) return;
+    void refreshTodayWidget({ force: true });
+  }, [appReady, isDarkMode, language]);
 
   useEffect(() => {
     if (appReady && !hasOnboarded) {
@@ -142,6 +173,9 @@ export default function RootLayout() {
             quietHours,
           );
         }
+        // Foreground refresh of the home-screen widget. Debounced inside the
+        // service so multiple resumes per minute don't recompute panchang.
+        void refreshTodayWidget();
       }
     });
     return () => sub.remove();
@@ -163,20 +197,44 @@ export default function RootLayout() {
   if (!appReady) return null;
 
   return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <Suspense fallback={null}>
-        <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
-              animation: 'slide_from_right',
-            }}>
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        </SQLiteProvider>
-      </Suspense>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <Suspense fallback={null}>
+          <SQLiteProvider databaseName="dharmagya.db" useSuspense onInit={initDatabase}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: isDarkMode ? darkColors.base : lightColors.base },
+                animation: 'slide_from_right',
+              }}>
+              <Stack.Screen name="(tabs)" />
+              {/* Settings sub-screens slide up as modals (P11.6). They're
+                  short-lived configuration sheets — modal presentation matches
+                  the user mental model better than the default deep-link push. */}
+              <Stack.Screen
+                name="settings/birth-place"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="settings/deities"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="settings/reminders"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="settings/widget"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              {/* Search swaps in/out as a content overlay rather than a push,
+                  so a fade reads more "search dialog" than "drilldown". */}
+              <Stack.Screen name="search" options={{ animation: 'fade' }} />
+            </Stack>
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+          </SQLiteProvider>
+        </Suspense>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -1,6 +1,6 @@
 # SYSTEM CONTEXT: Hindu Devotional App (dharmSetu / MVP Phase)
 
-> **Note:** This file has been trimmed to focus on **pending work only**. Completed phases (Phase 1, Phase 1.5, Phase 2, Phase 3.3, Phase 6, Phase 7.1–7.3) and stale pre-redesign screen specs have been removed — see git history and the `memory/project_*.md` files for the shipped record.
+> **Note:** Done phases are summarized in §6 below. Full sub-phase decisions live in `memory/project_*.md` files and git history. Pending work is in §7 onward, ordered by priority — **optimizations + features first, language support last.**
 
 ## 1. Project Objective
 
@@ -12,606 +12,386 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 - Framework: Expo (with New Architecture and React Compiler enabled).
 - Navigation: `expo-router` (File-based routing). Use expo-router `<Tabs>` for all tab navigation — do NOT use react-native-paper's BottomNavigation.
 - State Management: Zustand (for preferences, favorites, and theme toggling).
-- Panchang Engine: `@ishubhamx/panchangam-js` (Dynamic calculation of Tithi, Nakshatra, Yoga, Karana).
+- Panchang Engine: `panchang-ts`. Source of truth for tithi/nakshatra/yoga/karana/muhurat/kundli/dasha/dosha.
 - Location Services: `expo-location` (To feed coordinates into the Panchang engine).
-- Local Database: `expo-sqlite` — currently used **only for the muhurat scan cache** (`muhurat_cache` table). Aartis/chalisas/kathas tables were dropped; aarti + chalisa content now comes from the `hindu-devotional-texts@0.1.1` package at runtime. Favorites + preferences live in Zustand (persisted via `expo-sqlite/kv-store`).
+- Local Database: `expo-sqlite` — currently used for the muhurat scan cache (`muhurat_cache` table) and (future) the Jaap session table. Aartis/chalisas come from the `hindu-devotional-texts` package at runtime. Favorites + preferences live in Zustand (persisted via `expo-sqlite/kv-store`).
 - UI Library: `react-native-paper` (Material Design 3 — for UI components like Cards, Buttons, Surfaces only).
-- Animations: `react-native-reanimated` (v4 — already installed at v4.1.1, do NOT reinstall). `react-native-gesture-handler` v2.28 also installed.
-- Typography (post-P6.9.1, Sacred Editorial stack): `@expo-google-fonts/fraunces` (display serif — headlines + italic accents), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body, 400/500/700), `@expo-google-fonts/jetbrains-mono` (mono small-caps + numeric — 400/500). **Mukta was removed in P6.9.1**; do not reinstall.
+- Animations: `react-native-reanimated` v4.1.1 + `react-native-gesture-handler` v2.28 (already installed; do NOT reinstall).
+- Typography (post-P6.9.1): `@expo-google-fonts/fraunces` (display serif), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body), `@expo-google-fonts/jetbrains-mono` (mono caps + numeric). **Mukta is removed**; do not reinstall.
 - Icons (post-P6.9.2): custom `<Icon>` component in `src/components/common/Icon.tsx` (react-native-svg, 60 glyphs). `@expo/vector-icons` is no longer a direct dep.
 - App Loading: `expo-splash-screen` (already installed).
 
 ## 3. Architectural Rules & Conventions
 
 1. TypeScript Strictness: Every component, prop, and state must have a defined interface. No `any` types.
-2. Dynamic Panchang Calculation: Do NOT fetch Panchang data from an API. Use the `getPanchangam` function from `@ishubhamx/panchangam-js` passing in the current Date and user location.
-3. Fallback Location: If location permissions are denied, default the Observer coordinates to Lat: 18.6298, Lon: 73.7997 for local testing accuracy.
-4. Theme Toggling: Support Dark and Light modes toggled via Zustand and injected through the RN Paper Provider. Default to Dark mode (deep charcoal backgrounds, off-white text, Saffron accents).
-5. Expo Router Rules: Use the `app/` directory strictly for routing/layouts. Keep UI components, store logic, and data in `src/`.
-6. No babel.config.js changes needed: `react-native-reanimated` v4 does NOT require a babel plugin. Do not add `react-native-reanimated/plugin` anywhere.
+2. Dynamic Panchang Calculation: Do NOT fetch from an API. Use `panchang-ts` directly with the user's date/location.
+3. Fallback Location: If location permissions are denied, default coordinates to Lat: 18.6298, Lon: 73.7997.
+4. Theme Toggling: Support Dark and Light modes via Zustand. Default to Dark mode (deep ink + parchment + sindoor/goldLeaf accent).
+5. Expo Router Rules: Use `app/` strictly for routing/layouts. Keep UI components, store logic, and data in `src/`.
+6. No babel.config.js changes needed: `react-native-reanimated` v4 does NOT require a babel plugin.
 7. Source structure: existing root-level `components/`, `hooks/`, and `constants/` were migrated into `src/` during Phase 1.
 
-### 3.1 `@ishubhamx/panchangam-js` API Contract
+### 3.1 `panchang-ts` API Contract
 
-**Package:** `@ishubhamx/panchangam-js` (v2.1.x) — pure TypeScript, no native modules, works in React Native out of the box.
+Pure TypeScript, no native modules, RN-compatible. Wraps as `getPanchangam`, `computeKundli`, `computeAshtakoot`, `computeMangalDosha`, `computeKaalSarp`, `computePitruDosha`, `computeSadeSati`, `computeShadbala`, `computeDignity`, `computeVimshottariDashaFromBirth`, `computeAshtottariDasha`, `computeYoginiDasha`, `computeCharaDasha`, `computeDivisionalChart`, `scoreMuhurta`, etc. Library handles ayanamsa, house system, varga math; consumers cache via LRU keyed on input hash. See [`src/services/astrology/`](src/services/astrology/) for the existing wrapper pattern.
 
-**Import:**
-```typescript
-import { getPanchangam, Observer } from '@ishubhamx/panchangam-js';
-```
+**Timezone handling:** birth times are wallclock-in-birthplace-tz. Always pass through [`src/utils/time.ts`](src/utils/time.ts) `wallclockInZoneToUtc` before handing to library — `new Date('YYYY-MM-DDTHH:mm:00')` parses in device tz, which breaks any user travelling outside India.
 
-**Observer constructor:**
-```typescript
-// Observer(latitude: number, longitude: number, elevationInMeters: number)
-const observer = new Observer(18.6298, 73.7997, 560); // Pune
-```
-
-**getPanchangam call:**
-```typescript
-// getPanchangam(date: Date, observer: Observer, options?: { timezoneOffset?: number }): Panchangam
-const panchangam = getPanchangam(new Date(), observer, { timezoneOffset: 330 }); // IST = +330 minutes
-```
-
-**Return type — `Panchangam` interface (relevant fields for MVP):**
-```typescript
-interface Panchangam {
-  // Core — these are NUMERIC INDICES, not display strings
-  tithi: number;          // 0-29 (lunar day index)
-  nakshatra: number;      // 0-26 (lunar mansion index)
-  yoga: number;           // 0-26 (sun-moon combination index)
-  karana: string;         // string name (e.g., "Bava", "Balava", "Kaulava")
-  vara: number;           // 0=Sunday, 1=Monday, ... 6=Saturday
-
-  // Times — Date objects or null
-  sunrise: Date | null;
-  sunset: Date | null;
-  moonrise: Date | null;
-  moonset: Date | null;
-  tithiEndTime: Date | null;
-  nakshatraEndTime: Date | null;
-  yogaEndTime: Date | null;
-
-  // Inauspicious periods
-  rahuKalamStart: Date | null;
-  rahuKalamEnd: Date | null;
-
-  // Muhurats
-  abhijitMuhurta: { start: Date; end: Date } | null;
-  brahmaMuhurta: { start: Date; end: Date } | null;
-
-  // Planetary positions
-  planetaryPositions: {
-    sun: { rashi: number; rashiName: string; degree: number; longitude: number };
-    moon: { rashi: number; rashiName: string; degree: number; longitude: number };
-    // ... mars, mercury, jupiter, venus, saturn (same shape)
-  };
-
-  // Festivals
-  festivals: string[];
-}
-```
-
-**CRITICAL: Converting indices to display strings.** `tithi`, `nakshatra`, and `yoga` are numbers. Use the exported name arrays:
-```typescript
-import { tithiNames, nakshatraNames, yogaNames } from '@ishubhamx/panchangam-js';
-
-const tithiLabel = tithiNames[panchangam.tithi];         // e.g., "Krishna Chaturdashi"
-const nakshatraLabel = nakshatraNames[panchangam.nakshatra]; // e.g., "Purva Bhadrapada"
-const yogaLabel = yogaNames[panchangam.yoga];             // e.g., "Siddha"
-```
-
-**Timezone handling:** Always pass `timezoneOffset: 330` (IST, +5:30) in options for Indian users. Without it, the library approximates from longitude, which can be inaccurate.
-
-**Performance:** ~5ms per calculation. Safe to call synchronously on the JS thread.
+**Performance:** ~5–20ms per kundli compute. LRU caches keep re-renders cheap.
 
 ### 3.2 `expo-sqlite` API (SDK 54+)
 
-Use the modern synchronous API. Do NOT use the legacy `expo-sqlite/legacy` or `SQLite.openDatabase()`. The DB is wrapped via `<SQLiteProvider databaseName="dharmsetu.db" useSuspense>` in `app/_layout.tsx`; tables are managed in [`src/utils/database.ts`](src/utils/database.ts) on `onInit`.
+Use the modern synchronous API. Do NOT use the legacy `expo-sqlite/legacy` or `SQLite.openDatabase()`. The DB is wrapped via `<SQLiteProvider databaseName="dharmsetu.db" useSuspense>` in `app/_layout.tsx`; tables are managed in [`src/utils/database.ts`](src/utils/database.ts) on `onInit` and gated by `PRAGMA user_version`. Currently at version 2 (post-1.7.0).
 
-**Current schema:** only `muhurat_cache(occasion, lat_key, lon_key, matches_json, scanned_through, updated_at)` — a rolling 365-day muhurat scan cache keyed on 0.1°-rounded coordinates. The aartis/chalisas/kathas/rashifal/meta tables previously seeded here have all been dropped on init for existing installs. Future Phase 8 (kundli, etc.) calculations should also cache through this surface, not invent a second persistence layer.
+**Current schema:** `muhurat_cache(occasion, lat_key, lon_key, matches_json, scanned_through, updated_at)` — 365-day rolling muhurat scan cache. New tables for future features (e.g. `jaap_sessions`) cache through this surface, not a separate persistence layer.
 
 ### 3.3 Path Aliases
 
-`@/` alias points to `src/`. `tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
-  }
-}
-```
-
-All imports from `src/` use the alias:
-```typescript
-import { useStore } from '@/store/useStore';
-import { IAarti } from '@/types';
-import { darkTheme, lightTheme } from '@/config/theme';
-```
+`@/` alias points to `src/`. All imports from `src/` use the alias.
 
 ### 3.4 Zustand Persistence
 
-Use `zustand/middleware` persist with `expo-sqlite/kv-store` as the storage backend:
+`zustand/middleware` persist with `expo-sqlite/kv-store` as backend. Canonical snapshot in [`src/store/useStore.ts`](src/store/useStore.ts); secondary chart slice in [`src/store/useBirthStore.ts`](src/store/useBirthStore.ts).
 
-```typescript
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from 'expo-sqlite/kv-store';
+### 3.5 Project File Context
 
-// store shape evolves with each phase; canonical snapshot is in src/store/useStore.ts
-```
-
-### 3.5 Expo Router Dynamic Routes
-
-Detail routes use `useLocalSearchParams<{ id: string }>()`. Navigation from list screens uses `router.push(\`/aarti/${id}\`)` etc. Already wired for aarti, chalisa, god, muhurat[occasion].
-
-### 3.6 Project File Context
-
-Before any structural change, inspect:
-- `app.json` — existing plugins, splash config, scheme.
-- `tsconfig.json` — path aliases.
-- `package.json` — already-installed deps to avoid duplicates.
-- Run `ls app/` and `ls app/(tabs)/` to see current route files.
-
-Read first, then modify.
+Before any structural change, inspect `app.json`, `tsconfig.json`, `package.json`, `ls app/`, `ls app/(tabs)/`. Read first, then modify.
 
 ---
 
 ## 4. Design System (post-P6 — Sacred Editorial)
 
-The MVP-era beige + saffron tokens have been fully replaced by the Sacred Editorial system. Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typeScale.ts`](src/config/typeScale.ts).
+Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typeScale.ts`](src/config/typeScale.ts).
 
-**Palette ground:** parchment (light) ↔ deep ink (dark). **Accent:** sindoor (light) / goldLeaf (dark) via `colors.accent`. **Emphasis:** sindoorDeep (light) / goldLeaf (dark) via `colors.emphasis`. Hardcoded `palette.*` is allowed only for CTA backgrounds, intentionally-parchment onboarding steps, content-semantic dark plinths (eclipse), and component-internal defaults all callers override. See **Phase 6 conventions** in §11 below.
+**Palette ground:** parchment (light) ↔ deep ink (dark). **Accent:** sindoor (light) / goldLeaf (dark) via `colors.accent`. **Emphasis:** sindoorDeep / goldLeaf via `colors.emphasis`. Hardcoded `palette.*` allowed only for CTA backgrounds, parchment-only onboarding steps, content-semantic dark plinths (eclipse), and component-internal defaults all callers override.
 
 **Typography:** Fraunces (display serif + italic), Noto Serif Devanagari (Devanāgarī body, 400/500/700), JetBrains Mono (mono caps + numeric).
 
 **Spacing:** 24px screen horizontal padding; 16–20px card internal padding; 16–20px vertical card gap; 12–14px grid gap; tab bar 10px top / `Math.max(insets.bottom, 10)` bottom.
 
+**Phase 6 conventions (forward-applicable):**
+- Theme-responsive surfaces use `colors.surface` / `colors.surfaceRecessed` / `colors.border` / `colors.text*` / `colors.accent` / `colors.emphasis`. Hardcoded palette only in the four exceptions above.
+- Alpha-tinted alert banners: `color + '1E'` (bg) / `+ '66'` (border) / full-color foreground.
+- Plain screen names, not decorative kickers (per `feedback_no_decorative_taglines.md`).
+- No new deities (per `feedback_content_accuracy_audit.md`); 19-deity roster is fixed.
+- SafeAreaView edges: non-tab screens `['top','bottom']`; tab screens `['top']`.
+- Post-task gate: `tsc --noEmit` clean + `npx expo lint` ≤ 8 warnings.
+
+**Phase 7 conventions (forward-applicable):**
+- Transform + opacity only — never `width`/`height`/`borderRadius`/raw `color`.
+- Worklets always (`react-native-reanimated` 4.1). Never the legacy `Animated` API or `setInterval`-driven animation.
+- 220ms default duration, `Easing.out(Easing.cubic)`. Max 320ms for interaction feedback.
+- Stagger cap **120ms total** (post-P11.2; was 400ms); max 6 simultaneous animations per screen.
+- Reduced motion respected via `useReducedMotion()` hook in every animated component.
+- Haptics paired: `Selection` on state change, `Light` on confirmation. Never `Heavy`.
+- Ambient loops > 2s pause off-screen.
+
+**Compute-behind-animation rule (P11.2, durable — see `memory/feedback_animation_kept_when.md`):** an animation is kept iff (a) it runs on the UI thread without JS jank AND (b) its duration is used to mask compute (cache fetch, kundli compute, route mount, validateCandidates) OR it pairs with an action the user just took (haptic, press, toggle). Cut only if neither holds. Decorative-only animations are OK only if they're *free* — never if they delay content the user is asking for. Concretely: schedule masking animations with Reanimated's native-side primitives (`entering={FadeIn…}`, layout animations, gestures) so they start at mount without waiting for a post-commit `useEffect` to schedule the worklet on a busy JS thread. `ScreenMount` is the canonical example.
+
 ---
 
 ## 5. Screen Inventory
 
-### 5.1 Core Screens
-
+### Core
 | #  | Screen           | Route                        |
 | -- | ---------------- | ---------------------------- |
 | 1  | Splash           | (pre-navigation)             |
 | 2  | Home             | `app/(tabs)/index.tsx`       |
 | 3  | Panchang         | `app/(tabs)/panchang.tsx`    |
 | 4  | Library (Gods)   | `app/(tabs)/library.tsx`     |
-| 5  | Aarti Detail     | `app/aarti/[id].tsx`         |
-| 6  | Chalisa Detail   | `app/chalisa/[id].tsx`       |
-| 7  | God Detail       | `app/god/[id].tsx`           |
+| 5  | Astrology        | `app/(tabs)/astrology.tsx`   |
+| 6  | Aarti Detail     | `app/aarti/[id].tsx`         |
+| 7  | Chalisa Detail   | `app/chalisa/[id].tsx`       |
+| 8  | God Detail       | `app/god/[id].tsx`           |
 
-### 5.2 Supporting Screens
-
+### Supporting
 | #  | Screen                 | Route / Context                |
 | -- | ---------------------- | ------------------------------ |
-| 8  | Settings + sub-screens | `app/settings.tsx`, `app/settings/{birth-place,deities,reminders}.tsx` |
-| 9  | Favorites              | `app/favorites.tsx`            |
-| 10 | Search                 | `app/search.tsx`               |
-| 11 | Festivals              | `app/festivals.tsx`            |
-| 12 | Dasha                  | `app/dasha.tsx`                |
-| 13 | Muhurat (occasion list + detail) | `app/muhurat/index.tsx`, `app/muhurat/[occasion].tsx` |
-| 14 | Onboarding (3 steps + walkthrough) | `app/onboarding/*`     |
-| 15 | Location Permission    | `app/location-permission.tsx`  |
+| 9  | Settings + sub-screens | `app/settings.tsx`, `app/settings/{birth-place,deities,reminders}.tsx` |
+| 10 | Favorites              | `app/favorites.tsx`            |
+| 11 | Search                 | `app/search.tsx`               |
+| 12 | Festivals              | `app/festivals.tsx`            |
+| 13 | Kundli Match           | `app/kundli/match.tsx`         |
+| 14 | Muhurat                | `app/muhurat/index.tsx`, `app/muhurat/[occasion].tsx` |
+| 15 | Onboarding             | `app/onboarding/*` (3 steps + walkthrough) |
+| 16 | Location Permission    | `app/location-permission.tsx`  |
 
-**Removed:** `app/katha/` and `app/rashifal/` — see Phase 2 note in §9.
-
----
-
-## 6. Phase 1 — MVP — ✅ COMPLETED
-
-All 17 steps of the original Phase 1 execution plan shipped (initial release). Detailed step-by-step plan removed from this file — see git history (commits prior to 2026-04-12) and the live codebase.
+**Removed:** `app/katha/`, `app/rashifal/`, standalone `app/dasha.tsx` (now folded into Astrology tab).
 
 ---
 
-## 7. Phase 1.5 Follow-ups — Deferred Items Only
+## 6. Shipped phases — summary
 
-All Phase 1.5 follow-ups are shipped except:
+All phase decisions and per-sub-phase notes live in `memory/project_*.md`.
 
-- **Read Along Mode (auto-scroll lyrics):** ⏸️ Deferred — tied to audio track (see Phase 5).
-- **Reminder toggles surface "permission denied" in Expo Go:** ⏸️ Needs dev-build verification, not Expo Go. `src/services/notifications.ts` intentionally sets `Notifications = null` in Expo Go (SDK 53 dropped Android push from Expo Go), so `requestNotificationPermission()` returns `false` and the toggle flow aborts with a misleading "allow in Settings" alert. Not a real bug — notifications genuinely don't work in Expo Go. To verify: run an EAS development build and retest toggles for Tithi/Festival reminders. Optional polish: detect Expo Go and swap the alert text to "Notifications require a development build."
-
----
-
-## 8. Competitive-Gap Roadmap — Phases 2–5
-
-**Source:** Comparative analysis against Sri Mandir, AstroSage, Drik Panchang, myMandir, Hindu Calendar (Mandavgane), etc. Goal: close the feature gap that prevents Dharmagya from moving beyond a niche reference tool, while leaning into our existing `panchang-ts` accuracy moat.
-
-**Guiding rules for every pending phase below:**
-1. Never break offline-first. Every new feature must work without a network after first install. (The original exception for Rashifal remote pulls is now moot — Rashifal was removed; see §9.)
-2. Integrate with existing Zustand store, SQLite database, theme tokens, and i18n system. Do not introduce a second state/storage/theme/i18n layer.
-3. Respect the ad gating rules already established (`INTERSTITIAL_MIN_GAP_MS`, `FIRST_SESSION_GRACE_MS`, never show ads before the user has engaged with content — see `feedback_no_ads_after_onboarding.md`).
-4. All new text must be wired through `i18next` bundles, not hard-coded. Add keys to en/hi/sa at minimum.
-5. All new calculations must be locale-aware (IST timezone, device language for display).
-6. No new native modules unless a feature is impossible without one (widgets are the only Phase-2-to-4 exception).
+- **Phase 1 — MVP** ✅. All 17 steps shipped (initial release).
+- **Phase 1.5 — Follow-ups** ✅ except: Read-Along Mode (deferred — tied to P5.1 audio), Expo Go reminder verification (needs dev build, not Expo Go).
+- **Phase 2 — Daily habit drivers** ✅ partial. P2B reminders + P2C muhurats shipped. P2A vrat katha and P2D rashifal removed (tables dropped on init; do not revive without fresh design — see git log).
+- **Phase 3.3 — Isht Devata personalization** ✅ (2026-04-13). Home re-ranking, "Your Deities" strip, Search re-ranking, Settings → Manage Your Deities.
+- **Phase 6 — Sacred Editorial redesign** ✅ (2026-04-20). All 10 sub-phases. Mukta + Ionicons fully dropped; theme tokens drive everything.
+- **Phase 7.1–7.3 — Motion foundation + system micro-interactions + editorial reveals** ✅ (2026-04-22). Motion tokens, FavoriteHeart, SegmentedChip, ScreenMount, verse stagger, refrain highlight, CornerBrackets draw-in.
+- **Phase 8.1 — panchang-ts v2.4 surface** ✅ (2026-05-01). Tarabala, Varjyam, Ganda Mula, Madhyahna, Sandhya, Do Ghati, ayanamsa setting, Chandra Balam, Adhika Masa, instant snapshot, eclipses, GRAHA_ABBR chip, PanchangError diagnostics.
+- **Phase 8.2 — Kundli + Matching + Sade Sati** ✅ (shipped in 1.7.0, 2026-05-06). Astrology tab, North + South charts, D1 + D9, doshas (Mangal + Kaal Sarp + Pitru), Ashtakoot match with saved-charts store, Sade Sati banner, chart style + house system selectors, True Chitra + Thirukanitham ayanamsas.
+- **Phase 8.3 (most of)** ✅ (1.7.0, 2026-05-06). Divisional D2–D30, four dasha systems (Vimshottari/Ashtottari/Yogini/Chara), Shadbala chart, library-backed muhurat (custom RULES dropped, `scoreMuhurta` is source of truth), bundled-candidate fast path, instant-cache render. **Remaining:** Aspects view (now in §10).
+- **panchang-ts 3.1.0 surface** ✅ (2026-05-06). Kaal Sarp + Pitru doshas, Shadbala, D2–D30 divisional charts, Ashtottari/Yogini/Chara dashas wired up.
+- **1.7.0 Play Store launch** ✅. Screenshots, AAB, staged rollout. Bug fixes flagged 2026-05-06 all resolved (muhurat low-end perf, walkthrough off-screen clamp, screenshots).
+- **Phase 9 — Panchang Densification** ✅ (2026-05-06 → 2026-05-07). The originally-scoped fullscreen calendar route was reversed; instead the Panchang tab was densified into a "Sacred Almanac" ledger. Shipped: layout toggle (compact ↔ dense transposed grid) persisted in Zustand, lazy `useLazyDailyPanchang` hook (daily compute deferred until first accordion expand), category accordions (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), glance section reading from `CalendarDay` snapshot only, Pancha Anga "Sacred Almanac entry" redesign (italic Fraunces kickers replacing 96pt mono-caps label column; auto static/dynamic limb modes), full Hi localisation in dense cells (tithi / paksha / event / Devanagari numerals), default-open Pancha Anga, store v12/v13 migrations (`panchangCategoriesOpen` reset, `xl`/`xxl` font sizes dropped). Yearly drilldown lists (Ekadashi / Sankranti / Upcoming Eclipses) bundled into [`src/services/astrology/calendarService.ts`](src/services/astrology/calendarService.ts).
+- **P4.2 — Today's Panchang widget (Android scaffold)** ✅ (2026-05-06). Android-only AppWidgetProvider drop with system fonts + dark register + foreground+tap-refresh. **iOS WidgetKit deferred** (see §11).
+- **Phase 10 — Aspects + Mantra Counter** ✅ (2026-05-08). P10.3 Mantra Counter (jaap routes + 21 mantras + history; SQLite `jaap_sessions`, user_version 2 → 3) and P10.2 Aspects view (Drishti card inside Kundli, default-closed AccordionSection, surfaces existing `bundle.aspects`). P10.1 (landscape calendar) dropped, not deferred.
 
 ---
 
-## 9. Phase 2 — Daily Habit Drivers — partial state
+## 7. Pending — Sentry post-launch ⏳
 
-**Currently in app:**
-- ✅ **P2B Festival & Tithi Reminders** — `app/settings/reminders.tsx`, 6 tithi toggles + 5 festival-type toggles, scheduler in `src/services/notifications.ts`.
-- ✅ **P2C Occasion-specific Muhurats** — `app/muhurat/index.tsx` + `[occasion].tsx`, 365-day scan with progressive streaming + SQLite cache (`muhurat_cache` table), classical rules in `src/services/astrology/muhurat.ts`.
+Add `@sentry/react-native` + `sentry-expo` config plugin (decision 2026-05-02). Free Developer plan (5K errors/mo, 50 replays, 30-day retention) is sufficient at current scale; revisit only if usage actually overflows.
 
-**Shipped then removed (no longer in app):**
-- ❌ **P2A Vrat Katha Library** — `kathas` table dropped on init, no `app/katha/` route, favorites migration drops `katha-*` IDs (see [`src/utils/database.ts`](src/utils/database.ts) and [`src/store/useStore.ts`](src/store/useStore.ts) v1→v2 migration).
-- ❌ **P2D Daily Rashifal** — `rashifal` table dropped on init, `userRashi` field stripped from persisted store (v2→v3 migration), no `app/rashifal/` route. `userBirthDate` field is retained because it feeds future Phase 8 kundli work.
+Setup: install plugin, register DSN, set `SENTRY_AUTH_TOKEN` as EAS Build secret so source maps + Hermes bytecode maps upload at build time, wrap root in `Sentry.wrap()`. Ship as a patch — no UI surface change.
 
-If reviving either, treat as a fresh design pass — don't assume the prior implementation can be restored from git as-is, since the surrounding redesign (Phase 6) and motion layer (Phase 7) have moved on.
+Half-day of work. **Deferred until staged rollout reaches 100%** — Play Vitals covers the launch window.
 
 ---
 
-## 10. Phase 3 — Reach Expansion (languages + content depth)
+## 8. Pending — Phase 7 finishing — subsumed into Phase 11 (2026-05-08)
 
-**Goal:** Unlock pan-India audiences. English + Hindi + Sanskrit cover maybe 45% of the devotional market; adding 4 more regional languages expands reach to ~80%. Also deepens the deity/content library that users browse.
+P7.1–P7.3 shipped (see §6). Remaining sub-phases reorganized:
 
-**Sequencing within Phase 3:** Per `project_phase3_ordering.md` — execute **P3.3 → P3.2 → P3.1**. Language expansion is last in the sprint.
+- **P7.4 Screen-level transitions → P11.6** — lifted with compute-masking framing (panchang date crossfade, swipe gesture, muhurat detail fade, god hero fade). The transition's duration becomes the budget for the new-context compute.
+- **P7.5 Signature moments → dropped** — mandala drift = continuous animation with no compute window (battery cost on low-end Android), DeityAvatar Pranam = 700ms with nothing to mask. Both contradict the compute-behind-animation principle. Not deferred — out of scope.
+- **P7.6 Pixel 3a perf gate → P11.5** — full thresholds + artifact specced inside Phase 11.
 
-### Step P3.1: Multilingual Expansion (Marathi, Gujarati, Tamil, Telugu) — ⏳ PENDING
+Phase 7 conventions in §4 (UI thread / transform+opacity / 220ms / reduced-motion / haptics) remain forward-applicable. Phase 11 adds: animations must mask compute or be free; never delay content the user is asking for.
 
-**Why:** Drik Panchang supports 10 languages, AstroSage 9. Without regional languages, Dharmagya cannot compete in Maharashtra, Gujarat, Tamil Nadu, Andhra/Telangana.
+---
+
+## 9. Pending — Phase 3 — Multilingual Expansion (P3.1) ⏳
+
+**Sequencing note:** Languages are last in the active queue. Will be its own dedicated PR after current feature work lands. Regional rollout is content-heavy and shouldn't compete with feature velocity.
+
+**Why:** Drik Panchang supports 10 languages, AstroSage 9. Without regional languages we can't compete in Maharashtra, Gujarat, Tamil Nadu, Andhra/Telangana.
 
 **Implementation:**
-- Add 4 new i18n bundles: `mr` (Marathi), `gu` (Gujarati), `ta` (Tamil), `te` (Telugu). Keep existing lazy-loading — only the selected language loads at runtime.
-- Translate UI strings: split into two tiers:
-  - **Tier 1 (ship together with language toggle):** navigation, settings, panchang labels, notification templates, onboarding. Machine-translate via professional MT (DeepL/Google) then native-speaker QA pass for each language (budget: 1 freelancer per language for 4–6 hours).
-  - **Tier 2 (ship progressively):** devotional content (aarti/chalisa translations in regional scripts) — flows through the `hindu-devotional-texts` package. These are content-heavy; translate the 10 most-popular items per language first, add rest over subsequent releases.
-- Font loading: NSD covers Devanāgarī (Hindi/Marathi/Sanskrit). Add Tamil and Telugu serifs (`@expo-google-fonts/noto-serif-tamil` / `@expo-google-fonts/noto-serif-telugu`). Verify no rendering regressions on Android. For Gujarati, add `@expo-google-fonts/noto-serif-gujarati`.
-- Panchang terminology: the `panchang-ts` library may not have Marathi/Gujarati/Tamil/Telugu tithi/nakshatra/yoga names built-in. Extend our own mapping tables in `src/config/panchang-labels.ts` with regional transliterations.
-- Settings language picker: add 4 rows below existing en/hi/sa.
-- Persist selected language in Zustand (already supported).
-- **Gate:** do not ship a language publicly until Tier 1 + at least 5 devotional items in that language are QA-passed.
+- Add 4 i18n bundles (`mr`, `gu`, `ta`, `te`); existing lazy-load retained.
+- Translate UI strings — Tier 1 (nav, settings, panchang labels, notification templates, onboarding) ships with the language toggle. MT (DeepL/Google) + native-speaker QA (1 freelancer × 4–6h per language).
+- Font loading: NSD already covers Devanāgarī (Marathi). Add `@expo-google-fonts/noto-serif-tamil`, `noto-serif-telugu`, `noto-serif-gujarati`. Verify no Android rendering regressions.
+- Panchang terminology: extend `src/config/panchang-labels.ts` with regional transliterations (tithi/nakshatra/yoga).
+- Settings language picker: 4 new rows below en/hi/sa.
+- **Gate:** do not ship a language publicly until Tier 1 UI strings are QA-passed and devotional content for that language exists in the consumed text package.
 
-### Step P3.2: Deity / Aarti / Chalisa Library Expansion — ⏳ PENDING
-
-**Why:** 20 deities is thin vs. 100+ in Sri Mandir. Content depth is a direct retention metric.
-
-**Scope cap (per `feedback_content_accuracy_audit.md`):** Audit existing content first; **no new deities**; only fill gaps within the current 20-deity roster ([`src/config/deities.ts`](src/config/deities.ts)).
-
-**Content source:** aarti + chalisa text comes from the [`hindu-devotional-texts`](https://www.npmjs.com/package/hindu-devotional-texts) package (currently pinned to `0.1.1`). Adding content is a library upgrade + bundle bump, not a SQLite seed migration. Kathas were removed from the app (see §9) — do not reintroduce here unless the user explicitly opts back in.
-
-**Implementation:**
-- Audit current corpus per-deity: which aartis + chalisas exist in `hindu-devotional-texts`, what's missing, accuracy of Devanagari + transliteration.
-- Contribute missing items upstream to `hindu-devotional-texts`, cut a new minor version, bump in `package.json`.
-- 2-step editorial review for accuracy + script correctness on every new entry.
-- Library filters unchanged (sectarian chips already cover the roster).
-
-### Step P3.3: Isht Devata Personalization — ✅ SHIPPED (2026-04-13)
-
-Home re-ranking (Featured Aarti + Featured Chalisa prefer `selectedDeities`), "Your Deities" strip, Search re-ranking, Settings → Manage Your Deities row at [`app/settings/deities.tsx`](app/settings/deities.tsx). See `memory/project_p3_3_shipped.md` and git history.
+**Order:** Marathi first (largest contiguous market, NSD already loaded), then Gujarati, then Tamil, then Telugu. One language per release.
 
 ### Phase 3 Exit Criteria
 
-- 7 languages shipped with Tier 1 complete and Tier 2 ≥5 items each.
-- Content library audited and gap-filled within the existing 20-deity roster (via `hindu-devotional-texts` upstream contribution).
-- ✅ Home re-ranking live, "Your Deities" strip on Home, settings entry for re-selection (P3.3 shipped).
+- 4 new languages shipped with Tier 1 UI strings complete and per-language gating cleared.
 
 ---
 
-## 11. Phase 6 — Visual Redesign: "Sacred Editorial" — ✅ SHIPPED (2026-04-20)
+## 10. Phase 10 — Aspects + Mantra Counter ✅ (2026-05-08)
 
-All 10 sub-phases (P6.1 tokens → P6.10 release gate) landed 2026-04-20. Mukta dropped (P6.9.1), Ionicons dropped (P6.9.2), full theme-responsiveness sweep (P6.10). Detailed sub-phase specs and per-sub-phase decisions removed from this file — see `memory/project_p6_*.md` files and git history.
+**Why now:** Following the Phase 9 panchang densification (see §6), two high-impact features remain that pair well into a single release: a planetary aspects (Drishti) view that finally surfaces `bundle.aspects` data, and the long-pending mantra counter (originally P4.3). Both are app-internal, no native modules, no platform asymmetry.
 
-**Phase 6 conventions established (use forward in P7+ and beyond):**
+**Removed from this phase (2026-05-08):** Landscape detailed calendar route was originally P10.1. Dropped per user — the dense Panchang grid (Phase 9) is sufficient for the almanac-page use case, and the orientation-lock complexity (`expo-screen-orientation`, portrait→landscape→portrait flicker, "Auto-rotate off" handling) wasn't worth the marginal info density gain over the existing in-tab densified grid. Not deferred — out of scope.
 
-- **Theme-responsive surfaces** — every card / row / icon-circle / border on a theme-responsive screen MUST use `colors.surface` / `colors.surfaceRecessed` / `colors.border` / `colors.borderAccent` / `colors.text*` / `colors.accent` / `colors.emphasis`. Hardcoded `palette.parchmentBright` / `palette.ink` / `palette.sindoor` is allowed ONLY for: (a) CTA backgrounds with light foreground text, (b) onboarding steps that are deliberately parchment-only, (c) content-semantic dark plinths (eclipse card), (d) component-internal defaults that all callers override.
-- **`colors.accent`** — sindoor in light, goldLeaf in dark — for icons / mono-caps text / borders on theme-responsive surfaces.
-- **`colors.emphasis`** — sindoor-deep in light, goldLeaf in dark — for body emphasis (refrain lines, italicised tail syllables, see-all links, planet glyphs).
-- **Alpha-tinted alert banners** — `color + '1E'` (bg) / `+ '66'` (border) / full-color foreground. Used for festival / yoga / panchaka banners, sindoor row tints, and selected-state highlights.
-- **Plain screen names, not decorative kickers.** Hero copy in [design/redesign-preview.html](design/redesign-preview.html) is typographic demo text only — use the actual screen name in `display-italic`. Add a kicker only when it surfaces real info (location, count, step counter, active month, section purpose).
-- **No new deities, no roster edits, no fabricated classifications** (per `feedback_content_accuracy_audit.md`). The Library card classifications (PRESENTATION map) live screen-local.
-- **No ad placement changes** during redesign sub-phases (per `feedback_no_ads_after_onboarding.md`).
-- **SafeAreaView edges:** non-tab screens use `['top','bottom']`; tab screens use `['top']` only.
-- **`tsc --noEmit` clean + `npx expo lint` ≤ baseline (8 warnings post-P7.1)** is the post-sub-phase gate.
+### Step P10.2 — Aspects view in Astrology tab ✅ 2026-05-08
 
-**Open Phase 6 follow-up:** Device verification of dark-mode redesign, Play Store screenshots, AAB build, staged rollout. User-gated; checklist in `memory/project_p6_10_prepared.md`.
+Shipped: `AspectsCard` collapsible inside `KundliSection` (default-closed via `AccordionSection`, after the Shadbala block). One row per graha (Sun..Ketu) with the GRAHA_ABBR text label, "From {{rashi}} (House {{n}})" subtitle (`localizeRashi` + `useLocaleFormatters` for Devanagari digits when the language is Hindi), `aspects[graha]` rendered as a comma-separated mono house list, and a "Sits with" chip strip listing every other planet that occupies an aspected house (`{GRAHA_ABBR} · {house}` per chip). Empty `sitsWith` collapses gracefully — chips block hides instead of printing a placeholder. Aspect data comes straight from `bundle.aspects: AspectMap` (already returned by `computeKundli`); no recompute. `aspects.*` i18n namespace added to en + hi (4 keys).
 
-**Post-launch follow-up — Sentry crash reporting:** Add `@sentry/react-native` + `sentry-expo` config plugin **immediately after the staged rollout reaches 100%** (decision 2026-05-02). Deferred so the launch ships unblocked; Play Console's Android Vitals (crash-free rate, ANRs, stack traces) covers the rollout-watch window. What Sentry adds afterward: non-fatal JS exceptions, real-time alerts, source-mapped Hermes traces, breadcrumbs. Setup: install the plugin, register DSN, set `SENTRY_AUTH_TOKEN` as an EAS Build secret so source maps + Hermes bytecode maps upload at build time, wrap the root in `Sentry.wrap()`. Ship as a patch (`1.5.x` or `1.6.0`) — no UI surface change.
+**Why:** `bundle.aspects: AspectMap` is already returned by `computeKundli` and currently unused in the UI. Aspects (Drishti) describe how planets influence other houses beyond the one they sit in: all planets aspect the 7th from themselves; Mars also aspects 4th + 8th; Jupiter also 5th + 9th; Saturn also 3rd + 10th. Surfacing this is standard Vedic chart-reading depth — competitors all show it.
+
+**File:** add to existing [`app/(tabs)/astrology.tsx`](app/(tabs)/astrology.tsx) as a new expandable section below the existing chart + dasha + dosha cards. No new route.
+
+**Layout:**
+- Section header "Aspects (Drishti)" / "दृष्टि" via `SectionLabel`.
+- One row per graha (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu).
+- Each row:
+  - Graha icon (existing `<GrahaIcon>` per planet).
+  - "From {{rashi}} (House {{n}})" subtitle.
+  - "Aspects: {{house list}}" — comma-separated aspected house numbers, with the planets sitting in those houses chip-listed underneath.
+- Collapsible default-closed (uses existing `AccordionSection` from [`src/components/panchang/AccordionSection.tsx`](src/components/panchang/AccordionSection.tsx) — reuse, don't duplicate).
+
+**Localisation:** house numbers are numeric (digits via `useLocaleFormatters`), graha + rashi names via existing `localizeRashi` / planet localisation maps.
+
+### Step P10.3 — Mantra Counter (P4.3 lifted) ✅ 2026-05-08
+
+**Content dependency:** mantra text + transliteration + meaning is consumed from the `hindu-devotional-texts` package. The 0.2.0 release expanded the original 6-mantra plan to 21 mantras spanning the full deity roster (Om Namah Shivaya, Om Namo Narayanaya, Gayatri, Maha Mrityunjaya, Hare Krishna mahamantra, Om Gan Ganapataye Namah, Hanuman, Lakshmi, Rama Taraka, Durga, Saraswati, Parvati, Kali, Surya Gayatri, Brahma, Sai Ram, Santoshi, Sita, Khatu Shyam, Vaishno Devi, Narasimha). App calls `getMantra(slug)` / `getAllAppMantras()` (filtered to roster) — content lives in the package, not the app.
+
+**Shipped:**
+- Routes: `app/jaap/index.tsx` (picker), `app/jaap/[slug].tsx` (counter), `app/jaap/history.tsx`.
+- Picker groups mantras into "Universal" (Gayatri, Mahamrityunjaya) + deity-tagged sections; expandable Custom-mantra card; lifetime stats card (only when there's history) routes to history.
+- Counter: whole-screen tap zone (mantra at top stays visible during chanting; the entire body below the header is the tap target — chips and ±buttons capture their own taps via the standard responder chain). Reanimated SVG progress ring (UI-thread `useAnimatedProps` strokeDashoffset), `expo-haptics` `impactAsync(Heavy)` on each tap (revised up from Selection then Medium after user feedback that vibration was too weak), Success notification haptic + 800ms accent flash on mala completion.
+- Adaptive mantra typography: 22pt Devanagari for 1–2 line mantras (most), 19pt for 3-line, 17pt for 4-line (Gayatri); IAST scales 13 → 11pt similarly. Body height budgeted against worst case (Gayatri + IAST + chips + bottom bar) on a Pixel 3a (~590dp). Ring is 180dp.
+- Mala size selector: 27 / 54 / 108 / 216 / 1008 chips; mid-session size change prompts to discard count.
+- Decrement (-1) underflows into the previous mala; Reset asks before clearing.
+- SQLite `jaap_sessions(id, started_at, ended_at, mantra_slug, mantra_label, mala_size, mala_count, total_count)` with `idx_jaap_sessions_started_at` for the history query — gated by `PRAGMA user_version` bump v2 → v3.
+- Save flow: hardware/UI back prompts "Save this session?" when count > 0; checkmark in nav saves immediately. `mantra_label` snapshots the title at write time so custom mantras persist intact.
+- History screen: last 30 sessions grouped by date (newest first); each row shows time, mantra label, total count, mala count, mala size, duration; per-row delete with confirmation; empty state with CTA.
+- **No ads on the counter screen.** AdBanner kept on history (banner OK there per plan).
+- Entry points: Home tab QuickRow (replaced "Search" tile, lotus glyph) + Settings → Deities section row.
+- i18n: full `jaap.*` namespace in en + hi (~50 keys).
+
+**Schema notes:** Uses an autoincrementing `id` and stores `mantra_label` text at insert time so the history list never has to re-resolve via `getMantra()` — this means renamed package slugs won't break old rows.
+
+**Post-ship iteration (2026-05-08):** First counter draft used a ScrollView with the mantra above the counter — user reported the mantra scrolled out of view during tapping, and the Selection-strength haptic was too weak to feel. Redesigned to (a) drop the ScrollView and pin the mantra at the top of a whole-screen Pressable tap zone so reading + tapping happen on the same surface, (b) bump haptic to `impactAsync(Heavy)` for unmistakable per-tap feedback, (c) enlarge mantra typography with adaptive sizing per line count and shrink the ring 240 → 180dp to give the mantra clear visual primacy.
+
+### Phase 10 Exit Criteria ✅
+
+- Aspects view renders for all 9 grahas with correct house references against a known reference chart. ✅
+- Mantra counter: presets pickable from package, 5 mala sizes selectable, session writes to SQLite, history shows last 30 sessions. ✅
+- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings. ✅
 
 ---
 
-## 12. Phase 7 — Motion & Interaction Polish — 🟡 IN PROGRESS (P7.1–P7.3 shipped 2026-04-22)
+## 11. Phase 11 — Lean Pass: cleanup + low-end perf ⏳
 
-**Why:** Phase 6 established the Sacred Editorial visual language. With those final, motion is the missing layer between "well-designed app" and "premium devotional artefact." Phase 7 must not regress any P6 visual spec, any existing screen behavior, any i18n string, or the lint baseline.
+**Why now (2026-05-08):** App has accumulated 10 phases of feature work. User reports the **Panchang screen takes ~1s on cold open** (instant once warm), and wants the codebase trimmed for low-end Android (Pixel 3a target). High-priority polish phase — no new features, just cleanup + perf.
 
-**Non-negotiable performance constraint:** Every Phase 7 animation must hold **60 fps on a Pixel 3a (4GB RAM, Android 12)**. Low-end Android is the gate. This dictates technique.
+**Animation principle (Phase 11 convention, durable):** Animations are kept if (a) they run on UI thread without JS jank AND (b) the animation duration is used to mask compute. Cut only if neither holds. Decorative-only animations are OK if they're free; never if they delay content the user is asking for.
 
-### Motion principles (carried forward into every sub-phase)
+### P11.1 — Panchang cold-start fix ⏳ (highest user-perceived win)
 
-1. **Driven properties only:** `transform` (translateX / translateY / scale / rotate) and `opacity`. These are compositor-only on Fabric — zero layout / paint cost. **Never animate** `width`, `height`, `borderRadius`, `shadow*`, raw `color` (use `interpolateColor` on a worklet instead), `left`/`top`, `padding`, or `margin`. Those trigger layout and instantly drop frames on 3a-class devices.
-2. **UI-thread worklets always:** `useSharedValue` + `useAnimatedStyle` + `withTiming` / `withRepeat` / `interpolate` / `interpolateColor` from `react-native-reanimated` 4.1. Never the legacy `Animated` API. Never `setInterval`/`setTimeout`-driven animation.
-3. **Snappy, not spring-y:** default duration **220ms**, `Easing.out(Easing.cubic)`. Max duration for any interaction feedback is **320ms**. Ambient loops (mandala drift, ember breath) run at 2–90s but at very low magnitudes. **No overshooting springs** — they read "playful," wrong register for devotional.
-4. **Stagger cap:** when staggering N items, cap total stagger time at **400ms** (e.g. 6 items × 60ms). Longer feels sluggish; the last item should never feel forgotten.
-5. **Concurrency budget:** max **6 simultaneous animations per screen**. Navigating away cancels orphans (`cancelAnimation` in effect cleanup).
-6. **Reduced Motion honored:** single hook `useReducedMotion()` wraps `AccessibilityInfo.isReduceMotionEnabled` + change listener. When true: durations collapse to 0 (instant), loops disabled, staggers skipped. Functionality unchanged.
-7. **Haptics pair discreetly:** `Selection` on state change (tab, date, chip), `Light` on action confirmation (favorite toggle). **Never `Heavy`.** Already-installed `expo-haptics`.
-8. **Gesture rules:** Gesture Handler worklets only; never conflict with vertical scroll (require either clear directional intent via velocity/displacement thresholds or non-overlapping gesture surfaces).
+**Symptom:** First open of Panchang tab after cold-start takes ~1s. Subsequent opens instant. Day 2 cold-start re-pays the full cost (today's date is new each day).
 
-### Step P7.1: Motion foundation — ✅ SHIPPED (2026-04-22)
+**Suspected stack** (needs profiling to confirm — do not fix what isn't broken):
+1. SQLite cache miss on today's date → first compute + first DB write.
+2. First Reanimated UI thread spin-up (~50–100ms one-time).
+3. `PanchangScreen` first paint — multiple `AccordionSection` mounts (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), each measuring even if collapsed.
+4. First Devanagari glyph paint + layout reflow.
+5. Zustand SQLite-kv hydration tail.
 
-`src/config/motion.ts` + `useReducedMotion`, `useAnimatedMount`, `useEntranceStagger`, `MotionPressable` all shipped. Lint baseline now 8 (was 7). See `memory/project_p7_1_landed.md`.
+**Plan:**
+- **Pre-warm cache during splash → first-paint window**: in [`app/_layout.tsx`](app/_layout.tsx) after splash hide, fire `getCachedPanchangDay()` for today + user's lat/lon as fire-and-forget. By the time user taps Panchang tab from Home, Pass 1 cache is warm.
+- **Same on app foreground (`AppState` change)** if last warm > 6 hours ago.
+- **Lazy-mount accordion bodies**: confirm `AccordionSection` only renders header until expanded; if not, defer body subtree.
+- **Skeleton on first paint, fade in real data** as Pass 1 lands (the compute-behind-animation pattern applied here).
+- **Persist tomorrow's panchang from today**: at end-of-session or alongside reminder scheduling, precompute tomorrow's row and write to SQLite. Day 2 cold-start lands hot.
 
-### Step P7.2: System-wide micro-interactions — ✅ SHIPPED (2026-04-22)
+**Target:** cold-start Panchang from ~1s to ≤250ms perceived.
 
-Skeleton crossfade, FavoriteHeart (4 sites), SegmentedChip, ScreenMount on 15 screens shipped. Tab-bar ember reverted (4×4 dot too small to see the breath). See `memory/project_p7_2_landed.md`.
+**First action:** profile the cold path on Pixel 3a (or release build on emulator) with `console.time` markers at SQLite open, panchang-ts call, AccordionSection mount counts, first paint. Confirm the dominant contributor before patching.
 
-### Step P7.3: Editorial reveal patterns — ✅ SHIPPED (2026-04-22)
+### P11.2 — Compute-behind-animation pattern + decorative-stagger removal ✅
 
-Verse stagger + refrain highlight in readers, SectionLabel settle on home, CornerBrackets draw-in in every NightCard shipped. See `memory/project_p7_3_landed.md`.
+Audit ran across every `useSharedValue` / `withTiming` / `useAnimatedStyle` / `Animated.View` / `useEntranceStagger` / `ScreenMount` site in `src/` + `app/`.
 
-### Step P7.4: Screen-level transitions — ⏳ PENDING (next up)
+**Cuts shipped:**
+- `STAGGER_CAP_MS` 400 → 120 in [`src/config/motion.ts`](src/config/motion.ts). `useEntranceStagger` and `useRefrainHighlight` consume the new cap; aarti / chalisa verse cascades and refrain settle are now bounded under 120ms regardless of `VERSE_STAGGER_MAX`.
+- `ScreenMount` rewritten ([`src/components/common/ScreenMount.tsx`](src/components/common/ScreenMount.tsx)) on Reanimated's `entering={FadeIn.duration(durations.base)}` layout-animation primitive. Native-side scheduled at mount, no longer dependent on a post-commit `useEffect` that gets queued behind cold-start compute. The 220ms fade now actually masks the screen's mount-time compute window. `useAnimatedMount` deleted (only consumer was `ScreenMount`).
 
-**Scope:** inter-screen and intra-screen state transitions. Sacred Editorial demands **crossfades over slides** — context swaps with held type.
+**Keeps (audit verified):**
+- `FavoriteHeart` pulse / `MotionPressable` press / `SegmentedChip` color+scale — paired with user action.
+- `SkeletonCrossfade` + `SkeletonBlock` shimmer — masks load.
+- Mantra counter ring (`useAnimatedProps`) + tap scale + completion flash — masks tap feedback compute.
+- `useRefrainHighlight` — fires once per reader instance, doesn't delay content (only changes refrain emphasis post-stagger).
+- `CornerBrackets` draw-in, `SectionLabel` settle — one-shot worklets, do not delay content.
+- `AccordionSection` chevron rotation — paired with toggle.
+- Aarti / chalisa scroll-driven hero parallax — gesture-bound only.
+- `WalkthroughOverlay` spotlight pulse — overlay attention cue, runs only during walkthrough.
 
-- **Panchang date change** — [`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx). Tapping a date cell: content area (not the calendar grid itself) `opacity 1 → 0` over 140ms, new content mounts and fades `opacity 0 → 1 + translateY 4 → 0` over 220ms. Calendar cells use P7.2 chip interpolation for selected-state change. Haptic `Selection` on cell tap.
-- **Panchang horizontal swipe** — Pan gesture on the calendar hero changes day (previous / next). Commit if `|displacement| > 80px` OR `|velocity| > 400px/s`; spring back otherwise. Uses `useAnimatedGestureHandler` worklet. **Activation offset** set so vertical scroll in the screen body wins when gesture starts on a scrollable area (directional precedence via `activeOffsetX` on the Pan config).
-- **Muhurat occasion card → detail delayed fade** — [`app/muhurat/index.tsx`](app/muhurat/index.tsx) → [`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx). Detail screen's title + icon mount at opacity 0, fade in over 220ms after route mount completes (simple `useEffect` + shared value). **Explicitly NOT a true shared-element transition** — those crash on Android + Fabric in RN 0.81; we keep the illusion without the risk.
-- **God detail hero image fade** — [`app/god/[id].tsx`](app/god/[id].tsx). Hero photo starts at `opacity 0`, fades in over 320ms once loaded. Deity-gradient scrim stays at full opacity underneath — prevents the hard "pop" when a network / bundled image resolves.
+**Documented:** §4 Phase 7 conventions extended with the compute-behind-animation rule + pointer to `memory/feedback_animation_kept_when.md`.
 
-**Exit:** panchang date changes feel cohesive (no hard flash); swipe gesture does not hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a.
+### P11.3 — State surface + memoization ⏳
 
-### Step P7.5: Signature moments — ⏳ PENDING
+- [`src/components/kundli/KundliSection.tsx:47-61`](src/components/kundli/KundliSection.tsx#L47-L61) — collapse 16 individual Zustand selectors into one `useShallow()` selector. Single re-render instead of 16 on theme/language toggle.
+- DashaSection rows ([`src/components/astrology/DashaSection.tsx`](src/components/astrology/DashaSection.tsx)) — add `React.memo` to row/leaf components (currently re-render on parent state churn).
+- Slice the panchang state — instead of holding full `IPanchangDay` in `usePanchang` ([`src/hooks/usePanchang.ts`](src/hooks/usePanchang.ts)), store only the fields a screen reads. Cuts memory pressure on Pixel 3a.
+- Fix unmemoed `computeShadbalaCached` call ([`src/components/kundli/KundliSection.tsx:247`](src/components/kundli/KundliSection.tsx#L247)) — currently fires on every parent render.
+- Sweep inline style arrays/object literals in hot paths (KundliSection chip strip lines 285–308).
 
-**Scope:** the few animations that define the app's character. Restrained, sacred, memorable.
+### P11.4 — Dependency + asset trim ⏳
 
-- **DeityAvatar "Pranam" arrival** — [`src/components/common/DeityAvatar.tsx`](src/components/common/DeityAvatar.tsx) + god detail hero avatar. When the avatar first appears on a route-level surface (NOT in scrollable lists):
-  1. Outer parchment ring: `scale 0.92 → 1 + opacity 0 → 1` over 320ms, `easings.emphasized`.
-  2. Inner gold ring: same transform, delayed +120ms.
-  3. Portrait: `opacity 0 → 1` at delay +240ms, 280ms duration.
-  4. Total ~700ms. In library grid, the cheaper `useAnimatedMount` fade is used instead — reserving Pranam for single-focus screens.
-- **Mandala watermark slow drift** — [`src/components/common/MandalaWatermark.tsx`](src/components/common/MandalaWatermark.tsx). `withRepeat(withTiming('360deg', { duration: loop.drift, easing: Easing.linear }), -1)` on the UI thread. Opacity unchanged. **Pauses when off-screen** — component subscribes to `useIsFocused` (or equivalent) and cancels the animation on blur to avoid ambient battery cost. Disabled entirely under reduced motion.
-- **Muhurat result card verdict** — [`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx). When results compute, the result `NightCard` `translateY 16 → 0 + opacity 0 → 1` over 320ms. P7.3 CornerBrackets draw-in fires immediately after (stacked). Feels like a ruling settling into place.
+- **Drop `@expo-google-fonts/jetbrains-mono`** — only used for kickers/timestamps; system mono on Android renders identically. Update typeScale to fall back.
+- **`assets/dharmagya_logo.png` (144 KB) → SVG component or webp.** Same for `dharmagya_logo_small.png` (60 KB).
+- **Sweep unused i18n keys** in [`src/i18n/locales/en.ts`](src/i18n/locales/en.ts) + [`hi.ts`](src/i18n/locales/hi.ts) (grown organically through 10 phases).
+- **Sweep unused glyphs** in custom Icon component ([`src/components/common/Icon.tsx`](src/components/common/Icon.tsx)) — verify all 60 glyphs are still referenced.
+- **Audit `package.json`** for any dep that's no longer imported anywhere.
 
-**Exit:** Pranam arrival reads as intentional on a Pixel 3a screen capture (not jittery, not staggered-too-long); mandala drift is invisible at first glance, noticeable only on second look; reduced-motion toggle instantly stills every Phase 7 animation.
+### P11.5 — Pixel 3a perf gate (replaces P7.6) ⏳
 
-### Step P7.6: Perf QA + low-end Android gate (no new code) — ⏳ PENDING
+**Device matrix:** Pixel 3a (Android 12, 4GB) is the gate. Samsung A14 secondary. Pixel 7 / iPhone reference only.
 
-**Device matrix:**
-- **Pixel 3a (Android 12, 4GB RAM) — primary gate.** All P7 animations must hold 60 fps.
-- **Samsung A14 or equivalent budget Android** — secondary gate.
-- **Pixel 7 / modern iPhone** — reference only (passing on flagship proves nothing).
-
-**Profile per screen:** React Native Performance Monitor + Hermes CPU sampling. Capture the 5 most-animated interactions: reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
+**Profile per screen** with RN Performance Monitor + Hermes CPU sampling on the most-impactful interactions: cold-start Home → Panchang tab tap, reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
 
 **Acceptance thresholds:**
-- **UI FPS ≥ 58 avg, ≥ 55 p95** during any animation on Pixel 3a.
-- **JS FPS ≥ 55 avg** (worklets run on UI — if JS drops, something isn't on a worklet and must be fixed).
-- **No single dropped-frame event > 50ms** during any interaction.
-- **Cold-start to tab-bar-visible** unchanged from pre-P7 baseline ± 50ms.
+- Cold-start Home → Panchang tab tap → first paint of real data ≤ 350ms.
+- UI FPS ≥ 58 avg, ≥ 55 p95 during animation on Pixel 3a.
+- JS FPS ≥ 55 avg.
+- No single dropped-frame event > 50ms.
+- Cold-start to tab-bar-visible unchanged from pre-Phase-11 baseline ± 50ms.
+- Memory: full 5-tab traversal does not exceed pre-P11 baseline by > 5MB.
 
-**Regression rule:** if any screen fails the gate, the offending animation is **removed**, not "optimized later." Motion is non-essential; frame rate is essential. This is the hard line.
+**Regression rule:** offending animation/component is **removed**, not "optimized later." Frame rate is essential.
 
-**Reduced-motion end-to-end:** toggle Android's "Remove animations" system setting; verify every Phase 7 animation collapses to instant. Nothing should still run. Recorded on device video.
+**Reduced-motion E2E:** toggle Android "Remove animations" → every animation collapses to instant. Recorded on device video.
 
-**Battery check:** mandala drift is the only continuous animation. Measure 30-min foreground drain on Pixel 3a against pre-P7 baseline. If > 2% delta, verify the off-screen pause is firing.
+**Battery:** any continuous animation gets 30-min foreground drain delta vs pre-P11 baseline ≤ 2%.
 
-**Artifact:** `motion-perf.md` capturing per-screen FPS numbers + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
+**Artifact:** `perf-baseline.md` with per-screen FPS + memory + cold-start + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
 
-### Phase 7 Exit Criteria
+### P11.6 — Custom screen transitions with compute-masking (lifts P7.4) ⏳
 
-- ✅ Motion tokens + hooks shipped (P7.1).
-- ✅ P7.2 system micro-interactions landed across every screen — zero regressions to P6 visual spec.
-- ✅ P7.3 editorial reveals observable on reader + home without delaying first interaction.
-- ⏳ P7.4 panchang date crossfade + swipe gesture working on device without conflicting with vertical scroll.
-- ⏳ P7.5 signature moments (Pranam, drift, verdict) record well on a 60fps screen capture.
-- ⏳ P7.6 Pixel 3a perf gate passed — all animations hold ≥ 58 UI FPS; no frame drop > 50ms.
-- ⏳ Reduced-motion system setting fully respected end-to-end.
-- `tsc --noEmit` clean; `npx expo lint` ≤ current baseline (8 warnings).
-- App Store / Play Store: no metadata changes needed; ship as a minor version bump (`1.4.x`).
+Reanimated v4.1.1 + gesture-handler v2.28 already installed. Today they're used for **in-screen** animation only — screen-to-screen transitions are still default `expo-router` / `react-native-screens`. Make transitions richer + functional:
 
-**Phase 7 conventions (forward-applicable into Phase 4):**
-- **Transform + opacity only** for every new animation unless documented otherwise.
-- **Worklets always**; JS-driven animation banned in new code.
-- **220ms default** interaction duration — deviations must be justified inline.
-- **Reduced motion in every new animated component** — no exceptions.
-- **Motion tokens over magic numbers** — always import from `src/config/motion.ts`.
-- **Haptics are paired, not scattered** — `Selection` on state change, `Light` on confirmation, never `Heavy`.
-- **Ambient loops (>2s) must pause off-screen** — measurable battery impact otherwise.
+- **Panchang date change** ([`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx)) — content area `opacity 1→0` (140ms), kick off `getCachedPanchangDay()` for new date during the fade-out, new content `opacity 0→1 + translateY 4→0` (220ms) when ready. Skeleton fallback if compute exceeds 350ms. Calendar cells reuse P7.2 chip interpolation. Haptic `Selection` on cell tap.
+- **Panchang horizontal swipe** — pan-gesture day change. Commit if `|dx| > 80px` OR `|v| > 400px/s`; spring back otherwise. Worklet via `useAnimatedGestureHandler`. `activeOffsetX` so vertical scroll wins on scrollable bodies.
+- **Custom `expo-router` screen options** per route — modal slide-up for sub-screens like Settings → Birth Place; fade for content swaps. Configure via `<Stack.Screen options={{ animation, presentation }} />`.
+- **Muhurat occasion → detail** ([`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx)) — title + icon fade in over 220ms after route mount. Compute (validateCandidates if needed) fires during the fade.
+- **God detail hero image fade** — hero photo `opacity 0→1` over 320ms once loaded. Deity-gradient scrim at full opacity underneath.
 
----
+**Skip:** `react-native-shared-element` — crashes on Android + Fabric in RN 0.81 (existing PLAN.md note retained).
 
-## 13. Phase 4 — Native Extensions (widgets, mantra counter)
+**Exit:** date changes feel cohesive (no flash); swipe doesn't hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a; transitions actually mask compute (skeleton fallback rarely visible on warm cache).
 
-**Goal:** Add features that require more engineering effort but meaningfully differentiate Dharmagya. Order here is pragmatic: start with the lowest-native-surface-area feature and build up.
+### Phase 11 Exit Criteria
 
-> **Important supersession:** The original P4.1 (Kundli Generation) and P4.1b (Kundli Matching) are **superseded by Phase 8 (panchang-ts library wave consumption)**. With the library shipping native Kundli + Matching + Sade Sati in Wave 2, P4.1/P4.1b collapse into "consume + render" — see [`P8.2`](#step-p82--wave-2-consumption-kundli--matching--sade-sati-5d). The original P4.1/P4.1b text has been removed from this file.
-
-### Step P4.2: Home Screen Widgets (native modules required) — ⏳ PENDING
-
-**Why:** Hindu Calendar by Mandavgane ships 4 widgets (moon phase, lunar date, moonrise, sunrise/sunset). Widgets drive passive daily visibility — user sees tithi without opening the app, reducing dependence on notifications. Apple and Google both weight widget-having apps higher in discovery.
-
-**Implementation:**
-- This is a known hard problem for Expo/RN apps. Use `expo-modules-core` with a custom config plugin approach:
-  - **iOS:** WidgetKit extension (SwiftUI). Data is passed from RN → widget via App Groups + a JSON file written on panchang recalculation.
-  - **Android:** AppWidgetProvider (Kotlin). Data passed via SharedPreferences written from RN side.
-- Start with ONE widget: "Today's Panchang" — shows tithi, nakshatra, sunrise, rahu kalam. Small + medium sizes.
-- Add incrementally: Festival countdown widget, Brahma Muhurta alarm widget. (Rashifal widget was on the original list — drop, since the Rashifal feature was removed; see §9.)
-- Update frequency: widgets refresh on app launch + once daily at 4:00 AM local time via a background task that recomputes panchang and writes to the shared store.
-- **Risk:** EAS Build config complexity. Budget 1 full sprint for the first widget. Expect iOS/Android asymmetry.
-- Offline compatible: all data is computed locally, no network.
-
-### Step P4.3: Mantra Counter (Jaap) — ⏳ PENDING
-
-**Why:** Standard feature in devotional apps. Low effort, high-touch daily engagement moment (users open during their actual puja).
-
-**Implementation:**
-- New route: `app/jaap.tsx`.
-- Large tappable circle in the center; each tap = +1 count with haptic feedback (`expo-haptics`).
-- Configurable mala size (108 default, 27, 54, 216, 1008).
-- Progress ring filling around the tap circle as user approaches mala completion.
-- On mala completion: celebratory animation + "108 completed" toast + auto-increment mala counter.
-- Persist session history in SQLite: `jaap_sessions(id, started_at, ended_at, mantra_name, mala_count, total_count)`.
-- Mantra picker: preset list (Om Namah Shivaya, Om Namo Narayanaya, Gayatri, Maha Mrityunjaya, Hare Krishna, Ganesh Mantra) + "Custom" text input.
-- History screen showing sessions by date with total counts.
-- No ads during active jaap session. Banner ok on history screen.
-
-### Phase 4 Exit Criteria
-
-- ~~Kundli generation~~ — superseded by P8.2.
-- At least 1 widget shipped on both iOS and Android via EAS Build.
-- Mantra counter with 6 preset mantras, configurable mala size, session history.
+- ⏳ Panchang cold-start ≤ 250ms perceived (from current ~1s).
+- ⏳ Decorative stagger removed; compute-behind-animation pattern documented in §4.
+- ⏳ KundliSection + DashaSection + panchang state surface trimmed; no measurable re-render regressions on theme/language toggle.
+- ⏳ JetBrainsMono dropped, logo PNGs optimized, i18n + Icon glyph sweeps complete.
+- ⏳ Pixel 3a perf gate passed; `perf-baseline.md` checked in.
+- ⏳ P7.4 transitions shipped as P11.6 with compute-masking.
+- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings.
 
 ---
 
-## 14. Phase 5 — Far-Future (audio, booking, social) [ON HOLD]
+## 12. Deferred — iOS widget + Phase 5
 
-**User directive (2026-04-12):** Hold the items below until Phases 2–4 land. They require the most operational investment (audio licensing, ops infrastructure, social moderation) and should not block competitive-parity features that deliver immediate daily-habit value.
+### iOS WidgetKit (originally P4.2 second half) ⏸
 
-Listed in rough priority order for when we do revisit:
+Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension deferred — app currently ships Android-only on Play Store; iOS launch will happen after broader app refinement. Pick up the iOS half once the app is stabilised enough to be worth a parallel App Store rollout.
 
-### Step P5.1: Audio Playback for Aarti / Chalisa / Mantra
+### Phase 5 — Audio / booking / social (on hold)
 
-- The single biggest retention feature per the competitor report (Sri Mandir 5000+ tracks).
-- Scope: licensed or custom-recorded tracks for the aarti + chalisa corpus shipped via `hindu-devotional-texts` (count grows with P3.2) + the mantra library built in P4.3.
-- Implementation: `expo-av` or `expo-audio`, background audio entitlement (iOS/Android), lock-screen controls, offline downloads, verse-sync read-along (unblocks the deferred Phase 1 "Read Along Mode").
-- Content sourcing: evaluate licensing Saregama catalog vs. commissioning fresh Gita Press-style recordings. Budget implications significant.
-- CDN: Cloudflare R2 for audio hosting, progressive download + offline cache with user-controlled size limit.
+**User directive (2026-04-12):** hold until current feature work lands. Operationally heavy, should not block competitive-parity features.
 
-### Step P5.2: Puja Booking / Astrologer Consult / E-commerce
-
-- Sri Mandir's primary revenue driver ($12M+ ARR).
-- Requires temple partnerships, payment integration (Razorpay / UPI), video proof infrastructure, operational support team, refund policies, KYC for astrologers.
-- Minimum viable slice: Prasad delivery from 3 partner temples (Vaishno Devi, Tirupati, Siddhivinayak), ₹500 price point, partnered fulfillment.
-- Decision point before starting: do we have an ops co-founder or external partner willing to run fulfillment? If no, do not start.
-
-### Step P5.3: Social / Community / Sharing / Video
-
-- **Sharing:** add native share sheet on aarti/chalisa/god detail screens — simplest, ship anytime.
-- **Video content:** festival explainer videos, live aarti streams from partner temples. Requires video infra (Mux/Cloudflare Stream) and content production.
-- **Community:** discussion threads per festival/deity, user-posted bhajans, moderator tooling. High moderation overhead; only pursue if the product has clear community demand signals from Phase 2–4 usage data.
+- **P5.1 Audio playback** for aarti/chalisa/mantra. Single biggest retention feature per competitor analysis. Unblocks Read Along Mode. Significant content-licensing budget. Cloudflare R2 for hosting.
+- **P5.2 Puja booking / astrologer consult / e-commerce.** Sri Mandir's primary revenue driver (~$12M ARR). Requires temple partnerships, Razorpay/UPI, ops team. Don't start without an ops co-founder.
+- **P5.3 Social / community / sharing / video.** Native share sheet shippable any time; community + video need infrastructure + moderation overhead.
 
 ---
 
-## 15. Out-of-Scope / Explicitly Not Doing
+## 13. Out-of-Scope / Explicitly Not Doing
 
-- Paid subscription tier (we stay ad-supported until ad revenue clearly plateaus; no rush to introduce paywall friction).
-- Live streaming temple darshan (requires partnerships and 24/7 stream infra — revisit alongside P5.2).
-- AI chat astrologer (hallucination risk on religious content is unacceptable; only consider with heavy guardrails and explicit "AI-generated, not from an astrologer" disclaimers, and not before P5).
-- Cryptocurrency donations / NFTs / Web3 anything.
+- Paid subscription tier.
+- Live streaming temple darshan.
+- AI chat astrologer (hallucination risk on religious content).
+- Cryptocurrency / NFTs / Web3.
+- Landscape detailed calendar route (originally P10.1, dropped 2026-05-08). Densified Panchang grid from Phase 9 covers the almanac-page use case; not worth the orientation-lock complexity.
 
 ---
 
-## 16. Phase Dependencies Summary
+## 14. Phase Dependencies Summary
+
+**Sequencing principle:** ship optimizations + features first, language support last.
 
 ```
-Phase 1 ✅
-    ↓
-Phase 2 ✅ (Daily habit drivers) ──┐
-    ↓                               │
-Phase 3 (Reach + content depth) ──┤
-  P3.3 ✅                           │
-  P3.1, P3.2 ⏳                     │
-    ↓                               │
-Phase 6 ✅ (Visual redesign) ←──────┤   (P6 redesign ran in parallel with
-    ↓                               │    P3 content work. P7 layers motion
-Phase 7 🟡 (Motion & interaction) ──┤    on top of the finished visual
-  P7.1–P7.3 ✅                      │    vocabulary BEFORE P4 extensions,
-  P7.4–P7.6 ⏳                      │    so widgets / mantra counter inherit
-    ↓                               │    both the surface and the cadence.)
-Phase 8 ⏳ (panchang-ts consumption)│
-    ↓                               │
-Phase 4 ⏳ (Native extensions)  ────┘
-    ↓
-Phase 5 (Far-future — on hold)
+Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅ → Phase 10 ✅
+                                                                                                                              ↓
+                                                                                                  Phase 11 (Lean Pass — high priority NEXT)
+                                                                                                                              ↓
+                                                                                                  Phase 3 (P3.1 languages — separate PR)
+                                                                                                                              ↓
+                                                                                                  Sentry (post-rollout) + iOS widget (after iOS launch)
+                                                                                                                              ↓
+                                                                                                  Phase 5 (on hold)
 ```
 
-Each phase ships as its own production release. Do not bundle phases. Measure daily active users and D7 retention after each release before starting the next.
-
----
-
-## 17. Phase 8 — panchang-ts Library Wave Consumption — 📐 PLANNED (scoped 2026-04-25)
-
-**Goal.** Surface the new `panchang-ts` capabilities (Phases 28/29/30 in [panchang-ts/PLAN.md](../panchang-ts/PLAN.md) — Waves 1, 2, 3) inside dharmagya. **This is a pure consumption + UI phase** — all calculation work lives in the library.
-
-**Sequencing.** This phase lights up incrementally as each library minor release ships. Pin `panchang-ts` to each new version as it lands, regenerate types, rebuild affected screens. The phase's three sub-phases mirror the library's three waves and **must ship in order** because Wave 2 and 3 depend on Wave 1's data shape.
-
-**Why this is a separate phase, not part of P4.** P4 (existing) outlined Kundli as if dharmagya would do the calculation. With the library Wave 2 shipping it natively, P4.1 collapses into "consume + render" — clean, fast, and the same logic also feeds the website. P4.1 / P4.1b are **superseded** by P8.2 below; references to them in P4 stand as historical context only.
-
-### Step P8.1 — Wave 1 consumption: DrikPanchang parity panels (~3d)
-
-**Triggered by:** `panchang-ts` v2.4 shipped.
-
-**Files to modify:**
-- `src/services/astrology/panchangService.ts` — extend `mapToPanchangDay()` to surface new fields: `tarabala`, `varjyam`, `gandaMula`, `madhyahna`, `pratahSandhya`, `sayahnaSandhya`, `dinamanaMinutes`, `ratrimanaMinutes`, `panchakaRahita`, `doGhatiMuhurta`, plus new entries in `specialYogas` (Dwipushkar/Tripushkar/Jwalamukhi/Aadal/Vidaal/Ravi/Anandadi).
-- `src/types/panchang.ts` (internal) — extend `IPanchangDay` to mirror new fields.
-- `app/(tabs)/panchang.tsx` — new sections in the existing scrollable layout:
-  - "Tarabala & Chandrabala" card (now both populated when user supplies birth nakshatra).
-  - "Varjyam" inline warning chip in the Inauspicious section.
-  - "Ganda Mula" warning banner when active.
-  - "Madhyahna" + "Sandhya" rows in the Auspicious Times block.
-  - Replace "Bhadra" simple banner with a richer panel that links to "Panchaka Rahita Muhurta" availability windows.
-  - "Do Ghati Muhurta" — new alternate-quality system tab alongside Choghadiya / Gowri (user toggle).
-- `src/components/panchang/QualitySlotsCard.tsx` — accept new `system: 'choghadiya' | 'gowri' | 'doGhati'` prop.
-- `src/components/panchang/SpecialYogasCard.tsx` — handle 6 new yoga types in the icon/colour map.
-- Onboarding update: in Step 1 (Deity Preference) or Settings, capture optional **birth nakshatra** so Tarabala can populate. Persist in `useUserStore`.
-- i18n: add UI strings for new panel labels in `src/lib/translations.ts` (en + hi only — locked decision, no new locales this roadmap).
-
-**Done when:** every field DrikPanchang shows on its day-panchang page also renders on dharmagya's Panchang tab. Smoke-test against drikpanchang.com for 3 cities × 3 dates.
-
-### Step P8.2 — Wave 2 consumption: Kundli + Matching + Sade Sati (~5d)
-
-**Triggered by:** `panchang-ts` v3.0 shipped.
-
-**Replaces:** P4.1 + P4.1b (now obsolete).
-
-**Files to add:**
-- `app/(tabs)/kundli.tsx` — new tab (or expose under a new "Astrology" pillar grouping with existing `dasha.tsx`). Birth-input flow → renders Lagna + D1 + D9 charts + planetary positions + dignity highlights.
-- `app/kundli/match.tsx` — Ashtakoot matching screen. Two birth-detail forms → 36-point breakdown + cancellations + interpretation copy.
-- `app/sade-sati.tsx` — current phase + arc start/end + visual timeline. Reads natal moon rashi from the user's saved birth chart.
-- `src/components/kundli/NorthChart.tsx` + `SouthChart.tsx` — SVG diamond / square chart renderers (no native deps; pure RN SVG via `react-native-svg`).
-- `src/components/kundli/PlanetaryDignityChart.tsx` — Shadbala-style strip showing exalted/debilitated/own status per planet. (Full Shadbala numeric output deferred to P8.3 when library ships it.)
-- `src/services/astrology/kundliService.ts` — wraps `computeRashiChart`, `computeNavamsa`, `computeAshtakoot`, `computeMangalDosha`, `computeSadeSati` with the same caching strategy as `panchangService.ts`.
-- `src/store/useBirthStore.ts` — Zustand slice with SQLite persistence; supports primary user + up to 5 named charts (spouse, children, parents). Persists `{ name, dateTime, location, derived: { lagna, moonRashi, moonNakshatra } }` so derived fields are stable even if user edits inputs later.
-
-**Files to modify:**
-- `app/(tabs)/index.tsx` — Sade Sati warning chip on home if active for the user's natal moon.
-- Settings: "Manage saved charts" row.
-- `app/(tabs)/dasha.tsx` — wire to `useBirthStore`'s primary chart instead of one-off date picker. Add **pratyantar dasha** drilldown (third level, library now provides).
-- House system selector in Settings: `'whole-sign' | 'equal' | 'placidus-kp'` (default `'whole-sign'`).
-- Ayanamsa selector now includes True Chitra + Thirukanitham.
-
-**Done when:**
-- Kundli tab renders for 5 sample DOBs and matches Jagannath Hora output for D1, D9, lagna.
-- Marriage matching produces same 36-point score as drikpanchang.com horoscope-match for 5 sample pairs.
-- Sade Sati phase + arc dates within ±2 days of authoritative sources.
-
-### Step P8.3 — Wave 3 consumption: Advanced + library-backed muhurat (~3d)
-
-**Triggered by:** `panchang-ts` v3.x shipped.
-
-**Files to remove:**
-- `src/services/astrology/muhurat.ts` — **delete entirely**. All occasion logic now lives in the library's `scoreMuhurta` / `findAuspiciousDates` API.
-
-**Files to modify:**
-- `app/muhurat/index.tsx` + `app/muhurat/[occasion].tsx` — call `findAuspiciousDates(rule, range, location)` directly. Render the same UI; under the hood the score is now richer (multi-factor, library-blessed).
-- `app/(tabs)/kundli.tsx` — add "Divisional charts" expandable section: D2, D3, D7, D10, D12, D30 toggle. Each calls the library's `computeDivisionalChart`.
-- `app/(tabs)/kundli.tsx` — add Aspects view (Drishti map per planet) + Shadbala bar-chart panel.
-- `src/components/kundli/DoshasCard.tsx` — extend to surface Kaal Sarp (with subtype) and Pitru Dosha alongside existing Mangal Dosha.
-- `app/(tabs)/dasha.tsx` — add system selector: Vimshottari (default) / Ashtottari / Yogini / Chara. Each is a separate library call; render with the same timeline component.
-- New: `app/calendar/index.tsx` — utility "convert Gregorian ↔ Hindu" tool, plus "Ekadashi this year" / "Sankrantis this year" / "Upcoming eclipses" lists (uses library's calendar conversion APIs).
-
-**Done when:**
-- The duplicated muhurat logic is fully gone from the app; all behaviour comes from the library and parity is verified against the previous app behaviour for 7 stock occasions.
-- Divisional charts + dashas + doshas all visible inside the Kundli surface.
-
-### Phase 8 Exit Criteria
-
-- All three sub-phases shipped; pinned to corresponding `panchang-ts` versions.
-- Existing P3 / P4 / P6 / P7 work unaffected (additive on top of the panchang screen, no visual regressions).
-- Smoke-tested against drikpanchang.com (panchang values), Jagannath Hora (kundli values), and ProKerala (matching/Sade Sati values).
-- App startup time and panchang screen render time **unchanged** from pre-Phase-8 baseline (library is fast; consumption is just rendering).
-
-### Where to start (mobile)
-
-The mobile app is **blocked on the library** — start library Phase 28 first. Once `panchang-ts` v2.2 is published with Tarabala alone, ship a tiny dharmagya release that adds the Tarabala card to the Panchang tab. That's the smallest possible end-to-end loop and exercises the full publish → bump → render pipeline. After that, batch the rest of P8.1 fields together for v2.4.
-
-
-
-Bugs I found today, needs to be fixed today urgently:
-1. Muhurat calculation is very slow in low end phones, We need to cache it just like we did for festivals list if muhurats do not change, this will work
-2. the flow after onboarding flow can cause the elements to appear off screen and block the user from going forward
-3. need to update screenshots
+**Release cadence:** the user decides when to ship. Bundle multiple phases into one larger release rather than shipping each phase independently — the user prefers one substantive update over many small ones.

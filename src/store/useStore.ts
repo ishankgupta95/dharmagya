@@ -4,8 +4,13 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 import type { AyanamsaType } from 'panchang-ts';
 
 import type { AppLanguage } from '@/i18n';
+import {
+  DEFAULT_WIDGET_SLOTS,
+  WIDGET_FIELD_IDS,
+  type WidgetFieldId,
+} from '@/services/widgets/widgetFields';
 
-export type FontSize = 'small' | 'normal' | 'medium' | 'large' | 'xl' | 'xxl';
+export type FontSize = 'small' | 'normal' | 'medium' | 'large';
 export type MasaSystem = 'purnimanta' | 'amanta';
 export type TimeFormat = 'auto' | '12h' | '24h';
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -135,6 +140,16 @@ interface AppStore {
   quietHoursEnd: string;
   /** Show the Vikram Samvat year in panchang headers. */
   showVikramSamvat: boolean;
+  /** 'compact' = the original Sun-leading 7-col grid. 'dense' = transposed
+   *  view with 7 weekday rows × 6 week cols, each cell carrying tithi+paksha
+   *  and the day's primary event. Toggle is exposed in the month strip. */
+  panchangLayout: 'compact' | 'dense';
+  /** Open/closed state for each category accordion on the panchang day-detail.
+   *  Keyed by category slug; absent = closed. Persisted so a user who always
+   *  opens "Inauspicious Times" doesn't have to re-expand it daily. The
+   *  accordion drives lazy compute — no daily-panchang fetch fires until the
+   *  first category is expanded for the selected date. */
+  panchangCategoriesOpen: Record<string, boolean>;
   /** ISO YYYY-MM-DD, or null if not set. */
   userBirthDate: string | null;
   /** HH:mm in 24h, or null if not set. Used to refine Vimshottari dasha balance. */
@@ -152,6 +167,10 @@ interface AppStore {
   walkthroughStep: number;
   /** Timestamp (ms) of when the user first opened the app. Used for first-session ad grace period. */
   firstOpenTimestamp: number;
+  /** Today's-Panchang home-screen widget — the four user-pickable info slots
+   *  (top-main, mid-main, footer-left, footer-right). Each entry is a field
+   *  ID from the widget catalog (tithi/yoga/sunset/...). */
+  widgetSlots: [WidgetFieldId, WidgetFieldId, WidgetFieldId, WidgetFieldId];
 
   // Actions (not persisted)
   setThemeMode: (mode: ThemeMode) => void;
@@ -182,6 +201,8 @@ interface AppStore {
   setQuietHoursStart: (timeHHmm: string) => void;
   setQuietHoursEnd: (timeHHmm: string) => void;
   setShowVikramSamvat: (val: boolean) => void;
+  setPanchangLayout: (layout: 'compact' | 'dense') => void;
+  togglePanchangCategory: (key: string) => void;
   setUserBirthDate: (iso: string | null) => void;
   setUserBirthTime: (hhmm: string | null) => void;
   setUserBirthPlace: (place: { lat: number; lon: number; name: string; timezone: string } | null) => void;
@@ -189,6 +210,7 @@ interface AppStore {
   setUserName: (name: string | null) => void;
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
+  setWidgetSlot: (index: 0 | 1 | 2 | 3, fieldId: WidgetFieldId) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -221,6 +243,8 @@ export const useStore = create<AppStore>()(
       quietHoursStart: '22:00',
       quietHoursEnd: '06:00',
       showVikramSamvat: true,
+      panchangLayout: 'compact',
+      panchangCategoriesOpen: {},
       userBirthDate: null,
       userBirthTime: null,
       userBirthPlace: null,
@@ -228,6 +252,7 @@ export const useStore = create<AppStore>()(
       userName: null,
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
+      widgetSlots: [...DEFAULT_WIDGET_SLOTS],
 
       setThemeMode: (mode) => set({ themeMode: mode }),
       setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
@@ -259,6 +284,13 @@ export const useStore = create<AppStore>()(
       setQuietHoursStart: (timeHHmm) => set({ quietHoursStart: timeHHmm }),
       setQuietHoursEnd: (timeHHmm) => set({ quietHoursEnd: timeHHmm }),
       setShowVikramSamvat: (val) => set({ showVikramSamvat: val }),
+      setPanchangLayout: (layout) => set({ panchangLayout: layout }),
+      togglePanchangCategory: (key) => set((s) => ({
+        panchangCategoriesOpen: {
+          ...s.panchangCategoriesOpen,
+          [key]: !s.panchangCategoriesOpen[key],
+        },
+      })),
       setTithiReminder: (key, val) =>
         set((s) => ({
           reminderPrefs: {
@@ -283,11 +315,19 @@ export const useStore = create<AppStore>()(
       },
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
       initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
+      setWidgetSlot: (index, fieldId) =>
+        set((s) => {
+          const next = [...s.widgetSlots] as [
+            WidgetFieldId, WidgetFieldId, WidgetFieldId, WidgetFieldId,
+          ];
+          next[index] = fieldId;
+          return { widgetSlots: next };
+        }),
     }),
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 11,
+      version: 14,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -387,11 +427,15 @@ export const useStore = create<AppStore>()(
         }
 
         // v4 → v5: font size scale was re-graded with finer mid-steps. The old
-        // 'large' (1.5) is now 'xl', and old 'xl' (1.9) is closest to new 'xxl' (1.75).
+        // 'large' (1.5) became 'xl', and old 'xl' (1.9) → 'xxl'. Both 'xl' and
+        // 'xxl' were dropped in v13, so any value emitted here is intermediate
+        // and gets clamped back to 'large' by the v12→v13 step below. We keep
+        // the assignment so the historical migration chain stays correct;
+        // casts are required because 'xl'/'xxl' aren't valid `FontSize` now.
         if (version < 5) {
           const f = state.fontSize as string | undefined;
-          if (f === 'large') state.fontSize = 'xl';
-          else if (f === 'xl') state.fontSize = 'xxl';
+          if (f === 'large') state.fontSize = 'xl' as unknown as FontSize;
+          else if (f === 'xl') state.fontSize = 'xxl' as unknown as FontSize;
         }
 
         // v5 → v6: themeMode introduced. Carry forward the user's existing
@@ -440,6 +484,38 @@ export const useStore = create<AppStore>()(
             | undefined;
           if (place && !place.timezone) {
             state.userBirthPlace = { ...place, timezone: 'Asia/Kolkata' };
+          }
+        }
+
+        // v11 → v12: Pancha Anga accordion default-open behaviour. Earlier
+        // builds let the panchang screen toggle accordions open; users who
+        // tested ended up with several `true` values stuck in storage. Reset
+        // the open-set so the new "only Pancha Anga open by default" rule
+        // applies cleanly. Users who actively want other categories open will
+        // re-toggle them; their preferences then persist normally.
+        if (version < 12) {
+          state.panchangCategoriesOpen = {};
+        }
+
+        // v12 → v13: 'xl' and 'xxl' font-size steps removed (they over-scaled
+        // hero typography on the Sacred Editorial design). Anyone who landed
+        // on those gets clamped to 'large' so existing reading flows stay
+        // readable; they can re-pick if they want.
+        if (version < 13) {
+          const f = state.fontSize as string | undefined;
+          if (f === 'xl' || f === 'xxl') state.fontSize = 'large';
+        }
+
+        // v13 → v14: home-screen widget gained user-configurable slots. Seed
+        // existing installs with the four fields the widget shipped with so
+        // their content doesn't change on upgrade.
+        if (version < 14) {
+          const slots = state.widgetSlots as unknown[] | undefined;
+          const valid = Array.isArray(slots)
+            && slots.length === 4
+            && slots.every((id) => typeof id === 'string' && (WIDGET_FIELD_IDS as string[]).includes(id));
+          if (!valid) {
+            state.widgetSlots = [...DEFAULT_WIDGET_SLOTS];
           }
         }
 

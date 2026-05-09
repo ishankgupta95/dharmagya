@@ -18,6 +18,7 @@ import { darkColors, lightColors, borderRadius, palette, spacing, semanticColors
 import { Kicker } from '@/components/common/Kicker';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import {
   ALL_OCCASIONS,
   scanAuspiciousDays,
@@ -70,6 +71,8 @@ export default function OccasionDetailScreen() {
   const db = useSQLiteContext();
 
   const occasion: Occasion | null = ALL_OCCASIONS.includes(raw as Occasion) ? (raw as Occasion) : null;
+
+  useInterstitialOnExit();
 
   const [matches, setMatches] = useState<MuhuratMatch[]>([]);
   const [status, setStatus] = useState<Status>('loading');
@@ -320,6 +323,10 @@ export default function OccasionDetailScreen() {
   const progressPct = totalDays > 0 ? Math.min(100, Math.round((scannedCount / totalDays) * 100)) : 0;
 
   return (
+    // ScreenMount's 220ms FadeIn covers the title + icon row alongside the
+    // rest of the body. The validateCandidates fast-path (~50ms) runs from
+    // the picker's onMount effect during this fade window, so the user
+    // sees the header settle in while the match list scaffolds underneath.
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>

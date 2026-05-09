@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, TextInput, ScrollView, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import type { Dignity, Divisional, DivisionalChart } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
@@ -24,6 +25,8 @@ import {
 } from '@/services/astrology/kundliService';
 import { DoshaCard } from './DoshaCard';
 import { ShadbalaChart } from './ShadbalaChart';
+import { AspectsCard } from './AspectsCard';
+import { AccordionSection } from '@/components/panchang/AccordionSection';
 import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
 import { NorthChart } from './NorthChart';
@@ -42,21 +45,44 @@ const RASHI_NAMES_HI = [
 
 export function KundliSection() {
   const { t, i18n } = useTranslation();
-  const isDarkMode = useStore((s) => s.isDarkMode);
-  const language = useStore((s) => s.language);
-  const userBirthDate = useStore((s) => s.userBirthDate);
-  const userBirthTime = useStore((s) => s.userBirthTime);
-  const userBirthPlace = useStore((s) => s.userBirthPlace);
-  const userSex = useStore((s) => s.userSex);
-  const userName = useStore((s) => s.userName);
-  const setUserBirthDate = useStore((s) => s.setUserBirthDate);
-  const setUserBirthTime = useStore((s) => s.setUserBirthTime);
-  const setUserSex = useStore((s) => s.setUserSex);
-  const setUserName = useStore((s) => s.setUserName);
-  const ayanamsa = useStore((s) => s.ayanamsa);
-  const houseSystem = useStore((s) => s.houseSystem);
-  const chartStyle = useStore((s) => s.chartStyle);
-  const setChartStyle = useStore((s) => s.setChartStyle);
+  // Single shallow-compared slice of the 15 store fields this component
+  // touches. Without `useShallow`, each field is its own subscription and a
+  // theme/language toggle fires up to 15 re-renders before React batches.
+  const {
+    isDarkMode,
+    language,
+    userBirthDate,
+    userBirthTime,
+    userBirthPlace,
+    userSex,
+    userName,
+    setUserBirthDate,
+    setUserBirthTime,
+    setUserSex,
+    setUserName,
+    ayanamsa,
+    houseSystem,
+    chartStyle,
+    setChartStyle,
+  } = useStore(
+    useShallow((s) => ({
+      isDarkMode: s.isDarkMode,
+      language: s.language,
+      userBirthDate: s.userBirthDate,
+      userBirthTime: s.userBirthTime,
+      userBirthPlace: s.userBirthPlace,
+      userSex: s.userSex,
+      userName: s.userName,
+      setUserBirthDate: s.setUserBirthDate,
+      setUserBirthTime: s.setUserBirthTime,
+      setUserSex: s.setUserSex,
+      setUserName: s.setUserName,
+      ayanamsa: s.ayanamsa,
+      houseSystem: s.houseSystem,
+      chartStyle: s.chartStyle,
+      setChartStyle: s.setChartStyle,
+    })),
+  );
   const colors = isDarkMode ? darkColors : lightColors;
   const plinth = usePlinthColors();
   const { width } = useWindowDimensions();
@@ -68,6 +94,7 @@ export function KundliSection() {
   const [activeChart, setActiveChart] = useState<'D1' | Divisional>('D1');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [aspectsOpen, setAspectsOpen] = useState(false);
   // Local draft for the name TextInput so we only commit on blur, not on
   // every keystroke (avoids re-renders + per-key store writes).
   const [nameDraft, setNameDraft] = useState<string>(userName ?? '');
@@ -87,8 +114,37 @@ export function KundliSection() {
 
   const bundle = useMemo(() => (inputs ? computeKundli(inputs) : null), [inputs]);
 
+  // The cache below `computeShadbalaCached` is keyed on input hash, so the
+  // call returns instantly on cache hit — but the call itself still fires on
+  // every parent render. The useMemo here keeps it off the render hot path
+  // entirely; nothing downstream of `shadbala` re-runs unless inputs change.
+  const shadbala = useMemo(
+    () => (inputs ? computeShadbalaCached(inputs) : null),
+    [inputs],
+  );
+
   const lang = resolveLanguage(language);
   const rashiNames = lang === 'hi' ? RASHI_NAMES_HI : RASHI_NAMES_EN;
+
+  // Style memos — every render of the chip strip used to allocate fresh
+  // arrays + color objects, defeating SegmentedChip's structural-equality
+  // checks and trickling re-renders into Text. Hoisted here so they only
+  // change when the underlying inputs do.
+  const chipActiveBg = isDarkMode ? palette.goldLeaf : palette.sindoor;
+  const styleChipTextNorth = useMemo(
+    () => [
+      styles.styleChipText,
+      { color: chartStyle === 'north' ? palette.parchmentBright : colors.textSecondary },
+    ],
+    [chartStyle, colors.textSecondary],
+  );
+  const styleChipTextSouth = useMemo(
+    () => [
+      styles.styleChipText,
+      { color: chartStyle === 'south' ? palette.parchmentBright : colors.textSecondary },
+    ],
+    [chartStyle, colors.textSecondary],
+  );
 
   const userBirthDateObj = userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null;
   const birthDateLabel = userBirthDateObj
@@ -241,8 +297,6 @@ export function KundliSection() {
         ? cellsFromD9(activeDivisional, lang)
         : cellsFromD1(bundle.d1, lang);
 
-  const shadbala = inputs ? computeShadbalaCached(inputs) : null;
-
   // Chart fills screen width minus screen padding.
   const chartSize = Math.min(width - spacing.screenH * 2, 360);
   const dignityLabel = (d: Dignity): string => t(`kundli.dignity.${d}`);
@@ -272,17 +326,12 @@ export function KundliSection() {
             active={chartStyle === 'north'}
             onPress={() => setChartStyle('north')}
             inactiveBg="transparent"
-            activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+            activeBg={chipActiveBg}
             inactiveBorder={colors.border}
             activeBorder="transparent"
             style={styles.styleChip}
             accessibilityLabel={t('kundli.chartNorth')}>
-            <Text
-              variant="mono-caps"
-              style={[
-                styles.styleChipText,
-                { color: chartStyle === 'north' ? palette.parchmentBright : colors.textSecondary },
-              ]}>
+            <Text variant="mono-caps" style={styleChipTextNorth}>
               {t('kundli.chartNorth')}
             </Text>
           </SegmentedChip>
@@ -290,17 +339,12 @@ export function KundliSection() {
             active={chartStyle === 'south'}
             onPress={() => setChartStyle('south')}
             inactiveBg="transparent"
-            activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+            activeBg={chipActiveBg}
             inactiveBorder={colors.border}
             activeBorder="transparent"
             style={styles.styleChip}
             accessibilityLabel={t('kundli.chartSouth')}>
-            <Text
-              variant="mono-caps"
-              style={[
-                styles.styleChipText,
-                { color: chartStyle === 'south' ? palette.parchmentBright : colors.textSecondary },
-              ]}>
+            <Text variant="mono-caps" style={styleChipTextSouth}>
               {t('kundli.chartSouth')}
             </Text>
           </SegmentedChip>
@@ -378,6 +422,18 @@ export function KundliSection() {
           <ShadbalaChart shadbala={shadbala} />
         </>
       )}
+
+      {/* ── Aspects (Drishti) — collapsible, default-closed ────────────── */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.aspects"
+          title={t('aspects.sectionTitle')}
+          open={aspectsOpen}
+          onToggle={() => setAspectsOpen((o) => !o)}
+          colors={colors}>
+          <AspectsCard d1={bundle.d1} aspects={bundle.aspects} colors={colors} />
+        </AccordionSection>
+      </View>
 
       {/* ── Compatibility shortcuts ──────────────────────────────────────
           Two routes into Ashtakoot Guna Milan:
@@ -717,4 +773,6 @@ const styles = StyleSheet.create({
   },
   matchKicker: { fontSize: 9, marginBottom: 2 },
   matchBody: { fontSize: 14, lineHeight: 20 },
+
+  aspectsWrap: { marginTop: 14 },
 });

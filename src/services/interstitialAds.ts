@@ -4,6 +4,7 @@ import {
   getInterstitialUnitId,
   INTERSTITIAL_MIN_GAP_MS,
   FIRST_SESSION_GRACE_MS,
+  type InterstitialPlacement,
 } from '@/config/ads';
 import { useStore } from '@/store/useStore';
 
@@ -14,8 +15,6 @@ const AdsModule = getAdsModule();
 let lastShownTimestamp = 0;
 let currentAd: ReturnType<typeof createInterstitial> | null = null;
 let isLoading = false;
-
-type InterstitialPlacement = 'contentExit' | 'appResume';
 
 function createInterstitial(placement: InterstitialPlacement) {
   if (!AdsModule) return null;
