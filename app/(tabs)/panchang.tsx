@@ -839,8 +839,11 @@ export default function PanchangScreen() {
           <TouchableOpacity
             onPress={() => setPickerOpen(true)}
             activeOpacity={0.7}
-            hitSlop={8}
-            style={styles.monthLabelRow}
+            hitSlop={6}
+            style={[
+              styles.monthLabelRow,
+              { backgroundColor: colors.surface, borderColor: colors.borderAccent },
+            ]}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.openDatePicker')}>
             <Text variant="display-italic" style={[styles.monthName, { color: colors.textPrimary }]}>
@@ -849,9 +852,8 @@ export default function PanchangScreen() {
             <Text variant="mono" style={[styles.monthYear, { color: colors.textTertiary }]}>
               {calYear}
             </Text>
-            <View style={styles.monthCaret}>
-              <Icon name="chevron-down" size={11} color={palette.gold} />
-            </View>
+            <View style={[styles.monthDialDivider, { backgroundColor: colors.border }]} />
+            <Icon name="caret-down" size={12} color={colors.accent} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={goNextMonth}
@@ -1492,19 +1494,19 @@ const styles = StyleSheet.create({
   monthLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    gap: 7,
+    paddingLeft: 14,
+    paddingRight: 11,
+    paddingVertical: 6,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
   },
-  monthName: { fontSize: 20, lineHeight: 24 },
-  monthYear: { fontSize: 12, letterSpacing: 1.1, marginBottom: 2 },
-  monthCaret: {
-    width: 14,
+  monthName: { fontSize: 19, lineHeight: 22 },
+  monthYear: { fontSize: 11, letterSpacing: 1.3, marginBottom: 2 },
+  monthDialDivider: {
+    width: StyleSheet.hairlineWidth,
     height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 2,
+    marginLeft: 1,
   },
 
   todayRow: { alignItems: 'center', marginBottom: 2 },

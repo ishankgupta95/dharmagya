@@ -261,14 +261,19 @@ export function DatePickerModal({
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={openYearPage}
-                  hitSlop={8}
-                  style={styles.monthLabelRow}
+                  hitSlop={6}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.monthLabelRow,
+                    { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent },
+                  ]}
                   accessibilityRole="button"
                   accessibilityLabel={t('a11y.openDatePicker')}>
                   <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
                     {(t('panchang.monthNames', { returnObjects: true }) as string[])[month]} {year}
                   </Text>
-                  <Icon name="caret-down" size={12} color={colors.textMuted} />
+                  <View style={[styles.monthLabelDivider, { backgroundColor: colors.border }]} />
+                  <Icon name="caret-down" size={11} color={colors.accent} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={nextMonth}
@@ -520,8 +525,18 @@ const styles = StyleSheet.create({
   rule: { marginTop: 8, marginBottom: 14, alignSelf: 'center', width: '50%' },
 
   monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  monthLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  monthLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 14,
+    paddingRight: 11,
+    paddingVertical: 6,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
+  },
   monthLabel: { fontSize: 16, fontFamily: 'NotoSerifDevanagari_500Medium' },
+  monthLabelDivider: { width: StyleSheet.hairlineWidth, height: 14 },
 
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   pageHeaderLabel: { fontSize: 11 },
