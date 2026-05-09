@@ -8,9 +8,8 @@ import { Ornament } from './Ornament';
 import { borderRadius, palette, spacing } from '@/config/theme';
 
 /**
- * Editorial time picker. Mirrors [WheelDatePickerModal](./WheelDatePickerModal.tsx)
- * — iOS shows an inline spinner inside our parchment sheet; Android delegates
- * to the native time dialog.
+ * Editorial time picker. iOS shows an inline `@react-native-community/datetimepicker`
+ * spinner inside our parchment sheet; Android delegates to the native time dialog.
  *
  * Accepts and emits `HH:mm` 24-hour strings so callers can persist them as
  * compact primitives.

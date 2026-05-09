@@ -50,7 +50,7 @@ import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { Ornament } from '@/components/common/Ornament';
 import { CalendarGridSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
-import { WheelDatePickerModal } from '@/components/common/WheelDatePickerModal';
+import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
 import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
@@ -1397,14 +1397,18 @@ export default function PanchangScreen() {
         />
       )}
 
-      <WheelDatePickerModal
+      <DatePickerModal
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
         value={selectedDate}
         onPick={handlePickFromModal}
-        minimumDate={new Date(1900, 0, 1)}
-        maximumDate={new Date(2100, 11, 31)}
-        title={t('panchang.datePickerTitle', { defaultValue: 'Pick a date' })}
+        minDate={new Date(1900, 0, 1)}
+        maxDate={new Date(2100, 11, 31)}
+        minYear={1900}
+        maxYear={2100}
+        colors={colors}
+        mode="month"
+        title={t('panchang.datePickerTitle', { defaultValue: 'Jump to month' })}
       />
 
     </SafeAreaView>
