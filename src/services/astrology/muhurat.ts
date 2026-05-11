@@ -68,6 +68,15 @@ export interface MuhuratMatch {
   vara: string;
   /** Full panchang for this day — kept so the UI doesn't need a second fetch. */
   panchang: IPanchangDay;
+  /** Library's auspiciousness score [0..100] from `scoreMuhurta`. Higher is
+   *  more auspicious. Always present for fresh writes; SQLite cache schema
+   *  bumped to v5 to ensure no pre-score rows linger. */
+  score: number;
+  /** Why the score landed where it did — short library-supplied notes on
+   *  which factors raised or lowered it (tithi / nakshatra / yoga / vara
+   *  matches and exclusions). Rendered as a "Why this day" line in the
+   *  expanded day detail. */
+  reasons: string[];
 }
 
 export interface ScanProgress {
@@ -267,5 +276,7 @@ async function evaluateAndDescribe(
     yoga: panchang.yogas[0]?.name ?? '',
     vara: panchang.vara ?? '',
     panchang,
+    score: scored.score,
+    reasons: scored.reasons ?? [],
   };
 }

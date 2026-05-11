@@ -8,12 +8,13 @@ import { useStore } from '@/store/useStore';
 
 /**
  * Six-fold strength bars for the seven visible grahas. The library returns
- * Virupas (60 V = 1 Rupa). Classical "minimum required" thresholds vary per
- * planet, but a Sun total of ~390+ and others ~300+ is the rough public-
- * calculator convention. We render the bar as a percentage of the strongest
+ * Virupas (60 V = 1 Rupa). We render the bar as a percentage of the strongest
  * graha in this chart so the comparison is internal — the user reads
  * "Jupiter is strongest, Saturn is weakest in this chart" without needing
- * an absolute Virupa value to anchor against.
+ * an absolute Virupa value to anchor against. Absolute thresholds shift
+ * upward with panchang-ts 4.1 (sthana extended from 0–60 V to 0–420 V; per-
+ * graha total goes up by +30 to +150 V); the percentage normalization above
+ * leaves the bars visually unchanged regardless.
  */
 export interface ShadbalaChartProps {
   shadbala: ShadbalaResult;

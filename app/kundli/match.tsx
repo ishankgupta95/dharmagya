@@ -12,7 +12,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import type { AshtakootResult, KootName, NatalMoon } from 'panchang-ts';
+import type {
+  AshtakootResult,
+  KootName,
+  NatalMoon,
+  PathuPoruthamResult,
+  PoruthamName,
+} from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
@@ -31,6 +37,7 @@ import {
   computeKundli,
   buildBirthInputs,
   matchAshtakoot,
+  matchPathuPorutham,
   natalMoonFromChart,
 } from '@/services/astrology/kundliService';
 import { INDIAN_CITIES, cityTimezone, type City } from '@/config/cities';
@@ -81,6 +88,10 @@ export default function KundliMatchScreen() {
   const lang = resolveLanguage(language);
 
   // ── Derive "you" natal moon ────────────────────────────────────────────
+  // Pass the D9 chart so the result carries `navamsaRashi` for the 4.1
+  // opt-in Bhakoot cancellations (same lagna-lord / same 7th-lord / same
+  // navamsa-lord). Same-tier additive enrichment; default Ashtakoot still
+  // runs when either field is missing.
   const yourMoon = useMemo<NatalMoon | null>(() => {
     const inputs = buildBirthInputs({
       birthDateIso: userBirthDate,
@@ -93,7 +104,7 @@ export default function KundliMatchScreen() {
     if (!inputs) return null;
     const k = computeKundli(inputs);
     if (!k) return null;
-    return natalMoonFromChart(k.d1);
+    return natalMoonFromChart(k.d1, k.d9);
   }, [userBirthDate, userBirthTime, userBirthPlace, ayanamsa, lang, houseSystem]);
 
   // ── Derive partner natal moons (computes + caches into useBirthStore) ─
@@ -107,13 +118,15 @@ export default function KundliMatchScreen() {
 
   // Side effect: persist freshly-derived fields back to the store so future
   // opens skip the chart compute. Runs only when we actually computed (not
-  // when reading from the cache).
+  // when reading from the cache). `navamsaRashi` is added in the 4.1 surface;
+  // when it's available from a fresh compute we persist it for next time.
   useEffect(() => {
     if (!partnerA || !partnerACompute || partnerACompute.fromCache) return;
     setDerived(partnerA.id, {
       moonRashi: partnerACompute.moon.rashi,
       moonNakshatra: partnerACompute.moon.nakshatra,
       lagnaRashi: partnerACompute.lagnaRashi,
+      navamsaRashi: partnerACompute.moon.navamsaRashi,
     });
   }, [partnerA, partnerACompute, setDerived]);
   useEffect(() => {
@@ -122,6 +135,7 @@ export default function KundliMatchScreen() {
       moonRashi: partnerBCompute.moon.rashi,
       moonNakshatra: partnerBCompute.moon.nakshatra,
       lagnaRashi: partnerBCompute.lagnaRashi,
+      navamsaRashi: partnerBCompute.moon.navamsaRashi,
     });
   }, [partnerB, partnerBCompute, setDerived]);
 
@@ -131,28 +145,38 @@ export default function KundliMatchScreen() {
   const slotBMoon = partnerBCompute?.moon ?? null;
   const slotBSex: Sex | null = partnerB?.sex ?? null;
 
+  // North-Indian Ashtakoot 36-point vs South-Indian Pathu Porutham 10-fold —
+  // both consume the same `NatalMoon` shape but score very different criteria.
+  // Default to Ashtakoot (matches the historical surface); user can flip per
+  // session without re-entering data.
+  const [matchSystem, setMatchSystem] = useState<'ashtakoot' | 'porutham'>('ashtakoot');
+
   // ── Compute match ──────────────────────────────────────────────────────
   // Varna's scoring is asymmetric ("boy's varna ≥ girl's"). Assign roles by
   // biological sex per classical convention. Same-sex pairs fall through to
   // a stable order (slot A = boy) and the UI surfaces a disclaimer; the
   // score is still computed but the Varna point is interpreted with that note.
-  const result = useMemo<AshtakootResult | null>(() => {
+  // Both Ashtakoot and Pathu Porutham consume the same boy/girl roles.
+  const roles = useMemo<{ boy: NatalMoon; girl: NatalMoon } | null>(() => {
     if (!slotAMoon || !slotBMoon || !slotASex || !slotBSex) return null;
-    let boy: NatalMoon;
-    let girl: NatalMoon;
     if (slotASex === 'male' && slotBSex === 'female') {
-      boy = slotAMoon;
-      girl = slotBMoon;
-    } else if (slotASex === 'female' && slotBSex === 'male') {
-      boy = slotBMoon;
-      girl = slotAMoon;
-    } else {
-      // Same-sex — pick a stable order so the score is reproducible.
-      boy = slotAMoon;
-      girl = slotBMoon;
+      return { boy: slotAMoon, girl: slotBMoon };
     }
-    return matchAshtakoot(boy, girl);
+    if (slotASex === 'female' && slotBSex === 'male') {
+      return { boy: slotBMoon, girl: slotAMoon };
+    }
+    // Same-sex — pick a stable order so the score is reproducible.
+    return { boy: slotAMoon, girl: slotBMoon };
   }, [slotAMoon, slotBMoon, slotASex, slotBSex]);
+
+  const result = useMemo<AshtakootResult | null>(
+    () => (roles ? matchAshtakoot(roles.boy, roles.girl) : null),
+    [roles],
+  );
+  const poruthamResult = useMemo<PathuPoruthamResult | null>(
+    () => (roles ? matchPathuPorutham(roles.boy, roles.girl) : null),
+    [roles],
+  );
 
   const isSameSexMatch = !!(slotASex && slotBSex && slotASex === slotBSex);
 
@@ -351,41 +375,121 @@ export default function KundliMatchScreen() {
           )}
 
           {/* Result */}
-          {result && slotAMoon && slotBMoon && (
+          {result && poruthamResult && slotAMoon && slotBMoon && (
             <>
               <SectionLabel style={styles.sectionLabelSpacing}>
                 {t('match.resultTitle')}
               </SectionLabel>
 
-              <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
-                <Kicker color={plinth.accent} size={10}>
-                  {t('match.totalScoreLabel')}
-                </Kicker>
-                <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
-                  {result.totalScore} <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 36</Text>
-                </Text>
-                <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
-                  {verdictKey(result.totalScore, t)}
-                </Text>
-              </NightCard>
-
-              <View style={styles.kootList}>
-                {result.koots.map((k) => (
-                  <KootRow key={k.name} koot={k} colors={colors} t={t} />
-                ))}
+              {/* System toggle — flips between Ashtakoot 36-point and the
+                  Tamil Pathu Porutham 10-fold view without re-entering data. */}
+              <View style={styles.systemToggleRow}>
+                <SegmentedChip
+                  active={matchSystem === 'ashtakoot'}
+                  onPress={() => setMatchSystem('ashtakoot')}
+                  inactiveBg="transparent"
+                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  inactiveBorder={colors.border}
+                  activeBorder="transparent"
+                  style={styles.systemChip}
+                  accessibilityLabel={t('match.systemAshtakoot')}>
+                  <Text
+                    variant="mono-caps"
+                    style={[
+                      styles.systemChipText,
+                      {
+                        color:
+                          matchSystem === 'ashtakoot'
+                            ? palette.parchmentBright
+                            : colors.textSecondary,
+                      },
+                    ]}>
+                    {t('match.systemAshtakoot')}
+                  </Text>
+                </SegmentedChip>
+                <SegmentedChip
+                  active={matchSystem === 'porutham'}
+                  onPress={() => setMatchSystem('porutham')}
+                  inactiveBg="transparent"
+                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  inactiveBorder={colors.border}
+                  activeBorder="transparent"
+                  style={styles.systemChip}
+                  accessibilityLabel={t('match.systemPorutham')}>
+                  <Text
+                    variant="mono-caps"
+                    style={[
+                      styles.systemChipText,
+                      {
+                        color:
+                          matchSystem === 'porutham'
+                            ? palette.parchmentBright
+                            : colors.textSecondary,
+                      },
+                    ]}>
+                    {t('match.systemPorutham')}
+                  </Text>
+                </SegmentedChip>
               </View>
 
-              {result.cancellations.length > 0 && (
-                <View style={[styles.cancelCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Kicker color={colors.accent} size={9}>
-                    {t('match.cancellationsLabel')}
-                  </Kicker>
-                  {result.cancellations.map((c, i) => (
-                    <Text key={i} variant="body" style={[styles.cancelLine, { color: colors.textSecondary }]}>
-                      • {c}
+              {matchSystem === 'ashtakoot' ? (
+                <>
+                  <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+                    <Kicker color={plinth.accent} size={10}>
+                      {t('match.totalScoreLabel')}
+                    </Kicker>
+                    <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
+                      {result.totalScore} <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 36</Text>
                     </Text>
-                  ))}
-                </View>
+                    <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
+                      {verdictKey(result.totalScore, t)}
+                    </Text>
+                  </NightCard>
+
+                  <View style={styles.kootList}>
+                    {result.koots.map((k) => (
+                      <KootRow key={k.name} koot={k} colors={colors} t={t} />
+                    ))}
+                  </View>
+
+                  {result.cancellations.length > 0 && (
+                    <View style={[styles.cancelCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Kicker color={colors.accent} size={9}>
+                        {t('match.cancellationsLabel')}
+                      </Kicker>
+                      {result.cancellations.map((c, i) => (
+                        <Text key={i} variant="body" style={[styles.cancelLine, { color: colors.textSecondary }]}>
+                          • {c}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <>
+                  <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+                    <Kicker color={plinth.accent} size={10}>
+                      {t('match.pathuPorutham.totalScoreLabel')}
+                    </Kicker>
+                    <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
+                      {poruthamResult.totalPasses}{' '}
+                      <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 10</Text>
+                    </Text>
+                    <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
+                      {t(
+                        poruthamResult.recommended
+                          ? 'match.pathuPorutham.recommended'
+                          : 'match.pathuPorutham.notRecommended',
+                      )}
+                    </Text>
+                  </NightCard>
+
+                  <View style={styles.kootList}>
+                    {poruthamResult.poruthams.map((p) => (
+                      <PoruthamRow key={p.name} porutham={p} colors={colors} t={t} />
+                    ))}
+                  </View>
+                </>
               )}
 
               {isSameSexMatch && (
@@ -395,7 +499,11 @@ export default function KundliMatchScreen() {
               )}
 
               <Text variant="body-italic" style={[styles.disclaimer, { color: colors.textMuted }]}>
-                {t('match.disclaimer')}
+                {t(
+                  matchSystem === 'ashtakoot'
+                    ? 'match.disclaimer'
+                    : 'match.pathuPorutham.disclaimer',
+                )}
               </Text>
             </>
           )}
@@ -420,7 +528,9 @@ export default function KundliMatchScreen() {
 // Helper hook: derive a partner's natal moon, reading from the cached
 // `derived` fields when available and falling back to a fresh compute.
 // Caching lives in useBirthStore — caller persists the result via setDerived
-// after the first compute.
+// after the first compute. A cached entry that pre-dates the 4.1 navamsa-
+// rashi enrichment (no `navamsaRashi` field) is treated as a partial hit
+// and triggers a fresh compute so the opt-in Bhakoot cancellation can fire.
 function usePartnerCompute(
   partner: BirthChartEntry | null,
   ayanamsa: Ayanamsa,
@@ -429,9 +539,14 @@ function usePartnerCompute(
 ): { moon: NatalMoon; lagnaRashi: number; fromCache: boolean } | null {
   return useMemo(() => {
     if (!partner) return null;
-    if (partner.derived) {
+    if (partner.derived && partner.derived.navamsaRashi !== undefined) {
       return {
-        moon: { rashi: partner.derived.moonRashi, nakshatra: partner.derived.moonNakshatra },
+        moon: {
+          rashi: partner.derived.moonRashi,
+          nakshatra: partner.derived.moonNakshatra,
+          lagnaRashi: partner.derived.lagnaRashi,
+          navamsaRashi: partner.derived.navamsaRashi,
+        },
         lagnaRashi: partner.derived.lagnaRashi,
         fromCache: true,
       };
@@ -452,7 +567,7 @@ function usePartnerCompute(
       houseSystem,
     });
     if (!k) return null;
-    const moon = natalMoonFromChart(k.d1);
+    const moon = natalMoonFromChart(k.d1, k.d9);
     return { moon, lagnaRashi: k.d1.lagna.rashi.index, fromCache: false };
   }, [partner, ayanamsa, lang, houseSystem]);
 }
@@ -625,6 +740,67 @@ function kootKey(name: KootName): string {
     case 'Gana': return 'gana';
     case 'Bhakoot': return 'bhakoot';
     case 'Nadi': return 'nadi';
+  }
+}
+
+interface PoruthamRowProps {
+  porutham: PathuPoruthamResult['poruthams'][number];
+  colors: ColorPalette;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}
+
+function PoruthamRow({ porutham, colors, t }: PoruthamRowProps) {
+  // Pathu Porutham is binary per koot; pass = green tone, fail = sindoor.
+  // Veto-failed koots get a stronger sindoor outline so the user reads
+  // "this is the one that flipped the recommendation" at a glance.
+  const passes = porutham.passes;
+  const veto = porutham.veto === true;
+  const tone = passes ? '#3FA37D' : palette.sindoor;
+  return (
+    <View
+      style={[
+        styles.kootRow,
+        {
+          backgroundColor: colors.surface,
+          borderColor: veto ? palette.sindoor : colors.border,
+          borderWidth: veto ? 1.5 : 1,
+        },
+      ]}>
+      <View style={styles.kootHead}>
+        <Text variant="body" style={[styles.kootName, { color: colors.textPrimary }]}>
+          {t(`match.pathuPorutham.poruthams.${poruthamKey(porutham.name)}`)}
+          {veto && (
+            <Text variant="mono-caps" style={[styles.poruthamVetoTag, { color: palette.sindoor }]}>
+              {'  '}· {t('match.pathuPorutham.vetoTag')}
+            </Text>
+          )}
+        </Text>
+        <Text variant="mono-caps" style={[styles.kootScore, { color: tone }]}>
+          {t(passes ? 'match.pathuPorutham.pass' : 'match.pathuPorutham.fail')}
+        </Text>
+      </View>
+      <View style={[styles.kootBarTrack, { backgroundColor: colors.border }]}>
+        <View style={[styles.kootBarFill, { width: passes ? '100%' : '0%', backgroundColor: tone }]} />
+      </View>
+      <Text variant="mono" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
+        {porutham.description}
+      </Text>
+    </View>
+  );
+}
+
+function poruthamKey(name: PoruthamName): string {
+  switch (name) {
+    case 'Dina': return 'dina';
+    case 'Gana': return 'gana';
+    case 'Mahendra': return 'mahendra';
+    case 'SthreeDeergha': return 'sthreeDeergha';
+    case 'Yoni': return 'yoni';
+    case 'Rashi': return 'rashi';
+    case 'Rashyathipathi': return 'rashyathipathi';
+    case 'Vasya': return 'vasya';
+    case 'Rajju': return 'rajju';
+    case 'Vedha': return 'vedha';
   }
 }
 
@@ -1031,9 +1207,21 @@ const styles = StyleSheet.create({
   },
   addBtnText: { fontSize: 10 },
 
+  systemToggleRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  systemChip: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  systemChipText: { fontSize: 9 },
+
   totalScore: { fontSize: 56, lineHeight: 60, marginTop: 6 },
   totalOf: { fontSize: 24, lineHeight: 28 },
   verdict: { fontSize: 14, lineHeight: 20, marginTop: 6 },
+
+  poruthamVetoTag: { fontSize: 9, letterSpacing: 1.4 },
 
   kootList: { marginTop: 16, gap: 10 },
   kootRow: {

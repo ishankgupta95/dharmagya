@@ -39,6 +39,7 @@ import {
   localizeVara,
   localizeChoghadiya,
 } from '@/i18n/panchangNames';
+import { useLocaleFormatters } from '@/utils/format';
 
 const SCAN_DAYS = 365;
 const PERSIST_EVERY = 15; // flush partial scan to SQLite every N days
@@ -511,6 +512,20 @@ function parseYmd(s: string): Date | null {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+// Score band → color + label key. Drives both the score-column pill border /
+// number color and the "Highly auspicious / Auspicious / …" caption beneath
+// each result row's reasons block. Bands are inclusive on the lower bound.
+//   90+: rich gold (richest hue)            "Highly auspicious"
+//   70+: gold                                "Auspicious"
+//   50+: amber                               "Mildly auspicious"
+//   <50: sindoor (rule passed but minimum)   "Marginally auspicious"
+function scoreBand(score: number): { color: string; bandKey: 'excellent' | 'good' | 'mild' | 'marginal' } {
+  if (score >= 90) return { color: palette.goldLeaf, bandKey: 'excellent' };
+  if (score >= 70) return { color: palette.gold, bandKey: 'good' };
+  if (score >= 50) return { color: '#BA7E2A', bandKey: 'mild' };
+  return { color: palette.sindoor, bandKey: 'marginal' };
+}
+
 function DayRow({
   match,
   colors,
@@ -526,6 +541,7 @@ function DayRow({
 }) {
   const { t, i18n } = useTranslation();
   const plinth = usePlinthColors();
+  const { formatNumber } = useLocaleFormatters();
   const dateLocale = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
   const weekday = match.date.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNum = match.date.getDate();
@@ -533,6 +549,8 @@ function DayRow({
   const year = match.date.getFullYear();
 
   const bestSlots = useMemo(() => getBestSlots(match, t, i18n.language), [match, t, i18n.language]);
+  const band = scoreBand(match.score);
+  const scoreLabel = formatNumber(Math.round(match.score));
 
   return (
     <TouchableOpacity
@@ -547,7 +565,7 @@ function DayRow({
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`${weekday} ${dayNum} ${month} ${year}`}
+      accessibilityLabel={`${weekday} ${dayNum} ${month} ${year} · ${t('muhurat.scoreAccessibility', { score: scoreLabel })}`}
       accessibilityState={{ expanded }}>
       <View style={styles.dayRowHead}>
         <View
@@ -588,12 +606,56 @@ function DayRow({
             {localizeNakshatra(match.nakshatra, i18n.language)} · {localizeYoga(match.yoga, i18n.language)} · {localizeVara(match.vara, i18n.language)}
           </Text>
         </View>
+        {/* Score pill — band-colored, sits between dayInfo and the chevron.
+            Drives at-a-glance ranking of days within a month. The same band
+            colors the "Highly auspicious / Auspicious / …" caption in the
+            expanded detail below. */}
+        <View
+          style={[
+            styles.scoreCol,
+            { borderColor: band.color, backgroundColor: band.color + '14' },
+          ]}>
+          <Text variant="display-italic" style={[styles.scoreValue, { color: band.color }]}>
+            {scoreLabel}
+          </Text>
+          <Text variant="mono-caps" style={[styles.scoreSuffix, { color: colors.textMuted }]}>
+            {t('muhurat.scoreOutOf')}
+          </Text>
+        </View>
         <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
       </View>
 
       {expanded && (
         <View style={[styles.detail, { borderTopColor: colors.divider }]}>
-          <Kicker color={palette.gold} size={9} style={styles.detailHeading}>
+          {/* Score band label + library-supplied reasons. Always rendered when
+              `match.reasons` is non-empty (every fresh write supplies them
+              post-v5 cache wipe); the band label alone tells the user *how*
+              auspicious within the passing band. */}
+          <Kicker color={band.color} size={9} style={styles.detailHeading}>
+            {t('muhurat.whyThisDay')}
+          </Kicker>
+          <View
+            style={[
+              styles.scoreReasonsBlock,
+              { backgroundColor: band.color + '12', borderColor: band.color + '55' },
+            ]}>
+            <Text variant="body" style={[styles.scoreBandLabel, { color: band.color }]}>
+              {t(`muhurat.scoreBand.${band.bandKey}`)}
+              <Text variant="body-italic" style={{ color: colors.textMuted }}>
+                {'  '}· {scoreLabel}{t('muhurat.scoreOutOf')}
+              </Text>
+            </Text>
+            {match.reasons.map((r, i) => (
+              <Text
+                key={i}
+                variant="body-italic"
+                style={[styles.scoreReasonItem, { color: colors.textSecondary }]}>
+                • {r}
+              </Text>
+            ))}
+          </View>
+
+          <Kicker color={palette.gold} size={9} style={[styles.detailHeading, styles.detailHeadingTop]}>
             {t('muhurat.bestSlots')}
           </Kicker>
           {bestSlots.length === 0 ? (
@@ -760,9 +822,32 @@ const styles = StyleSheet.create({
   dayTithi: { flexShrink: 1, fontSize: 14, lineHeight: 19 },
   dayMeta: { fontSize: 12, lineHeight: 16 },
 
+  scoreCol: {
+    minWidth: 44,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: borderRadius.iconContainer,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 1,
+  },
+  scoreValue: { fontSize: 18, lineHeight: 20 },
+  scoreSuffix: { fontSize: 7, letterSpacing: 1.0 },
+
   detail: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, borderTopWidth: StyleSheet.hairlineWidth },
   detailHeading: { marginBottom: 10 },
+  detailHeadingTop: { marginTop: 14 },
   detailText: { fontSize: 12, marginBottom: 4 },
+  scoreReasonsBlock: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: borderRadius.cardInner,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+    gap: 4,
+  },
+  scoreBandLabel: { fontSize: 13, lineHeight: 18, marginBottom: 4 },
+  scoreReasonItem: { fontSize: 12, lineHeight: 17 },
   slotsPlinth: { marginTop: 2 },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   slotName: { flex: 1, fontSize: 13, lineHeight: 18 },

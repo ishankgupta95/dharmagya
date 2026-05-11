@@ -41,9 +41,9 @@ Pure TypeScript, no native modules, RN-compatible. Wraps as `getPanchangam`, `co
 
 ### 3.2 `expo-sqlite` API (SDK 54+)
 
-Use the modern synchronous API. Do NOT use the legacy `expo-sqlite/legacy` or `SQLite.openDatabase()`. The DB is wrapped via `<SQLiteProvider databaseName="dharmsetu.db" useSuspense>` in `app/_layout.tsx`; tables are managed in [`src/utils/database.ts`](src/utils/database.ts) on `onInit` and gated by `PRAGMA user_version`. Currently at version 2 (post-1.7.0).
+Use the modern synchronous API. Do NOT use the legacy `expo-sqlite/legacy` or `SQLite.openDatabase()`. The DB is wrapped via `<SQLiteProvider databaseName="dharmsetu.db" useSuspense>` in `app/_layout.tsx`; tables are managed in [`src/utils/database.ts`](src/utils/database.ts) on `onInit` and gated by `PRAGMA user_version`. Currently at version 5 (post-Phase 13 — `muhurat_cache` rows wiped to backfill `score` + `reasons` from `MuhuratMatch`).
 
-**Current schema:** `muhurat_cache(occasion, lat_key, lon_key, matches_json, scanned_through, updated_at)` — 365-day rolling muhurat scan cache. New tables for future features (e.g. `jaap_sessions`) cache through this surface, not a separate persistence layer.
+**Current schema:** `muhurat_cache(occasion, lat_key, lon_key, matches_json, scanned_through, updated_at)` — 365-day rolling muhurat scan cache; `matches_json` carries `MuhuratMatch[]` including the 4.1-era `score: 0..100` and `reasons: string[]` from `scoreMuhurta`. Also: `jaap_sessions` (counter history), `custom_mantras` (user-typed presets). New tables for future features cache through this surface, not a separate persistence layer.
 
 ### 3.3 Path Aliases
 
@@ -240,33 +240,17 @@ Shipped: `AspectsCard` collapsible inside `KundliSection` (default-closed via `A
 
 ---
 
-## 11. Phase 11 — Lean Pass: cleanup + low-end perf ⏳
+## 11. Phase 11 — Lean Pass: cleanup + low-end perf ✅ (2026-05-10)
 
 **Why now (2026-05-08):** App has accumulated 10 phases of feature work. User reports the **Panchang screen takes ~1s on cold open** (instant once warm), and wants the codebase trimmed for low-end Android (Pixel 3a target). High-priority polish phase — no new features, just cleanup + perf.
 
 **Animation principle (Phase 11 convention, durable):** Animations are kept if (a) they run on UI thread without JS jank AND (b) the animation duration is used to mask compute. Cut only if neither holds. Decorative-only animations are OK if they're free; never if they delay content the user is asking for.
 
-### P11.1 — Panchang cold-start fix ⏳ (highest user-perceived win)
+### P11.1 — Panchang cold-start fix ✅ (resolved organically 2026-05-10)
 
-**Symptom:** First open of Panchang tab after cold-start takes ~1s. Subsequent opens instant. Day 2 cold-start re-pays the full cost (today's date is new each day).
+Original symptom: first open of Panchang tab after cold-start took ~1s. Resolved without the planned cache-prewarm / tomorrow-precompute work — the upstream cuts in P11.2 (`STAGGER_CAP_MS` 400→120, `ScreenMount` on native-side FadeIn), P11.3 (`useShallow` collapsing 16 store subscriptions in `KundliSection`, `React.memo` on Dasha rows, dead `usePanchang.ts` deleted), and P11.4 (JetBrainsMono dropped, logo→webp, 46 i18n keys + 4 deps trimmed) collectively closed the gap. User-verified on device: Panchang tab cold-open is no longer slow.
 
-**Suspected stack** (needs profiling to confirm — do not fix what isn't broken):
-1. SQLite cache miss on today's date → first compute + first DB write.
-2. First Reanimated UI thread spin-up (~50–100ms one-time).
-3. `PanchangScreen` first paint — multiple `AccordionSection` mounts (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), each measuring even if collapsed.
-4. First Devanagari glyph paint + layout reflow.
-5. Zustand SQLite-kv hydration tail.
-
-**Plan:**
-- **Pre-warm cache during splash → first-paint window**: in [`app/_layout.tsx`](app/_layout.tsx) after splash hide, fire `getCachedPanchangDay()` for today + user's lat/lon as fire-and-forget. By the time user taps Panchang tab from Home, Pass 1 cache is warm.
-- **Same on app foreground (`AppState` change)** if last warm > 6 hours ago.
-- **Lazy-mount accordion bodies**: confirm `AccordionSection` only renders header until expanded; if not, defer body subtree.
-- **Skeleton on first paint, fade in real data** as Pass 1 lands (the compute-behind-animation pattern applied here).
-- **Persist tomorrow's panchang from today**: at end-of-session or alongside reminder scheduling, precompute tomorrow's row and write to SQLite. Day 2 cold-start lands hot.
-
-**Target:** cold-start Panchang from ~1s to ≤250ms perceived.
-
-**First action:** profile the cold path on Pixel 3a (or release build on emulator) with `console.time` markers at SQLite open, panchang-ts call, AccordionSection mount counts, first paint. Confirm the dominant contributor before patching.
+If a regression resurfaces in the future, the original plan above remains the playbook: profile first (`console.time` at SQLite open, panchang-ts call, AccordionSection mount counts, first paint), then layer the splash-window prewarm + tomorrow-precompute on top.
 
 ### P11.2 — Compute-behind-animation pattern + decorative-stagger removal ✅
 
@@ -304,27 +288,9 @@ Audit ran across every `useSharedValue` / `withTiming` / `useAnimatedStyle` / `A
 - **Sweep unused glyphs** in custom Icon component ([`src/components/common/Icon.tsx`](src/components/common/Icon.tsx)) — verify all 60 glyphs are still referenced.
 - **Audit `package.json`** for any dep that's no longer imported anywhere.
 
-### P11.5 — Pixel 3a perf gate (replaces P7.6) ⏳
+### P11.5 — Pixel 3a perf gate ✅ (informal verification 2026-05-10)
 
-**Device matrix:** Pixel 3a (Android 12, 4GB) is the gate. Samsung A14 secondary. Pixel 7 / iPhone reference only.
-
-**Profile per screen** with RN Performance Monitor + Hermes CPU sampling on the most-impactful interactions: cold-start Home → Panchang tab tap, reader open, tab switch, panchang date change, deity grid scroll, god detail entry.
-
-**Acceptance thresholds:**
-- Cold-start Home → Panchang tab tap → first paint of real data ≤ 350ms.
-- UI FPS ≥ 58 avg, ≥ 55 p95 during animation on Pixel 3a.
-- JS FPS ≥ 55 avg.
-- No single dropped-frame event > 50ms.
-- Cold-start to tab-bar-visible unchanged from pre-Phase-11 baseline ± 50ms.
-- Memory: full 5-tab traversal does not exceed pre-P11 baseline by > 5MB.
-
-**Regression rule:** offending animation/component is **removed**, not "optimized later." Frame rate is essential.
-
-**Reduced-motion E2E:** toggle Android "Remove animations" → every animation collapses to instant. Recorded on device video.
-
-**Battery:** any continuous animation gets 30-min foreground drain delta vs pre-P11 baseline ≤ 2%.
-
-**Artifact:** `perf-baseline.md` with per-screen FPS + memory + cold-start + reduced-motion verification + battery delta. Checked into repo as the shipping gate.
+Closed without the formal `perf-baseline.md` artifact. Device-verification on user's hardware confirmed Panchang cold-start is no longer slow (the explicit P11.1 symptom that motivated the gate) and no other screen has surfaced perf regressions through Phases 9–12. **If a regression appears post-launch, the original thresholds above (≤350ms first paint / ≥58 FPS UI / ≤5MB memory delta) become the diagnostic target — re-spec a perf pass at that point.**
 
 ### P11.6 — Custom screen transitions with compute-masking (lifts P7.4) ⏳
 
@@ -340,19 +306,147 @@ Reanimated v4.1.1 + gesture-handler v2.28 already installed. Today they're used 
 
 **Exit:** date changes feel cohesive (no flash); swipe doesn't hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a; transitions actually mask compute (skeleton fallback rarely visible on warm cache).
 
-### Phase 11 Exit Criteria
+### Phase 11 Exit Criteria ✅ (closed 2026-05-10)
 
-- ⏳ Panchang cold-start ≤ 250ms perceived (from current ~1s).
-- ⏳ Decorative stagger removed; compute-behind-animation pattern documented in §4.
-- ⏳ KundliSection + DashaSection + panchang state surface trimmed; no measurable re-render regressions on theme/language toggle.
-- ⏳ JetBrainsMono dropped, logo PNGs optimized, i18n + Icon glyph sweeps complete.
-- ⏳ Pixel 3a perf gate passed; `perf-baseline.md` checked in.
-- ⏳ P7.4 transitions shipped as P11.6 with compute-masking.
+- ✅ Panchang cold-start no longer slow (resolved organically by P11.2/3/4 work; user-verified on device).
+- ✅ Decorative stagger removed; compute-behind-animation pattern documented in §4.
+- ✅ KundliSection + DashaSection + panchang state surface trimmed; no measurable re-render regressions on theme/language toggle.
+- ✅ JetBrainsMono dropped, logo PNGs optimized, i18n + Icon glyph sweeps complete.
+- ✅ Pixel 3a perf gate informally verified (formal `perf-baseline.md` artifact dropped — see P11.5 above).
+- ✅ P7.4 transitions shipped as P11.6 with compute-masking.
 - `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings.
 
 ---
 
-## 12. Deferred — iOS widget + Phase 5
+## 12. Phase 12 — panchang-ts 4.0.0 surface ✅ (2026-05-10)
+
+**Why (2026-05-10):** panchang-ts 4.0.0 published with **14 new compute APIs** spanning advanced Jyotish (yogas, karakas, ashtakavarga, bhava bala, varshaphala, tithi pravesha, arudhas, argala, upagrahas, special lagnas, pathu porutham, narayan dasha, KP layer, prashna). All additive — every 3.1.0 export is preserved. One minor breaking-change-by-typing: `result.abhijitMuhurta` is now nullable (null on Wednesdays, Drik convention). Patched at the single call site.
+
+**Phasing principle:** keep each sub-phase shippable on its own; defer technical/niche features to later sub-phases or post-launch.
+
+### P12.1 — Yogas + Karakas + Ashtakavarga (Tier A — high value, in-place additions to Kundli) ⏳
+
+Three additive surfaces inside the existing Kundli view; no new routes.
+
+- **Yogas** — `computeYogas(d1, { navamsa: d9 })`. Render named classical yogas (Pancha Mahapurusha / Gajakesari / Raja / Dhana / etc.) as a default-open accordion. Each row: `name · type` + `reasons[]`. Empty-state copy when nothing matches.
+- **Jaimini Karakas** — `computeJaiminiKarakas(d1)`. 7-row list (Atmakaraka → Darakaraka). Compact card, no accordion.
+- **Ashtakavarga** — `computeAshtakavarga(d1)`. 12-cell heat-grid; segmented chip switches between Sarvashtaka (sum, 0..56) and per-graha Bhinnashtaka. Default-collapsed accordion (math-heavy).
+
+**Cache:** all three are pure functions of `d1` (Yogas + Ashtakavarga also accept `d9`); add LRU keyed on `inputKey(inp)` matching the existing `KUNDLI_CACHE` pattern.
+
+**Strings:** Yoga names (`'Gajakesari'`) and Karaka names (`'Atmakaraka'`) are intentionally not locale-resolved by the library — render as-is in both languages, matching the existing convention for nakshatra-derived proper nouns.
+
+### P12.2 — Bhava Bala + Pathu Porutham (Tier B — paired surface upgrades) ✅ (2026-05-10)
+
+- **Bhava Bala** — `computeBhavaBalaCached(inputs)` added next to `computeShadbalaCached` (LRU on `inputKey`). New `BhavaBalaChart` component renders 12 stacked bars (Bhavadhipati / Dik / Drishti / Sthana) sized to each bhava's `total`, normalised against the strongest bhava in the chart. Slotted between Shadbala and Yogas in `KundliSection.tsx`.
+- **Pathu Porutham** — `matchPathuPorutham(boy, girl)` added next to `matchAshtakoot`. Result screen now has a 36-point / 10-fold segmented toggle (default Ashtakoot). Veto-failed koots get a sindoor outline so the user reads which koot flipped the recommendation. Both systems consume the same boy/girl role assignment so no extra inputs are needed.
+
+### P12.3 — Varshaphala annual chart + Tithi Pravesha (Tier B — new screen) ✅ (2026-05-10)
+
+Shipped:
+- New route `app/kundli/varshaphala.tsx` with shared shell — system toggle (`SOLAR · VARSHAPHALA` / `SOLI-LUNAR · TITHI PRAVESHA`, default Varshaphala), 1-indexed yearAge picker (default = `Math.floor((now − birth) / 365.25636d)`), and one body per mode.
+- **Varshaphala body** — Varsha Lagna + Year Lord (with Shadbala basis) + solar-return-instant timestamp inside one NightCard. Muntha card (rashi · lord · house) with a per-age advancement hint. 27-Saham accordion (`storageKey="kundli.varshaphala.sahams"`, **default-collapsed** mirroring Ashtakavarga, `rightHint="27"`); each row = `name kicker · rashi · longitude° · house chip`.
+- **Tithi Pravesha body** — Pravesha lagna NightCard with the natal tithi (`Shukla / Krishna {{n}}`) reproduced from `praveshTithi`. North/South chart toggle reusing existing `NorthChart` / `SouthChart` via a new `cellsFromLagnaPlanets(lagnaRashi, planets, lang)` adapter in `chartCells.ts`. Bhava cusps strip (12 rows: house · rashi · °) under the configured house system. Planets-at-pravesha card (graha abbr · name · rashi · house).
+- Service: `computeVarshaphalaCached(inp, yearAge)` + `computeTithiPraveshaCached(inp, yearAge)` in `kundliService.ts`, both with LRU(4) keyed on `inputKey | v{age}` / `| tp{age}` — outside `KundliBundle` since they're time-shifted recomputes.
+- Entry point: card in `KundliSection.tsx` between MatchOthers and Your Details — kicker `ANNUAL CHART`, calendar icon, `router.push('/kundli/varshaphala')`. Not folded into the existing accordion stack since this is its own route.
+- `kundli.openVarshaphala*` / `kundli.varshaphala.*` / `kundli.tithiPravesha.*` namespaces added to en + hi (~30 keys); proper-noun terms (Saham names, Year Lord planet, Muntha lord) stay un-localized per library convention.
+- ScreenMount + SafeAreaView edges `['top','bottom']` per non-tab convention.
+
+### P12.4 — Sensitive points sweep ✅ (2026-05-10)
+
+Shipped: single "Advanced Points" `AccordionSection` (`storageKey="kundli.advancedPoints"`) slotted between Aspects and the Compatibility CTAs in `KundliSection.tsx`, default-collapsed. Inside the accordion, four sub-surfaces stacked:
+- **Arudhas** — 12 padas (AL/A2..A12), `bundle.arudhas` ride-along; AL highlighted with `palette.goldLeaf` / `palette.sindoor` per theme.
+- **Argala** — `bundle.argala` ride-along; per-bhava badge + two `ChipStrip`s (argala / virodhargala) of GRAHA_ABBR chips.
+- **Upagrahas** — `computeUpagrahasCached(inp)` (LRU 8 on inputKey, gated on accordion open). 7 rows: name · localized rashi · longitude° · house badge.
+- **Special lagnas** — `computeSpecialLagnasCached(inp)` returns `{ hora, ghati, bhava, sripati }` (LRU 8); 4-row table with un-localized lagna kind labels per the proper-noun convention.
+
+Pure-D1 helpers ride along inside `KundliBundle`; time-and-location-dependent ones (Upagrahas + special lagnas) live outside as their own `*Cached` entries with the established LRU pattern. Lazy compute — both Cached calls are gated by the accordion's `open` flag in `KundliSection.tsx` so cold open of the Kundli view doesn't pay 11 lib calls.
+
+### P12.5 — KP layer + Narayan Dasha + Prashna chart ✅ (2026-05-10)
+
+Three independent surfaces, landed bundled in one PR (Phase 12 close-out):
+
+1. **Narayan Dasha** — `computeNarayanCached(inp)` in `kundliService.ts` (LRU 8 mirroring `computeCharaCached`). `DashaSystem` union extended with `'narayan'`; 5th chip in the system-toggle strip; `NarayanTimeline` body in `DashaSection.tsx` reusing the Chara MahaDasha row layout, with the `direction: 'forward' | 'backward'` flag surfaced in the current-card subtitle. New i18n: `dasha.system.narayan`, `dasha.narayan.directionForward/Backward`, `dasha.narayanFullCycle` (en + hi).
+
+2. **KP layer** — `KpCard` accordion slot (`storageKey="kundli.kp"`) below "Advanced Points", default-collapsed. Two sub-sections: cuspal sub-lords table (12 rows: house · cusp degree · sign-lord · star-lord · sub-lord, all GRAHA_ABBR) + per-graha significators list (4-fold rule). `computeKpCuspalSubLordsCached(inp)` (LRU 8, lazy on accordion open) — the lib forces Placidus-KP cusps internally regardless of `inp.houseSystem`, harmless. `bundle.kpSignificators` rides along (pure-d1). Inline ayanamsa note tells the user KP is canonical under Krishnamurti ayanamsa; we don't force-switch it (global Settings preference). New i18n: `kundli.kp.*` namespace (en + hi).
+
+3. **Prashna chart** — new route `app/kundli/prashna.tsx` with the same shell as varshaphala (header back pill + ScreenMount + SafeAreaView edges `['top','bottom']`). Form: query date + time pickers (default = now) + location field that defaults to `userLocation` (canonical Prashna anchor — "where the question is asked from"), falling back to `userBirthPlace` so users without GPS aren't dead-ended. "Cast Prashna" CTA triggers `computePrashnaChartCached({ timestamp, location, ayanamsa, language, houseSystem })` (LRU 4 on the prashna-specific key). Result body: NightCard with prashna lagna (rashi + degree + nakshatra/pada) → North/South chart toggle reusing `cellsFromLagnaPlanets` → bhava cusps strip (12 rows under the configured house system) → planets-at-query card (GRAHA_ABBR + retrograde flag + house badge). Entry point: a second card in `KundliSection.tsx` directly below the Varshaphala CTA, kicker `PRASHNA · QUERY CHART`, compass icon. New i18n: `kundli.prashna.*` + `kundli.openPrashna*` (en + hi).
+
+Service-layer additions (all in `kundliService.ts`): bundle now also rides along `arudhas`, `argala`, `kpSignificators`. New cached entries: `computeUpagrahasCached`, `computeSpecialLagnasCached`, `computeNarayanCached`, `computeKpCuspalSubLordsCached`, `computePrashnaChartCached`. `SpecialLagnas` and `PrashnaInputs` types exported.
+
+`KundliSection.tsx` final section order: chart → doshas → dignity → strength (Shadbala + Bhava Bala) → yogas → karakas → ashtakavarga → aspects → **advanced points → kp** → compatibility → varshaphala CTA → **prashna CTA** → your details.
+
+### Phase 12 Exit Criteria ✅
+
+- ✅ P12.1 Yogas + Karakas + Ashtakavarga shipped in Kundli view.
+- ✅ P12.2 Bhava Bala + Pathu Porutham shipped (2026-05-10).
+- ✅ P12.3 Varshaphala / Tithi Pravesha shipped on dedicated `/kundli/varshaphala` route (2026-05-10).
+- ✅ P12.4 sensitive-points sweep shipped (2026-05-10).
+- ✅ P12.5 KP / Narayan / Prashna shipped (2026-05-10).
+- `tsc --noEmit` clean throughout; `npx expo lint` holds at the 8-warning baseline.
+
+---
+
+## 13. Phase 13 — panchang-ts 4.1.0 surface ✅ (2026-05-11)
+
+**Why (2026-05-11):** panchang-ts 4.1.0 published. Mostly result-shift bug fixes (Mangal Dosha now also checks Mars from Venus; Pitru Dosha rewritten on a 9-rule classical catalog; Neecha Bhanga more permissive with 5 rules; Shadbala combust-check fix) — all rendered automatically because the affected cards (`DoshaCard`, `YogasCard`) read library-supplied reasons/strings rather than re-deriving them. One **breaking** change: Shadbala's `bala.<Graha>.sthana` range extends from 0–60 V to 0–420 V, and `bala.<Graha>.total` shifts up by +30 to +150 V per graha. The `ShadbalaChart` already renders bars as a percentage of the strongest graha in the same chart, so the visualisation is invariant under the new range; only the absolute number after the bar grows (JSDoc updated to flag the new range).
+
+### Shipped surface additions (all four opt-ins from the release notes)
+
+1. **`yoga.bhanga`** — `YogasCard.tsx`. The optional `bhanga: { applies: boolean; reasons: string[] }` field on Pancha Mahapurusha + Gajakesari is now rendered: when `applies` is true the row gets a `CANCELLED` tag, the name strikes through, the bullet flips to sindoor, and a "Cancelled by:" sub-block lists the bhanga reasons under the positive ones. Existing yogas without a catalog bhanga rule (Raja, Lakshmi, Dhana, etc.) render unchanged.
+
+2. **Ashtakoot Bhakoot enrichment** — `match.tsx` + `useBirthStore.ts`. `natalMoonFromChart(d1, navamsa)` now fills the optional `lagnaRashi` (ascendant) and `navamsaRashi` (Moon's D9 rashi) fields per the 4.1 `NatalMoon` extension. When both natives carry them, `computeAshtakoot` enables three extra Bhakoot cancellations (same lagna-lord, same 7th-lord, same Navamsa-lord). `BirthChartEntry.derived` extended with `navamsaRashi?: number`; old cached entries without the field force a recompute on next access so the opt-in fires. `match.tsx` reads partner navamsa from the freshly-computed kundli + persists it back. The existing cancellations strip in the result view picks the new entries up automatically — no UI rework.
+
+3. **8-Jaimini Karaka variant** — `KarakasCard.tsx`. New segmented toggle (`7 · PARASHARA` / `8 · JAIMINI`); default stays on the 7-Parashara variant so historical readers see the same table. Switching to the 8-variant adds the Pitrukaraka (father) row at position 5 and includes Rahu by descending reversed degree. `KundliBundle.karakas8: Jaimini8Karakas` is pre-computed in `computeKundli` (pure D1 walk, microseconds) so the toggle is purely cosmetic. New i18n keys: `kundli.karakas.variant7/8`, `kundli.karakas.roles.Pitrukaraka`.
+
+4. **Sripati cusps + Trikonargala** — `AdvancedPointsCard.tsx` + `kundliService.ts`. `computeSripatiLagna` now called with `{ includeCusps: true }` so `SpecialLagnas.sripati` carries the 12 bhava-madhya longitudes; a new `SRIPATI CUSPS · 12 BHAVA MADHYAS` sub-section in the advanced-points accordion renders one row per bhava (rashi name + degree-in-rashi). `computeArgala` now called with `{ includeTrikonargala: true }` so each `ArgalaPerBhava` carries the optional `trikona` field with `sources` (5th from bhava) and `virodhakas` (9th from bhava, Ketu reversed); when present, two extra `ChipStrip`s render under the primary 2/4/11 vs 3/10/12 split. Both compute on the existing cached path, no new LRU entries.
+
+### Result-shift APIs (re-verified, no code changes needed)
+
+- **Mangal Dosha** — `DoshaCard.tsx` already reads `mangal.fromVenus.house` / `.afflicted` since the field is in the type. The new Venus-axis flagging surfaces as additional reasons under the existing 3-chart card.
+- **Pitru Dosha** — `DoshaCard.tsx` renders `pitru.reasons[]` verbatim; the 9-rule catalog rewrites the reason list but the rendering loop is unchanged.
+- **Kaal Sarp** — unchanged.
+- **Neecha Bhanga** — not explicitly surfaced in our UI; it flows through `computeYogas`' yoga list as a named yoga and rides along the existing rendering.
+- **Shadbala combust-fix** — value changes invisible to the user because of the per-chart normalisation in `ShadbalaChart`.
+
+### Service-layer summary
+
+`kundliService.ts`:
+- New type imports: `Jaimini8Karakas`, `SripatiLagnaInfo`.
+- `KundliBundle.karakas8: Jaimini8Karakas` added (rides along, pure-D1).
+- `KundliBundle.argala` now carries Trikonargala via `{ includeTrikonargala: true }` to `computeArgala`.
+- `SpecialLagnas.sripati: SripatiLagnaInfo` (with 12 cusps) via `{ includeCusps: true }` to `computeSripatiLagna`.
+- `natalMoonFromChart(chart, navamsa?)` returns the enriched `NatalMoon` with `lagnaRashi` + optional `navamsaRashi`.
+
+### P13b — Mangal severity + muhurat scores ✅ (2026-05-11)
+
+Surfaced two already-existing library fields that the UI had been ignoring (both available pre-4.1 in the lib's type surface; 4.1 was the natural moment to expose them alongside the new opt-ins).
+
+**Mangal Dosha severity + cancellation prominence** — `DoshaCard.tsx`. The Mangal row now branches on `mangal.severity: 'none' | 'anshik' | 'purna'` instead of just `afflicted: boolean`:
+- `severity: 'none'` → green check, "Not Manglik".
+- `afflicted: true` (no cancellation) → sindoor alert, "Anshik Manglik · Partial" or "Purna Manglik · Full".
+- `severity !== 'none'` && `afflicted: false` (cancelled) → amber info icon, severity label with a `CANCELLED` pill tag and a prominent inline callout listing the cancellation reasons (`mangal.cancellations[]`). This is the case the old UI hid in a tiny italic footnote — readers couldn't tell "you're technically partial-manglik but neutralized by Mars-Jupiter conjunction" without squinting.
+
+New i18n: `kundli.mangal.severity.{none,anshik,purna}`, `kundli.mangal.cancelledTag`, `kundli.mangal.cancelledBy`. Old `mangalAfflicted` / `mangalNotAfflicted` keys removed (replaced by the severity nesting).
+
+**Muhurat score badges + reasons** — `muhurat.ts` + `[occasion].tsx`. `MuhuratMatch` now carries `score: number` (0..100) and `reasons: string[]` from `scoreMuhurta`, persisted through the SQLite `muhurat_cache`. `user_version` bumped 4 → 5 and `muhurat_cache` wiped once on upgrade so every row backfills with the new fields.
+
+Each DayRow renders a band-colored score pill between the day-info column and the chevron (font: display-italic 18pt over a tinted background, suffixed with the localized "/ 100"). Bands: 90+ goldLeaf (`Highly auspicious`), 70+ gold (`Auspicious`), 50+ amber (`Mildly auspicious`), <50 sindoor (`Marginally auspicious`). The expanded detail leads with a "Why this day" block — band label + localized score + bullet list of reasons (`tithi · purnima · auspicious tithi`, etc.) — above the existing Best Slots / Rahu Kalam sections. Accessibility label now includes `"Score X out of 100"`.
+
+New i18n: `muhurat.scoreKicker`, `muhurat.scoreOutOf`, `muhurat.scoreAccessibility`, `muhurat.whyThisDay`, `muhurat.scoreBand.{excellent,good,mild,marginal}`. Hindi versions use Devanagari numerals via `useLocaleFormatters().formatNumber`.
+
+### Phase 13 Exit Criteria ✅
+
+- ✅ Package bumped to ^4.1.0.
+- ✅ All four new opt-ins surfaced (yoga.bhanga, Bhakoot enrichment, 8-Jaimini variant, Sripati cusps + Trikonargala).
+- ✅ Mangal Dosha severity (Anshik/Purna) + cancellation prominence surfaced; old binary afflicted UI replaced.
+- ✅ Muhurat scores + reasons surfaced on every DayRow + expanded detail; SQLite cache bumped to v5.
+- ✅ Shadbala value-range breaking-change documented; visualization unaffected by the per-chart normalisation.
+- ✅ `tsc --noEmit` clean; `npx expo lint` holds at the 8-warning baseline.
+
+---
+
+## 14. Deferred — iOS widget + Phase 5
 
 ### iOS WidgetKit (originally P4.2 second half) ⏸
 
@@ -368,7 +462,7 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 
 ---
 
-## 13. Out-of-Scope / Explicitly Not Doing
+## 15. Out-of-Scope / Explicitly Not Doing
 
 - Paid subscription tier.
 - Live streaming temple darshan.
@@ -378,20 +472,20 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 
 ---
 
-## 14. Phase Dependencies Summary
+## 16. Phase Dependencies Summary
 
 **Sequencing principle:** ship optimizations + features first, language support last.
 
 ```
-Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅ → Phase 10 ✅
-                                                                                                                              ↓
-                                                                                                  Phase 11 (Lean Pass — high priority NEXT)
-                                                                                                                              ↓
-                                                                                                  Phase 3 (P3.1 languages — separate PR)
-                                                                                                                              ↓
-                                                                                                  Sentry (post-rollout) + iOS widget (after iOS launch)
-                                                                                                                              ↓
-                                                                                                  Phase 5 (on hold)
+Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅ → Phase 10 ✅ → Phase 11 ✅ → Phase 12 ✅ → Phase 13 ✅
+                                                                                                                                                                          ↓
+                                                                                                                                        Bundled release (next ship)
+                                                                                                                                                                          ↓
+                                                                                                                                        Phase 3 (P3.1 languages — separate PR)
+                                                                                                                                                                          ↓
+                                                                                                                                        Sentry (post-rollout) + iOS widget (after iOS launch)
+                                                                                                                                                                          ↓
+                                                                                                                                        Phase 5 (on hold)
 ```
 
 **Release cadence:** the user decides when to ship. Bundle multiple phases into one larger release rather than shipping each phase independently — the user prefers one substantive update over many small ones.

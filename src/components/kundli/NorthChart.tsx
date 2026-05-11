@@ -140,7 +140,7 @@ export const NorthChart = memo(function NorthChart({ cells, size }: NorthChartPr
                   {p}
                 </SvgText>
               ))}
-              {/* Rashi name (or lagna marker for house 1) */}
+              {/* House number + rashi short label (lagna cell uses accent fill) */}
               <SvgText
                 x={g.cx}
                 y={g.cy + (planets.length === 0 ? rashiFontSize / 3 : (planets.length * lineH) / 2 + rashiFontSize)}
@@ -148,7 +148,7 @@ export const NorthChart = memo(function NorthChart({ cells, size }: NorthChartPr
                 fill={cell.isLagna ? accent : muted}
                 textAnchor="middle"
                 fontStyle="italic">
-                {cell.isLagna ? 'Asc' : cell.rashiName}
+                {`${cell.house} · ${cell.rashiName}`}
               </SvgText>
             </G>
           );

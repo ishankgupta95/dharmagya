@@ -100,14 +100,14 @@ export const SouthChart = memo(function SouthChart({ cells, size, centerCaption 
                 <Rect x={x} y={y} width={cellSize} height={cellSize} fill={accentSoft} />
               )}
 
-              {/* Rashi short name in top-left of the cell */}
+              {/* House number + rashi short label, top-left of the cell */}
               <SvgText
                 x={x + 6}
                 y={y + rashiFontSize + 2}
                 fontSize={rashiFontSize}
                 fill={cell.isLagna ? accent : muted}
                 fontStyle="italic">
-                {cell.isLagna ? `Asc · ${cell.rashiName}` : cell.rashiName}
+                {`${cell.house} · ${cell.rashiName}`}
               </SvgText>
 
               {/* Planets stacked at the cell center */}

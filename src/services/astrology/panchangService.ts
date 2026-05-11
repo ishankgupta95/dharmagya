@@ -306,8 +306,8 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
     yamagandaEnd: formatTime(result.yamaganda.end),
     gulikaKalamStart: formatTime(result.gulikaKalam.start),
     gulikaKalamEnd: formatTime(result.gulikaKalam.end),
-    abhijitMuhurtaStart: formatTime(result.abhijitMuhurta.start),
-    abhijitMuhurtaEnd: formatTime(result.abhijitMuhurta.end),
+    abhijitMuhurtaStart: formatTime(result.abhijitMuhurta?.start),
+    abhijitMuhurtaEnd: formatTime(result.abhijitMuhurta?.end),
     durMuhurta: result.durMuhurta.map(dm => ({
       start: formatTime(dm.start) ?? '',
       end: formatTime(dm.end) ?? '',

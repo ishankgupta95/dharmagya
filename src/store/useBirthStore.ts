@@ -33,6 +33,10 @@ export interface BirthChartEntry {
     moonRashi: number;       // 0..11
     moonNakshatra: number;   // 0..26
     lagnaRashi: number;      // 0..11
+    /** Moon's navamsa (D9) rashi, 0..11. Added in panchang-ts 4.1 surface for
+     *  the opt-in Bhakoot navamsa-lord cancellation. Old cached entries
+     *  without this field force a recompute on next access (see match.tsx). */
+    navamsaRashi?: number;
   };
   /** When the entry was created (ms epoch). Used to sort the picker list. */
   createdAt: number;

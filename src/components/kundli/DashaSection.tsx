@@ -7,6 +7,7 @@ import {
   type CharaDashaResult,
   type DashaLord,
   type MahaDasha,
+  type NarayanDashaResult,
   type PratyantarDasha,
   type YoginiDashaResult,
   type YoginiMahaDasha,
@@ -34,6 +35,7 @@ import {
   computeCharaCached,
   computeDashaTimeline,
   computeKundli,
+  computeNarayanCached,
   computeYoginiCached,
   moonSiderealLonFromChart,
   type DashaSystem,
@@ -51,7 +53,7 @@ const RASHI_NAMES_HI = [
   'तुला', 'वृश्चिक', 'धनु', 'मकर', 'कुम्भ', 'मीन',
 ];
 
-const DASHA_SYSTEMS: DashaSystem[] = ['vimshottari', 'ashtottari', 'yogini', 'chara'];
+const DASHA_SYSTEMS: DashaSystem[] = ['vimshottari', 'ashtottari', 'yogini', 'chara', 'narayan'];
 
 const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
   Sun: 'sun',
@@ -146,6 +148,14 @@ export function DashaSection() {
   const chara = useMemo(() => {
     if (!birthInputs || system !== 'chara') return null;
     return computeCharaCached(birthInputs);
+  }, [birthInputs, system]);
+
+  // Narayan Dasha — Chara skeleton with the vishama-/sama-pada parity-direction
+  // rule. Same row UI as Chara since the result shape is identical except for
+  // the `direction` flag (surfaced in the current-card subtitle).
+  const narayan = useMemo(() => {
+    if (!birthInputs || system !== 'narayan') return null;
+    return computeNarayanCached(birthInputs);
   }, [birthInputs, system]);
 
   // Vimshottari and Ashtottari both return `VimshottariDashaResult`, so they
@@ -368,6 +378,17 @@ export function DashaSection() {
       {system === 'chara' && chara && (
         <CharaTimeline
           result={chara}
+          plinth={plinth}
+          colors={colors}
+          rashiNames={resolveLanguage(language) === 'hi' ? RASHI_NAMES_HI : RASHI_NAMES_EN}
+          lang={i18n.language}
+          t={t}
+        />
+      )}
+
+      {system === 'narayan' && narayan && (
+        <NarayanTimeline
+          result={narayan}
           plinth={plinth}
           colors={colors}
           rashiNames={resolveLanguage(language) === 'hi' ? RASHI_NAMES_HI : RASHI_NAMES_EN}
@@ -752,6 +773,86 @@ function CharaTimeline({ result, plinth, colors, rashiNames, lang, t }: CharaTim
 
       <SectionLabel style={styles.sectionLabelSpacing}>
         {t('dasha.charaFullCycle')}
+      </SectionLabel>
+      {result.mahaDashas.map((md, i) => {
+        const isActive = i === result.currentIndex;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.mahaCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: isActive ? colors.accent : colors.border,
+                borderWidth: isActive ? 1.5 : 1,
+              },
+            ]}>
+            <View style={styles.mahaRowHeader}>
+              <View style={[styles.spine, { backgroundColor: isActive ? colors.accent : palette.rule }]} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.mahaTitleRow}>
+                  <Text variant="body" style={[styles.mahaLord, { color: colors.textPrimary }]}>
+                    {rashiNames[md.rashi]}{' '}
+                    <Text variant="body-italic" style={{ color: colors.textTertiary }}>
+                      {t(`dasha.planet.${DASHA_LORD_TO_KEY[md.lord]}`)}
+                    </Text>
+                  </Text>
+                  {isActive && <View style={[styles.activeChip, { backgroundColor: colors.accent }]} />}
+                </View>
+                <Text variant="mono" style={[styles.mahaMeta, { color: colors.textMuted }]}>
+                  {t('dasha.dateRangeLong', {
+                    start: formatRangeDate(md.startDate, lang),
+                    end: formatRangeDate(md.endDate, lang),
+                  })}{' '}
+                  · {formatYears(md.years, t)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+interface NarayanTimelineProps {
+  result: NarayanDashaResult;
+  plinth: ReturnType<typeof usePlinthColors>;
+  colors: ColorPalette;
+  rashiNames: string[];
+  lang: string;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}
+
+function NarayanTimeline({ result, plinth, colors, rashiNames, lang, t }: NarayanTimelineProps) {
+  const currentMaha = result.mahaDashas[result.currentIndex];
+  const directionLabel =
+    result.direction === 'forward'
+      ? t('dasha.narayan.directionForward')
+      : t('dasha.narayan.directionBackward');
+  return (
+    <>
+      {currentMaha && (
+        <View style={styles.currentWrap}>
+          <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+            <Kicker color={plinth.accent} size={10}>
+              {t('dasha.currentLabel')}
+            </Kicker>
+            <Text variant="display-italic" style={[styles.currentMahaLord, { color: plinth.text }]}>
+              {rashiNames[currentMaha.rashi]} {t('dasha.mahadashaSuffix')}
+            </Text>
+            <Text variant="mono" style={[styles.yoginiSubtitle, { color: plinth.textSubdued }]}>
+              {t(`dasha.planet.${DASHA_LORD_TO_KEY[currentMaha.lord]}`)} · {directionLabel}
+            </Text>
+            <Text variant="mono" style={[styles.currentUntil, { color: plinth.textSubdued }]}>
+              {t('dasha.untilDate', { date: formatRangeDate(currentMaha.endDate, lang) })}
+            </Text>
+          </NightCard>
+        </View>
+      )}
+
+      <SectionLabel style={styles.sectionLabelSpacing}>
+        {t('dasha.narayanFullCycle')}
       </SectionLabel>
       {result.mahaDashas.map((md, i) => {
         const isActive = i === result.currentIndex;

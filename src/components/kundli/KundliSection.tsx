@@ -20,12 +20,22 @@ import {
   computeKundli,
   computeDivisional,
   computeShadbalaCached,
+  computeBhavaBalaCached,
+  computeKpCuspalSubLordsCached,
+  computeSpecialLagnasCached,
+  computeUpagrahasCached,
   buildBirthInputs,
   DIVISIONAL_CHARTS_BEYOND_D9,
 } from '@/services/astrology/kundliService';
 import { DoshaCard } from './DoshaCard';
 import { ShadbalaChart } from './ShadbalaChart';
+import { BhavaBalaChart } from './BhavaBalaChart';
 import { AspectsCard } from './AspectsCard';
+import { YogasCard } from './YogasCard';
+import { KarakasCard } from './KarakasCard';
+import { AshtakavargaCard } from './AshtakavargaCard';
+import { AdvancedPointsCard } from './AdvancedPointsCard';
+import { KpCard } from './KpCard';
 import { AccordionSection } from '@/components/panchang/AccordionSection';
 import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
@@ -95,6 +105,11 @@ export function KundliSection() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [aspectsOpen, setAspectsOpen] = useState(false);
+  const [ashtakavargaOpen, setAshtakavargaOpen] = useState(false);
+  const [advancedPointsOpen, setAdvancedPointsOpen] = useState(false);
+  const [kpOpen, setKpOpen] = useState(false);
+  const [shadbalaOpen, setShadbalaOpen] = useState(false);
+  const [bhavaBalaOpen, setBhavaBalaOpen] = useState(false);
   // Local draft for the name TextInput so we only commit on blur, not on
   // every keystroke (avoids re-renders + per-key store writes).
   const [nameDraft, setNameDraft] = useState<string>(userName ?? '');
@@ -114,13 +129,33 @@ export function KundliSection() {
 
   const bundle = useMemo(() => (inputs ? computeKundli(inputs) : null), [inputs]);
 
-  // The cache below `computeShadbalaCached` is keyed on input hash, so the
-  // call returns instantly on cache hit — but the call itself still fires on
-  // every parent render. The useMemo here keeps it off the render hot path
-  // entirely; nothing downstream of `shadbala` re-runs unless inputs change.
+  // Shadbala + Bhava Bala live in default-closed accordions (advanced
+  // diagnostic; not a primary read). Gate the compute on the open flag — the
+  // service-layer cache will keep subsequent re-opens instant.
   const shadbala = useMemo(
-    () => (inputs ? computeShadbalaCached(inputs) : null),
-    [inputs],
+    () => (inputs && shadbalaOpen ? computeShadbalaCached(inputs) : null),
+    [inputs, shadbalaOpen],
+  );
+  const bhavaBala = useMemo(
+    () => (inputs && bhavaBalaOpen ? computeBhavaBalaCached(inputs) : null),
+    [inputs, bhavaBalaOpen],
+  );
+
+  // Upagrahas + special lagnas + KP cuspal sub-lords are all gated on their
+  // accordions actually being open — math is cheap individually but there are
+  // 11 lib calls in total (7 upagrahas + 4 lagnas + KP cuspal); no point
+  // paying them on a chart load nobody will see.
+  const upagrahas = useMemo(
+    () => (inputs && advancedPointsOpen ? computeUpagrahasCached(inputs) : null),
+    [inputs, advancedPointsOpen],
+  );
+  const specialLagnas = useMemo(
+    () => (inputs && advancedPointsOpen ? computeSpecialLagnasCached(inputs) : null),
+    [inputs, advancedPointsOpen],
+  );
+  const kpCuspal = useMemo(
+    () => (inputs && kpOpen ? computeKpCuspalSubLordsCached(inputs) : null),
+    [inputs, kpOpen],
   );
 
   const lang = resolveLanguage(language);
@@ -303,6 +338,15 @@ export function KundliSection() {
 
   return (
     <View>
+      {/* ── Your details (always at top) ─────────────────────────────────
+          Editable inline so birth-data tweaks happen without scrolling past
+          the whole chart. The chart re-renders whenever any field changes. */}
+      <SectionLabel style={styles.sectionLabelSpacing}>
+        {t('kundli.yourDetailsLabel')}
+      </SectionLabel>
+      {formCard}
+      {pickerModals}
+
       {/* ── Lagna NightCard ──────────────────────────────────────────────── */}
       <View style={styles.lagnaWrap}>
         <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
@@ -413,15 +457,53 @@ export function KundliSection() {
       </SectionLabel>
       <PlanetaryDignityChart items={bundle.dignity} labelFor={dignityLabel} />
 
-      {/* ── Shadbala (six-fold strength) ─────────────────────────────────── */}
-      {shadbala && (
-        <>
-          <SectionLabel style={styles.sectionLabelSpacing}>
-            {t('kundli.shadbalaSection')}
-          </SectionLabel>
-          <ShadbalaChart shadbala={shadbala} />
-        </>
-      )}
+      {/* ── Yogas (named classical combinations) ────────────────────────── */}
+      <SectionLabel style={styles.sectionLabelSpacing}>
+        {t('kundli.yogas.sectionTitle')}
+      </SectionLabel>
+      <YogasCard yogas={bundle.yogas} colors={colors} />
+
+      {/* ── Jaimini Karakas (Atmakaraka..Darakaraka) ────────────────────── */}
+      <SectionLabel style={styles.sectionLabelSpacing}>
+        {t('kundli.karakas.sectionTitle')}
+      </SectionLabel>
+      <KarakasCard karakas={bundle.karakas} karakas8={bundle.karakas8} colors={colors} />
+
+      {/* ── Shadbala — advanced diagnostic, default-collapsed ───────────── */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.shadbala"
+          title={t('kundli.shadbalaSection')}
+          open={shadbalaOpen}
+          onToggle={() => setShadbalaOpen((o) => !o)}
+          colors={colors}>
+          {shadbala && <ShadbalaChart shadbala={shadbala} />}
+        </AccordionSection>
+      </View>
+
+      {/* ── Bhava Bala — advanced diagnostic, default-collapsed ─────────── */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.bhavaBala"
+          title={t('kundli.bhavaBala.sectionTitle')}
+          open={bhavaBalaOpen}
+          onToggle={() => setBhavaBalaOpen((o) => !o)}
+          colors={colors}>
+          {bhavaBala && <BhavaBalaChart bhavaBala={bhavaBala} colors={colors} />}
+        </AccordionSection>
+      </View>
+
+      {/* ── Ashtakavarga — math-heavy, default-collapsed ────────────────── */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.ashtakavarga"
+          title={t('kundli.ashtakavarga.sectionTitle')}
+          open={ashtakavargaOpen}
+          onToggle={() => setAshtakavargaOpen((o) => !o)}
+          colors={colors}>
+          <AshtakavargaCard result={bundle.ashtakavarga} colors={colors} />
+        </AccordionSection>
+      </View>
 
       {/* ── Aspects (Drishti) — collapsible, default-closed ────────────── */}
       <View style={styles.aspectsWrap}>
@@ -432,6 +514,44 @@ export function KundliSection() {
           onToggle={() => setAspectsOpen((o) => !o)}
           colors={colors}>
           <AspectsCard d1={bundle.d1} aspects={bundle.aspects} colors={colors} />
+        </AccordionSection>
+      </View>
+
+      {/* ── Advanced points — Arudhas + Argala + Upagrahas + Special lagnas
+          (P12.4). Default-collapsed because it's a dense reference panel
+          rather than a primary read; opening it triggers Upagrahas and
+          Special-lagnas compute (gated by useMemo dependency on the open flag
+          above), so the cost is paid only when the user looks. */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.advancedPoints"
+          title={t('kundli.advancedPoints.sectionTitle')}
+          open={advancedPointsOpen}
+          onToggle={() => setAdvancedPointsOpen((o) => !o)}
+          colors={colors}>
+          <AdvancedPointsCard
+            arudhas={bundle.arudhas}
+            argala={bundle.argala}
+            upagrahas={upagrahas}
+            specialLagnas={specialLagnas}
+            colors={colors}
+            isDarkMode={isDarkMode}
+          />
+        </AccordionSection>
+      </View>
+
+      {/* ── KP layer — cuspal sub-lords + significators (P12.5). KP is
+          analytically anchored to Krishnamurti-Paddhati ayanamsa; the card's
+          internal note tells the user. We don't force-switch the app's
+          ayanamsa since that's a global preference set in Settings. */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.kp"
+          title={t('kundli.kp.sectionTitle')}
+          open={kpOpen}
+          onToggle={() => setKpOpen((o) => !o)}
+          colors={colors}>
+          <KpCard cuspal={kpCuspal} significators={bundle.kpSignificators} colors={colors} />
         </AccordionSection>
       </View>
 
@@ -462,14 +582,55 @@ export function KundliSection() {
 
       <MatchOthersCard colors={colors} t={t} />
 
-      {/* ── Your details ─────────────────────────────────────────────────
-          Editable inline so the user can adjust without leaving Kundli. The
-          chart above re-renders whenever any of these values change. */}
-      <SectionLabel style={styles.sectionLabelSpacing}>
-        {t('kundli.yourDetailsLabel')}
-      </SectionLabel>
-      {formCard}
-      {pickerModals}
+      {/* ── Varshaphala / Tithi Pravesha entry ───────────────────────────
+          Lives on its own screen (rather than the existing Kundli accordion
+          stack) because every recompute is time-shifted by yearAge — the
+          screen owns its own age picker + system toggle. */}
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => router.push('/kundli/varshaphala')}
+        style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel={t('kundli.openVarshaphala')}>
+        <View style={[styles.matchIc, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
+          <Icon name="calendar" size={18} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text variant="mono-caps" style={[styles.matchKicker, { color: colors.accent }]}>
+            {t('kundli.openVarshaphalaKicker')}
+          </Text>
+          <Text variant="body-italic" style={[styles.matchBody, { color: colors.textPrimary }]}>
+            {t('kundli.openVarshaphala')}
+          </Text>
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+      </TouchableOpacity>
+
+      {/* ── Prashna (horary) CTA ─────────────────────────────────────────
+          Cast-on-demand chart for the moment a question is asked, anchored
+          to the querent's *current* location (not the natal location) per
+          classical Prashna doctrine. Lives on its own route because the
+          input flow (timestamp picker + cast button) is independent of the
+          natal chart. */}
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => router.push('/kundli/prashna')}
+        style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel={t('kundli.openPrashna')}>
+        <View style={[styles.matchIc, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
+          <Icon name="compass" size={18} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text variant="mono-caps" style={[styles.matchKicker, { color: colors.accent }]}>
+            {t('kundli.openPrashnaKicker')}
+          </Text>
+          <Text variant="body-italic" style={[styles.matchBody, { color: colors.textPrimary }]}>
+            {t('kundli.openPrashna')}
+          </Text>
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+      </TouchableOpacity>
     </View>
   );
 }

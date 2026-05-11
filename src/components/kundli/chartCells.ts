@@ -4,6 +4,7 @@ import {
   type DivisionalChart,
   type GrahaName,
   type Language,
+  type PlanetPlacement,
 } from 'panchang-ts';
 
 /** One cell of a kundli chart — what goes inside one of the 12 boxes. */
@@ -61,6 +62,29 @@ export function cellsFromD9(chart: DivisionalChart, lang: Language): ChartCell[]
   const labels = RASHI_SHORT[lang] ?? RASHI_SHORT.en;
   return Array.from({ length: 12 }, (_, rashi) => {
     const planetsHere = chart.planets
+      .filter((p) => p.rashi.index === rashi)
+      .map(fmtGraha);
+    return {
+      rashi,
+      house: ((rashi - lagnaRashi + 12) % 12) + 1,
+      rashiName: labels[rashi],
+      planets: planetsHere,
+      isLagna: rashi === lagnaRashi,
+    };
+  });
+}
+
+/** Build the 12 cells for any chart whose shape is `{ lagnaRashi, planets[] }`
+ *  — used by Varshaphala / Tithi Pravesha which return a flat planets array
+ *  + an explicit lagna instead of a `BirthChart` / `DivisionalChart` wrapper. */
+export function cellsFromLagnaPlanets(
+  lagnaRashi: number,
+  planets: PlanetPlacement[],
+  lang: Language,
+): ChartCell[] {
+  const labels = RASHI_SHORT[lang] ?? RASHI_SHORT.en;
+  return Array.from({ length: 12 }, (_, rashi) => {
+    const planetsHere = planets
       .filter((p) => p.rashi.index === rashi)
       .map(fmtGraha);
     return {

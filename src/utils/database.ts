@@ -87,6 +87,9 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // bump just records that the schema reached version 3.
   // 4: custom_mantras table introduced. No old data to migrate; bump records
   // that the schema reached version 4.
+  // 5: MuhuratMatch gained `score` + `reasons` (Phase 13b, 4.1 score surface).
+  // Old cache JSON lacks both fields; wipe muhurat_cache once so every row
+  // re-fills with the score data the DayRow now renders.
   const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version < 2) {
@@ -98,6 +101,10 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   }
   if (version < 4) {
     db.execSync('PRAGMA user_version = 4');
+  }
+  if (version < 5) {
+    db.execSync('DELETE FROM muhurat_cache');
+    db.execSync('PRAGMA user_version = 5');
   }
   end();
 }
