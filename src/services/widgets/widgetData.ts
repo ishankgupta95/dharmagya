@@ -102,6 +102,15 @@ export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
     buildSlot(userSlots[3], day, lang, useDevanagari),
   ] as WidgetPayload['slots'];
 
+  // Legacy v1 fields — the prebuild plugin's Kotlin scaffold reads these flat
+  // keys + a `labels` object directly. Emitted alongside `slots[]` so old and
+  // new widget code both render real data. Always uses the four fixed legacy
+  // fields (tithi/nakshatra/sunrise/rahuKalam), independent of user slot picks.
+  const tithiField = getWidgetField('tithi')!;
+  const nakshatraField = getWidgetField('nakshatra')!;
+  const sunriseField = getWidgetField('sunrise')!;
+  const rahuField = getWidgetField('rahuKalam')!;
+
   const today = new Date();
   return {
     v: 2,
@@ -113,5 +122,18 @@ export async function buildTodayWidgetPayload(): Promise<WidgetPayload> {
     slots,
     locationLabel: state.locationName ?? null,
     isDarkMode: state.isDarkMode,
+    tithiName: tithiField.getValue(day, lang, useDevanagari),
+    tithiEndTime: tithiField.getUntil?.(day, useDevanagari) ?? '',
+    nakshatraName: nakshatraField.getValue(day, lang, useDevanagari),
+    nakshatraEndTime: nakshatraField.getUntil?.(day, useDevanagari) ?? '',
+    sunrise: sunriseField.getValue(day, lang, useDevanagari),
+    rahuKalam: rahuField.getValue(day, lang, useDevanagari),
+    labels: {
+      tithi: tithiField.label(lang),
+      nakshatra: nakshatraField.label(lang),
+      sunrise: sunriseField.label(lang),
+      rahuKalam: rahuField.label(lang),
+      until: UNTIL_LABEL[lang],
+    },
   };
 }

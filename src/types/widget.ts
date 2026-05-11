@@ -44,6 +44,27 @@ export interface WidgetPayload {
   locationLabel: string | null;
   /** Resolved theme mirror — Kotlin picks light vs dark colors at render time. */
   isDarkMode: boolean;
+
+  // ─── v1 legacy fields ──────────────────────────────────────────────────
+  // The prebuild plugin scaffold (plugins/withTodayPanchangWidget.js) still
+  // reads the v1 flat schema — `tithiName` / `nakshatraName` / `sunrise` /
+  // `rahuKalam` plus a `labels` object — directly from SharedPreferences.
+  // We emit both shapes so whichever native Kotlin ships in a given build
+  // can render real values. Drop these only after the plugin templates are
+  // migrated to read `slots[]`.
+  tithiName: string;
+  tithiEndTime: string;
+  nakshatraName: string;
+  nakshatraEndTime: string;
+  sunrise: string;
+  rahuKalam: string;
+  labels: {
+    tithi: string;
+    nakshatra: string;
+    sunrise: string;
+    rahuKalam: string;
+    until: string;
+  };
 }
 
 const PLACEHOLDER_SLOTS: WidgetPayload['slots'] = [
@@ -64,4 +85,17 @@ export const WIDGET_PLACEHOLDER: WidgetPayload = {
   slots: PLACEHOLDER_SLOTS,
   locationLabel: null,
   isDarkMode: true,
+  tithiName: '—',
+  tithiEndTime: '',
+  nakshatraName: '—',
+  nakshatraEndTime: '',
+  sunrise: '—',
+  rahuKalam: '—',
+  labels: {
+    tithi: 'Tithi',
+    nakshatra: 'Nakshatra',
+    sunrise: 'Sunrise',
+    rahuKalam: 'Rahu Kalam',
+    until: 'until',
+  },
 };
