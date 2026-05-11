@@ -195,7 +195,8 @@ export const CalGridDense = memo(function CalGridDense({
                   {eventLabel ? (
                     <Text
                       style={[styles.eventText, { color: eventTextColor }]}
-                      numberOfLines={1}>
+                      numberOfLines={2}
+                      ellipsizeMode="tail">
                       {eventLabel}
                     </Text>
                   ) : null}
@@ -217,10 +218,10 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    minHeight: 64,
+    minHeight: 82,
   },
   labelCell: {
-    width: 26,
+    width: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: StyleSheet.hairlineWidth,
@@ -231,8 +232,8 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 3,
+    paddingVertical: 5,
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: 1,
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
   eventText: {
     fontFamily: 'NotoSerifDevanagari_500Medium',
     fontSize: 8.5,
-    lineHeight: 10,
+    lineHeight: 11,
     textAlign: 'center',
     marginTop: 1,
   },
