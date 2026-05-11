@@ -222,6 +222,38 @@ const TITHI_NAMES: readonly string[] = [
 ];
 
 /**
+ * Headline tier for `type === 'major'` festivals. When multiple majors share a
+ * single day, the one nearest the top of this list wins the cell's primary
+ * label. Anything not in the list defaults to "whichever was first in the
+ * JSON", which is alphabetical — fine when there's no collision, broken when
+ * (e.g.) "Narak Chaturdashi" lexically precedes "Diwali".
+ */
+const HEADLINE_MAJORS: readonly string[] = [
+  'Diwali',
+  'Holi',
+  'Maha Shivaratri',
+  'Krishna Janmashtami',
+  'Janmashtami',
+  'Rama Navami',
+  'Ganesh Chaturthi',
+  'Hanuman Jayanti',
+  'Vijayadashami',
+  'Dussehra',
+  'Raksha Bandhan',
+  'Karva Chauth',
+  'Akshaya Tritiya',
+  'Maha Navami',
+  'Govardhan Puja',
+  'Bhai Dooj',
+  'Dhanteras',
+  'Vasant Panchami',
+  'Ugadi',
+  'Gudi Padwa',
+  'Mahalaya Amavasya',
+  'Thiru Onam',
+];
+
+/**
  * Pick the most informative single label for a calendar cell, in priority
  * order. Each cell prints the result as its third line. The returned string
  * tries to stay short — long festival names are truncated by the renderer
@@ -237,17 +269,35 @@ function pickPrimaryEvent(
   amavasya: boolean,
   pradosh: boolean,
 ): { label: string; category: CalendarDay['eventCategory'] } {
-  // 1. Eclipse beats everything visually — content-semantic dark plinth.
+  // 1. Major festival (Holi, Diwali, Rama Navami, etc.) — the cultural anchors.
+  //    These trump eclipses for the headline because that's what users open the
+  //    calendar to find. Eclipse co-occurrences (Holi 2024/2025/2026 on a lunar
+  //    eclipse, etc.) are still surfaced via `CalendarDay.eclipse` so the
+  //    FlagStrip / day detail can flag them — just not as the primary label.
+  //
+  //    When multiple majors share a day (e.g. Diwali + Narak Chaturdashi on
+  //    2026-11-08, Dussehra + Maha Navami, Holi + Phagli), pick the
+  //    higher-recognition one via `HEADLINE_MAJORS`. Falls back to the first
+  //    major in the array when none are ranked.
+  const majors = festivals.filter(f => f.type === 'major');
+  if (majors.length > 0) {
+    let chosen = majors[0];
+    let bestRank = Number.POSITIVE_INFINITY;
+    for (const f of majors) {
+      const rank = HEADLINE_MAJORS.indexOf(f.name);
+      if (rank >= 0 && rank < bestRank) {
+        bestRank = rank;
+        chosen = f;
+      }
+    }
+    return { label: chosen.name, category: 'festival' };
+  }
+  // 2. Eclipse — content-semantic dark plinth when no major festival overlaps.
   if (eclipse) {
     return {
       label: eclipse === 'lunar' ? 'Chandra Grahan' : 'Surya Grahan',
       category: 'eclipse',
     };
-  }
-  // 2. Major festival (Holi, Diwali, Rama Navami, etc.).
-  const major = festivals.find(f => f.type === 'major');
-  if (major) {
-    return { label: major.name, category: 'festival' };
   }
   // 3. Sankranti — prefer specific name (Makar Sankranti, Pongal, etc.) over generic.
   if (sankranti) {

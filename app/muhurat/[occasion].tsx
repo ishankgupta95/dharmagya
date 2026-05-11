@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   },
   scoreBandLabel: { fontSize: 13, lineHeight: 18, marginBottom: 4 },
   scoreReasonItem: { fontSize: 12, lineHeight: 17 },
-  slotsPlinth: { marginTop: 2 },
+  slotsPlinth: { marginTop: 2, borderWidth: 0 },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   slotName: { flex: 1, fontSize: 13, lineHeight: 18 },
   slotTime: { fontSize: 12, lineHeight: 16 },

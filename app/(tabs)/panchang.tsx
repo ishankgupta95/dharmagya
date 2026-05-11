@@ -734,11 +734,27 @@ export default function PanchangScreen() {
   // ── Glance data (sync — sourced from cellLookup, no daily compute) ──────
   const glanceFestivals: FlagStripItem[] = useMemo(() => {
     if (!selectedCell) return [];
-    return selectedCell.festivals.map((f, i) => ({
-      key: `fest-${i}`,
-      label: f.description ?? f.name,
-      tone: 'gold' as const,
-    }));
+    // Always show the festival name. Append `description` only when it adds
+    // information on *this* day — i.e. when it isn't a shared metadata string
+    // across multiple festivals (lunar month for majors on Diwali day, rashi
+    // for the Sankranti triple, etc.). A description that's unique on the day
+    // (e.g. Ekadashi day with one row and desc="Saphala Ekadashi", or a
+    // pradosha with desc="Shani Pradosha") still surfaces.
+    const descCounts = new Map<string, number>();
+    selectedCell.festivals.forEach(f => {
+      if (!f.description) return;
+      descCounts.set(f.description, (descCounts.get(f.description) ?? 0) + 1);
+    });
+    const seen = new Set<string>();
+    const out: FlagStripItem[] = [];
+    selectedCell.festivals.forEach((f, i) => {
+      const showDesc = !!f.description && (descCounts.get(f.description) ?? 0) === 1;
+      const label = showDesc ? `${f.name} · ${f.description}` : f.name;
+      if (seen.has(label)) return;
+      seen.add(label);
+      out.push({ key: `fest-${i}`, label, tone: 'gold' as const });
+    });
+    return out;
   }, [selectedCell]);
 
   const glanceLine = useMemo(() => {
