@@ -42,6 +42,7 @@ import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { Ornament } from '@/components/common/Ornament';
 import { TodaysDeityCard } from '@/components/common/TodaysDeityCard';
+import { SadhanaStreakBadge } from '@/components/common/SadhanaStreakBadge';
 import { HomePanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
@@ -327,6 +328,14 @@ export default function HomeScreen() {
             accessibilityLabel={t('a11y.openSettings')}>
             <Icon name="gear" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
+        </View>
+
+        {/* ── Sadhana streak (P14.4) — top placement, non-interactive ─── */}
+        {/* Anchors the daily-engagement loop. Renders at the top of Home so
+            it's the first thing the user reads on opening the app. Pure
+            indicator — not a button — so it never traps a tap. */}
+        <View style={styles.streakRow}>
+          <SadhanaStreakBadge colors={colors} large />
         </View>
 
         {/* ── Greeting ─────────────────────────────────────────────────── */}
@@ -931,6 +940,9 @@ const styles = StyleSheet.create({
 
   // Quick row
   quickRow: { flexDirection: 'row', gap: spacing.gridGap, marginBottom: 16 },
+  // Top streak row — sits between header and greeting; right-aligned so it
+  // visually balances the gear above and reads as a private metric, not a CTA.
+  streakRow: { alignItems: 'flex-end', marginTop: 6, marginBottom: 4 },
   quickCard: {
     flex: 1,
     borderRadius: 14,

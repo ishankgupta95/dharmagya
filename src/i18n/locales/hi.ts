@@ -430,8 +430,8 @@ export default {
     appVersion: 'ऐप संस्करण',
     replayWalkthrough: 'ऐप परिचय',
     replayWalkthroughDesc: 'ऐप का उपयोग कैसे करें जानें',
-    festivalTithiReminders: 'त्योहार एवं तिथि अनुस्मारक',
-    festivalTithiRemindersDesc: 'एकादशी, प्रदोष, त्योहारों के लिए नियमित अनुस्मारक',
+    festivalTithiReminders: 'साधना, तिथि एवं त्योहार अनुस्मारक',
+    festivalTithiRemindersDesc: 'दैनिक साधना याद + एकादशी, प्रदोष, त्योहार',
     sendFeedback: 'प्रतिक्रिया भेजें',
     sendFeedbackDesc: 'त्रुटि बताएँ या नई सुविधा माँगें',
     rateApp: 'धर्मज्ञ को रेट करें',
@@ -515,6 +515,12 @@ export default {
     festivalTimeLabel: 'अनुस्मारक समय (एक दिन पहले संध्या)',
     tithiTimePickerTitle: 'तिथि अनुस्मारक समय',
     festivalTimePickerTitle: 'त्योहार अनुस्मारक समय',
+    // P14.4 — साधना अभ्यास अनुस्मारक (वैकल्पिक, शांत भाव में)
+    sadhanaSection: 'साधना अभ्यास',
+    sadhanaLabel: 'संध्या साधना अनुस्मारक',
+    sadhanaSublabel: 'यदि आज अभी साधना शुरू नहीं की हो — एक कोमल याद',
+    sadhanaTimeLabel: 'अनुस्मारक समय',
+    sadhanaTimePickerTitle: 'साधना अनुस्मारक समय',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -1094,6 +1100,12 @@ export default {
     kickerVerse: 'पावन पंक्ति',
     kickerJaap: 'जाप पूर्ण',
     jaapCountLine: 'आज {{count}} बार जप',
+    kickerMilestone: 'साधना मील-पत्थर',
+    milestoneSubline: {
+      sessions: 'पूर्ण किए गए सत्र',
+      repetitions: 'पावन जप',
+      streak: 'दिनों की साधना',
+    },
     from: 'स्रोत — {{name}}',
     // Entry-point buttons
     ctaGreeting: 'शुभकामना साझा करें',
@@ -1104,5 +1116,37 @@ export default {
     viaDharmagya: 'dharmagya ऐप से साझा',
     a11yShare: 'साझा करने योग्य चित्र बनाएँ',
     a11yShareFullText: 'पूरा पाठ व्हाट्सऐप या किसी अन्य ऐप पर साझा करें',
+  },
+
+  // ── साधना श्रृंखला + मील-पत्थर (P14.4) ─────────────────────────────────
+  sadhana: {
+    streakLabel: 'साधना',
+    streakDays_one: 'दिन',
+    streakDays_other: 'दिन',
+    dayStreakLabel_one: 'दिन साधना',
+    dayStreakLabel_other: 'दिन साधना',
+    a11yStreakBadge_one: 'आपकी वर्तमान साधना श्रृंखला: {{count}} दिन',
+    a11yStreakBadge_other: 'आपकी वर्तमान साधना श्रृंखला: {{count}} दिन',
+
+    milestoneEyebrow: 'साधना मील-पत्थर',
+    milestoneKicker: {
+      sessions: 'sessions · सत्र',
+      repetitions: 'जप · repetitions',
+      streak: 'साधना · दिनों का अभ्यास',
+    },
+    milestoneSub: {
+      sessions_one: 'सत्र पूर्ण',
+      sessions_other: 'सत्र पूर्ण',
+      repetitions_one: 'पावन जप',
+      repetitions_other: 'पावन जप',
+      streak_one: 'दिन की अखंड साधना',
+      streak_other: 'दिनों की अखंड साधना',
+    },
+    milestoneBlessing: 'आपकी साधना गहरी हो।',
+    continueBtn: 'आगे बढ़ें',
+    shareBtn: 'साझा करें',
+
+    reminderTitle: '🪔 एक शांत क्षण',
+    reminderBody: 'जब समय मिले, आज की साधना आरंभ करें।',
   },
 } as const;

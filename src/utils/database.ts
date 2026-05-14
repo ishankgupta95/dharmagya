@@ -76,6 +76,21 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
       ON custom_mantras(last_used_at DESC);
   `);
 
+  // Sadhana milestones the user has crossed (P14.4). `kind` is one of
+  // 'sessions' | 'repetitions' | 'streak'; `threshold` is the sacred-number
+  // boundary just crossed (108, 1008, …). UNIQUE(kind, threshold) makes the
+  // insert idempotent — re-crossing the same threshold doesn't double-log
+  // and doesn't re-trigger the celebration overlay.
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS milestones_achieved (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,
+      threshold INTEGER NOT NULL,
+      achieved_at INTEGER NOT NULL,
+      UNIQUE(kind, threshold)
+    );
+  `);
+
   // 1: 1.5.0 — excludedVaras rule was a no-op before (English weekday vs.
   // panchang-ts Sanskrit name), so cached scans may include forbidden
   // weekdays. Drop them once so the next open recomputes correctly.
@@ -90,6 +105,8 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // 5: MuhuratMatch gained `score` + `reasons` (Phase 13b, 4.1 score surface).
   // Old cache JSON lacks both fields; wipe muhurat_cache once so every row
   // re-fills with the score data the DayRow now renders.
+  // 6: milestones_achieved table introduced (P14.4 sadhana milestones). No
+  // old data to migrate; the bump just records that the schema reached v6.
   const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version < 2) {
@@ -105,6 +122,9 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   if (version < 5) {
     db.execSync('DELETE FROM muhurat_cache');
     db.execSync('PRAGMA user_version = 5');
+  }
+  if (version < 6) {
+    db.execSync('PRAGMA user_version = 6');
   }
   end();
 }

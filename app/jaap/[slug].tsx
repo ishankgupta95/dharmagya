@@ -37,10 +37,14 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { resolveLanguage } from '@/i18n';
 import { useShareSheet } from '@/store/useShareSheet';
+import { useMilestoneCelebration } from '@/store/useMilestoneCelebration';
 import {
   CUSTOM_MANTRA_SLUG,
+  getJaapStats,
   insertJaapSession,
 } from '@/services/jaapSessions';
+import { recordSessionForSadhana } from '@/services/sadhanaRecorder';
+import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import {
   getMantraBySlug,
   type ContentLang,
@@ -139,6 +143,14 @@ export default function JaapCounterScreen() {
   const lang: ContentLang = resolveLanguage(appLanguage);
   const db = useSQLiteContext();
   const openShare = useShareSheet(s => s.open);
+  const unlockMilestone = useMilestoneCelebration(s => s.unlock);
+  const sadhana = useStore(s => s.sadhana);
+  const setSadhanaState = useStore(s => s.setSadhanaState);
+  const sadhanaReminderEnabled = useStore(s => s.sadhanaReminderEnabled);
+  const sadhanaReminderTime = useStore(s => s.sadhanaReminderTime);
+  const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
+  const quietHoursStart = useStore(s => s.quietHoursStart);
+  const quietHoursEnd = useStore(s => s.quietHoursEnd);
 
   const resolved = useMemo<ResolvedMantra | null>(() => {
     if (slug === CUSTOM_MANTRA_SLUG) {
@@ -292,18 +304,57 @@ export default function JaapCounterScreen() {
   }, [hasCounted, totalCount, t]);
 
   // ── Save / exit flow ───────────────────────────────────────────────────
+  // Persist the session AND advance the sadhana streak / scan milestones in
+  // one call. We deliberately keep the SQLite write and the orchestrator
+  // synchronous so that:
+  //   - the celebration overlay opens before `router.back()` resolves,
+  //     which puts it cleanly on top of the picker
+  //   - the at-risk reminder cancellation runs from a known-true state
+  //     (today is now a qualifying day) rather than racing on next focus.
   const persistSession = useCallback(() => {
     if (!resolved || !hasCounted) return;
+    const nowMs = Date.now();
     insertJaapSession(db, {
       startedAt: startedAtRef.current,
-      endedAt: Date.now(),
+      endedAt: nowMs,
       mantraSlug: resolved.slug,
       mantraLabel: resolved.label,
       malaSize,
       malaCount,
       totalCount,
     });
-  }, [db, resolved, hasCounted, malaSize, malaCount, totalCount]);
+
+    // Re-read lifetime totals AFTER the insert — milestone scan needs the
+    // post-write counts to detect crossings.
+    const statsAfter = getJaapStats(db);
+    const { nextState, celebration } = recordSessionForSadhana({
+      db,
+      prevState: sadhana,
+      statsAfter,
+      nowMs,
+      deityId: mantraDeity,
+    });
+    if (nextState !== sadhana) setSadhanaState(nextState);
+    if (celebration) unlockMilestone(celebration);
+
+    // The user practised today — kill today's at-risk reminder and roll the
+    // 14-day horizon forward so tomorrow's still fires (if enabled).
+    if (sadhanaReminderEnabled) {
+      void rescheduleSadhanaReminder({
+        enabled: true,
+        timeHHmm: sadhanaReminderTime,
+        sadhana: nextState,
+        quietHours: quietHoursEnabled
+          ? { enabled: true, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }
+          : undefined,
+      });
+    }
+  }, [
+    db, resolved, hasCounted, malaSize, malaCount, totalCount,
+    sadhana, setSadhanaState, unlockMilestone, mantraDeity,
+    sadhanaReminderEnabled, sadhanaReminderTime,
+    quietHoursEnabled, quietHoursStart, quietHoursEnd,
+  ]);
 
   const handleSaveExit = useCallback(() => {
     persistSession();

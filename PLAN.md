@@ -218,7 +218,7 @@ The full nine-day Navratri practice, tied into the existing Festivals screen + p
 
 **Surfaces:** Festivals screen → Navratri card with auto-computed dates + Ghatasthapana muhurat; a 9-day guide screen (day picker, current day highlighted during Navratri); daily push notifications during the 9 days (morning: day#, form, color, bhog, mantra; Day1: Ghatasthapana muhurat; Day8/9: Kanya Pujan reminder; Day9: Navami close + havan; Day10: Visarjan); the vrat-guide screen; the Durga Saptashati added to the existing chalisa/aarti reader with the 9-day chapter map. The Navadurga forms are Navratri *content*, not 9 new Library entries.
 
-### P14.4 — Sadhana streaks + milestones (gamification) ⏳
+### P14.4 — Sadhana streaks + milestones (gamification) ✅ (2026-05-14)
 
 A retention layer built on data the app already records (`jaap_sessions`), tuned for a devotional context — private milestones, no leaderboards, gentle framing.
 
@@ -241,7 +241,7 @@ Render styled cards off-screen → hand them to the system share sheet: deity bl
 - P14.1: ✅ 7-day Vaar Devata — Home card + detail screen, **deities shown at equal weight (no per-day "primary")**, variant notes labeled, Isht Devata + Kundli-remedy tie-ins wired (dignity / Dosha / Sade Sati / Dasha). **Remaining:** the qualified-reviewer pass on the mantra strings — until then they ship `reviewPending: true` with a "provisional" caption (4 of 7 already match the `hindu-devotional-texts` package verbatim).
 - P14.2: ~7 named pujas on the Shodashopachara template with samagri checklists + step lists + cross-links; expert-review pass complete; disclaimers in place. (Guided Mode = P14.2b, deferred.)
 - P14.3: Sharad-Navratri 9-day guide shipped before its 2026 window — auto-computed dates + Ghatasthapana muhurat, per-day form/mantra/bhog, **panchang-computed colors (not hardcoded)**, daily notifications, vrat guide, Durga Saptashati in the reader; four Navratris handled (full guide for Sharad/Chaitra, info card for the Gupt pair).
-- P14.4: Sadhana streak + cumulative counter + sacred-number milestones, offline-safe (26-hr grace + clock-rollback guard), zero leaderboards/comparisons, opt-in-only at-risk reminder; SQLite `user_version` bumped for `milestones_achieved`.
+- P14.4: ✅ Sadhana streak (`useStore.sadhana` slice with 26-hr grace + clock-rollback freeze in [`src/services/sadhana.ts`](src/services/sadhana.ts)) + cumulative counter derived from `getJaapStats` + sacred-number milestones (sessions 7/21/30/108/365; reps 108/1008/10800/108000; streak 7/21/30/108/365). Celebration overlay ([`src/components/common/MilestoneCelebrationHost.tsx`](src/components/common/MilestoneCelebrationHost.tsx)) mounted in `app/_layout.tsx`; Share button opens the new 5th `ShareCardSpec` kind `milestone`. Zero leaderboards/comparisons; opt-in evening reminder ([`src/services/sadhanaReminders.ts`](src/services/sadhanaReminders.ts), default off, 20:30, 14-day rolling horizon, skips today if already practised). SQLite `user_version` 5→6 for `milestones_achieved(kind, threshold, achieved_at)` with `UNIQUE(kind, threshold)` so re-crossings are idempotent. Zustand persist v14→v15. Streak badge on Home (under QuickRow) + Jaap picker stats card. **Aarti reader is NOT a streak signal in v1** — jaap-only, per PLAN; deferred until a clear "completed" event is added to the reader.
 - P14.5: ✅ festival + deity + verse + jaap-completion cards via `captureRef` → `expo-sharing` (+ `expo-media-library` save-to-gallery), 1080-px renders (Story 9:16 / Square 1:1 toggle), app-watermarked, source-labelled text. Off-screen `<ShareCardHost>` in `app/_layout.tsx`; entry points on Festivals (major rows), deity detail hero, aarti verses, chalisa dohas, and the Jaap counter. **Plus** a separate "Share full text" affordance in the aarti + chalisa headers using RN `Share.share({ message })` — paste-into-WhatsApp ready, source + "shared via dharmagya" tail (image cards stay scoped to one-or-two lines per the source-text rule). **Not in v1 (unchanged):** name-personalized greetings, video status cards, WhatsApp-direct sharing.
 - `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings throughout. New content carries source attribution; the no-new-deities roster constraint holds.
 
@@ -340,7 +340,7 @@ Shipped to production (2026-05-12):
   → Phase 12 (panchang-ts 4.0.0) → Phase 13 (panchang-ts 4.1.1)
         ↓
   Phase 14 — Devotional Practice & Engagement   ← next active feature work
-      P14.1 Vaar Devata → P14.5 Shareable cards → P14.4 Sadhana streaks
+      P14.1 Vaar Devata ✅ → P14.5 Shareable cards ✅ → P14.4 Sadhana streaks ✅
       → P14.3 Navratri guide (ship before Sharad Navratri ≈ Oct 2026) → P14.2 Puja Vidhi
         ↓
   Phase 15 — Accounts & Sync (Google Sign-In, phased A→D; A is the small first step;

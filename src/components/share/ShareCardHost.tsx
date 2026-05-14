@@ -43,6 +43,9 @@ export function ShareCardHost() {
     kickerVerse: t('share.kickerVerse'),
     kickerJaap: t('share.kickerJaap'),
     jaapCountLine: (count: number) => t('share.jaapCountLine', { count }),
+    kickerMilestone: t('share.kickerMilestone'),
+    milestoneSubline: (kind) => t(`share.milestoneSubline.${kind}`),
+    milestoneFigure: (threshold: number) => threshold.toLocaleString('en-IN'),
   }), [t]);
 
   const content = useMemo(() => (spec ? resolveShareContent(spec, strings) : null), [spec, strings]);

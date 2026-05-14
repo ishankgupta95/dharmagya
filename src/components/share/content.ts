@@ -47,6 +47,15 @@ export interface ShareStrings {
   kickerJaap: string;
   /** "{{count}} repetitions" — pass an i18n-formatted count. */
   jaapCountLine: (count: number) => string;
+  /** Milestone kicker — e.g. "SADHANA MILESTONE". */
+  kickerMilestone: string;
+  /**
+   * Sub-line beneath the milestone numeral, e.g. "sacred repetitions",
+   * "day sadhana", "completed sessions". Localised per kind.
+   */
+  milestoneSubline: (kind: 'sessions' | 'repetitions' | 'streak') => string;
+  /** Headline numeral itself — already formatted with locale digits / grouping. */
+  milestoneFigure: (threshold: number) => string;
 }
 
 export function resolveShareContent(spec: ShareCardSpec, s: ShareStrings): ShareCardContent {
@@ -102,6 +111,21 @@ export function resolveShareContent(spec: ShareCardSpec, s: ShareStrings): Share
         focalHi: spec.mantraHi,
         focalEn: spec.mantraTranslit,
         subEn: spec.mantraTitleEn,
+        verseLayout: false,
+      };
+    }
+    case 'milestone': {
+      // No deity image — the celebration is private, the focal block is the
+      // numeral, and a portrait behind it muddies the read. Top-half halo
+      // shows the sacred ॐ; bottom block carries the number + kind label.
+      const meta = spec.deityId ? DEITY_BY_ID[spec.deityId] : undefined;
+      return {
+        image: null,
+        accent: meta?.color ?? palette.goldLeaf,
+        initial: 'ॐ',
+        kicker: s.kickerMilestone,
+        focalHi: s.milestoneFigure(spec.threshold),
+        focalEn: s.milestoneSubline(spec.milestoneKind),
         verseLayout: false,
       };
     }

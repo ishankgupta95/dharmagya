@@ -432,8 +432,8 @@ export default {
     appVersion: 'App Version',
     replayWalkthrough: 'App Walkthrough',
     replayWalkthroughDesc: 'Learn how to use the app',
-    festivalTithiReminders: 'Festival & Tithi Reminders',
-    festivalTithiRemindersDesc: 'Recurring reminders for Ekadashi, Pradosha, festivals',
+    festivalTithiReminders: 'Sadhana, Tithi & Festival Reminders',
+    festivalTithiRemindersDesc: 'Daily sadhana nudge + Ekadashi, Pradosha, festivals',
     sendFeedback: 'Send Feedback',
     sendFeedbackDesc: 'Report a bug or request a feature',
     rateApp: 'Rate Dharmagya',
@@ -517,6 +517,12 @@ export default {
     festivalTimeLabel: 'Reminder Time (evening before)',
     tithiTimePickerTitle: 'Tithi Reminder Time',
     festivalTimePickerTitle: 'Festival Reminder Time',
+    // Sadhana practice (P14.4) — opt-in evening nudge, off by default.
+    sadhanaSection: 'SADHANA PRACTICE',
+    sadhanaLabel: 'Evening sadhana reminder',
+    sadhanaSublabel: 'A gentle nudge if you haven’t begun today',
+    sadhanaTimeLabel: 'Reminder time',
+    sadhanaTimePickerTitle: 'Sadhana Reminder Time',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -1100,6 +1106,12 @@ export default {
     kickerVerse: 'Sacred Verse',
     kickerJaap: 'Jaap Complete',
     jaapCountLine: '{{count}} repetitions today',
+    kickerMilestone: 'Sadhana Milestone',
+    milestoneSubline: {
+      sessions: 'completed sessions',
+      repetitions: 'sacred repetitions',
+      streak: 'day sadhana',
+    },
     from: 'From {{name}}',
     // Entry-point buttons
     ctaGreeting: 'Share greeting',
@@ -1110,5 +1122,41 @@ export default {
     viaDharmagya: 'shared via dharmagya',
     a11yShare: 'Create a shareable image',
     a11yShareFullText: 'Share the full text via WhatsApp or another app',
+  },
+
+  // ── Sadhana streak + milestones (P14.4) ─────────────────────────────────
+  sadhana: {
+    // Streak badge on Home / Jaap picker
+    streakLabel: 'Sadhana',
+    streakDays_one: 'day',
+    streakDays_other: 'days',
+    dayStreakLabel_one: 'DAY SADHANA',
+    dayStreakLabel_other: 'DAYS SADHANA',
+    a11yStreakBadge_one: 'Your current sadhana streak: {{count}} day',
+    a11yStreakBadge_other: 'Your current sadhana streak: {{count}} days',
+
+    // Milestone celebration overlay
+    milestoneEyebrow: 'SADHANA MILESTONE',
+    milestoneKicker: {
+      sessions: 'सत्र · sessions',
+      repetitions: 'जप · repetitions',
+      streak: 'साधना · days of practice',
+    },
+    milestoneSub: {
+      // Plural-safe — count interpolated below the big numeral.
+      sessions_one: 'session completed',
+      sessions_other: 'sessions completed',
+      repetitions_one: 'sacred repetition',
+      repetitions_other: 'sacred repetitions',
+      streak_one: 'day of unbroken sadhana',
+      streak_other: 'days of unbroken sadhana',
+    },
+    milestoneBlessing: 'May your practice deepen.',
+    continueBtn: 'Continue',
+    shareBtn: 'Share',
+
+    // Opt-in evening reminder (off by default; gentle wording)
+    reminderTitle: '🪔 A quiet moment',
+    reminderBody: 'Begin your sadhana when you have a moment today.',
   },
 } as const;

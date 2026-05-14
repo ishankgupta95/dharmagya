@@ -27,10 +27,13 @@ import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
 import { preloadInterstitial, showInterstitial } from '@/services/interstitialAds';
 import { scheduleDailyReminder } from '@/services/notifications';
 import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
+import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 import { pmark } from '@/utils/perfProfile';
 import { ShareCardHost } from '@/components/share/ShareCardHost';
+import { MilestoneCelebrationHost } from '@/components/common/MilestoneCelebrationHost';
+import { SadhanaOpenRecorder } from '@/components/common/SadhanaOpenRecorder';
 
 pmark('app:_layout:moduleEval');
 
@@ -53,6 +56,9 @@ export default function RootLayout() {
     quietHoursEnabled,
     quietHoursStart,
     quietHoursEnd,
+    sadhana,
+    sadhanaReminderEnabled,
+    sadhanaReminderTime,
   } = useStore();
   const systemScheme = useColorScheme();
   // Resolve themeMode + system scheme into isDarkMode. useColorScheme already
@@ -174,13 +180,23 @@ export default function RootLayout() {
             quietHours,
           );
         }
+        // Roll the sadhana at-risk horizon forward (P14.4). Idempotent;
+        // also skips today's prompt internally if already practised.
+        if (sadhanaReminderEnabled) {
+          void rescheduleSadhanaReminder({
+            enabled: true,
+            timeHHmm: sadhanaReminderTime,
+            sadhana,
+            quietHours: quietHoursEnabled ? quietHours : undefined,
+          });
+        }
         // Foreground refresh of the home-screen widget. Debounced inside the
         // service so multiple resumes per minute don't recompute panchang.
         void refreshTodayWidget();
       }
     });
     return () => sub.remove();
-  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime]);
 
   // Roll reminder horizons once on each cold start too.
   useEffect(() => {
@@ -193,7 +209,15 @@ export default function RootLayout() {
         quietHours,
       );
     }
-  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours]);
+    if (sadhanaReminderEnabled) {
+      void rescheduleSadhanaReminder({
+        enabled: true,
+        timeHHmm: sadhanaReminderTime,
+        sadhana,
+        quietHours: quietHoursEnabled ? quietHours : undefined,
+      });
+    }
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime]);
 
   if (!appReady) return null;
 
@@ -233,6 +257,8 @@ export default function RootLayout() {
               <Stack.Screen name="search" options={{ animation: 'fade' }} />
             </Stack>
             <ShareCardHost />
+            <MilestoneCelebrationHost />
+            <SadhanaOpenRecorder />
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
           </SQLiteProvider>
         </Suspense>

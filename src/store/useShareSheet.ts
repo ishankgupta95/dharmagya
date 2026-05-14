@@ -43,6 +43,16 @@ export type ShareCardSpec =
       mantraTranslit?: string;
       mantraTitleEn: string;
       deityId?: string;
+    }
+  /** Sadhana milestone unlocked (P14.4) — the sacred number itself is the focal
+   *  glyph. `kind` selects the headline phrasing ("repetitions" vs "day sadhana"
+   *  vs "sessions"); the resolver picks the gold-on-ink accent and an optional
+   *  deity portrait if one was tied to the session that crossed the threshold. */
+  | {
+      kind: 'milestone';
+      milestoneKind: 'sessions' | 'repetitions' | 'streak';
+      threshold: number;
+      deityId?: string;
     };
 
 interface ShareSheetState {
