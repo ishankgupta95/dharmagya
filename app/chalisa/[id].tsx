@@ -18,7 +18,7 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { FavoriteHeart } from '@/components/common/FavoriteHeart';
-import { SegmentedChip } from '@/components/common/SegmentedChip';
+import { LangToggle } from '@/components/common/LangToggle';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { useEntranceStagger } from '@/hooks/useEntranceStagger';
 import { useShareSheet } from '@/store/useShareSheet';
@@ -171,7 +171,7 @@ export default function ChalisaDetailScreen() {
         </Animated.View>
 
         {/* ── Lang toggle ───────────────────────────────────────────────────── */}
-        <LangToggle lang={lang} onChange={setLang} colors={colors} t={t} />
+        <LangToggle lang={lang} onChange={setLang} colors={colors} />
 
         {/* ── Sections ──────────────────────────────────────────────────────── */}
         {sections.map((section, sectionIndex) => {
@@ -221,49 +221,6 @@ export default function ChalisaDetailScreen() {
 
     </SafeAreaView>
     </ScreenMount>
-  );
-}
-
-interface LangToggleProps {
-  lang: ContentLang;
-  onChange: (next: ContentLang) => void;
-  colors: ColorPalette;
-  t: (key: string) => string;
-}
-
-function LangToggle({ lang, onChange, colors, t }: LangToggleProps) {
-  return (
-    <View style={styles.langToggleBar}>
-      <View style={[styles.langToggle, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <LangChip label={t('langToggle.english')} active={lang === 'en'} onPress={() => onChange('en')} colors={colors} />
-        <LangChip label={t('langToggle.hindi')} active={lang === 'hi'} onPress={() => onChange('hi')} colors={colors} />
-      </View>
-    </View>
-  );
-}
-
-interface LangChipProps {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  colors: ColorPalette;
-}
-
-function LangChip({ label, active, onPress, colors }: LangChipProps) {
-  return (
-    <SegmentedChip
-      active={active}
-      onPress={onPress}
-      inactiveBg="transparent"
-      activeBg={palette.ink}
-      style={styles.langChip}
-      accessibilityLabel={label}>
-      <Text
-        variant="mono-caps"
-        style={[styles.langChipText, { color: active ? palette.parchmentBright : colors.textTertiary }]}>
-        {label}
-      </Text>
-    </SegmentedChip>
   );
 }
 
@@ -404,27 +361,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     width: '60%',
   },
-
-  // Lang toggle
-  langToggleBar: {
-    alignItems: 'center',
-    paddingBottom: 22,
-  },
-  langToggle: {
-    flexDirection: 'row',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 3,
-    gap: 2,
-  },
-  langChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 7,
-    borderRadius: 17,
-    minWidth: 96,
-    alignItems: 'center',
-  },
-  langChipText: { fontSize: 9.5 },
 
   // Sections
   section: { marginBottom: 8 },

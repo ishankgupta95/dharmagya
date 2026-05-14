@@ -120,12 +120,12 @@ export default function PracticeTab() {
             t={t}
           />
 
-          {/* ── Puja Vidhi — coming soon (P14.2) ────────────────────────── */}
+          {/* ── Puja Vidhi (P14.2 — Featured Pujas) ─────────────────────── */}
           <PracticeRow
             icon="gift"
             title={t('practice.pujaVidhi.title')}
             subtitle={t('practice.pujaVidhi.subtitle')}
-            onPress={null}
+            onPress={() => router.push('/puja')}
             colors={colors}
             t={t}
           />

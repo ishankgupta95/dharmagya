@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,8 +9,10 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, semanticColors, spacing, type ColorPalette } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
+import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import i18n, { resolveLanguage } from '@/i18n';
 
 import {
   NAVRATRI_SOURCES,
@@ -19,14 +22,19 @@ import {
   type VratTier,
 } from '@/config/navratri';
 
-type Lang = 'en' | 'hi';
+type Lang = ContentLang;
 
 export default function NavratriVratScreen() {
-  const { t, i18n } = useTranslation();
-  const lang: Lang = i18n.language === 'hi' ? 'hi' : 'en';
+  const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
+  const appLanguage = useStore(s => s.language);
   const colors = isDarkMode ? darkColors : lightColors;
   const ornamentTone = isDarkMode ? 'dark' : 'light';
+
+  // In-screen content-language toggle, seeded from the app-wide preference —
+  // same pattern as aarti/chalisa.
+  const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
   return (
     <ScreenMount>
@@ -43,7 +51,7 @@ export default function NavratriVratScreen() {
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {t('navratri.vratTitle')}
+            {tForLang('navratri.vratTitle')}
           </Text>
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
@@ -55,18 +63,21 @@ export default function NavratriVratScreen() {
           {/* ── Editorial intro ────────────────────────────────────────── */}
           <View style={styles.intro}>
             <Kicker color={colors.accent} size={11} style={styles.introEyebrow}>
-              {t('navratri.vratEyebrow')}
+              {tForLang('navratri.vratEyebrow')}
             </Kicker>
             <Text variant="body" style={[styles.introText, { color: colors.textSecondary }]}>
-              {t('navratri.vratIntro')}
+              {tForLang('navratri.vratIntro')}
             </Text>
             <Ornament variant="lotus" tone={ornamentTone} style={styles.introOrnament} />
           </View>
 
+          {/* ── Lang toggle (same pattern as aarti/chalisa) ─────────────── */}
+          <LangToggle lang={lang} onChange={setLang} colors={colors} />
+
           {/* ── Tiers ───────────────────────────────────────────────────── */}
           <View style={styles.section}>
             <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
-              {t('navratri.vratTiersLabel')}
+              {tForLang('navratri.vratTiersLabel')}
             </Kicker>
             {VRAT_TIERS.map((tier, i) => (
               <TierCard key={tier.slug} tier={tier} lang={lang} colors={colors} isLast={i === VRAT_TIERS.length - 1} />
@@ -75,7 +86,7 @@ export default function NavratriVratScreen() {
 
           {/* ── Allowed foods ───────────────────────────────────────────── */}
           <FoodColumn
-            title={t('navratri.allowedLabel')}
+            title={tForLang('navratri.allowedLabel')}
             items={VRAT_FOODS.allowed}
             tint={palette.goldLeaf}
             lang={lang}
@@ -84,7 +95,7 @@ export default function NavratriVratScreen() {
 
           {/* ── Forbidden foods ─────────────────────────────────────────── */}
           <FoodColumn
-            title={t('navratri.forbiddenLabel')}
+            title={tForLang('navratri.forbiddenLabel')}
             items={VRAT_FOODS.forbidden}
             tint={semanticColors.error}
             lang={lang}
@@ -93,7 +104,7 @@ export default function NavratriVratScreen() {
 
           {/* ── Sources / disclaimer ────────────────────────────────────── */}
           <View style={styles.sourcesBlock}>
-            <Kicker color={colors.textMuted} size={9}>{t('navratri.sourcesLabel')}</Kicker>
+            <Kicker color={colors.textMuted} size={9}>{tForLang('navratri.sourcesLabel')}</Kicker>
             <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
               {NAVRATRI_SOURCES[lang]}
             </Text>

@@ -35,6 +35,7 @@ import { DEITY_BY_ID } from '@/config/deities';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { getDeityImage } from '@/config/deityImages';
 import { useShareSheet } from '@/store/useShareSheet';
+import { getPujasForDeity } from '@/config/pujas';
 import {
   getAartiForDeity,
   getChalisaForDeity,
@@ -197,7 +198,8 @@ interface HeroBlockProps {
 }
 
 function HeroBlock({ deityId, deityColor, displayName, description, image, colors, onBack }: HeroBlockProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
   const meta = DEITY_BY_ID[deityId];
   const initial = meta?.initial ?? 'ॐ';
   const openShare = useShareSheet(s => s.open);
@@ -205,6 +207,7 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
     () => getAllAppMantras().find(m => m.deity === deityId)?.text.devanagari?.split('\n')[0],
     [deityId],
   );
+  const featuredPuja = useMemo(() => getPujasForDeity(deityId)[0], [deityId]);
   // Hero photo fades 0→1 over 320ms once decoded (P11.6). Deity-color gradient
   // sits at full opacity underneath as the always-visible scrim, so the user
   // never sees a blank container — only the gradient, then the photo settling
@@ -270,17 +273,32 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         <Text variant="body-italic" style={[styles.heroDescription, { color: colors.textTertiary }]}>
           {description}
         </Text>
-        <TouchableOpacity
-          onPress={() => openShare({ kind: 'deity-blessing', deityId, mantraHi: sigMantra })}
-          activeOpacity={0.85}
-          style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
-          accessibilityRole="button"
-          accessibilityLabel={t('share.a11yShare')}>
-          <Icon name="share" size={13} color={colors.accent} />
-          <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
-            {t('share.ctaDeity')}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.heroCtaRow}>
+          <TouchableOpacity
+            onPress={() => openShare({ kind: 'deity-blessing', deityId, mantraHi: sigMantra })}
+            activeOpacity={0.85}
+            style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('share.a11yShare')}>
+            <Icon name="share" size={13} color={colors.accent} />
+            <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
+              {t('share.ctaDeity')}
+            </Text>
+          </TouchableOpacity>
+          {featuredPuja && (
+            <TouchableOpacity
+              onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: featuredPuja.slug } })}
+              activeOpacity={0.85}
+              style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('puja.openDeityPuja', { name: featuredPuja.name[lang] })}>
+              <Icon name="gift" size={13} color={colors.accent} />
+              <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
+                {t('puja.openPujaCta')}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Ornament variant="lotus" style={styles.heroOrnament} />
       </View>
     </View>
@@ -436,11 +454,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: spacing.cardPadLg,
   },
+  heroCtaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
   heroShareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    marginTop: 14,
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: borderRadius.chip,

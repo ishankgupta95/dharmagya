@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,10 +9,12 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
+import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
+import i18n, { resolveLanguage } from '@/i18n';
 import {
   getVaarDevataByKey,
   VAAR_DEVATA,
@@ -20,8 +22,9 @@ import {
   type VaarDeity,
   type VaarDevata,
 } from '@/config/vaarDevata';
+import { getPujasForDeity, type PujaContent } from '@/config/pujas';
 
-type Lang = 'en' | 'hi';
+type Lang = ContentLang;
 
 function startJaap(vaar: VaarDevata) {
   if (vaar.mantra.jaapSlug) {
@@ -35,11 +38,16 @@ function startJaap(vaar: VaarDevata) {
 }
 
 export default function VaarDevataScreen() {
-  const { t, i18n } = useTranslation();
-  const lang: Lang = i18n.language === 'hi' ? 'hi' : 'en';
+  const { t } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
+  const appLanguage = useStore((s) => s.language);
   const colors = isDarkMode ? darkColors : lightColors;
   const ornamentTone = isDarkMode ? 'dark' : 'light';
+
+  // In-screen content-language toggle, seeded from the app-wide preference —
+  // same pattern as aarti/chalisa.
+  const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
   const { day: routeDay } = useLocalSearchParams<{ day?: string }>();
   const [dayKey, setDayKey] = useState<string>(getVaarDevataByKey(routeDay)?.dayKey ?? 'sunday');
@@ -53,6 +61,25 @@ export default function VaarDevataScreen() {
 
   // `dayKey` is only ever set from a valid lookup, so the fallback is defensive.
   const vaar: VaarDevata = getVaarDevataByKey(dayKey) ?? VAAR_DEVATA[0];
+
+  // Surface every featured puja whose primary deity is in today's roster
+  // (de-duplicated). Tuesday + Saturday → Hanuman Puja (the explicit
+  // P14.2 wiring); Monday → Rudrabhishek; Wednesday → Ganesh; Thursday →
+  // Satyanarayan; Friday → Lakshmi. Sunday has no roster-pair v1 puja.
+  const linkedPujas: PujaContent[] = useMemo(() => {
+    const seen = new Set<string>();
+    const result: PujaContent[] = [];
+    for (const d of vaar.deities) {
+      if (!d.rosterId) continue;
+      for (const p of getPujasForDeity(d.rosterId)) {
+        if (!seen.has(p.slug)) {
+          seen.add(p.slug);
+          result.push(p);
+        }
+      }
+    }
+    return result;
+  }, [vaar]);
 
   return (
     <ScreenMount>
@@ -69,7 +96,7 @@ export default function VaarDevataScreen() {
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {t('vaar.detailTitle', { day: vaar.dayName[lang] })}
+            {tForLang('vaar.detailTitle', { day: vaar.dayName[lang] })}
           </Text>
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
@@ -104,15 +131,18 @@ export default function VaarDevataScreen() {
             })}
           </View>
 
+          {/* ── Lang toggle (same pattern as aarti/chalisa) ─────────────── */}
+          <LangToggle lang={lang} onChange={setLang} colors={colors} />
+
           {/* ── Day facts: ruling graha + colour ────────────────────────── */}
           <View style={styles.facts}>
             <Text variant="mono-caps" style={[styles.factsGraha, { color: colors.accent }]}>
-              {t('vaar.rulingGraha', { graha: vaar.grahaName[lang] })}
+              {tForLang('vaar.rulingGraha', { graha: vaar.grahaName[lang] })}
             </Text>
             <View style={styles.factsColorRow}>
               <View style={[styles.factsSwatch, { backgroundColor: vaar.color.hex, borderColor: colors.textTertiary }]} />
               <Text variant="mono-caps" style={[styles.factsColorText, { color: colors.textTertiary }]}>
-                {t('vaar.dayColorLabel')} — {vaar.color.name[lang]}
+                {tForLang('vaar.dayColorLabel')} — {vaar.color.name[lang]}
               </Text>
             </View>
             <Ornament variant="lotus" tone={ornamentTone} style={styles.factsOrnament} />
@@ -120,7 +150,7 @@ export default function VaarDevataScreen() {
 
           {/* ── Deities of the day (all equal weight) ───────────────────── */}
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Kicker color={colors.accent} size={10}>{t('vaar.deitiesSectionLabel')}</Kicker>
+            <Kicker color={colors.accent} size={10}>{tForLang('vaar.deitiesSectionLabel')}</Kicker>
             <View style={styles.cardBody}>
               {vaar.deities.map((d, i, arr) => (
                 <DeityRow
@@ -136,7 +166,7 @@ export default function VaarDevataScreen() {
 
           {/* ── Mantra for the day ──────────────────────────────────────── */}
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Kicker color={colors.accent} size={10}>{t('vaar.mantraLabel')}</Kicker>
+            <Kicker color={colors.accent} size={10}>{tForLang('vaar.mantraLabel')}</Kicker>
             <Text variant="deva-bold" style={[styles.mantraDeva, { color: colors.textPrimary }]}>
               {vaar.mantra.devanagari}
             </Text>
@@ -153,15 +183,41 @@ export default function VaarDevataScreen() {
               accessibilityRole="button"
               accessibilityLabel={t('vaar.a11yStartJaap')}>
               <Icon name="flower" size={14} color={palette.parchmentBright} />
-              <Text variant="mono-caps" style={styles.jaapBtnText}>{t('vaar.startJaap')}</Text>
+              <Text variant="mono-caps" style={styles.jaapBtnText}>{tForLang('vaar.startJaap')}</Text>
             </TouchableOpacity>
             <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
-              {t('vaar.mantraReviewNote')}
+              {tForLang('vaar.mantraReviewNote')}
             </Text>
           </View>
 
+          {/* ── Linked puja vidhi (P14.2) ───────────────────────────────── */}
+          {linkedPujas.length > 0 && (
+            <SectionCard title={tForLang('vaar.linkedPujaLabel')} colors={colors}>
+              {linkedPujas.map((p) => (
+                <TouchableOpacity
+                  key={p.slug}
+                  onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: p.slug } })}
+                  activeOpacity={0.85}
+                  style={[styles.linkedPujaRow, { borderColor: colors.borderAccent, backgroundColor: colors.surfaceRecessed }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('puja.openNamedPuja', { name: p.name[lang] })}>
+                  <Icon name="gift" size={14} color={colors.accent} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" style={[styles.linkedPujaName, { color: colors.textPrimary }]}>
+                      {p.name[lang]}
+                    </Text>
+                    <Text variant="mono-caps" style={[styles.linkedPujaKicker, { color: colors.accent }]} numberOfLines={1}>
+                      {p.kicker[lang]}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </SectionCard>
+          )}
+
           {/* ── Offerings ───────────────────────────────────────────────── */}
-          <SectionCard title={t('vaar.offeringsLabel')} colors={colors}>
+          <SectionCard title={tForLang('vaar.offeringsLabel')} colors={colors}>
             {vaar.offerings.map((o, i) => (
               <View key={i} style={styles.bulletRow}>
                 <View style={[styles.bulletDot, { backgroundColor: colors.accent }]} />
@@ -173,7 +229,7 @@ export default function VaarDevataScreen() {
           </SectionCard>
 
           {/* ── Fasting / vrat ──────────────────────────────────────────── */}
-          <SectionCard title={t('vaar.fastingLabel')} colors={colors}>
+          <SectionCard title={tForLang('vaar.fastingLabel')} colors={colors}>
             <Text variant="body" style={[styles.paragraph, { color: colors.textSecondary }]}>
               {vaar.fasting[lang]}
             </Text>
@@ -181,7 +237,7 @@ export default function VaarDevataScreen() {
 
           {/* ── Regional & traditional variants ─────────────────────────── */}
           {vaar.variantNotes.length > 0 && (
-            <SectionCard title={t('vaar.variantNotesLabel')} colors={colors}>
+            <SectionCard title={tForLang('vaar.variantNotesLabel')} colors={colors}>
               {vaar.variantNotes.map((n, i) => (
                 <View key={i} style={i > 0 ? styles.variantRowSpaced : undefined}>
                   <Text variant="mono-caps" style={[styles.variantLabel, { color: colors.accent }]}>
@@ -197,7 +253,7 @@ export default function VaarDevataScreen() {
 
           {/* ── Sources / disclaimer ────────────────────────────────────── */}
           <View style={styles.sourcesBlock}>
-            <Kicker color={colors.textMuted} size={9}>{t('vaar.sourcesLabel')}</Kicker>
+            <Kicker color={colors.textMuted} size={9}>{tForLang('vaar.sourcesLabel')}</Kicker>
             <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
               {VAAR_SOURCES[lang]}
             </Text>
@@ -383,6 +439,20 @@ const styles = StyleSheet.create({
   variantRowSpaced: { marginTop: 14 },
   variantLabel: { fontSize: 9, letterSpacing: 1.4 },
   variantText: { marginTop: 4 },
+
+  // Linked puja rows (P14.2)
+  linkedPujaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: borderRadius.cardInner,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  linkedPujaName: { fontSize: 14.5, lineHeight: 20 },
+  linkedPujaKicker: { fontSize: 8.5, letterSpacing: 1.4, marginTop: 3 },
 
   // Sources
   sourcesBlock: { marginTop: 4, gap: 8 },

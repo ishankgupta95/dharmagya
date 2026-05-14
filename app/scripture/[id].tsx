@@ -6,13 +6,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
+import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
-import { SegmentedChip } from '@/components/common/SegmentedChip';
-import { resolveLanguage } from '@/i18n';
+import i18n, { resolveLanguage } from '@/i18n';
 
 import {
   NAVRATRI_SOURCES,
@@ -20,7 +20,7 @@ import {
   SAPTASHATI_DAY_MAP,
 } from '@/config/navratri';
 
-type Lang = 'en' | 'hi';
+type Lang = ContentLang;
 
 /**
  * Scripture reader — currently surfaces the Durga Saptashati outline + the
@@ -40,7 +40,10 @@ export default function ScriptureDetailScreen() {
   const ornamentTone = isDarkMode ? 'dark' : 'light';
   const appLanguage = useStore(s => s.language);
 
-  const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage) as Lang);
+  const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
+  // Chrome (kickers, "About this text", "9-day pāṭha schedule", etc.) follows
+  // the in-screen toggle — same pattern as aarti/chalisa.
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
   // Both hooks must run before any conditional return — Saptashati is the
   // only scripture in v1, but the same hook order has to hold even on the
@@ -103,7 +106,7 @@ export default function ScriptureDetailScreen() {
           {/* ── Editorial title block ──────────────────────────────────── */}
           <View style={styles.heroBlock}>
             <Kicker color={colors.accent} size={11} style={styles.heroEyebrow}>
-              {t('scripture.kickerSaptashati')}
+              {tForLang('scripture.kickerSaptashati')}
             </Kicker>
             <Kicker color={colors.accent} size={22} style={styles.heroTitle}>
               {titleByLang[lang]}
@@ -114,31 +117,26 @@ export default function ScriptureDetailScreen() {
             <Ornament variant="lotus" tone={ornamentTone} style={styles.heroRule} />
           </View>
 
-          {/* ── Lang toggle ─────────────────────────────────────────────── */}
-          <View style={styles.langToggleBar}>
-            <View style={[styles.langToggle, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <LangChip label={t('langToggle.english')} active={lang === 'en'} onPress={() => setLang('en')} colors={colors} />
-              <LangChip label={t('langToggle.hindi')}   active={lang === 'hi'} onPress={() => setLang('hi')} colors={colors} />
-            </View>
-          </View>
+          {/* ── Lang toggle (shared component) ──────────────────────────── */}
+          <LangToggle lang={lang} onChange={setLang} colors={colors} />
 
           {/* ── About — what the Saptashati is ──────────────────────────── */}
           <View style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Kicker color={colors.accent} size={10}>{t('scripture.aboutLabel')}</Kicker>
+            <Kicker color={colors.accent} size={10}>{tForLang('scripture.aboutLabel')}</Kicker>
             <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
               {lang === 'hi'
                 ? 'दुर्गा सप्तशती — मार्कण्डेय पुराण के ८१–९३ अध्याय। तीन चरित्र (मध्यम-पाठ): प्रथम चरित्र — महाकाली; मध्यम चरित्र — महालक्ष्मी; उत्तम चरित्र — महासरस्वती। नवरात्रि की नौ रात्रियों में पारंपरिक पाठ-क्रम के अनुसार पठित।'
                 : "The Durga Saptashati (chapters 81–93 of the Mārkaṇḍeya Purāṇa) is the foundational scripture of Devī worship. Three caritas: Prathama (Mahakali, ch 1), Madhyama (Mahalakshmi, ch 2–4), Uttama (Mahasaraswati, ch 5–13). Read across the 9 nights of Navratri in the schedule below."}
             </Text>
             <Text variant="body-italic" style={[styles.aboutReviewNote, { color: colors.textMuted }]}>
-              {t('scripture.reviewNote')}
+              {tForLang('scripture.reviewNote')}
             </Text>
           </View>
 
           {/* ── 9-day chapter map ───────────────────────────────────────── */}
           <View style={styles.section}>
             <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
-              {t('scripture.dayMapLabel')}
+              {tForLang('scripture.dayMapLabel')}
             </Kicker>
             {dayMap.map(entry => (
               <View
@@ -146,7 +144,7 @@ export default function ScriptureDetailScreen() {
                 style={[styles.dayMapRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={[styles.dayNumCol, { borderRightColor: colors.divider }]}>
                   <Text variant="mono-caps" style={[styles.dayNumKicker, { color: colors.textMuted }]}>
-                    {t('navratri.dayShortLabel')}
+                    {tForLang('navratri.dayShortLabel')}
                   </Text>
                   <Text variant="display-italic" style={[styles.dayNum, { color: colors.textPrimary }]}>
                     {String(entry.day)}
@@ -154,7 +152,7 @@ export default function ScriptureDetailScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="body" style={[styles.dayMapChapters, { color: colors.textPrimary }]}>
-                    {t('scripture.chaptersN', {
+                    {tForLang('scripture.chaptersN', {
                       count: entry.chapters.length,
                       list: entry.chapters.join(', '),
                     })}
@@ -170,7 +168,7 @@ export default function ScriptureDetailScreen() {
           {/* ── Chapter outline (13 chapters) ───────────────────────────── */}
           <View style={[styles.section, { marginTop: 8 }]}>
             <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
-              {t('scripture.chaptersLabel')}
+              {tForLang('scripture.chaptersLabel')}
             </Kicker>
             {chapters.map(ch => (
               <View
@@ -179,7 +177,7 @@ export default function ScriptureDetailScreen() {
                 <View style={styles.chapterHead}>
                   <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider}
                     wrapperStyle={styles.chapterKickerWrap}>
-                    {t('scripture.chapterKicker', { num: ch.number })}
+                    {tForLang('scripture.chapterKicker', { num: ch.number })}
                   </Kicker>
                 </View>
                 <Text variant="deva-bold" style={[styles.chapterSanskrit, { color: colors.textPrimary }]}>
@@ -197,7 +195,7 @@ export default function ScriptureDetailScreen() {
 
           {/* ── Sources / disclaimer ──────────────────────────────────────── */}
           <View style={styles.sourcesBlock}>
-            <Kicker color={colors.textMuted} size={9}>{t('navratri.sourcesLabel')}</Kicker>
+            <Kicker color={colors.textMuted} size={9}>{tForLang('navratri.sourcesLabel')}</Kicker>
             <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
               {NAVRATRI_SOURCES[lang]}
             </Text>
@@ -207,26 +205,6 @@ export default function ScriptureDetailScreen() {
         </ScrollView>
       </SafeAreaView>
     </ScreenMount>
-  );
-}
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function LangChip({ label, active, onPress, colors }: { label: string; active: boolean; onPress: () => void; colors: ColorPalette }) {
-  return (
-    <SegmentedChip
-      active={active}
-      onPress={onPress}
-      inactiveBg="transparent"
-      activeBg={palette.ink}
-      style={styles.langChip}
-      accessibilityLabel={label}>
-      <Text
-        variant="mono-caps"
-        style={[styles.langChipText, { color: active ? palette.parchmentBright : colors.textTertiary }]}>
-        {label}
-      </Text>
-    </SegmentedChip>
   );
 }
 
@@ -261,24 +239,6 @@ const styles = StyleSheet.create({
   heroTitle: { lineHeight: 32, letterSpacing: 2.8, textAlign: 'center', paddingHorizontal: 12 },
   heroSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 8, textAlign: 'center' },
   heroRule: { marginTop: 16, width: '60%' },
-
-  // Lang toggle
-  langToggleBar: { alignItems: 'center', paddingBottom: 22 },
-  langToggle: {
-    flexDirection: 'row',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 3,
-    gap: 2,
-  },
-  langChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 7,
-    borderRadius: 17,
-    minWidth: 96,
-    alignItems: 'center',
-  },
-  langChipText: { fontSize: 9.5 },
 
   // About block
   aboutCard: {

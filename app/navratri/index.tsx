@@ -9,9 +9,11 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
+import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
+import i18n, { resolveLanguage } from '@/i18n';
 
 import {
   GUPT_NAVRATRI_INFO,
@@ -32,7 +34,7 @@ import {
   type NavratriWindow,
 } from '@/services/astrology/navratri';
 
-type Lang = 'en' | 'hi';
+type Lang = ContentLang;
 
 function startJaap(form: NavadurgaForm) {
   router.push({
@@ -47,8 +49,7 @@ function pickInitialDay(window: NavratriWindow | null): 1|2|3|4|5|6|7|8|9 {
 }
 
 export default function NavratriGuideScreen() {
-  const { t, i18n } = useTranslation();
-  const lang: Lang = i18n.language === 'hi' ? 'hi' : 'en';
+  const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
   const ornamentTone = isDarkMode ? 'dark' : 'light';
@@ -56,6 +57,13 @@ export default function NavratriGuideScreen() {
   const userLocation = useStore(s => s.userLocation);
   const masaSystem = useStore(s => s.masaSystem);
   const ayanamsa = useStore(s => s.ayanamsa);
+  const appLanguage = useStore(s => s.language);
+
+  // In-screen content-language toggle, seeded from the app-wide preference —
+  // same pattern as aarti/chalisa. `tForLang` flips chrome with the user's
+  // toggle (section labels, day pickers, button text).
+  const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
   // Sharad is the primary; we reuse the same surface for Chaitra. A small
   // toggle at the top lets the user flip; default is the upcoming Sharad.
@@ -92,7 +100,7 @@ export default function NavratriGuideScreen() {
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            {t('navratri.title')}
+            {tForLang('navratri.title')}
           </Text>
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
@@ -100,6 +108,9 @@ export default function NavratriGuideScreen() {
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}>
+
+          {/* ── Lang toggle (same pattern as aarti/chalisa) ─────────────── */}
+          <LangToggle lang={lang} onChange={setLang} colors={colors} style={styles.langTogglePad} />
 
           {/* ── Kind toggle (Sharad / Chaitra / Gupt info) ───────────────── */}
           <View style={styles.kindToggleRow}>
@@ -146,7 +157,7 @@ export default function NavratriGuideScreen() {
 
           {/* ── Gupt: info card only (no 9-day guide) ─────────────────────── */}
           {isGupt && (
-            <GuptInfoCard lang={lang} colors={colors} t={t} />
+            <GuptInfoCard lang={lang} colors={colors} t={tForLang} />
           )}
 
           {/* ── Full guide (Sharad / Chaitra) ─────────────────────────────── */}
@@ -158,6 +169,7 @@ export default function NavratriGuideScreen() {
                 onSelect={setSelectedDay}
                 colors={colors}
                 isDarkMode={isDarkMode}
+                t={tForLang}
               />
 
               <DayCard
@@ -171,17 +183,17 @@ export default function NavratriGuideScreen() {
                 lang={lang}
                 colors={colors}
                 isDarkMode={isDarkMode}
-                t={t}
+                t={tForLang}
               />
 
               {/* ── Vrat + Saptashati cross-links ──────────────────────── */}
-              <CrossLinksCard lang={lang} colors={colors} t={t} />
+              <CrossLinksCard lang={lang} colors={colors} t={tForLang} />
             </>
           )}
 
           {/* ── Sources / disclaimer ────────────────────────────────────── */}
           <View style={styles.sourcesBlock}>
-            <Kicker color={colors.textMuted} size={9}>{t('navratri.sourcesLabel')}</Kicker>
+            <Kicker color={colors.textMuted} size={9}>{tForLang('navratri.sourcesLabel')}</Kicker>
             <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
               {NAVRATRI_SOURCES[lang]}
             </Text>
@@ -202,10 +214,11 @@ interface DayPickerProps {
   onSelect: (d: 1|2|3|4|5|6|7|8|9) => void;
   colors: ColorPalette;
   isDarkMode: boolean;
+  /** Localised translator — passed from the parent so labels follow the in-screen lang toggle. */
+  t: (key: string, opts?: Record<string, unknown>) => string;
 }
 
-function DayPicker({ window: navWindow, selectedDay, onSelect, colors, isDarkMode }: DayPickerProps) {
-  const { t } = useTranslation();
+function DayPicker({ window: navWindow, selectedDay, onSelect, colors, isDarkMode, t }: DayPickerProps) {
   return (
     <View style={styles.dayPicker}>
       {navWindow.days.map((d) => {
@@ -398,6 +411,19 @@ function DayCard({
               </Text>
             </View>
           )}
+          {/* Link into the Ghatasthapana puja vidhi (P14.2). */}
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: 'navratri-ghatasthapana' } })}
+            activeOpacity={0.85}
+            style={[styles.ghatasthapanaPujaCta, { borderColor: colors.borderAccent }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('navratri.openGhatasthapanaPuja')}>
+            <Icon name="gift" size={13} color={colors.accent} />
+            <Text variant="mono-caps" style={[styles.ghatasthapanaPujaCtaText, { color: colors.accent }]}>
+              {t('navratri.openGhatasthapanaPuja')}
+            </Text>
+            <Icon name="chevron-right" size={13} color={colors.accent} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -539,6 +565,9 @@ const styles = StyleSheet.create({
 
   scroll: { paddingTop: 16, paddingBottom: 24 },
 
+  // Lang toggle (English ↔ हिन्दी) — tighten the default 22 px gap a little.
+  langTogglePad: { paddingBottom: 10 },
+
   // Kind toggle (Sharad / Chaitra / Gupt …)
   kindToggleRow: { flexDirection: 'row', gap: 5, marginBottom: 16, flexWrap: 'wrap' },
   kindChip: {
@@ -636,6 +665,19 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   warningText: { flex: 1, fontSize: 12.5, lineHeight: 18 },
+
+  // P14.2 — Ghatasthapana puja vidhi CTA on the Day-1 muhurat card
+  ghatasthapanaPujaCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.button,
+    borderWidth: 1,
+  },
+  ghatasthapanaPujaCtaText: { flex: 1, fontSize: 9.5, letterSpacing: 1.4 },
 
   // Saptashati cross-card
   saptashatiCard: {

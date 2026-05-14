@@ -1083,6 +1083,7 @@ export default {
     mantraLabel: 'Mantra for the day',
     mantraReviewNote: 'Transliteration is under scholarly review — treat as provisional.',
     variantNotesLabel: 'Regional & traditional variants',
+    linkedPujaLabel: 'Linked puja vidhi',
     sourcesLabel: 'About this',
     // Kundli remedy nudges (Dignity / Dosha / Sade Sati / Dasha cards)
     nudgeWeakChandra: 'Born with a weak (debilitated) Moon? Monday is traditionally for Shiva worship — see the Monday Vaar Devata.',
@@ -1159,6 +1160,8 @@ export default {
     a11yStartJaap: 'Start a jaap of this mantra',
     a11yOpenVrat: 'Open the Navratri vrat guide',
     a11yOpenSaptashati: 'Open the Durga Saptashati outline',
+    // P14.2 cross-link: Ghatasthapana puja vidhi
+    openGhatasthapanaPuja: 'Open the Ghatasthapana puja vidhi',
   },
 
   // ── Scripture reader (P14.3) ────────────────────────────────────────────
@@ -1178,7 +1181,7 @@ export default {
   practice: {
     title: 'Pujas',
     eyebrow: 'PUJA · SADHANA',
-    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide and the Vaar Devata. Detailed household pujas (Satyanarayan, Lakshmi, Ganesh, and more) coming soon; festival-specific vrats (Ekadashi, Karva Chauth, Maha Shivaratri, …) are tracked on the Festivals tab today.',
+    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide, the Vaar Devata, and seven Featured Pujas with samagri checklists and step-by-step upacharas. Festival-specific vrats (Ekadashi, Karva Chauth, Maha Shivaratri, …) are tracked on the Festivals tab.',
     comingSoon: 'COMING SOON',
     navratri: {
       title: 'Navratri 9-day guide',
@@ -1191,8 +1194,41 @@ export default {
     },
     pujaVidhi: {
       title: 'Puja Vidhi',
-      subtitle: 'Step-by-step household pujas — Satyanarayan, Ganesh, Lakshmi, and more.',
+      subtitle: 'Step-by-step household pujas — Satyanarayan, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha, Ghatasthapana.',
     },
+  },
+
+  // ── Puja Vidhi (P14.2) ──────────────────────────────────────────────────
+  puja: {
+    // Index screen
+    indexTitle: 'Puja Vidhi',
+    indexEyebrow: 'FEATURED PUJAS',
+    indexIntro: 'Seven of the most-performed household pujas, each on the classical Shodashopachara template — when and why, an interactive samagri checklist, numbered steps, and deep links to the aarti, chalisa, jaap, and the matching festival or muhurat.',
+    notFound: 'This puja is not available.',
+    // Detail-screen section labels
+    whenWhyLabel: 'When & why',
+    samagriLabel: 'Samagri · supplies',
+    samagriHint: 'Tap items as you gather them — your checks reset when you leave the page.',
+    sankalpaLabel: 'Sankalpa · dedication',
+    sankalpaHint: "Recite mentally; substitute your gotra, name, place, and intention where shown in brackets.",
+    preArcLabel: 'Opening steps',
+    shodashopacharaLabel: 'The sixteen upacharas',
+    shodashopacharaHint: 'The classical Shodashopachara sequence, parameterised for this puja.',
+    postArcLabel: 'Closing steps',
+    afterTheLabel: 'After the puja',
+    variantsLabel: 'Regional & traditional variants',
+    sourcesLabel: 'About this',
+    // Banners + buttons
+    reviewBanner: "Mantras are under scholarly review — treat as provisional. Regional and family variations exist; a pandit's guidance supersedes this app for any major ceremony.",
+    startJaap: 'Start Jaap',
+    openAarti: 'Open the aarti',
+    openChalisa: 'Open the chalisa',
+    // Cross-link CTAs (used by Library / Festivals / Vaar / Navratri)
+    openPujaCta: 'Open the Puja',
+    openNamedPuja: 'OPEN {{name}}',
+    openDeityPuja: 'Open the {{name}}',
+    // Accessibility
+    a11yStartJaap: 'Start a jaap of this mantra',
   },
   share: {
     // Sheet chrome

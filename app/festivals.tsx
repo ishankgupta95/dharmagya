@@ -22,6 +22,7 @@ import festivalsData from '@/data/static/festivals.json';
 import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
 import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
 import { useShareSheet } from '@/store/useShareSheet';
+import { getPujaForFestivalName } from '@/config/pujas';
 import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
@@ -496,6 +497,8 @@ function FestivalRowImpl({
           ) {
             secondary = localizeFestivalDescription(f.description, i18n.language);
           }
+          const matchedPuja = getPujaForFestivalName(f.name, f.description);
+          const pujaLang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
           return (
             <View key={i} style={styles.festivalItem}>
               <View style={{ marginTop: 3 }}>
@@ -509,6 +512,20 @@ function FestivalRowImpl({
                   <Text variant="body-italic" style={[styles.festivalSecondary, { color: colors.textMuted }]}>
                     {secondary}
                   </Text>
+                )}
+                {matchedPuja && (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: matchedPuja.slug } })}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    style={styles.pujaCtaRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('puja.openNamedPuja', { name: matchedPuja.name[pujaLang] })}>
+                    <Icon name="gift" size={11} color={colors.accent} />
+                    <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
+                      {t('puja.openNamedPuja', { name: matchedPuja.name[pujaLang] })}
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </View>
               {f.type === 'major' && (
@@ -608,6 +625,8 @@ const styles = StyleSheet.create({
   festivalItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   festivalName: { fontSize: 14, lineHeight: 19 },
   festivalSecondary: { fontSize: 11, lineHeight: 15, marginTop: 1 },
+  pujaCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  pujaCtaText: { fontSize: 8.5, letterSpacing: 1.4, flexShrink: 1 },
 
   soonBadge: {
     alignSelf: 'flex-start',
