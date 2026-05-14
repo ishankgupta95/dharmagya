@@ -9,6 +9,15 @@ import type {
 import festivalsData from '@/data/static/festivals.json';
 import { applyQuietHoursShift } from '@/utils/format';
 import type { QuietHours } from './notifications';
+import {
+  computeGhatasthapanaMuhurat,
+  formatMuhuratRange,
+  nextNavratri,
+  navratriDayYmd,
+  type NavratriDay,
+  type NavratriWindow,
+} from './astrology/navratri';
+import { NAVADURGA_FORMS } from '@/config/navratri';
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
@@ -27,8 +36,11 @@ if (!isExpoGo) {
 
 const TITHI_PREFIX = 'dharmagya-tithi-';
 const FESTIVAL_PREFIX = 'dharmagya-festival-';
+const NAVRATRI_PREFIX = 'dharmagya-navratri-';
 /** Look this many days ahead when scheduling. */
 const HORIZON_DAYS = 30;
+/** HH:mm — when each Navratri day's morning push fires. Same time every day. */
+const NAVRATRI_MORNING_TIME = '08:00';
 /** Default tithi reminder time on the evening BEFORE the observance. */
 const DEFAULT_TITHI_TIME = '19:00';
 /** Default festival reminder time on the evening BEFORE. */
@@ -206,12 +218,117 @@ export function enumerateReminders(
   return [...byKey.values()];
 }
 
+// ─── Navratri 9-day notification sequence ────────────────────────────────────
+//
+// One morning push per day during Sharad Navratri, plus Vijayadashami (Day 10).
+// Each day's body references the Navadurga form, the day's bhog, and (on Day 1)
+// the computed Ghatasthapana muhurat. Gated by `prefs.festival.major` — we
+// don't add a new pref key because Navratri is *the* canonical major festival
+// and a separate toggle would just complicate the settings screen.
+//
+// We pre-render the body text at schedule time (rather than scheduling a
+// recurring trigger) because each day has different content. Cancel-and-
+// reschedule on every settings change is safe — each entry has a deterministic
+// id, so re-scheduling is idempotent.
+
+export function enumerateNavratriReminders(
+  prefs: ReminderPrefs,
+  now: Date = new Date(),
+  horizonDays: number = HORIZON_DAYS,
+  coords?: { lat: number; lon: number } | null,
+  ayanamsa?: import('panchang-ts').AyanamsaType,
+  masaSystem?: import('panchang-ts').MasaSystem,
+): ScheduledReminder[] {
+  if (!prefs.festival.major) return [];
+
+  const window: NavratriWindow | null = nextNavratri('sharad', now, {
+    coords: coords ?? undefined,
+    ayanamsa,
+    masaSystem,
+  });
+  if (!window) return [];
+
+  const { hour, minute } = parseHHmm(NAVRATRI_MORNING_TIME, 8);
+  const out: ScheduledReminder[] = [];
+  const nowMs = now.getTime();
+  const cutoffMs = nowMs + horizonDays * 24 * 60 * 60 * 1000;
+
+  // 9 morning pushes (Day 1..9) + Day 10 Vijayadashami.
+  const days: { day: number; date: Date; entry: NavratriDay | null }[] = [
+    ...window.days.map(d => ({ day: d.day as number, date: d.date, entry: d })),
+    { day: 10, date: window.vijayadashami, entry: null },
+  ];
+
+  for (const slot of days) {
+    const fireAt = new Date(slot.date);
+    fireAt.setHours(hour, minute, 0, 0);
+    if (fireAt.getTime() < nowMs || fireAt.getTime() > cutoffMs) continue;
+
+    const id = `${NAVRATRI_PREFIX}d${slot.day}-${navratriDayYmd(slot.date)}`;
+
+    if (slot.day === 10) {
+      out.push({
+        id,
+        fireAt,
+        title: i18n.t('navratri.notif.day10Title'),
+        body: i18n.t('navratri.notif.day10Body'),
+      });
+      continue;
+    }
+
+    const entry = slot.entry!;
+    const form = NAVADURGA_FORMS[slot.day - 1];
+    const lang = i18n.language === 'hi' ? 'hi' : 'en';
+
+    let body: string;
+    if (slot.day === 1) {
+      // Day 1 includes Ghatasthapana muhurat in the body.
+      const gm = computeGhatasthapanaMuhurat(slot.date, {
+        coords: coords ?? undefined,
+        ayanamsa,
+        masaSystem,
+      });
+      const muhuratStr = gm ? formatMuhuratRange(gm.start, gm.end) : '';
+      body = i18n.t('navratri.notif.day1Body', {
+        form: form.name[lang],
+        muhurat: muhuratStr,
+      });
+    } else if (slot.day === 8 || slot.day === 9) {
+      // Days 8 & 9 add the Kanya Pujan reminder line.
+      body = i18n.t('navratri.notif.dayKanyaBody', {
+        form: form.name[lang],
+        color: entry.color.name[lang],
+        bhog: form.bhog[lang],
+      });
+    } else {
+      body = i18n.t('navratri.notif.dayBody', {
+        form: form.name[lang],
+        color: entry.color.name[lang],
+        bhog: form.bhog[lang],
+      });
+    }
+
+    out.push({
+      id,
+      fireAt,
+      title: i18n.t('navratri.notif.dayTitle', { day: slot.day, form: form.name[lang] }),
+      body,
+    });
+  }
+  return out;
+}
+
 // ─── Scheduling side effects ──────────────────────────────────────────────────
 
 export async function rescheduleReminders(
   prefs: ReminderPrefs,
   times: ReminderTimes = {},
   quietHours?: QuietHours,
+  navratriCtx?: {
+    coords?: { lat: number; lon: number } | null;
+    ayanamsa?: import('panchang-ts').AyanamsaType;
+    masaSystem?: import('panchang-ts').MasaSystem;
+  },
 ): Promise<void> {
   if (!Notifications) return;
   const granted = await requestReminderPermission();
@@ -220,12 +337,26 @@ export async function rescheduleReminders(
   // Clear anything we own in the reminder namespaces.
   const existing = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
   for (const n of existing) {
-    if (n.identifier.startsWith(TITHI_PREFIX) || n.identifier.startsWith(FESTIVAL_PREFIX)) {
+    if (
+      n.identifier.startsWith(TITHI_PREFIX) ||
+      n.identifier.startsWith(FESTIVAL_PREFIX) ||
+      n.identifier.startsWith(NAVRATRI_PREFIX)
+    ) {
       await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
     }
   }
 
-  const desired = enumerateReminders(prefs, new Date(), HORIZON_DAYS, times);
+  const desired = [
+    ...enumerateReminders(prefs, new Date(), HORIZON_DAYS, times),
+    ...enumerateNavratriReminders(
+      prefs,
+      new Date(),
+      HORIZON_DAYS,
+      navratriCtx?.coords,
+      navratriCtx?.ayanamsa,
+      navratriCtx?.masaSystem,
+    ),
+  ];
   for (const r of desired) {
     const fireAt = quietHours?.enabled
       ? applyQuietHoursShift(r.fireAt, {
@@ -249,7 +380,11 @@ export async function cancelAllReminders(): Promise<void> {
   if (!Notifications) return;
   const existing = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
   for (const n of existing) {
-    if (n.identifier.startsWith(TITHI_PREFIX) || n.identifier.startsWith(FESTIVAL_PREFIX)) {
+    if (
+      n.identifier.startsWith(TITHI_PREFIX) ||
+      n.identifier.startsWith(FESTIVAL_PREFIX) ||
+      n.identifier.startsWith(NAVRATRI_PREFIX)
+    ) {
       await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
     }
   }

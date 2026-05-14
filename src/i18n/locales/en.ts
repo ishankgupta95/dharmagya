@@ -49,7 +49,13 @@ export default {
     home: 'Home',
     panchang: 'Panchang',
     gods: 'Gods',
-    astrology: 'Astrology',
+    // "Jyotish" (Sanskrit jyotiṣa) is the canonical name for Vedic astrology
+    // and matches the existing Hindi label; keeps the bar from ellipsising on
+    // 6-tab edge-to-edge layouts. The in-screen title (`astrology.title`)
+    // still reads "Astrology" so the meaning is unambiguous on entry.
+    astrology: 'Jyotish',
+    pujas: 'Pujas',
+    settings: 'Settings',
   },
 
   // ── Home Screen ─────────────────────────────────────────────────────────
@@ -1088,6 +1094,105 @@ export default {
     a11yStartJaap: 'Start a jaap of this mantra',
     a11yBrowseDay: '{{day}} — Vaar Devata',
     a11yRemedyNudgeHint: 'Opens the related Vaar Devata page',
+  },
+
+  // ── Navratri / Navadurga 9-day guide (P14.3) ────────────────────────────
+  navratri: {
+    title: 'Navratri',
+    sharadName: 'Sharad Navratri',
+    dayShortLabel: 'DAY',
+    // Index screen
+    dayKicker: 'DAY {{day}} · {{name}}',
+    colorLabel: "Today's colour",
+    colorComputedNote: 'Anchored to {{weekday}} — colours follow the weekday, not the goddess.',
+    iconographyLabel: 'Iconography',
+    significanceLabel: 'Significance',
+    mantraLabel: 'Mantra for the day',
+    mantraReviewNote: 'Transliteration is under scholarly review — treat as provisional.',
+    startJaap: 'Start Jaap',
+    dhyanaLabel: 'Dhyana shloka',
+    bhogLabel: 'Bhog / prasad',
+    chakraLabel: 'Chakra',
+    ghatasthapanaLabel: 'Ghatasthapana muhurat',
+    ghatasthapanaWindowNote: 'Computed for your location — the first one-third of the day while Pratipada prevails.',
+    ghatasthapanaAbhijitFallback: 'Pratipada ends before sunrise — use the Abhijit muhurta window instead.',
+    warnChitra: 'Chitra nakshatra is active — classically advised against, not prohibited.',
+    warnVaidhriti: 'Vaidhriti yoga is active — classically advised against, not prohibited.',
+    kanyaPujanKicker: 'KANYA PUJAN',
+    kanyaPujanText: 'Ashtami or Navami is the day for Kanya Pujan / Kanjak — nine girls aged 2–10 (optionally one boy as Bhairav); wash their feet, tilak, offer halwa-puri-chana, and gift clothes or money. Both Ashtami and Navami are valid; Ashtami is more common in North India.',
+    day9HavanText: 'Navami closes the navratri with a havan and purna ahuti. Many households also keep Kanya Pujan on this day — nine girls aged 2–10, halwa-puri-chana, and a gift.',
+    vijayadashamiLabel: 'Vijayadashami / Dussehra',
+    vijayadashamiText: 'Day 10 — {{date}} — is Vijayadashami / Dussehra. Durga visarjan and, in many traditions, Ravan Dahan and Shami Pujan.',
+    saptashatiTodayLabel: "Today's Saptashati pāṭha",
+    saptashatiChapters_one: 'Chapter {{list}}',
+    saptashatiChapters_other: 'Chapters {{list}}',
+    saptashatiOpenCta: 'Open the Saptashati outline',
+    vratCta: 'Vrat & food rules',
+    saptashatiCta: 'Durga Saptashati',
+    guptKicker: 'GUPT NAVRATRI',
+    // Vrat screen
+    vratTitle: 'Navratri Vrat',
+    vratEyebrow: 'NINE-DAY OBSERVANCE',
+    vratIntro: 'Navratri vrat varies by intensity — pick the tier that suits your day and your health. Sendha namak (rock salt) is the rule; regular iodised salt is not.',
+    vratTiersLabel: 'Tiers of practice',
+    allowedLabel: 'Allowed',
+    forbiddenLabel: 'Forbidden',
+    sourcesLabel: 'About this',
+    // Festivals-screen header card
+    headerKickerUpcoming: 'UPCOMING · 9-DAY GUIDE',
+    headerKickerActive: 'DAY {{day}} OF 9 · IN PROGRESS',
+    headerGhatasthapanaLine: 'Ghatasthapana · {{range}}',
+    headerAbhijitLine: 'Abhijit muhurta · {{range}}',
+    // Daily push notifications
+    notif: {
+      dayTitle: 'Day {{day}} · {{form}}',
+      day1Body: "Ghatasthapana is the morning's main rite — auspicious window {{muhurat}}. Today is {{form}}'s day.",
+      dayBody: "Today's colour is {{color}}; offer {{bhog}} to {{form}}.",
+      dayKanyaBody: "Today is for {{form}} — colour {{color}}, bhog {{bhog}}. Kanya Pujan is kept on Ashtami or Navami.",
+      day10Title: 'Vijayadashami · Dussehra',
+      day10Body: 'Durga visarjan today. Ravan Dahan and Shami Pujan in many traditions.',
+    },
+    // Accessibility
+    a11yOpenGuide: 'Open the Navratri 9-day guide',
+    a11ySwitchKind: 'Switch to {{name}}',
+    a11yPickDay: 'Day {{day}}',
+    a11yStartJaap: 'Start a jaap of this mantra',
+    a11yOpenVrat: 'Open the Navratri vrat guide',
+    a11yOpenSaptashati: 'Open the Durga Saptashati outline',
+  },
+
+  // ── Scripture reader (P14.3) ────────────────────────────────────────────
+  scripture: {
+    notFound: 'Scripture not available.',
+    kickerSaptashati: 'DURGĀ MĀHĀTMYA',
+    aboutLabel: 'About this text',
+    reviewNote: 'Full verse-by-verse text is under scholarly review and not shipped in this version. The chapter outline + the 9-day pāṭha map are surfaced here as the practice scaffold.',
+    dayMapLabel: '9-day pāṭha schedule',
+    chaptersLabel: 'The thirteen chapters',
+    chapterKicker: 'CHAPTER {{num}}',
+    chaptersN_one: 'Chapter {{list}}',
+    chaptersN_other: 'Chapters {{list}}',
+  },
+
+  // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
+  practice: {
+    title: 'Pujas',
+    eyebrow: 'PUJA · SADHANA',
+    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide and the Vaar Devata. Detailed household pujas (Satyanarayan, Lakshmi, Ganesh, and more) coming soon; festival-specific vrats (Ekadashi, Karva Chauth, Maha Shivaratri, …) are tracked on the Festivals tab today.',
+    comingSoon: 'COMING SOON',
+    navratri: {
+      title: 'Navratri 9-day guide',
+      defaultSubtitle: 'Sharad Navratri · per-day form, mantra, bhog, vrat rules, and the Durga Saptashati',
+      activeSubtitle: 'In progress · Day {{day}} of 9',
+    },
+    vaar: {
+      title: 'Vaar Devata',
+      subtitle: '{{day}} — {{deities}}',
+    },
+    pujaVidhi: {
+      title: 'Puja Vidhi',
+      subtitle: 'Step-by-step household pujas — Satyanarayan, Ganesh, Lakshmi, and more.',
+    },
   },
   share: {
     // Sheet chrome

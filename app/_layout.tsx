@@ -59,6 +59,9 @@ export default function RootLayout() {
     sadhana,
     sadhanaReminderEnabled,
     sadhanaReminderTime,
+    userLocation,
+    ayanamsa,
+    masaSystem,
   } = useStore();
   const systemScheme = useColorScheme();
   // Resolve themeMode + system scheme into isDarkMode. useColorScheme already
@@ -178,6 +181,7 @@ export default function RootLayout() {
             reminderPrefs,
             { tithi: tithiReminderTime, festival: festivalReminderTime },
             quietHours,
+            { coords: userLocation, ayanamsa, masaSystem },
           );
         }
         // Roll the sadhana at-risk horizon forward (P14.4). Idempotent;
@@ -196,7 +200,7 @@ export default function RootLayout() {
       }
     });
     return () => sub.remove();
-  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime, userLocation, ayanamsa, masaSystem]);
 
   // Roll reminder horizons once on each cold start too.
   useEffect(() => {
@@ -207,6 +211,7 @@ export default function RootLayout() {
         reminderPrefs,
         { tithi: tithiReminderTime, festival: festivalReminderTime },
         quietHours,
+        { coords: userLocation, ayanamsa, masaSystem },
       );
     }
     if (sadhanaReminderEnabled) {
@@ -217,7 +222,7 @@ export default function RootLayout() {
         quietHours: quietHoursEnabled ? quietHours : undefined,
       });
     }
-  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime, userLocation, ayanamsa, masaSystem]);
 
   if (!appReady) return null;
 

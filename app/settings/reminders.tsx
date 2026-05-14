@@ -96,6 +96,12 @@ export default function RemindersScreen() {
     setSadhanaReminderEnabled(val);
   }
 
+  // Navratri context — `prefs.festival.major` triggers the 9-day Navratri
+  // sequence, which needs panchang-compute inputs.
+  const userLocation = useStore(s => s.userLocation);
+  const ayanamsa = useStore(s => s.ayanamsa);
+  const masaSystem = useStore(s => s.masaSystem);
+
   // Debounce: reschedule after the user stops tapping toggles or changing
   // times for 300ms.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,7 +109,12 @@ export default function RemindersScreen() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (hasAnyReminderEnabled(prefs)) {
-        void rescheduleReminders(prefs, { tithi: tithiReminderTime, festival: festivalReminderTime });
+        void rescheduleReminders(
+          prefs,
+          { tithi: tithiReminderTime, festival: festivalReminderTime },
+          undefined,
+          { coords: userLocation, ayanamsa, masaSystem },
+        );
       } else {
         void cancelAllReminders();
       }
@@ -111,7 +122,7 @@ export default function RemindersScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [prefs, tithiReminderTime, festivalReminderTime]);
+  }, [prefs, tithiReminderTime, festivalReminderTime, userLocation, ayanamsa, masaSystem]);
 
   async function handleTithiToggle(key: TithiReminderKey, val: boolean) {
     if (val && !hasAnyReminderEnabled(prefs)) {
