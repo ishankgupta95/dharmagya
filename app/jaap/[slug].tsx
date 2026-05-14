@@ -36,6 +36,7 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { resolveLanguage } from '@/i18n';
+import { useShareSheet } from '@/store/useShareSheet';
 import {
   CUSTOM_MANTRA_SLUG,
   insertJaapSession,
@@ -137,6 +138,7 @@ export default function JaapCounterScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
   const lang: ContentLang = resolveLanguage(appLanguage);
   const db = useSQLiteContext();
+  const openShare = useShareSheet(s => s.open);
 
   const resolved = useMemo<ResolvedMantra | null>(() => {
     if (slug === CUSTOM_MANTRA_SLUG) {
@@ -146,6 +148,10 @@ export default function JaapCounterScreen() {
     const m = getMantraBySlug(slug);
     return m ? buildResolved(m, lang, t) : null;
   }, [slug, customText, lang, t]);
+  const mantraDeity = useMemo(
+    () => (slug === CUSTOM_MANTRA_SLUG ? undefined : getMantraBySlug(slug)?.deity),
+    [slug],
+  );
 
   // Adaptive type scale — Gayatri is 4 lines, Mahamrityunjaya is 2, most are
   // 1. The mantra is the focal element so short mantras get a generous size;
@@ -619,6 +625,25 @@ export default function JaapCounterScreen() {
                 <Text variant="mono-caps" style={[styles.actionBtnText, { color: colors.textSecondary }]}>
                   {t('jaap.reset')}
                 </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => openShare({
+                  kind: 'jaap-completion',
+                  count: totalCount,
+                  mantraHi: resolved.bodyDevanagari,
+                  mantraTranslit: resolved.bodyIast,
+                  mantraTitleEn: resolved.titleEn,
+                  deityId: mantraDeity,
+                })}
+                disabled={!hasCounted}
+                style={[
+                  styles.actionBtn,
+                  { borderColor: hasCounted ? colors.borderAccent : colors.border, opacity: hasCounted ? 1 : 0.4 },
+                ]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('share.a11yShare')}>
+                <Icon name="share" size={13} color={hasCounted ? colors.accent : colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>

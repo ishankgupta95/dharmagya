@@ -1054,4 +1054,61 @@ export default {
     deityChip: 'For {{name}}',
     homeBody: 'Begin a mantra jaap',
   },
+
+  vaar: {
+    // Home "Today's Deities" card
+    todaysDeityKicker: "TODAY'S DEITIES",
+    rulingGraha: 'Ruled by {{graha}}',
+    dayColorLabel: "Day's colour",
+    ishtDevataInFocus: 'Your Isht Devata is in focus today',
+    startJaap: 'Start Jaap',
+    // Detail screen
+    detailTitle: "{{day}}'s Deities",
+    deitiesSectionLabel: 'Deities of the day',
+    openInLibrary: 'Open {{name}} in the Library',
+    offeringsLabel: 'Offerings & bhog',
+    fastingLabel: 'Fasting & vrat',
+    mantraLabel: 'Mantra for the day',
+    mantraReviewNote: 'Transliteration is under scholarly review — treat as provisional.',
+    variantNotesLabel: 'Regional & traditional variants',
+    sourcesLabel: 'About this',
+    // Kundli remedy nudges (Dignity / Dosha / Sade Sati / Dasha cards)
+    nudgeWeakChandra: 'Born with a weak (debilitated) Moon? Monday is traditionally for Shiva worship — see the Monday Vaar Devata.',
+    nudgeMangal: 'Facing Mangal Dosha? Tuesday is traditionally for Hanuman worship — see the Tuesday Vaar Devata.',
+    nudgeSadeSati: 'During Sade Sati, Saturday worship of Shani Dev (with Hanuman) is the classical observance.',
+    nudgeDashaLord: 'You are in {{planet}} mahādaśā — {{day}} is its weekday. See its Vaar Devata.',
+    // Accessibility
+    a11yTodaysDeities: "Today's deities: {{names}}, ruled by {{graha}}. Open for details.",
+    a11yStartJaap: 'Start a jaap of this mantra',
+    a11yBrowseDay: '{{day}} — Vaar Devata',
+    a11yRemedyNudgeHint: 'Opens the related Vaar Devata page',
+  },
+  share: {
+    // Sheet chrome
+    title: 'Share a card',
+    shareBtn: 'Share',
+    saveBtn: 'Save',
+    shapeStory: 'Story · 9:16',
+    shapeSquare: 'Square · 1:1',
+    statusHint: 'For WhatsApp Status, open the share sheet, pick WhatsApp, then tap "My status".',
+    savedToast: 'Saved to your gallery.',
+    permissionDenied: 'Gallery access was denied.',
+    error: "Couldn't create the card. Please try again.",
+    // Card kickers (the small label on the card)
+    kickerDeityBlessing: 'Deity Blessing',
+    kickerFestival: 'Festival Greeting',
+    kickerVerse: 'Sacred Verse',
+    kickerJaap: 'Jaap Complete',
+    jaapCountLine: '{{count}} repetitions today',
+    from: 'From {{name}}',
+    // Entry-point buttons
+    ctaGreeting: 'Share greeting',
+    ctaDeity: 'Share',
+    ctaVerse: 'Share verse',
+    ctaJaap: 'Share',
+    shareFullText: 'Share full text',
+    viaDharmagya: 'shared via dharmagya',
+    a11yShare: 'Create a shareable image',
+    a11yShareFullText: 'Share the full text via WhatsApp or another app',
+  },
 } as const;

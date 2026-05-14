@@ -1048,4 +1048,61 @@ export default {
     deityChip: '{{name}} के लिए',
     homeBody: 'मंत्र जप आरंभ करें',
   },
+
+  vaar: {
+    // होम "आज के देवता" कार्ड
+    todaysDeityKicker: 'आज के देवता',
+    rulingGraha: '{{graha}} ग्रह का वार',
+    dayColorLabel: 'दिन का रंग',
+    ishtDevataInFocus: 'आज आपके इष्ट देव का दिन है',
+    startJaap: 'जप आरंभ करें',
+    // विवरण स्क्रीन
+    detailTitle: '{{day}} के देवता',
+    deitiesSectionLabel: 'इस दिन के देवता',
+    openInLibrary: 'लाइब्रेरी में {{name}} खोलें',
+    offeringsLabel: 'अर्पण एवं भोग',
+    fastingLabel: 'व्रत एवं उपवास',
+    mantraLabel: 'इस दिन का मंत्र',
+    mantraReviewNote: 'लिप्यंतरण विद्वानों की समीक्षा में है — अभी अंतिम न मानें।',
+    variantNotesLabel: 'क्षेत्रीय एवं पारंपरिक भेद',
+    sourcesLabel: 'स्रोत',
+    // कुंडली उपाय संकेत (ग्रह-स्थिति / दोष / साढ़े साती / दशा कार्ड)
+    nudgeWeakChandra: 'कुंडली में चंद्र निर्बल (नीच) है? सोमवार पारंपरिक रूप से शिव उपासना का दिन है — सोमवार का वार देवता देखें।',
+    nudgeMangal: 'मंगल दोष है? मंगलवार पारंपरिक रूप से हनुमान पूजा का दिन है — मंगलवार का वार देवता देखें।',
+    nudgeSadeSati: 'साढ़े साती में शनिवार को शनि देव (हनुमान सहित) की उपासना शास्त्रीय उपाय है।',
+    nudgeDashaLord: 'आप {{planet}} महादशा में हैं — {{day}} इसका वार है। इसका वार देवता देखें।',
+    // सुगम्यता
+    a11yTodaysDeities: 'आज के देवता: {{names}}, {{graha}} ग्रह का वार। विवरण के लिए खोलें।',
+    a11yStartJaap: 'इस मंत्र का जप आरंभ करें',
+    a11yBrowseDay: '{{day}} — वार देवता',
+    a11yRemedyNudgeHint: 'संबंधित वार देवता पृष्ठ खोलता है',
+  },
+  share: {
+    // Sheet chrome
+    title: 'कार्ड साझा करें',
+    shareBtn: 'साझा करें',
+    saveBtn: 'सेव करें',
+    shapeStory: 'स्टोरी · 9:16',
+    shapeSquare: 'वर्ग · 1:1',
+    statusHint: 'व्हाट्सऐप स्टेटस के लिए — शेयर शीट खोलें, व्हाट्सऐप चुनें, फिर "My status" पर टैप करें।',
+    savedToast: 'आपकी गैलरी में सेव हो गया।',
+    permissionDenied: 'गैलरी की अनुमति नहीं मिली।',
+    error: 'कार्ड नहीं बन सका। कृपया फिर से प्रयास करें।',
+    // Card kickers
+    kickerDeityBlessing: 'देव आशीर्वाद',
+    kickerFestival: 'पर्व की शुभकामनाएँ',
+    kickerVerse: 'पावन पंक्ति',
+    kickerJaap: 'जाप पूर्ण',
+    jaapCountLine: 'आज {{count}} बार जप',
+    from: 'स्रोत — {{name}}',
+    // Entry-point buttons
+    ctaGreeting: 'शुभकामना साझा करें',
+    ctaDeity: 'साझा करें',
+    ctaVerse: 'पंक्ति साझा करें',
+    ctaJaap: 'साझा करें',
+    shareFullText: 'पूरा पाठ साझा करें',
+    viaDharmagya: 'dharmagya ऐप से साझा',
+    a11yShare: 'साझा करने योग्य चित्र बनाएँ',
+    a11yShareFullText: 'पूरा पाठ व्हाट्सऐप या किसी अन्य ऐप पर साझा करें',
+  },
 } as const;

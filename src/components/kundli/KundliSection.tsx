@@ -28,6 +28,7 @@ import {
   DIVISIONAL_CHARTS_BEYOND_D9,
 } from '@/services/astrology/kundliService';
 import { DoshaCard } from './DoshaCard';
+import { RemedyNudge } from './RemedyNudge';
 import { ShadbalaChart } from './ShadbalaChart';
 import { BhavaBalaChart } from './BhavaBalaChart';
 import { AspectsCard } from './AspectsCard';
@@ -457,6 +458,18 @@ export function KundliSection() {
       </SectionLabel>
       <PlanetaryDignityChart items={bundle.dignity} labelFor={dignityLabel} />
 
+      {/* Remedy nudge — a debilitated Moon in the D1 chart → the Monday (Shiva)
+          Vaar Devata, framed as "traditionally", not a fix (P14.1). */}
+      {bundle.dignity.some((d) => d.graha === 'Moon' && d.dignity === 'debilitated') && (
+        <RemedyNudge
+          text={t('vaar.nudgeWeakChandra')}
+          dayKey="monday"
+          icon="moon"
+          colors={colors}
+          style={styles.remedyNudge}
+        />
+      )}
+
       {/* ── Yogas (named classical combinations) ────────────────────────── */}
       <SectionLabel style={styles.sectionLabelSpacing}>
         {t('kundli.yogas.sectionTitle')}
@@ -821,6 +834,7 @@ function MatchOthersCard({ colors, t }: MatchOthersCardProps) {
 
 const styles = StyleSheet.create({
   sectionLabelSpacing: { marginTop: 24, marginBottom: 10 },
+  remedyNudge: { marginTop: 12 },
 
   formIntro: {
     fontSize: 13,

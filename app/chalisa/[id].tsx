@@ -21,6 +21,8 @@ import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { useEntranceStagger } from '@/hooks/useEntranceStagger';
+import { useShareSheet } from '@/store/useShareSheet';
+import { shareChalisaText } from '@/services/shareText';
 import i18n, { resolveLanguage } from '@/i18n';
 import {
   getChalisaForDeity,
@@ -96,6 +98,9 @@ export default function ChalisaDetailScreen() {
   }
 
   const sections = chalisaSections(chalisa, lang);
+  // Parallel-language couplet text for share cards (section order is stable).
+  const sectionsHi = chalisaSections(chalisa, 'hi');
+  const sectionsEn = chalisaSections(chalisa, 'en');
   const compactTitle = titleFor(chalisa, lang);
   const deityDisplay = tForLang(`deities.${chalisa.deity}.displayName`);
   const sectionLabel = tForLang('reader.chalisaLabel');
@@ -126,15 +131,25 @@ export default function ChalisaDetailScreen() {
           </Text>
         </Animated.View>
 
-        <FavoriteHeart
-          active={isFavorite}
-          onPress={() => toggleFavorite(favoriteKey)}
-          size={16}
-          inactiveColor={colors.textSecondary}
-          activeColor={colors.accent}
-          accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
-          style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        />
+        <View style={styles.navRightGroup}>
+          <TouchableOpacity
+            onPress={() => { void shareChalisaText(chalisa, lang); }}
+            style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('share.a11yShareFullText')}>
+            <Icon name="share" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <FavoriteHeart
+            active={isFavorite}
+            onPress={() => toggleFavorite(favoriteKey)}
+            size={16}
+            inactiveColor={colors.textSecondary}
+            activeColor={colors.accent}
+            accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+            style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          />
+        </View>
       </View>
 
       <Animated.ScrollView
@@ -180,6 +195,10 @@ export default function ChalisaDetailScreen() {
                     lang={lang}
                     colors={colors}
                     t={t}
+                    deityId={chalisa.deity}
+                    verseHi={sectionsHi[sectionIndex]?.verses[verseIndex] ?? verse}
+                    verseEn={sectionsEn[sectionIndex]?.verses[verseIndex]}
+                    sourceName={chalisa.titleEnglish}
                     entranceIndex={thisVisibleIndex}
                     animateEntrance={thisVisibleIndex < VERSE_STAGGER_MAX}
                   />
@@ -255,14 +274,21 @@ interface VerseBlockProps {
   lang: ContentLang;
   colors: ColorPalette;
   t: (key: string, opts?: Record<string, unknown>) => string;
+  deityId: string;
+  verseHi: string;
+  verseEn?: string;
+  sourceName: string;
   entranceIndex: number;
   animateEntrance: boolean;
 }
 
 function VerseBlock({
-  verse, number, type, lang, colors, t, entranceIndex, animateEntrance,
+  verse, number, type, lang, colors, t,
+  deityId, verseHi, verseEn, sourceName,
+  entranceIndex, animateEntrance,
 }: VerseBlockProps) {
   const staggerStyle = useEntranceStagger(entranceIndex, animateEntrance);
+  const openShare = useShareSheet(s => s.open);
   const isChaupai = type === 'chaupai';
   const lines = verse.split('\n').filter(l => l.trim().length > 0);
 
@@ -282,6 +308,17 @@ function VerseBlock({
             {line}
           </Text>
         ))}
+        <TouchableOpacity
+          onPress={() => openShare({ kind: 'verse', deityId, verseHi, verseEn, sourceLabel: t('share.from', { name: sourceName }) })}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.dohaShareBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('share.ctaVerse')}>
+          <Icon name="share" size={13} color={colors.textMuted} />
+          <Text variant="mono-caps" style={[styles.dohaShareText, { color: colors.textMuted }]}>
+            {t('share.ctaVerse')}
+          </Text>
+        </TouchableOpacity>
       </Animated.View>
     );
   }
@@ -335,6 +372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  navRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compactTitle: { flex: 1, alignItems: 'center', marginHorizontal: 12 },
   compactTitleText: {
     fontSize: 15,
@@ -408,6 +446,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 25,
   },
+  dohaShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  dohaShareText: { fontSize: 8.5 },
 
   // Chaupai
   chaupaiBlock: {

@@ -41,6 +41,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { Ornament } from '@/components/common/Ornament';
+import { TodaysDeityCard } from '@/components/common/TodaysDeityCard';
 import { HomePanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
@@ -405,6 +406,9 @@ export default function HomeScreen() {
             </SkeletonCrossfade>
           </NightCard>
         </MotionPressable>
+
+        {/* ── Today's Deity (Vaar Devata) ───────────────────────────────── */}
+        <TodaysDeityCard colors={colors} />
 
         {/* ── Your Deities strip ────────────────────────────────────────── */}
         {selectedDeityMetas.length > 0 && (

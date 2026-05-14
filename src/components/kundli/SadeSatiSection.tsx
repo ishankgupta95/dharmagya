@@ -7,6 +7,7 @@ import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
+import { RemedyNudge } from './RemedyNudge';
 import { useStore } from '@/store/useStore';
 import { borderRadius, darkColors, lightColors } from '@/config/theme';
 import { computeSadeSatiCached } from '@/services/astrology/kundliService';
@@ -172,6 +173,17 @@ export function SadeSatiSection() {
           {t('sadeSati.aboutDesc')}
         </Text>
       </View>
+
+      {/* Remedy nudge — when Sade Sati is active, point to the Saturday
+          (Shani + Hanuman) Vaar Devata as the classical observance (P14.1). */}
+      {sadeSati.active && (
+        <RemedyNudge
+          text={t('vaar.nudgeSadeSati')}
+          dayKey="saturday"
+          colors={colors}
+          style={styles.nudgeSpacing}
+        />
+      )}
     </View>
   );
 }
@@ -207,4 +219,5 @@ const styles = StyleSheet.create({
   },
   eduKicker: { fontSize: 10, marginBottom: 6 },
   eduBody: { fontSize: 13, lineHeight: 20 },
+  nudgeSpacing: { marginTop: 16 },
 });

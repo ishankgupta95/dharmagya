@@ -30,6 +30,7 @@ import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderS
 import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 import { pmark } from '@/utils/perfProfile';
+import { ShareCardHost } from '@/components/share/ShareCardHost';
 
 pmark('app:_layout:moduleEval');
 
@@ -231,6 +232,7 @@ export default function RootLayout() {
                   so a fade reads more "search dialog" than "drilldown". */}
               <Stack.Screen name="search" options={{ animation: 'fade' }} />
             </Stack>
+            <ShareCardHost />
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
           </SQLiteProvider>
         </Suspense>

@@ -21,6 +21,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import festivalsData from '@/data/static/festivals.json';
 import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
 import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
+import { useShareSheet } from '@/store/useShareSheet';
 import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
@@ -424,6 +425,7 @@ function FestivalRowImpl({
   const dayName = item.date.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNum = item.date.getDate();
   const highlighted = isToday || isSoon;
+  const openShare = useShareSheet(s => s.open);
 
   return (
     <View
@@ -509,6 +511,21 @@ function FestivalRowImpl({
                   </Text>
                 )}
               </View>
+              {f.type === 'major' && (
+                <TouchableOpacity
+                  onPress={() => openShare({
+                    kind: 'festival-greeting',
+                    festivalNameEn: localizeFestivalName(f.name, 'en'),
+                    festivalNameHi: localizeFestivalName(f.name, 'hi'),
+                    dateLabel: item.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+                  })}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginTop: 1 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('share.ctaGreeting')}>
+                  <Icon name="share" size={15} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
             </View>
           );
         })}

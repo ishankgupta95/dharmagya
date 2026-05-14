@@ -4,6 +4,7 @@ import type { KaalSarpDoshaInfo, MangalDoshaInfo, PitruDoshaInfo } from 'panchan
 
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
+import { RemedyNudge } from './RemedyNudge';
 import { borderRadius, palette, type ColorPalette } from '@/config/theme';
 
 interface DoshaCardProps {
@@ -19,42 +20,57 @@ const CANCELLED_AMBER = '#BA7E2A';
 export function DoshaCard({ mangal, kaalSarp, pitru, colors }: DoshaCardProps) {
   const { t } = useTranslation();
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <MangalRow mangal={mangal} colors={colors} />
-      <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-      <DoshaRow
-        title={
-          kaalSarp.afflicted
-            ? kaalSarp.subtype
-              ? t('kundli.kaalSarpAfflictedNamed', { subtype: capitalizeKaalSarpSubtype(kaalSarp.subtype) })
-              : t('kundli.kaalSarpAfflicted')
-            : t('kundli.kaalSarpNotAfflicted')
-        }
-        kicker={t('kundli.kaalSarpKicker')}
-        icon={kaalSarp.afflicted ? 'alert-circle' : 'check-circle'}
-        accent={kaalSarp.afflicted ? palette.sindoor : SAFE_GREEN}
-        meta={[
-          { label: t('kundli.rahuHouse'), value: String(kaalSarp.rahuHouse) },
-          { label: t('kundli.ketuHouse'), value: String(kaalSarp.ketuHouse) },
-        ]}
-        footnote={
-          kaalSarp.partial
-            ? t('kundli.kaalSarpPartialNote')
-            : null
-        }
-        colors={colors}
-      />
-      <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-      <DoshaRow
-        title={pitru.afflicted ? t('kundli.pitruAfflicted') : t('kundli.pitruNotAfflicted')}
-        kicker={t('kundli.pitruKicker')}
-        icon={pitru.afflicted ? 'alert-circle' : 'check-circle'}
-        accent={pitru.afflicted ? palette.sindoor : SAFE_GREEN}
-        meta={[]}
-        footnote={pitru.afflicted && pitru.reasons.length > 0 ? pitru.reasons.join('; ') : null}
-        colors={colors}
-      />
-    </View>
+    <>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <MangalRow mangal={mangal} colors={colors} />
+        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+        <DoshaRow
+          title={
+            kaalSarp.afflicted
+              ? kaalSarp.subtype
+                ? t('kundli.kaalSarpAfflictedNamed', { subtype: capitalizeKaalSarpSubtype(kaalSarp.subtype) })
+                : t('kundli.kaalSarpAfflicted')
+              : t('kundli.kaalSarpNotAfflicted')
+          }
+          kicker={t('kundli.kaalSarpKicker')}
+          icon={kaalSarp.afflicted ? 'alert-circle' : 'check-circle'}
+          accent={kaalSarp.afflicted ? palette.sindoor : SAFE_GREEN}
+          meta={[
+            { label: t('kundli.rahuHouse'), value: String(kaalSarp.rahuHouse) },
+            { label: t('kundli.ketuHouse'), value: String(kaalSarp.ketuHouse) },
+          ]}
+          footnote={
+            kaalSarp.partial
+              ? t('kundli.kaalSarpPartialNote')
+              : null
+          }
+          colors={colors}
+        />
+        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+        <DoshaRow
+          title={pitru.afflicted ? t('kundli.pitruAfflicted') : t('kundli.pitruNotAfflicted')}
+          kicker={t('kundli.pitruKicker')}
+          icon={pitru.afflicted ? 'alert-circle' : 'check-circle'}
+          accent={pitru.afflicted ? palette.sindoor : SAFE_GREEN}
+          meta={[]}
+          footnote={pitru.afflicted && pitru.reasons.length > 0 ? pitru.reasons.join('; ') : null}
+          colors={colors}
+        />
+      </View>
+
+      {/* Remedy nudge — links an *active* (uncancelled) Mangal Dosha to the
+          Tuesday (Hanuman) Vaar Devata, framed as "traditionally", not a fix
+          (P14.1). Cancelled charts don't get it — the "cancelled" badge above
+          would contradict it. */}
+      {mangal.afflicted && (
+        <RemedyNudge
+          text={t('vaar.nudgeMangal')}
+          dayKey="tuesday"
+          colors={colors}
+          style={styles.nudge}
+        />
+      )}
+    </>
   );
 }
 
@@ -241,6 +257,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
+  nudge: { marginTop: 12 },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   row: { padding: 16 },
   head: {

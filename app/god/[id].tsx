@@ -34,9 +34,11 @@ import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { getDeityImage } from '@/config/deityImages';
+import { useShareSheet } from '@/store/useShareSheet';
 import {
   getAartiForDeity,
   getChalisaForDeity,
+  getAllAppMantras,
   type Recitation,
   type Chalisa,
 } from '@/services/content';
@@ -198,6 +200,11 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
   const { t } = useTranslation();
   const meta = DEITY_BY_ID[deityId];
   const initial = meta?.initial ?? 'ॐ';
+  const openShare = useShareSheet(s => s.open);
+  const sigMantra = useMemo(
+    () => getAllAppMantras().find(m => m.deity === deityId)?.text.devanagari?.split('\n')[0],
+    [deityId],
+  );
   // Hero photo fades 0→1 over 320ms once decoded (P11.6). Deity-color gradient
   // sits at full opacity underneath as the always-visible scrim, so the user
   // never sees a blank container — only the gradient, then the photo settling
@@ -263,6 +270,17 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         <Text variant="body-italic" style={[styles.heroDescription, { color: colors.textTertiary }]}>
           {description}
         </Text>
+        <TouchableOpacity
+          onPress={() => openShare({ kind: 'deity-blessing', deityId, mantraHi: sigMantra })}
+          activeOpacity={0.85}
+          style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('share.a11yShare')}>
+          <Icon name="share" size={13} color={colors.accent} />
+          <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
+            {t('share.ctaDeity')}
+          </Text>
+        </TouchableOpacity>
         <Ornament variant="lotus" style={styles.heroOrnament} />
       </View>
     </View>
@@ -418,6 +436,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: spacing.cardPadLg,
   },
+  heroShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
+  },
+  heroShareText: { fontSize: 9 },
   heroOrnament: {
     marginTop: 12,
     width: '55%',
