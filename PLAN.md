@@ -235,6 +235,52 @@ Render styled cards off-screen → hand them to the system share sheet: deity bl
 
 **v1 card types:** (1) **festival greeting** — one template per major festival (deity image + festival name in Devanagari + English + app watermark; "Share greeting" on the Festivals screen; ties to P14.3 for Navratri); (2) **deity blessing** — 1:1, deity image + name + one signature mantra/verse; "Share" on the deity detail screen; (3) **verse/mantra card** — from the aarti/chalisa reader, "Share this verse" on any verse with "From <text name>" attribution; from the Jaap counter, a post-session "I completed 108 repetitions of <mantra> today" card. Reuse the app's fonts (NotoSerifDevanagari / Fraunces). **Content/rights:** deity images are existing licensed assets; watermark cards with the app name (small, lower corner) — identifies the source, makes no authenticity claim. Chalisa/aarti/mantra text is classical/public-domain; share one or two lines (not a whole chalisa) with a source label. **Not in v1:** name-personalized greetings (needs a name-input form), video status cards (Skia/ffmpeg — much bigger), WhatsApp-direct sharing.
 
+### P14.6 — Audit-driven content + accuracy fixes ⏳ — bundled-release blocker
+
+**Why (2026-05-14, audit on `phase_14`):** A full audit of the bundled-pending Phase 14 surfaced **four critical content errors**, **eight significant concerns**, and **one implementation gap** that go beyond the existing mantra-reviewer debt. Unlike the mantras (which carry `reviewPending: true` and surface a "provisional" caption everywhere they render), these items are **not flagged in the UI**, so a user reading them takes them as authoritative — every wrong fact is a trust hit. P14.6 is the cleanup pass that closes the audit before the bundle ships. Independent of, and in parallel with, the still-pending Sanskrit-reviewer mantra pass (the existing combined open item).
+
+**Scope:** content + one notification-scheduler edit. **No new screens, no schema changes, no new deities, no new package dependencies.** All edits to existing `src/config/*.ts` files plus one `src/services/reminderScheduler.ts` change. ~1–2 hours of focused work for someone with the audit punch list in hand.
+
+**Critical (must fix before bundled release):**
+
+1. **`src/config/pujas.ts:1262, 1273` — Hanuman Chalisa meter error.** "40 dohas" / "forty-doha hymn" → "40 chaupais (framed by 3 dohas)" / "forty-chaupai hymn". Tulsidas wrote *cālīsā* in chaupai meter, not doha. Hindi readers will catch it.
+2. **`src/config/navratri.ts:715-716` — Besan miscategorised as a grain.** Besan (chickpea flour) is a legume flour, not a grain. Move from the "All grains" line to the "All dals/legumes" line. The forbidden ruling itself is correct; only the categorisation is wrong.
+3. **`src/config/navratri.ts:719` — Turmeric/hing rule too strict.** Currently lists both as universally forbidden; in fact regional practice (Maharashtra/Gujarat/Bengal) commonly permits a pinch. Either reword the line with a `(strict tradition only)` caveat or add a screen-level variant note. Decision: lean strict (Smarta-North-Indian) but disclose the variation.
+4. **`src/services/reminderScheduler.ts:256-260` — 11th Navratri push notification missing.** Plan §8 P14.3 says 11; only 10 are scheduled (Days 1–9 + Day 10). Decide: schedule a Day-1 Ghatasthapana muhurat reminder (~30 min before muhurat start) as the 11th, or update the plan + closure to reflect the deliberate 10-only schedule.
+
+**Significant (resolve or document deferral):**
+
+5. **`src/config/navratri.ts:351-356, 378-383` — Chakra ascent discontinuity.** Day 7 → Day 8 currently goes Sahasrara → Soma ("between Ajna and Sahasrara"), reading as a regression. Either move Day 7 Kalaratri to "between Ajna and Sahasrara" OR relabel Soma chakra as transcendent ("above Sahasrara"). Pick one and apply consistently.
+6. **`src/config/navratri.ts:397` — Ardhanarishvara-from-Siddhidatri claim.** A 19th-century Bengali tradition reading presented as canonical; classical sources derive Ardhanarishvara from Shiva-Parvati union, not Siddhidatri-grace. Drop or properly attribute.
+7. **`src/config/pujas.ts:919-920` — Source attribution mismatch.** Says "Ganesha Purana" for the durva-21 + tulsi-forbidden rule; the variant note at line 927 (correctly) cites Brahmavaivarta Purana. Change to "Brahmavaivarta Purana, Prakriti Khanda ch 21".
+8. **`src/config/pujas.ts:1326-1328` — Navagraha grain/flower issues.** Add variant notes: (a) Chandra/Shukra both being "rice" / "white rice" is regional; (b) Ketu's flower "red oleander" is one of several options (kusha grass / multi-color also valid); (c) "durva" (Budh) is a grass, not a flower — relabel section as "botanicals".
+9. **`src/config/pujas.ts:1376-1381` — Navagraha invocation mantra mislabel.** "Brahma Murari Tripurantakari…" is a *morning navagraha vandana* (prabhāta-stuti), not the formal avahana. Relabel; or supplement with the per-graha bīja-mantras as a separate sub-step.
+10. **`src/config/navratri.ts:727-730` — Mantra-pattern lineage undisclosed.** The 9 Navadurga mantras all use the simple `oṁ devī <form>āyai namaḥ` pattern (Devi-Mahatmya commentary lineage). Other lineages prefix bījas (`hrīṁ`, `śrīṁ`, `klīṁ`). Extend `NAVRATRI_SOURCES` to disclose the lineage choice.
+11. **`src/config/pujas.ts:434, 603, 776, 944, 1146, 1314, 1478` — 7 puja `kicker` strings.** Borderline against `feedback_no_decorative_taglines.md` ("THE PURNIMA HOUSEHOLD PUJA", "PRATHAM PUJYA · BEGIN ANY UNDERTAKING", "BAJRANGBALI", etc.). They're more descriptive (when/who) than the rejected examples ("The Pantheon", "Thirty-three koṭi"), but still embellished. Decide: drop them all OR add a JSDoc comment explicitly justifying them as descriptive context.
+12. **`src/config/vaarDevata.ts` — Weekday-mantra type inconsistency.** Mon = pure deity (`oṁ namaḥ śivāya`); Tue/Sat = graha-bīja (`oṁ haṁ hanumate`, `oṁ śaṁ śanaiścarāya`); Fri = deity-bīja (`oṁ śrīṁ mahālakṣmyai`); Thu = Vishnu mantra (`oṁ namo bhagavate vāsudevāya`). No internal rule. Decide on a consistent rule across all 7 days OR add a per-day `mantraVariantNote` documenting the choice.
+
+**Minor (fold in opportunistically):**
+
+13. `src/config/vaarDevata.ts:189-194` — Bhairava-Ravivara-Vrat note: rare tradition, weak attribution. Replace with Aditya Hridaya Stotra reference (already in Sunday's deity note) OR strengthen with citation.
+14. `src/config/pujas.ts:813-823` — Ganesh Prana-Pratishtha step says "with the prescribed mantra" but cites no mantra. Either include a placeholder Prana-Pratishtha mantra (with `reviewPending: true`) or reword to "follow the household's tradition; consult a pandit for the formal mantra".
+15. `src/config/pujas.ts:1416-1422` — Navagraha Stotra (Vyasa) referenced but its opening shloka isn't inline. Other pujas show their headline mantras (Mahamrityunjaya, kshama-prarthana). Add `japākusumasaṅkāśam…` opening with `reviewPending: true`.
+16. `src/config/navratri.ts:294-296` — Skandamata iconography "seated on a lotus … rides a lion" parses contradictory. Reword: "rides a lion, seated on a lotus throne on its back".
+17. `src/config/navratri.ts:474-475` — "Tripura Sundari" → "Tripurasundari" (canonical Sanskrit).
+18. `src/config/navratri.ts` Saptashati outline — surface the JSDoc note about other-tradition chapter groupings on the screen as a one-line caption.
+
+**Hard rules (carried over from Phase 14, unchanged):**
+
+- **No new deities** to `src/config/deities.ts` — the 19-deity roster is fixed. Any figure outside the roster (Murugan, Brihaspati, Shani Dev, Bhairava, Mahavidyas, Navagrahas, Satyanarayan-as-Vishnu) appears as text only.
+- **Do not flip any `reviewPending: true` to `false`** — that's the Sanskrit-reviewer pass, not P14.6. P14.6 may *add* `reviewPending: true` flags to newly-introduced mantra text (items 14, 15) but cannot clear existing ones.
+- **No decorative editorial taglines** (`feedback_no_decorative_taglines.md`).
+- **Roster-side cross-link discipline** unchanged: cross-links live in `src/config/pujas.ts` lookups, never inline in `app/festivals.tsx` or `app/(tabs)/panchang.tsx`.
+
+**Out of scope for P14.6:**
+
+- The Sanskrit-reviewer pass on existing mantra strings (separate combined item — see closure note).
+- The full verse-by-verse Durga Saptashati text (separate ~700-verse content project, deferred under P14.3).
+- Live-device smoke testing of the bundled branch (separate pre-release gate, see closure note).
+
 ### Phase 14 Exit Criteria
 
 - P14.1: ✅ 7-day Vaar Devata — Home card + detail screen, **deities shown at equal weight (no per-day "primary")**, variant notes labeled, Isht Devata + Kundli-remedy tie-ins wired (dignity / Dosha / Sade Sati / Dasha). **Remaining:** the qualified-reviewer pass on the mantra strings — until then they ship `reviewPending: true` with a "provisional" caption (4 of 7 already match the `hindu-devotional-texts` package verbatim).
@@ -242,13 +288,18 @@ Render styled cards off-screen → hand them to the system share sheet: deity bl
 - P14.3: ✅ Sharad-Navratri 9-day guide — Day-1 read from `festivals.json` (`Sharad Navaratri` entry); Days 2–9 = Day 1 + N days; Day 10 from the `Dussehra` entry. **Chaitra Day 1 derived from `Rama Navami` − 8 days.** No `convertHinduToGregorian` at app-time — the dates are already baked into the pre-generated `festivals.json` from the build script, and we re-used that. Ghatasthapana muhurat (first-third-of-day-while-Pratipada window + Abhijit fallback + Chitra/Vaidhriti caption flags) is the only panchang-ts call left in the screen, `getDailyPanchang` on Day 1 only, memoised per-render. Per-day form/iconography/mantra (`reviewPending: true`)/dhyana/bhog/chakra in `src/config/navratri.ts`. **Panchang-computed colors via the Drik 9-day weekday cycle** (primary + secondary on weekday recurrence, never hardcoded per goddess) in `src/services/astrology/navratri.ts`. Daily notifications (Days 1–9 + Day 10 Vijayadashami) gated by `prefs.festival.major`. Vrat-guide screen with 4 tiers + allowed/forbidden food lists. Durga Saptashati outline + 9-day chapter map at `/scripture/durga-saptashati` (chapter titles + theme paragraphs `reviewPending`; full verses deferred to a separate content-review pass). Four Navratris handled — Sharad/Chaitra share the full guide, Magha + Ashadha Gupt surface a "Ten Mahavidyas, kept private" info card. **Surface:** dedicated 5th bottom tab **Practice** (`app/(tabs)/practice.tsx`) — replaces the earlier "Navratri header card on Festivals" decision (reverted; was a 2–3 s open-time regression on the calendar tab). Practice tab lists Navratri / Vrats / Saptashati / Vaar Devata / (Puja Vidhi coming soon) with subtitle text only — no panchang compute on tab mount. **Remaining:** a qualified-reviewer pass on the 9 bīja mantras + the dhyāna shlokas (until then they ship `reviewPending: true` with a "provisional" caption — same pattern as P14.1); the full verse-by-verse Saptashati Sanskrit text (its own ~700-verse content-review project).
 - P14.4: ✅ Sadhana streak (`useStore.sadhana` slice with 26-hr grace + clock-rollback freeze in [`src/services/sadhana.ts`](src/services/sadhana.ts)) + cumulative counter derived from `getJaapStats` + sacred-number milestones (sessions 7/21/30/108/365; reps 108/1008/10800/108000; streak 7/21/30/108/365). Celebration overlay ([`src/components/common/MilestoneCelebrationHost.tsx`](src/components/common/MilestoneCelebrationHost.tsx)) mounted in `app/_layout.tsx`; Share button opens the new 5th `ShareCardSpec` kind `milestone`. Zero leaderboards/comparisons; opt-in evening reminder ([`src/services/sadhanaReminders.ts`](src/services/sadhanaReminders.ts), default off, 20:30, 14-day rolling horizon, skips today if already practised). SQLite `user_version` 5→6 for `milestones_achieved(kind, threshold, achieved_at)` with `UNIQUE(kind, threshold)` so re-crossings are idempotent. Zustand persist v14→v15. Streak badge on Home (under QuickRow) + Jaap picker stats card. **Aarti reader is NOT a streak signal in v1** — jaap-only, per PLAN; deferred until a clear "completed" event is added to the reader.
 - P14.5: ✅ festival + deity + verse + jaap-completion cards via `captureRef` → `expo-sharing` (+ `expo-media-library` save-to-gallery), 1080-px renders (Story 9:16 / Square 1:1 toggle), app-watermarked, source-labelled text. Off-screen `<ShareCardHost>` in `app/_layout.tsx`; entry points on Festivals (major rows), deity detail hero, aarti verses, chalisa dohas, and the Jaap counter. **Plus** a separate "Share full text" affordance in the aarti + chalisa headers using RN `Share.share({ message })` — paste-into-WhatsApp ready, source + "shared via dharmagya" tail (image cards stay scoped to one-or-two lines per the source-text rule). **Not in v1 (unchanged):** name-personalized greetings, video status cards, WhatsApp-direct sharing.
+- **P14.6:** ⏳ All 4 critical items resolved (Hanuman Chalisa meter, besan re-categorisation, turmeric/hing softening, Navratri 11th notification decision). All 8 significant items either resolved or explicitly deferred with a JSDoc note explaining why. Minor items folded in opportunistically. New memory entry `project_p14_6_landed.md` capturing what shipped and what was deferred. Phase 14 closure note updated to reflect P14.6 status.
 - `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings throughout. New content carries source attribution; the no-new-deities roster constraint holds.
 
-### Phase 14 — closure note (2026-05-14)
+### Phase 14 — closure note (2026-05-14, updated for P14.6)
 
-Phase 14 is **feature-complete and bundled-pending**. All five sub-phases shipped to the working tree on branch `phase_14`; the next ship is a single bundled release that includes P14.1 + P14.2 + P14.3 + P14.4 + P14.5 together (per `feedback_release_cadence`).
+Phase 14 is **feature-complete on the branch but not bundle-ready** — five sub-phases (P14.1–P14.5) shipped to the working tree on branch `phase_14`, plus a sixth (P14.6, audit-driven content fixes) is now scoped and pending. The next ship is a single bundled release that includes P14.1 + P14.2 + P14.3 + P14.4 + P14.5 + P14.6 together (per `feedback_release_cadence`).
 
-**Single combined open item:** a qualified-Sanskrit-reviewer pass on every mantra string surfaced by Phase 14 — P14.1 (the seven weekday mantras in `src/config/vaarDevata.ts`) + P14.2 (the puja-step mantras + closing kshama-prarthana + all preset-linked mantras in `src/config/pujas.ts`) + P14.3 (the nine Navadurga bīja-mantras + dhyāna shlokas in `src/config/navratri.ts`). All three carry `reviewPending: true` today and surface a "transliteration under scholarly review — treat as provisional" caption everywhere they render. Until the reviewer pass lands, do not flip the flag. (A separate, larger content-review project — the full verse-by-verse Durga Saptashati Sanskrit text, ~700 verses — remains deferred and is tracked under P14.3.)
+**Two open items now block the bundle:**
+
+1. **P14.6 — Audit-driven content fixes.** Surface-level inaccuracies found in the bundled-pending audit (Hanuman Chalisa meter error, besan miscategorisation, over-strict turmeric/hing rule, missing 11th Navratri notification, chakra-ascent discontinuity, fringe Ardhanarishvara claim, mislabeled Navagraha vandana, +12 more). **Not** the mantra-reviewer pass — these are non-mantra content errors that surface to the user without the "provisional" caption and so need a hard fix, not a flag. Scope + punch list in P14.6 above. ~1–2 hours.
+
+2. **Sanskrit-reviewer pass on every mantra string.** P14.1 (the seven weekday mantras in `src/config/vaarDevata.ts`) + P14.2 (the puja-step mantras + closing kshama-prarthana + all preset-linked mantras in `src/config/pujas.ts`) + P14.3 (the nine Navadurga bīja-mantras + dhyāna shlokas in `src/config/navratri.ts`). All three carry `reviewPending: true` today and surface a "transliteration under scholarly review — treat as provisional" caption everywhere they render. **Until the reviewer pass lands, do not flip the flag.** P14.6 may *add* `reviewPending: true` flags to newly-introduced mantra text (Prana-Pratishtha placeholder, Navagraha Stotra opening) but cannot clear existing ones. (A separate, larger content-review project — the full verse-by-verse Durga Saptashati Sanskrit text, ~700 verses — remains deferred and is tracked under P14.3.)
 
 **Live-device smoke is still pending** on the bundled branch: the 6-tab edge-to-edge bar (P14.3); the streak + milestone celebration flow and the share-card kinds (P14.4 / P14.5); the new Puja Vidhi detail screen with its samagri checklist + step-mantra plinths + post-puja chips (P14.2). All of these compile clean and pass type-check + lint, but have not been run on a physical device yet.
 
@@ -346,11 +397,12 @@ Shipped to production (2026-05-12):
   → 1.7.0 launch → 9 → P4.2 (Android) → Phase 10 → Phase 11 (incl. P7.4→P11.6, P7.6→P11.5)
   → Phase 12 (panchang-ts 4.0.0) → Phase 13 (panchang-ts 4.1.1)
         ↓
-  Phase 14 — Devotional Practice & Engagement ✅ (feature-complete 2026-05-14,
-                                                 bundled-pending; Sanskrit-reviewer
-                                                 pass is the only open item)
+  Phase 14 — Devotional Practice & Engagement (P14.1–P14.5 ✅ shipped to branch
+                                                 2026-05-14, bundle blocked on
+                                                 P14.6 + Sanskrit-reviewer pass)
       P14.1 Vaar Devata ✅ → P14.5 Shareable cards ✅ → P14.4 Sadhana streaks ✅
       → P14.3 Navratri guide ✅ → P14.2 Puja Vidhi ✅
+      → P14.6 Audit-driven content fixes ⏳ (~1–2 h, blocks the bundled release)
         ↓
   Phase 15 — Accounts & Sync (Google Sign-In, phased A→D; A is the small first step;
       makes the P14.4 streak / birth charts survive reinstall; D = Sign in with Apple, at iOS launch)

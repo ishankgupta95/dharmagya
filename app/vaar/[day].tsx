@@ -176,6 +176,9 @@ export default function VaarDevataScreen() {
             <Text variant="body" style={[styles.mantraMeaning, { color: colors.textSecondary }]}>
               {vaar.mantra.meaning[lang]}
             </Text>
+            <Text variant="body-italic" style={[styles.mantraVariantNote, { color: colors.textTertiary }]}>
+              {vaar.mantra.variantNote[lang]}
+            </Text>
             <TouchableOpacity
               onPress={() => startJaap(vaar)}
               activeOpacity={0.85}
@@ -416,6 +419,7 @@ const styles = StyleSheet.create({
   mantraDeva: { fontSize: 22, lineHeight: 32, marginTop: 12 },
   mantraIast: { fontSize: 14, lineHeight: 20, marginTop: 4 },
   mantraMeaning: { fontSize: 14, lineHeight: 21, marginTop: 12 },
+  mantraVariantNote: { fontSize: 12.5, lineHeight: 19, marginTop: 10 },
   jaapBtn: {
     flexDirection: 'row',
     alignItems: 'center',

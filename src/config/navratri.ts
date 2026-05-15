@@ -277,8 +277,8 @@ export const NAVADURGA_FORMS: readonly NavadurgaForm[] = [
     day: 5,
     name: { en: 'Skandamata', hi: 'स्कन्दमाता' },
     iconography: {
-      en: 'Four-armed, seated on a lotus (Padmāsana); holds the infant Skanda (Kartikeya / Murugan) on her lap, with lotuses in two hands. Rides a lion.',
-      hi: 'चतुर्भुजी, कमल पर पद्मासन में विराजमान; गोद में बालक स्कन्द (कार्तिकेय / मुरुगन) तथा अन्य हाथों में कमल। सिंह पर सवार।',
+      en: 'Four-armed; rides a lion, seated on a lotus throne on its back (Padmāsana); holds the infant Skanda (Kartikeya / Murugan) on her lap, with lotuses in two hands.',
+      hi: 'चतुर्भुजी; सिंह पर सवार, उसकी पीठ पर कमल-आसन में विराजमान (पद्मासन); गोद में बालक स्कन्द (कार्तिकेय / मुरुगन) तथा अन्य हाथों में कमल।',
     },
     significance: {
       en: 'The Devi as mother of Skanda — the universal mother who, by her grace, fills devotees with the protective love of her child Kartikeya. Worshipped for wisdom and a child\'s wellbeing.',
@@ -352,7 +352,7 @@ export const NAVADURGA_FORMS: readonly NavadurgaForm[] = [
       hi: 'एकवेणी जपाकर्णपूरा नग्ना खरास्थिता।\nलम्बोष्ठी कर्णिकाकर्णी तैलाभ्यक्तशरीरिणी॥',
     },
     bhog: { en: 'Jaggery (gur)', hi: 'गुड़' },
-    chakra: { en: 'Sahasrara — crown', hi: 'सहस्रार चक्र' },
+    chakra: { en: 'Soma — between Ajna and Sahasrara', hi: 'सोम चक्र' },
   },
 
   // ── Day 8 · Mahagauri (महागौरी) ────────────────────────────────────────────
@@ -380,7 +380,7 @@ export const NAVADURGA_FORMS: readonly NavadurgaForm[] = [
       hi: 'श्वेते वृषे समारूढा श्वेताम्बरधरा शुचिः।\nमहागौरी शुभं दद्यान्महादेवप्रमोददा॥',
     },
     bhog: { en: 'Coconut', hi: 'नारियल' },
-    chakra: { en: 'Soma — between Ajna and Sahasrara', hi: 'सोम चक्र' },
+    chakra: { en: 'Sahasrara — crown', hi: 'सहस्रार चक्र' },
   },
 
   // ── Day 9 · Siddhidatri (सिद्धिदात्री) ──────────────────────────────────────
@@ -393,8 +393,8 @@ export const NAVADURGA_FORMS: readonly NavadurgaForm[] = [
       hi: 'चतुर्भुजी; कमल पर अथवा सिंह पर विराजमान। गदा, चक्र, कमल एवं शंख धारण। अष्ट-सिद्धियों के दाता रूप में — देव, गन्धर्व, असुर सभी ने उन्हीं से सिद्धियाँ प्राप्त कीं।',
     },
     significance: {
-      en: 'The Devi who grants all eight classical siddhis (aṇimā, mahimā, garimā, laghimā, prāpti, prākāmya, īśitva, vaśitva). Even Shiva is said to have obtained his perfections from her — hence Ardhanārīśvara is sometimes traced to her grace. The completion of the navratri sadhana.',
-      hi: 'अष्ट-सिद्धियों (अणिमा, महिमा, गरिमा, लघिमा, प्राप्ति, प्राकाम्य, ईशित्व, वशित्व) की दात्री। शिव ने भी इन्हीं से सिद्धियाँ प्राप्त कीं — इसी कारण अर्धनारीश्वर रूप उनकी कृपा से माना जाता है। नवरात्रि साधना की पूर्णता।',
+      en: 'The Devi who grants all eight classical siddhis (aṇimā, mahimā, garimā, laghimā, prāpti, prākāmya, īśitva, vaśitva). Even Shiva is said to have obtained his perfections from her in some Shakta commentaries. The completion of the navratri sadhana.',
+      hi: 'अष्ट-सिद्धियों (अणिमा, महिमा, गरिमा, लघिमा, प्राप्ति, प्राकाम्य, ईशित्व, वशित्व) की दात्री। कुछ शाक्त परंपराओं में शिव ने भी इन्हीं से सिद्धियाँ प्राप्त कीं। नवरात्रि साधना की पूर्णता।',
     },
     mantra: {
       jaapSlug: null,
@@ -412,7 +412,7 @@ export const NAVADURGA_FORMS: readonly NavadurgaForm[] = [
       en: 'Halwa, puri, and black chana — the traditional Kanya Pujan offering',
       hi: 'हलवा, पूरी एवं काला चना — परंपरागत कन्या-पूजन का प्रसाद',
     },
-    chakra: { en: 'Sahasrara — crown', hi: 'सहस्रार चक्र' },
+    chakra: { en: 'Above Sahasrara — nirguna / transcendent', hi: 'सहस्रार से परे — निर्गुण / पारलौकिक' },
   },
 ] as const;
 
@@ -471,8 +471,8 @@ export const NAVRATRI_MASAS: readonly NavratriMasaInfo[] = [
 
 /** A short informational paragraph shown on the Gupt-Navratri info card. */
 export const GUPT_NAVRATRI_INFO: Bilingual = {
-  en: 'The Gupt ("hidden") Navratris are tantra-focused observances in which the Ten Mahavidyas — Kali, Tara, Tripura Sundari, Bhuvaneshvari, Bhairavi, Chinnamasta, Dhumavati, Bagalamukhi, Matangi, Kamala — are worshipped, not the Navadurga. They are kept private and are intended for serious sādhakas under a teacher\'s guidance.',
-  hi: 'गुप्त नवरात्रि तंत्र-प्रधान साधना-काल हैं — इनमें नवदुर्गा नहीं, अपितु दश-महाविद्या (काली, तारा, त्रिपुर सुंदरी, भुवनेश्वरी, भैरवी, छिन्नमस्ता, धूमावती, बगलामुखी, मातंगी, कमला) की उपासना की जाती है। ये साधना गोपनीय है तथा गुरु के मार्गदर्शन में गंभीर साधकों हेतु अभिप्रेत है।',
+  en: 'The Gupt ("hidden") Navratris are tantra-focused observances in which the Ten Mahavidyas — Kali, Tara, Tripurasundari, Bhuvaneshvari, Bhairavi, Chinnamasta, Dhumavati, Bagalamukhi, Matangi, Kamala — are worshipped, not the Navadurga. They are kept private and are intended for serious sādhakas under a teacher\'s guidance.',
+  hi: 'गुप्त नवरात्रि तंत्र-प्रधान साधना-काल हैं — इनमें नवदुर्गा नहीं, अपितु दश-महाविद्या (काली, तारा, त्रिपुरसुंदरी, भुवनेश्वरी, भैरवी, छिन्नमस्ता, धूमावती, बगलामुखी, मातंगी, कमला) की उपासना की जाती है। ये साधना गोपनीय है तथा गुरु के मार्गदर्शन में गंभीर साधकों हेतु अभिप्रेत है।',
 };
 
 // ─── Durga Saptashati outline ────────────────────────────────────────────────
@@ -645,6 +645,18 @@ export const SAPTASHATI_CHAPTERS: readonly SaptashatiChapter[] = [
  * day; we surface this distribution as the *default schedule* but link to the
  * chapter list so readers can sequence their own pāṭha.
  */
+/**
+ * A short caption explaining the day-mapping for on-screen surfacing — the
+ * 9-day chapter distribution is one of several traditional groupings (e.g.
+ * some lineages put all of Madhyam — ch 2–4 — on Day 2; others read all 13
+ * chapters every day). The text below is what the Durga-Saptashati screen
+ * shows under the day-map kicker.
+ */
+export const SAPTASHATI_DAY_MAP_CAPTION: Bilingual = {
+  en: 'This is the most-followed North-Indian distribution; some lineages read all 13 chapters every day, others use slightly different day-groupings.',
+  hi: 'यह उत्तर-भारतीय परंपरा का सर्वाधिक प्रचलित विभाजन है; कुछ परंपराओं में प्रतिदिन सभी तेरह अध्याय पढ़े जाते हैं, अन्य में दिन-वार समूहन कुछ भिन्न होता है।',
+};
+
 export const SAPTASHATI_DAY_MAP: readonly SaptashatiDayMapEntry[] = [
   { day: 1, chapters: [1], note: { en: 'Prathama Charita — Mahakali tattva.', hi: 'प्रथम चरित्र — महाकाली तत्त्व।' } },
   { day: 2, chapters: [2, 3, 4], note: { en: 'Madhyama Charita — Mahalakshmi tattva; the slaying of Mahishasura.', hi: 'मध्यम चरित्र — महालक्ष्मी तत्त्व; महिषासुर वध।' } },
@@ -712,11 +724,11 @@ export const VRAT_FOODS: VratFoodList = {
     { en: 'Cumin, pepper, ginger, green chilli, lemon, ajwain', hi: 'जीरा, काली मिर्च, अदरक, हरी मिर्च, नींबू, अजवायन' },
   ],
   forbidden: [
-    { en: 'All grains — wheat, rice, maida, sooji, besan, corn', hi: 'समस्त अनाज — गेहूँ, चावल, मैदा, सूजी, बेसन, मक्का' },
-    { en: 'All dals and legumes (except sometimes peanut)', hi: 'समस्त दाल एवं फलियाँ (कभी-कभी मूँगफली की छूट)' },
+    { en: 'All grains — wheat, rice, maida, sooji, corn', hi: 'समस्त अनाज — गेहूँ, चावल, मैदा, सूजी, मक्का' },
+    { en: 'All dals and legumes including besan (chickpea flour); peanut is sometimes permitted', hi: 'समस्त दाल एवं फलियाँ — बेसन (चना-आटा) सहित; कभी-कभी मूँगफली की छूट' },
     { en: 'Onion, garlic, brinjal', hi: 'प्याज, लहसुन, बैंगन' },
     { en: 'Regular iodised salt', hi: 'साधारण नमक' },
-    { en: 'Turmeric, hing, mustard, fenugreek, garam masala', hi: 'हल्दी, हींग, सरसों, मेथी, गरम मसाला' },
+    { en: 'Turmeric, hing, mustard, fenugreek, garam masala (strict tradition; a pinch of turmeric or hing is widely permitted in Maharashtra, Gujarat, and Bengal)', hi: 'हल्दी, हींग, सरसों, मेथी, गरम मसाला (कठोर परंपरा; महाराष्ट्र, गुजरात एवं बंगाल में चुटकी भर हल्दी अथवा हींग की प्रायः छूट मिलती है)' },
     { en: 'Meat, fish, egg', hi: 'मांस, मछली, अंडा' },
     { en: 'Alcohol, tobacco', hi: 'मद्य, तम्बाकू' },
   ],
@@ -725,8 +737,8 @@ export const VRAT_FOODS: VratFoodList = {
 // ─── Disclaimer ──────────────────────────────────────────────────────────────
 
 export const NAVRATRI_SOURCES: Bilingual = {
-  en: 'Navratri practice varies by region, sampradaya and family tradition — this is one widely-kept form. Dates and the Ghatasthapana muhurat are computed from the panchang for your location. For any major observance, follow a pandit\'s guidance.',
-  hi: 'नवरात्रि साधना क्षेत्र, सम्प्रदाय एवं पारिवारिक परंपरा के अनुसार भिन्न होती है — यह एक प्रचलित रूप है। तिथियाँ एवं घटस्थापना मुहूर्त आपके स्थान के पंचांग से गणित हैं। किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
+  en: "Navratri practice varies by region, sampradaya and family tradition — this is one widely-kept form. Dates and the Ghatasthapana muhurat are computed from the panchang for your location. The nine per-day mantras use the plain `oṁ devī <form>āyai namaḥ` pattern from the Devī Māhātmya commentary lineage (also given in Drik Panchang and the Gita Press editions); other Shakta and Tantric lineages prefix bīja-syllables — `hrīṁ` (Bhuvaneshvarī-bīja), `śrīṁ` (Lakṣmī-bīja), `klīṁ` (Kāma-bīja), `aiṁ` (Vāgbhava-bīja) — and a guru or family pandit would teach the form belonging to that initiation. For any major observance, follow a pandit's guidance.",
+  hi: 'नवरात्रि साधना क्षेत्र, सम्प्रदाय एवं पारिवारिक परंपरा के अनुसार भिन्न होती है — यह एक प्रचलित रूप है। तिथियाँ एवं घटस्थापना मुहूर्त आपके स्थान के पंचांग से गणित हैं। नौ दैनिक मन्त्र देवी-माहात्म्य टीका परंपरा के सरल `ॐ देवी <स्वरूप>ायै नमः` स्वरूप में हैं (यह स्वरूप Drik Panchang एवं गीता प्रेस संस्करणों में भी दिया गया है); अन्य शाक्त एवं तान्त्रिक परंपराओं में बीज-अक्षर — `ह्रीं` (भुवनेश्वरी-बीज), `श्रीं` (लक्ष्मी-बीज), `क्लीं` (काम-बीज), `ऐं` (वाग्भव-बीज) — पूर्व में जोड़े जाते हैं, तथा गुरु अथवा कुल-पंडित अपनी दीक्षा-अनुसार स्वरूप सिखाते हैं। किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
 };
 
 // ─── Lookup helpers ──────────────────────────────────────────────────────────

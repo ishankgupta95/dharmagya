@@ -190,7 +190,17 @@ export interface PujaContent {
   slug: PujaSlug;
   /** Localised display name ("Satyanarayan Katha Puja" / "सत्यनारायण कथा पूजा"). */
   name: Bilingual;
-  /** Short kicker shown above the title on the detail hero. */
+  /**
+   * Short uppercase context tag shown above the title on the detail hero —
+   * a "when / who / why" descriptor (e.g. "DAY 1 OF NAVRATRI · KALASH STHAPANA",
+   * "ABHISHEKAM TO SHIVA · MONDAY / PRADOSH", "NINE GRAHAS · CHART-DRIVEN
+   * REMEDY"). These are concrete information chips, not decorative editorial
+   * taglines: each names the timing, the addressee, or the role of the puja
+   * — never literary flourish — so they're cleared under
+   * `feedback_no_decorative_taglines` (which rejects ornamentation like "The
+   * Pantheon" or "Thirty-three koṭi"). Keep new entries to that pattern;
+   * if a kicker can't be reduced to a `WHEN · WHO · WHY` chip, omit it.
+   */
   kicker: Bilingual;
   /** When/why this puja is performed — a single short paragraph each side. */
   whenWhy: Bilingual;
@@ -813,8 +823,18 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
         slug: 'prana-pratishtha',
         name: { sanskrit: 'प्राण-प्रतिष्ठा', en: 'Prana Pratishtha', hi: 'प्राण-प्रतिष्ठा' },
         line: {
-          en: 'For a new idol — especially the clay idol for Ganesh Chaturthi — perform Prana Pratishtha: invoke the prana of Ganesh into the idol with the prescribed mantra, akshat and flowers touched to the heart, eyes, and crown of the image. Not needed for an already-consecrated idol from a temple or shop.',
-          hi: 'नई मूर्ति के लिए — विशेषकर गणेश चतुर्थी की मिट्टी की मूर्ति के लिए — प्राण-प्रतिष्ठा करें: निर्धारित मन्त्र, अक्षत एवं पुष्प मूर्ति के हृदय, नेत्र एवं शिखर पर स्पर्श करते हुए गणेश के प्राण का आवाहन करें। पहले से प्रतिष्ठित (मन्दिर या दुकान की) मूर्ति के लिए आवश्यक नहीं।',
+          en: 'For a new idol — especially the clay idol for Ganesh Chaturthi — perform Prana Pratishtha: invoke the prāṇa of Ganesh into the idol with the brief invocation below, akshat and flowers touched to the heart, eyes, and crown of the image. The full Prāṇa-pratiṣṭhā with ṛk-mantras and nyāsa traditionally needs a pandit; the line below is the short household form. Not needed for an already-consecrated idol from a temple or shop.',
+          hi: 'नई मूर्ति के लिए — विशेषकर गणेश चतुर्थी की मिट्टी की मूर्ति के लिए — प्राण-प्रतिष्ठा करें: नीचे दिए संक्षिप्त आवाहन, अक्षत एवं पुष्प मूर्ति के हृदय, नेत्र एवं शिखर पर स्पर्श करते हुए गणेश के प्राण का आवाहन करें। पूर्ण प्राण-प्रतिष्ठा (ऋक्-मन्त्रों एवं न्यास सहित) के लिए परंपरा से पंडित जी आवश्यक होते हैं; नीचे की पंक्ति संक्षिप्त गृह-स्वरूप है। पहले से प्रतिष्ठित (मन्दिर या दुकान की) मूर्ति के लिए आवश्यक नहीं।',
+        },
+        mantra: {
+          jaapSlug: null,
+          devanagari: 'अस्यां मूर्तौ श्रीगणेशस्य प्राणाः प्रतिष्ठिता भवन्तु ।\nइहागच्छ इह तिष्ठ ॥',
+          iast: 'asyāṁ mūrtau śrīgaṇeśasya prāṇāḥ pratiṣṭhitā bhavantu |\nihāgaccha iha tiṣṭha ||',
+          meaning: {
+            en: "May the prāṇa of Śrī Gaṇeśa be established in this image. Come hither; abide here. (A short household form; for a major installation, follow a pandit's full Prāṇa-pratiṣṭhā with the Puruṣa Sūkta nyāsa.)",
+            hi: 'इस मूर्ति में श्री गणेश के प्राण प्रतिष्ठित हों। यहाँ पधारिए, यहाँ निवास कीजिए। (संक्षिप्त गृह-स्वरूप; बड़ी प्रतिष्ठा के लिए पंडित जी से पुरुष-सूक्त न्यास सहित पूर्ण प्राण-प्रतिष्ठा करवाएँ।)',
+          },
+          reviewPending: true,
         },
         conditional: {
           en: 'Required only for a new (especially clay-Chaturthi) idol. Skip for a permanent home shrine image.',
@@ -916,8 +936,8 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
       { needle: 'vinayaka chaturthi' },
     ],
     sources: {
-      en: 'Ganesh Puja procedure is from the Ganapatya Upanishad, Brihat Tantrasara, the Gita Press Ganesh Vrat-Vidhi pamphlet, and Drik Panchang\'s Ganesh Chaturthi vidhi page; durva-twentyone count and the tulsi-forbidden rule are from the Ganesha Purana.',
-      hi: 'गणेश पूजा-विधि गाणपत्य उपनिषद, बृहत् तन्त्रसार, गीता प्रेस गणेश व्रत-विधि पुस्तिका एवं Drik Panchang की गणेश चतुर्थी विधि से संग्रहीत; इक्कीस-दूर्वा-नियम एवं तुलसी-वर्जन गणेश पुराण से।',
+      en: "Ganesh Puja procedure is from the Ganapatya Upanishad, Brihat Tantrasara, the Gita Press Ganesh Vrat-Vidhi pamphlet, and Drik Panchang's Ganesh Chaturthi vidhi page; the twenty-one-durva count is from the Ganesha Purana, and the tulsi-forbidden rule (the Tulasī–Gaṇeśa curse story) is from the Brahmavaivarta Purana, Prakṛti Khaṇḍa, chapter 21.",
+      hi: 'गणेश पूजा-विधि गाणपत्य उपनिषद, बृहत् तन्त्रसार, गीता प्रेस गणेश व्रत-विधि पुस्तिका एवं Drik Panchang की गणेश चतुर्थी विधि से संग्रहीत; इक्कीस-दूर्वा-गणना गणेश पुराण से, एवं तुलसी-वर्जन (तुलसी–गणेश शाप-कथा) ब्रह्मवैवर्त पुराण, प्रकृति खण्ड, अध्याय 21 से।',
     },
     variantNotes: [
       {
@@ -1258,8 +1278,8 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
         slug: 'chalisa-or-sundarkand',
         name: { sanskrit: 'चालीसा / सुन्दर काण्ड', en: 'Chalisa / Sundara Kanda', hi: 'चालीसा / सुन्दर काण्ड' },
         line: {
-          en: 'Read the Hanuman Chalisa (40 dohas, ~15 minutes) — every home keeps this. For a longer practice, read the Sundara Kanda (Tulsidas\' Ramcharitmanas, fifth kanda) — a single sitting takes 1–2 hours; many do it in seven sittings across a week.',
-          hi: 'हनुमान चालीसा (40 दोहा, ~15 मिनट) का पाठ करें — हर घर में रखी जाती है। दीर्घ-अभ्यास हेतु सुन्दर काण्ड (तुलसीदास रामचरितमानस, पाँचवाँ काण्ड) — एक बैठक में 1–2 घंटे; अनेक लोग इसे सप्ताह भर सात बैठकों में पढ़ते हैं।',
+          en: 'Read the Hanuman Chalisa (40 chaupais framed by 3 dohas, ~15 minutes) — every home keeps this. For a longer practice, read the Sundara Kanda (Tulsidas\' Ramcharitmanas, fifth kanda) — a single sitting takes 1–2 hours; many do it in seven sittings across a week.',
+          hi: 'हनुमान चालीसा (40 चौपाई, 3 दोहों सहित, ~15 मिनट) का पाठ करें — हर घर में रखी जाती है। दीर्घ-अभ्यास हेतु सुन्दर काण्ड (तुलसीदास रामचरितमानस, पाँचवाँ काण्ड) — एक बैठक में 1–2 घंटे; अनेक लोग इसे सप्ताह भर सात बैठकों में पढ़ते हैं।',
         },
       },
       ...STANDARD_CLOSING_ARC,
@@ -1269,8 +1289,8 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
       deity: 'hanuman',
       label: { en: 'Hanuman Chalisa', hi: 'हनुमान चालीसा' },
       note: {
-        en: 'Tulsidas\' forty-doha hymn — the single most-recited devotional text in north India. Many also recite the Bajrang Baan and the Hanuman Ashtaka after the Chalisa, especially on Shanivar.',
-        hi: 'तुलसीदास की चालीस-दोहा रचना — उत्तर भारत में सबसे अधिक पाठ की जाने वाली भक्ति-कृति। अनेक लोग चालीसा के पश्चात्, विशेषकर शनिवार को, बजरंग बाण एवं हनुमान अष्टक भी पढ़ते हैं।',
+        en: "Tulsidas' forty-chaupai hymn (the name *cālīsā* means forty; the chaupais are framed by three dohas) — the single most-recited devotional text in north India. Many also recite the Bajrang Baan and the Hanuman Ashtaka after the Chalisa, especially on Shanivar.",
+        hi: 'तुलसीदास की चालीस-चौपाई रचना (नाम *चालीसा* चौपाइयों की चालीस संख्या से; तीन दोहे इनके आरंभ एवं अंत में) — उत्तर भारत में सबसे अधिक पाठ की जाने वाली भक्ति-कृति। अनेक लोग चालीसा के पश्चात्, विशेषकर शनिवार को, बजरंग बाण एवं हनुमान अष्टक भी पढ़ते हैं।',
       },
     },
     postPujaLinks: [
@@ -1324,8 +1344,8 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
         label: { en: 'A kalash with a coconut, mango leaves, and clean water', hi: 'कलश, नारियल, आम के पत्ते एवं स्वच्छ जल सहित' } },
       { group: { en: 'Nine grains', hi: 'नव-धान्य' },
         label: { en: 'Wheat (Surya), rice (Chandra), red lentils/masoor (Mangal), green gram/moong (Budh), chana dal (Brihaspati), white rice (Shukra), black sesame/til (Shani), urad dal (Rahu), horsegram/kulthi (Ketu)', hi: 'गेहूँ (सूर्य), चावल (चन्द्र), मसूर (मंगल), मूँग (बुध), चना दाल (बृहस्पति), श्वेत चावल (शुक्र), काले तिल (शनि), उड़द दाल (राहु), कुलथी (केतु)' } },
-      { group: { en: 'Nine flowers', hi: 'नव-पुष्प' },
-        label: { en: 'Red lotus, white kumud, red oleander, durva, yellow tagar, white kamal, blue aparajita, blue lotus, red oleander', hi: 'लाल कमल, श्वेत कुमुद, लाल कनेर, दूर्वा, पीला तगर, श्वेत कमल, नीली अपराजिता, नील कमल, लाल कनेर' } },
+      { group: { en: 'Nine botanicals (flowers & grasses)', hi: 'नव-वनस्पतियाँ (पुष्प एवं तृण)' },
+        label: { en: 'Red lotus (Surya), white kumud (Chandra), red oleander (Mangal), durva grass (Budh — a grass, not a flower), yellow tagar (Brihaspati), white kamal (Shukra), blue aparajita (Shani), kusha grass / blue lotus (Rahu), red oleander / multi-coloured (Ketu)', hi: 'लाल कमल (सूर्य), श्वेत कुमुद (चन्द्र), लाल कनेर (मंगल), दूर्वा (बुध — पुष्प नहीं, तृण), पीला तगर (बृहस्पति), श्वेत कमल (शुक्र), नीली अपराजिता (शनि), कुश तृण / नील कमल (राहु), लाल कनेर / बहु-वर्ण (केतु)' } },
       { group: { en: 'Nine cloths', hi: 'नव-वस्त्र' },
         label: { en: 'Red, white, red, green, yellow, white, blue/black, multi-coloured, multi-coloured — small cloth pieces under each grain heap', hi: 'लाल, श्वेत, लाल, हरा, पीला, श्वेत, नील/काला, बहु-वर्ण, बहु-वर्ण — प्रत्येक धान्य-राशि के नीचे छोटे वस्त्र-खंड' } },
       { group: { en: 'Naivedya', hi: 'नैवेद्य' },
@@ -1364,20 +1384,23 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
       },
     ],
     upacharas: [
-      // 1. Dhyana/Avahana — Navagraha as a group
+      // 1. Dhyana/Avahana — Navagraha as a group.
+      // The mantra below is the popular *prabhāta-vandana* (morning Navagraha
+      // stuti), not the formal per-graha avahana — see the variant note "Vandana
+      // vs per-graha avahana" for the bīja-mantra alternative.
       {
         ...STANDARD_UPACHARAS[0],
         line: {
-          en: 'Meditate on the nine grahas at their yantra-positions. Invoke each with its bīja-mantra in order: Surya (the centre), then Chandra, Mangal, Budh, Brihaspati, Shukra, Shani, Rahu, Ketu — clockwise from the east. Each invocation is paired with a single akshat-flower offering at its grain-heap.',
-          hi: 'नौ ग्रहों का यन्त्र-स्थानों पर ध्यान करें। प्रत्येक का बीज-मन्त्र क्रम से उच्चारित कर आवाहन करें: सूर्य (मध्य), फिर चन्द्र, मंगल, बुध, बृहस्पति, शुक्र, शनि, राहु, केतु — पूर्व से दक्षिणावर्त। प्रत्येक आवाहन के साथ उसकी धान्य-राशि पर एक अक्षत-पुष्प अर्पण।',
+          en: 'Meditate on the nine grahas at their yantra-positions. Open with the prabhāta-vandana below — a single morning Navagraha-stuti naming all nine. Then, for a formal avahana, invoke each graha individually with its bīja-mantra (oṁ hrāṁ hrīṁ hrauṁ saḥ sūryāya namaḥ for Surya, oṁ śrāṁ śrīṁ śrauṁ saḥ candrāya namaḥ for Chandra, and so on) in order: Surya (the centre), then Chandra, Mangal, Budh, Brihaspati, Shukra, Shani, Rahu, Ketu — clockwise from the east. Each invocation is paired with a single akshat-flower offering at its grain-heap.',
+          hi: 'नौ ग्रहों का यन्त्र-स्थानों पर ध्यान करें। नीचे की प्रातः-वंदना से आरंभ करें — एक प्रचलित प्रातःकालीन नवग्रह-स्तुति जो सभी नौ का स्मरण करती है। फिर औपचारिक आवाहन हेतु प्रत्येक ग्रह को क्रम से उसके बीज-मन्त्र सहित आहूत करें (सूर्य के लिए ॐ ह्रां ह्रीं ह्रौं सः सूर्याय नमः, चन्द्र के लिए ॐ श्रां श्रीं श्रौं सः चन्द्राय नमः, इत्यादि): सूर्य (मध्य), फिर चन्द्र, मंगल, बुध, बृहस्पति, शुक्र, शनि, राहु, केतु — पूर्व से दक्षिणावर्त। प्रत्येक आवाहन के साथ उसकी धान्य-राशि पर एक अक्षत-पुष्प अर्पण।',
         },
         mantra: {
           jaapSlug: null,
           devanagari: 'ॐ ब्रह्मा मुरारिस्त्रिपुरान्तकारी भानुः शशी भूमिसुतो बुधश्च ।\nगुरुश्च शुक्रः शनिराहुकेतवः कुर्वन्तु सर्वे मम सुप्रभातम् ॥',
           iast: 'oṁ brahmā murāristripurāntakārī bhānuḥ śaśī bhūmisuto budhaśca |\nguruśca śukraḥ śanirāhuketavaḥ kurvantu sarve mama suprabhātam ||',
           meaning: {
-            en: 'May Brahma, Vishnu, and Shiva (the dawn invocation), and the Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu and Ketu, all make my morning auspicious.',
-            hi: 'ब्रह्मा, विष्णु एवं शिव (प्रातः-वंदना के अधिष्ठाता), तथा सूर्य, चन्द्र, मंगल, बुध, बृहस्पति, शुक्र, शनि, राहु एवं केतु — सभी मेरे प्रातः को मंगलमय करें।',
+            en: 'The Navagraha prabhāta-vandana (morning stuti): may Brahma, Viṣṇu (Murāri), Śiva (Tripurāntakāri), the Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rāhu and Ketu — all of them — make my morning auspicious.',
+            hi: 'नवग्रह प्रातः-वंदना: ब्रह्मा, विष्णु (मुरारि), शिव (त्रिपुरान्तकारी), सूर्य, चन्द्र, मंगल, बुध, बृहस्पति, शुक्र, शनि, राहु एवं केतु — सभी मेरे प्रातःकाल को मंगलमय करें।',
           },
           reviewPending: true,
         },
@@ -1417,8 +1440,18 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
         slug: 'navagraha-stotra',
         name: { sanskrit: 'नवग्रह-स्तोत्र', en: 'Navagraha Stotra', hi: 'नवग्रह-स्तोत्र' },
         line: {
-          en: 'Recite the Navagraha Stotra (Vyasa) or the Navagraha Stuti — nine verses, one per graha. For an active Sade Sati, follow with one mala of "Om Sham Shanaishcharaye Namah"; for an active Mangal Dosha, one mala of "Om Ham Hanumate Namah" (Hanuman is the classical pacifier of Mangal-pīḍā).',
-          hi: 'नवग्रह स्तोत्र (व्यास) अथवा नवग्रह स्तुति का पाठ करें — नौ श्लोक, प्रति ग्रह एक। सक्रिय साढ़े साती हेतु एक माला "ॐ शं शनैश्चराय नमः"; सक्रिय मंगल दोष हेतु एक माला "ॐ हं हनुमते नमः" (हनुमान मंगल-पीड़ा के शास्त्रोक्त शान्तिदाता)।',
+          en: 'Recite the Navagraha Stotra (Vyasa) or the Navagraha Stuti — nine verses, one per graha; the opening Sūrya-vandana is below. For an active Sade Sati, follow with one mala of "Om Sham Shanaishcharaye Namah"; for an active Mangal Dosha, one mala of "Om Ham Hanumate Namah" (Hanuman is the classical pacifier of Mangal-pīḍā).',
+          hi: 'नवग्रह स्तोत्र (व्यास) अथवा नवग्रह स्तुति का पाठ करें — नौ श्लोक, प्रति ग्रह एक; नीचे आरंभिक सूर्य-वन्दना दी गई है। सक्रिय साढ़े साती हेतु एक माला "ॐ शं शनैश्चराय नमः"; सक्रिय मंगल दोष हेतु एक माला "ॐ हं हनुमते नमः" (हनुमान मंगल-पीड़ा के शास्त्रोक्त शान्तिदाता)।',
+        },
+        mantra: {
+          jaapSlug: null,
+          devanagari: 'जपाकुसुमसङ्काशं काश्यपेयं महाद्युतिम् ।\nतमोऽरिं सर्वपापघ्नं प्रणतोऽस्मि दिवाकरम् ॥',
+          iast: 'japākusumasaṅkāśaṁ kāśyapeyaṁ mahādyutim |\ntamo\'riṁ sarvapāpaghnaṁ praṇato\'smi divākaram ||',
+          meaning: {
+            en: "I bow to Divākara (the day-maker, Sūrya) — radiant as the japa flower, son of Kaśyapa, of great splendour, foe of darkness, destroyer of all sins. (Opening śloka of the Navagraha Stotra attributed to Vyāsa; one parallel verse follows for each of the other eight grahas.)",
+            hi: 'मैं दिवाकर (दिन के स्रष्टा, सूर्य) को प्रणाम करता/करती हूँ — जपा-पुष्प सम तेजस्वी, कश्यप-पुत्र, महातेज, अंधकार के शत्रु, समस्त पापों के नाशक। (व्यास-कृत नवग्रह स्तोत्र का आरंभिक श्लोक; अन्य आठ ग्रहों के लिए तदनुरूप एक-एक श्लोक क्रमशः आते हैं।)',
+          },
+          reviewPending: true,
         },
       },
       ...STANDARD_CLOSING_ARC,
@@ -1466,6 +1499,20 @@ export const FEATURED_PUJAS: readonly PujaContent[] = [
         text: {
           en: "Rahu and Ketu are chāyā-grahas (shadow grahas) — they have no physical body. In navagraha puja they are invoked alongside the seven physical grahas at the corner positions of the yantra; some texts give them their own separate puja (Kaal Sarp Yoga shanti).",
           hi: 'राहु एवं केतु छाया-ग्रह हैं — इनका भौतिक शरीर नहीं। नवग्रह पूजा में इनका आवाहन सात भौतिक ग्रहों के साथ यन्त्र के कोणीय स्थानों पर होता है; कुछ ग्रन्थ इन्हें पृथक् पूजा (काल सर्प योग शान्ति) देते हैं।',
+        },
+      },
+      {
+        label: { en: 'Vandana vs per-graha avahana', hi: 'वंदना बनाम प्रति-ग्रह आवाहन' },
+        text: {
+          en: "The opening 'Brahma Murari Tripurantakari...' is a morning Navagraha *prabhāta-vandana* (stuti) — a single verse naming all nine, traditionally recited at sunrise and folded into the dhyāna for a compact household puja. The formal avahana is a separate sequence: one bīja-mantra per graha, recited as that graha is invoked at its yantra-position (oṁ hrāṁ hrīṁ hrauṁ saḥ sūryāya namaḥ for Surya, and the parallel forms for the other eight). For a chart-driven shanti puja a pandit usually opens with the prabhāta-vandana *and* recites a full mala (108) of the afflicted graha's bīja-mantra.",
+          hi: 'आरंभिक "ब्रह्मा मुरारिस्त्रिपुरान्तकारी..." नवग्रह प्रातः-वंदना (स्तुति) है — एक एकल श्लोक जो सभी नौ का स्मरण करता है, पारंपरिक रूप से सूर्योदय पर पढ़ा जाता है तथा संक्षिप्त गृह-पूजा में ध्यान-चरण में सम्मिलित किया जाता है। औपचारिक आवाहन एक पृथक् क्रम है: प्रति ग्रह एक बीज-मन्त्र, उस ग्रह को यन्त्र-स्थान पर आहूत करते समय (सूर्य के लिए ॐ ह्रां ह्रीं ह्रौं सः सूर्याय नमः, अन्य आठ के लिए तदनुरूप)। कुंडली-आधारित शान्ति पूजा में पंडित जी प्रायः प्रातः-वंदना के साथ-साथ पीड़ित ग्रह के बीज-मन्त्र की एक माला (108) का भी पाठ करते हैं।',
+        },
+      },
+      {
+        label: { en: 'Grain & botanical variations', hi: 'धान्य एवं वनस्पति-भेद' },
+        text: {
+          en: "Chandra and Shukra are both listed as 'rice' / 'white rice' in the table; some traditions use unbroken raw rice for Chandra and basmati for Shukra to distinguish them. Ketu's flower is given as red oleander, but kusha grass and multi-coloured flowers are also widely accepted (Ketu has no fixed colour). Durva (Budh) is a grass, not a flower — pandits substitute green leaves where durva is not available.",
+          hi: 'चन्द्र एवं शुक्र दोनों के लिए तालिका में "चावल" / "श्वेत चावल" है; कुछ परंपराओं में चन्द्र के लिए अखंडित कच्चा चावल एवं शुक्र के लिए बासमती से इन्हें भिन्न किया जाता है। केतु का पुष्प लाल कनेर बताया गया है, परंतु कुश तृण एवं बहु-वर्ण पुष्प भी व्यापक रूप से मान्य हैं (केतु का कोई स्थिर वर्ण नहीं)। दूर्वा (बुध) तृण है, पुष्प नहीं — जहाँ दूर्वा उपलब्ध न हो, पंडित जी हरे पत्ते स्वीकार करते हैं।',
         },
       },
     ],

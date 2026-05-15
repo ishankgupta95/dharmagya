@@ -18,6 +18,7 @@ import {
   NAVRATRI_SOURCES,
   SAPTASHATI_CHAPTERS,
   SAPTASHATI_DAY_MAP,
+  SAPTASHATI_DAY_MAP_CAPTION,
 } from '@/config/navratri';
 
 type Lang = ContentLang;
@@ -138,6 +139,9 @@ export default function ScriptureDetailScreen() {
             <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
               {tForLang('scripture.dayMapLabel')}
             </Kicker>
+            <Text variant="body-italic" style={[styles.dayMapCaption, { color: colors.textTertiary }]}>
+              {SAPTASHATI_DAY_MAP_CAPTION[lang]}
+            </Text>
             {dayMap.map(entry => (
               <View
                 key={entry.day}
@@ -255,6 +259,7 @@ const styles = StyleSheet.create({
   sectionKicker: { marginBottom: 12 },
 
   // Day map
+  dayMapCaption: { fontSize: 12.5, lineHeight: 19, marginBottom: 12, marginTop: -4 },
   dayMapRow: {
     flexDirection: 'row',
     alignItems: 'stretch',

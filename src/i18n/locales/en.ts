@@ -1152,6 +1152,8 @@ export default {
       dayKanyaBody: "Today is for {{form}} — colour {{color}}, bhog {{bhog}}. Kanya Pujan is kept on Ashtami or Navami.",
       day10Title: 'Vijayadashami · Dussehra',
       day10Body: 'Durga visarjan today. Ravan Dahan and Shami Pujan in many traditions.',
+      day1MuhuratTitle: 'Ghatasthapana muhurat starts soon',
+      day1MuhuratBody: 'The auspicious window for Kalash Sthapana begins in about 30 minutes — {{range}}.',
     },
     // Accessibility
     a11yOpenGuide: 'Open the Navratri 9-day guide',

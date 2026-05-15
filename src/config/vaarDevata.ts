@@ -94,6 +94,15 @@ export interface VaarMantra {
    * scholar sign-off (PLAN §8 content-accuracy posture).
    */
   reviewPending: true;
+  /**
+   * One-line label explaining what category of mantra this is — the seven
+   * weekday mantras don't share a single form (some are deity-pranāma, some
+   * graha-bīja + deity dative, some deity-bīja + deity dative). Each line is
+   * the canonical, most-recited form for that day in its tradition rather
+   * than being forced into one shape; this note discloses the choice so a
+   * reader can compare across days. Always present in v1.
+   */
+  variantNote: Bilingual;
 }
 
 export interface VaarVariantNote {
@@ -179,6 +188,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
       iast: 'oṁ sūryāya namaḥ',
       meaning: { en: 'Om, salutations to Surya, the Sun.', hi: 'ॐ, सूर्य देव को नमस्कार।' },
       reviewPending: true,
+      variantNote: {
+        en: 'Deity-name in the dative case (no bīja) — the simple Sūrya-praṇāma used in the prātaḥ-sandhyā tradition at sunrise.',
+        hi: 'देव-नाम चतुर्थी विभक्ति में (बीज-रहित) — सूर्योदय की प्रातः-सन्ध्या परंपरा में प्रयुक्त सरल सूर्य-प्रणाम।',
+      },
     },
     fasting: {
       en: 'Ravivar Vrat is kept for health and vitality — one meal before sunset, often without salt or oil, after offering the dawn arghya.',
@@ -186,10 +199,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
     },
     variantNotes: [
       {
-        label: { en: 'Bhairava Ravivara Vrat', hi: 'भैरव रविवार व्रत' },
+        label: { en: 'Aditya Hṛdaya Stotra', hi: 'आदित्य हृदय स्तोत्र' },
         text: {
-          en: 'Some traditional almanacs also record a Bhairava Ravivara Vrat — a Shaiva observance of Bhairava on Sundays.',
-          hi: 'कुछ पारंपरिक पंचांगों में रविवार को भैरव रविवार व्रत भी मिलता है — रविवार को भैरव की उपासना की शैव परंपरा।',
+          en: "Sunday morning is the classical time for the Āditya Hṛdaya Stotra — the dawn-hymn the sage Agastya gave Rama on the battlefield before Ravana (Vālmīki Rāmāyaṇa, Yuddha Kāṇḍa, sarga 105). Recited at sunrise with the arghya, it's the most widely-kept Sunday Sūrya practice today.",
+          hi: 'रविवार प्रातः आदित्य हृदय स्तोत्र का शास्त्रोक्त समय है — रावण-युद्ध से पूर्व महर्षि अगस्त्य द्वारा श्री राम को दिया गया प्रातः-स्तोत्र (वाल्मीकि रामायण, युद्ध काण्ड, सर्ग 105)। सूर्योदय पर अर्घ्य के साथ पाठ — आज की सर्वाधिक प्रचलित रविवार-सूर्य साधना।',
         },
       },
     ],
@@ -236,6 +249,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
       iast: 'oṁ namaḥ śivāya',
       meaning: { en: 'Om, salutations to Shiva.', hi: 'ॐ, शिव को नमस्कार।' },
       reviewPending: true,
+      variantNote: {
+        en: 'The classical Shaiva *pañcākṣarī* mantra (five syllables, no bīja) — the most widely-recited Shiva invocation across India and the canonical Somvar mantra.',
+        hi: 'शास्त्रोक्त शैव *पञ्चाक्षरी* मन्त्र (पाँच अक्षर, बीज-रहित) — सम्पूर्ण भारत में सर्वाधिक प्रचलित शिव-आवाहन एवं सोमवार का शास्त्रोक्त मन्त्र।',
+      },
     },
     fasting: {
       en: 'Somvar Vrat — a single satvik meal in the evening after Shiva puja. Solah Somvar (sixteen consecutive Mondays) and the Mondays of the month of Shravan are the classical observances.',
@@ -302,6 +319,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
       iast: 'oṁ haṁ hanumate namaḥ',
       meaning: { en: 'Om, haṁ — salutations to Hanuman.', hi: 'ॐ, हं — हनुमान को नमस्कार।' },
       reviewPending: true,
+      variantNote: {
+        en: 'Graha-bīja (*haṁ* — the Mars / Mangal-bīja) + deity dative — the standard Mangal-bound Hanuman form for Mangalvar vrat and Mangal-dosha shanti. Hanuman is here addressed as Mangal\'s classical pacifier rather than through his own seed-mantra.',
+        hi: 'ग्रह-बीज (*हं* — मंगल-बीज) + देव-नाम चतुर्थी — मंगलवार व्रत एवं मंगल-दोष शान्ति हेतु मानक मंगल-बद्ध हनुमान स्वरूप। यहाँ हनुमान को उनके अपने बीज-मन्त्र से नहीं, अपितु मंगल के शास्त्रोक्त शान्तिदाता के रूप में आहूत किया गया है।',
+      },
     },
     fasting: {
       en: 'Mangalvar Vrat — kept with a single meal (often wheat- and jaggery-based, without salt); widely observed for strength, protection, courage, and relief from the afflictions of Mangal Dosha.',
@@ -363,6 +384,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
         hi: 'ॐ, गं — विघ्नहर्ता गणपति को नमस्कार।',
       },
       reviewPending: true,
+      variantNote: {
+        en: "Deity-bīja (*gaṁ* — Ganeśa's own seed-mantra, not the Mercury-bīja) + deity dative. Wednesday's Ganeśa worship draws on his Vighnaharta role; the graha Budha is addressed separately via the Budha-bīja `oṁ braṁ bṛhaspataye namaḥ` style only when an explicit Budha-graha shanti is being performed.",
+        hi: '*देव-बीज* (गं — गणेश का अपना बीज-मन्त्र, बुध-बीज नहीं) + देव-नाम चतुर्थी। बुधवार की गणेश-उपासना उनके विघ्नहर्ता स्वरूप पर आधारित है; बुध-ग्रह को बुध-बीज शैली से तब आहूत किया जाता है जब विशेषतः बुध-ग्रह शान्ति की जा रही हो।',
+      },
     },
     fasting: {
       en: 'Budhvar Vrat is kept by some seekers of intellect, learning, and success in trade — a single satvik meal; green moong, green vegetables, and green cloth are favoured.',
@@ -431,6 +456,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
         hi: 'ॐ, भगवान वासुदेव (विष्णु / कृष्ण) को नमस्कार।',
       },
       reviewPending: true,
+      variantNote: {
+        en: "Viṣṇu's classical twelve-syllable *dvādaśākṣarī* mantra (no bīja) — the most widely-recited Vaiṣṇava invocation. Guruvar is given to Viṣṇu by tradition; the graha Bṛhaspati is addressed separately when a chart-driven Bṛhaspati-graha shanti is being performed (`oṁ bṛṁ bṛhaspataye namaḥ`).",
+        hi: 'विष्णु का शास्त्रोक्त द्वादशाक्षरी मन्त्र (बीज-रहित) — सर्वाधिक प्रचलित वैष्णव आवाहन। गुरुवार परंपरा से विष्णु को समर्पित है; गुरु ग्रह बृहस्पति को कुंडली-आधारित बृहस्पति-ग्रह शान्ति के समय पृथक् रूप से (`ॐ बृं बृहस्पतये नमः`) आहूत किया जाता है।',
+      },
     },
     fasting: {
       en: "Guruvar Vrat — a yellow-themed fast (yellow food, often no salt, one meal), kept for a guru's blessings, knowledge, marriage prospects, and Brihaspati's favour; many recite the Brihaspativar Vrat Katha. The Thursday Sai fast is kept in the same spirit.",
@@ -491,6 +520,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
         hi: 'ॐ, श्रीं — धन-वैभव की महादेवी महालक्ष्मी को नमस्कार।',
       },
       reviewPending: true,
+      variantNote: {
+        en: "Deity-bīja (*śrīṁ* — Lakṣmī's own seed-mantra) + deity dative — the standard Shukravar form; the same `śrīṁ` opens the Mahālakṣmī Aṣṭakam and the Śrī Sūkta. Śukra-graha shanti, when called for by a chart, uses the Śukra-bīja `oṁ śuṁ śukrāya namaḥ` instead.",
+        hi: 'देव-बीज (*श्रीं* — लक्ष्मी का अपना बीज-मन्त्र) + देव-नाम चतुर्थी — शुक्रवार का मानक स्वरूप; यही `श्रीं` महालक्ष्मी अष्टकम् एवं श्री सूक्त के आरंभ में आता है। कुंडली-आधारित शुक्र-ग्रह शान्ति में शुक्र-बीज `ॐ शुं शुक्राय नमः` का प्रयोग होता है।',
+      },
     },
     fasting: {
       en: 'Shukravar Vrat — a Friday fast for wealth, contentment, and household prosperity; in the popular Santoshi Mata form it runs sixteen Fridays with no sour food (no lemon, tamarind, or curd) for the duration, ending with a Udyapan.',
@@ -558,6 +591,10 @@ export const VAAR_DEVATA: readonly VaarDevata[] = [
         hi: 'ॐ, शं — मंद गति वाले शनि देव को नमस्कार।',
       },
       reviewPending: true,
+      variantNote: {
+        en: "Graha-bīja (*śaṁ* — the Saturn / Śani-bīja) + deity dative — Śani Dev is invoked as the graha (Śanaiścara, the slow-moving one) rather than as a separate Purāṇic deity. The standard Shanivar form for Sade Sati and Śani-daśā remedies; often paired with Hanuman japa.",
+        hi: 'ग्रह-बीज (*शं* — शनि-बीज) + देव-नाम चतुर्थी — शनि देव यहाँ ग्रह (शनैश्चर, मंद-गति वाले) के रूप में आहूत हैं, पृथक् पौराणिक देवता के रूप में नहीं। साढ़े साती एवं शनि-दशा उपायों हेतु मानक शनिवार स्वरूप; प्रायः हनुमान-जप के साथ युग्म।',
+      },
     },
     fasting: {
       en: 'Shanivar Vrat — a Saturday fast with black sesame, urad dal, and a sesame-oil lamp; widely kept for relief during Sade Sati, a Shani daśā, or his transit-aspect. Hanuman is worshipped on this day too; oil is offered at Shani temples.',

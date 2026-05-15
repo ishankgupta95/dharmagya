@@ -282,7 +282,8 @@ export function enumerateNavratriReminders(
 
     let body: string;
     if (slot.day === 1) {
-      // Day 1 includes Ghatasthapana muhurat in the body.
+      // Day 1 includes Ghatasthapana muhurat in the body, and an additional
+      // T-30min muhurat-start reminder is appended after the loop.
       const gm = computeGhatasthapanaMuhurat(slot.date, {
         coords: coords ?? undefined,
         ayanamsa,
@@ -315,6 +316,33 @@ export function enumerateNavratriReminders(
       body,
     });
   }
+
+  // Day-1 Ghatasthapana muhurat reminder — fires ~30 minutes before muhurat
+  // start. Skipped if the muhurat can't be computed (no coords) or its T-30
+  // moment is already past / outside the horizon.
+  const day1 = window.days[0];
+  if (day1) {
+    const gm = computeGhatasthapanaMuhurat(day1.date, {
+      coords: coords ?? undefined,
+      ayanamsa,
+      masaSystem,
+    });
+    if (gm) {
+      const reminderAt = new Date(gm.start.getTime() - 30 * 60 * 1000);
+      const reminderMs = reminderAt.getTime();
+      if (reminderMs >= nowMs && reminderMs <= cutoffMs) {
+        out.push({
+          id: `${NAVRATRI_PREFIX}ghatasthapana-${navratriDayYmd(day1.date)}`,
+          fireAt: reminderAt,
+          title: i18n.t('navratri.notif.day1MuhuratTitle'),
+          body: i18n.t('navratri.notif.day1MuhuratBody', {
+            range: formatMuhuratRange(gm.start, gm.end),
+          }),
+        });
+      }
+    }
+  }
+
   return out;
 }
 
