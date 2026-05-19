@@ -214,6 +214,7 @@ export default {
   god: {
     aartiBadge: 'Aarti',
     chalisaBadge: 'Chalisa',
+    kathaBadge: 'Vrat Katha',
     chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
@@ -1113,7 +1114,6 @@ export default {
     startJaap: 'Start Jaap',
     dhyanaLabel: 'Dhyana shloka',
     bhogLabel: 'Bhog / prasad',
-    chakraLabel: 'Chakra',
     ghatasthapanaLabel: 'Ghatasthapana muhurat',
     ghatasthapanaWindowNote: 'Computed for your location — the first one-third of the day while Pratipada prevails.',
     ghatasthapanaAbhijitFallback: 'Pratipada ends before sunrise — use the Abhijit muhurta window instead.',
@@ -1164,6 +1164,18 @@ export default {
     a11yOpenSaptashati: 'Open the Durga Saptashati outline',
     // P14.2 cross-link: Ghatasthapana puja vidhi
     openGhatasthapanaPuja: 'Open the Ghatasthapana puja vidhi',
+    // Kanya Pujan (dedicated guide — /navratri/kanya-pujan)
+    kanyaPujanCardCta: 'Read the Kanya Pujan guide',
+    kanyaTitle: 'Kanya Pujan',
+    kanyaEyebrow: 'NINE GIRLS HONOURED AS THE DEVI',
+    kanyaAboutLabel: 'About the rite',
+    kanyaWhenLabel: 'When it is kept',
+    kanyaAgeNamesLabel: 'The nine kanyas',
+    kanyaAgeLabel: 'AGE {{age}}',
+    kanyaProtocolLabel: 'The rite, step by step',
+    kanyaOfferingsLabel: 'Offerings',
+    kanyaNotesLabel: 'Notes',
+    a11yOpenKanyaPujan: 'Open the Kanya Pujan guide',
   },
 
   // ── Scripture reader (P14.3) ────────────────────────────────────────────
@@ -1179,11 +1191,26 @@ export default {
     chaptersN_other: 'Chapters {{list}}',
   },
 
+  // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────
+  katha: {
+    indexTitle: 'Vrat Kathas',
+    indexEyebrow: 'RECITED WHEN A VRAT IS KEPT',
+    indexIntro: 'The traditional narratives recited when a vrat is observed — each paired with its puja samagri and vidhi. Tap a katha to read it in full.',
+    notFound: 'This katha is not available.',
+    aboutLabel: 'About this katha',
+    samagriLabel: 'Puja Samagri',
+    vidhiLabel: 'Puja Vidhi',
+    adhyayKicker: 'ADHYAY {{num}}',
+    sourcesLabel: 'About this',
+    a11yOpenKatha: 'Open {{name}}',
+    festivalCta: 'READ THE VRAT KATHA',
+  },
+
   // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
   practice: {
     title: 'Pujas',
     eyebrow: 'PUJA · SADHANA',
-    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide, the Vaar Devata, and seven Featured Pujas with samagri checklists and step-by-step upacharas. Festival-specific vrats (Ekadashi, Karva Chauth, Maha Shivaratri, …) are tracked on the Festivals tab.',
+    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide, the Vaar Devata, seven Featured Pujas with samagri checklists and step-by-step upacharas, and six vrat kathas. Festival dates (Ekadashi, Maha Shivaratri, …) are tracked on the Festivals tab.',
     comingSoon: 'COMING SOON',
     navratri: {
       title: 'Navratri 9-day guide',
@@ -1197,6 +1224,10 @@ export default {
     pujaVidhi: {
       title: 'Puja Vidhi',
       subtitle: 'Step-by-step household pujas — Satyanarayan, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha, Ghatasthapana.',
+    },
+    kathas: {
+      title: 'Vrat Kathas',
+      subtitle: 'The stories recited when keeping a vrat — Satyanarayan, Karva Chauth, Vaibhav Lakshmi, Santoshi Mata, Solah Somvar, Ahoi Ashtami.',
     },
   },
 

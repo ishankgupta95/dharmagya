@@ -130,6 +130,16 @@ export default function PracticeTab() {
             t={t}
           />
 
+          {/* ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────── */}
+          <PracticeRow
+            icon="text"
+            title={t('practice.kathas.title')}
+            subtitle={t('practice.kathas.subtitle')}
+            onPress={() => router.push('/katha')}
+            colors={colors}
+            t={t}
+          />
+
           <View style={styles.adWrap}>
             <AdBanner colors={colors} placement="astrologyInline" inline />
           </View>

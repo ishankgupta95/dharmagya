@@ -35,7 +35,7 @@
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "expo-store-review": "~9.0.9",
-    "hindu-devotional-texts": "^0.2.0",
+    "hindu-devotional-texts": "0.3.0",
     "i18next": "^26.0.3",
     "panchang-ts": "^4.1.1",
     "react": "19.1.0",

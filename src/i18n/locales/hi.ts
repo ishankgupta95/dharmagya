@@ -208,6 +208,7 @@ export default {
   god: {
     aartiBadge: 'आरती',
     chalisaBadge: 'चालीसा',
+    kathaBadge: 'व्रत कथा',
     chaupaiCount: '{{count}} चौपाई',
     noContent: 'अभी कोई सामग्री उपलब्ध नहीं',
     deityNotFound: 'देवता नहीं मिले',
@@ -1102,7 +1103,6 @@ export default {
     startJaap: 'जप आरंभ करें',
     dhyanaLabel: 'ध्यान-श्लोक',
     bhogLabel: 'भोग / प्रसाद',
-    chakraLabel: 'चक्र',
     ghatasthapanaLabel: 'घटस्थापना मुहूर्त',
     ghatasthapanaWindowNote: 'आपके स्थान हेतु गणित — दिन के प्रथम तृतीयांश में, जब प्रतिपदा सक्रिय हो।',
     ghatasthapanaAbhijitFallback: 'सूर्योदय से पूर्व ही प्रतिपदा समाप्त हो जाती है — अभिजित मुहूर्त का प्रयोग करें।',
@@ -1149,6 +1149,18 @@ export default {
     a11yOpenSaptashati: 'दुर्गा सप्तशती रूपरेखा खोलें',
     // P14.2 cross-link: घटस्थापना पूजा-विधि
     openGhatasthapanaPuja: 'घटस्थापना पूजा-विधि खोलें',
+    // कन्या पूजन (समर्पित मार्गदर्शिका — /navratri/kanya-pujan)
+    kanyaPujanCardCta: 'कन्या पूजन मार्गदर्शिका पढ़ें',
+    kanyaTitle: 'कन्या पूजन',
+    kanyaEyebrow: 'देवी रूप में नौ कन्याएँ',
+    kanyaAboutLabel: 'अनुष्ठान के विषय में',
+    kanyaWhenLabel: 'कब रखा जाता है',
+    kanyaAgeNamesLabel: 'नौ कन्याएँ',
+    kanyaAgeLabel: '{{age}} वर्ष',
+    kanyaProtocolLabel: 'अनुष्ठान-विधि, क्रमशः',
+    kanyaOfferingsLabel: 'अर्पण',
+    kanyaNotesLabel: 'टिप्पणियाँ',
+    a11yOpenKanyaPujan: 'कन्या पूजन मार्गदर्शिका खोलें',
   },
 
   // ── Scripture reader (P14.3) ────────────────────────────────────────────
@@ -1164,11 +1176,26 @@ export default {
     chaptersN_other: 'अध्याय {{list}}',
   },
 
+  // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────
+  katha: {
+    indexTitle: 'व्रत कथाएँ',
+    indexEyebrow: 'व्रत के समय पठित',
+    indexIntro: 'व्रत रखने पर पठित पारंपरिक कथाएँ — प्रत्येक के साथ उसकी पूजा सामग्री एवं विधि। पूरी कथा पढ़ने हेतु किसी कथा पर स्पर्श करें।',
+    notFound: 'यह कथा उपलब्ध नहीं है।',
+    aboutLabel: 'इस कथा के विषय में',
+    samagriLabel: 'पूजा सामग्री',
+    vidhiLabel: 'पूजा विधि',
+    adhyayKicker: 'अध्याय {{num}}',
+    sourcesLabel: 'इसके विषय में',
+    a11yOpenKatha: '{{name}} खोलें',
+    festivalCta: 'व्रत कथा पढ़ें',
+  },
+
   // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
   practice: {
     title: 'पूजा',
     eyebrow: 'पूजा · साधना',
-    intro: 'पूजा-विधि एवं वार-उपासना — नवरात्रि नौ-दिवसीय मार्गदर्शिका, वार देवता तथा सात विशेष पूजाएँ, प्रत्येक में सामग्री-सूची एवं क्रमिक उपचार। एकादशी, करवा चौथ, महाशिवरात्रि आदि पर्व-विशेष व्रत पर्व-तालिका (Festivals) टैब में सूचीबद्ध हैं।',
+    intro: 'पूजा-विधि एवं वार-उपासना — नवरात्रि नौ-दिवसीय मार्गदर्शिका, वार देवता, सामग्री-सूची एवं क्रमिक उपचार सहित सात विशेष पूजाएँ, तथा छह व्रत कथाएँ। पर्व-तिथियाँ (एकादशी, महाशिवरात्रि आदि) पर्व-तालिका (Festivals) टैब में सूचीबद्ध हैं।',
     comingSoon: 'शीघ्र आ रही',
     navratri: {
       title: 'नवरात्रि नौ-दिवसीय मार्गदर्शिका',
@@ -1182,6 +1209,10 @@ export default {
     pujaVidhi: {
       title: 'पूजा-विधि',
       subtitle: 'गृहस्थ पूजाओं की क्रमिक विधि — सत्यनारायण, लक्ष्मी/दीपावली, गणेश, रुद्राभिषेक, हनुमान, नवग्रह, घटस्थापना।',
+    },
+    kathas: {
+      title: 'व्रत कथाएँ',
+      subtitle: 'व्रत रखते समय पठित कथाएँ — सत्यनारायण, करवा चौथ, वैभव लक्ष्मी, संतोषी माता, सोलह सोमवार, अहोई अष्टमी।',
     },
   },
 

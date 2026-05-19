@@ -36,6 +36,7 @@ import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { getDeityImage } from '@/config/deityImages';
 import { useShareSheet } from '@/store/useShareSheet';
 import { getPujasForDeity } from '@/config/pujas';
+import { getKathasForDeity, type Katha } from '@/config/kathas';
 import {
   getAartiForDeity,
   getChalisaForDeity,
@@ -48,7 +49,8 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 type ListItem =
   | { type: 'aarti'; data: Recitation }
-  | { type: 'chalisa'; data: Chalisa };
+  | { type: 'chalisa'; data: Chalisa }
+  | { type: 'katha'; data: Katha };
 
 interface ListSection {
   title: string;
@@ -71,13 +73,20 @@ export default function GodDetailScreen() {
 
   const aarti = useMemo(() => (deity ? getAartiForDeity(deity.id) : undefined), [deity]);
   const chalisa = useMemo(() => (deity ? getChalisaForDeity(deity.id) : undefined), [deity]);
+  const kathas = useMemo(() => (deity ? getKathasForDeity(deity.id) : []), [deity]);
 
   const sections = useMemo<ListSection[]>(() => {
     const result: ListSection[] = [];
     if (aarti) result.push({ title: t('god.aartiBadge'), data: [{ type: 'aarti', data: aarti }] });
     if (chalisa) result.push({ title: t('god.chalisaBadge'), data: [{ type: 'chalisa', data: chalisa }] });
+    if (kathas.length > 0) {
+      result.push({
+        title: t('god.kathaBadge'),
+        data: kathas.map((k) => ({ type: 'katha', data: k })),
+      });
+    }
     return result;
-  }, [aarti, chalisa, t]);
+  }, [aarti, chalisa, kathas, t]);
 
   const renderItem = useCallback(
     ({ item }: SectionListRenderItemInfo<ListItem, ListSection>) => {
@@ -96,19 +105,33 @@ export default function GodDetailScreen() {
           />
         );
       }
-      const c = item.data;
-      const favKey = `chalisa-${c.deity}`;
-      const chaupaiCount = c.chaupai.hindi.length;
+      if (item.type === 'chalisa') {
+        const c = item.data;
+        const favKey = `chalisa-${c.deity}`;
+        const chaupaiCount = c.chaupai.hindi.length;
+        return (
+          <ContentCard
+            titleHindi={c.titleHindi}
+            titleEnglish={c.titleEnglish}
+            badge={t('god.chalisaBadge')}
+            secondary={chaupaiCount > 0 ? t('god.chaupaiCount', { count: chaupaiCount }) : undefined}
+            colors={colors}
+            isFavorite={favoriteIds.includes(favKey)}
+            onToggleFavorite={() => toggleFavorite(favKey)}
+            onPress={() => router.push(`/chalisa/${c.deity}`)}
+          />
+        );
+      }
+      // Katha — no favorite (favorites are aarti/chalisa-keyed); the card
+      // shows a chevron and pushes the katha reader.
+      const k = item.data;
       return (
         <ContentCard
-          titleHindi={c.titleHindi}
-          titleEnglish={c.titleEnglish}
-          badge={t('god.chalisaBadge')}
-          secondary={chaupaiCount > 0 ? t('god.chaupaiCount', { count: chaupaiCount }) : undefined}
+          titleHindi={k.titleHindi}
+          titleEnglish={k.titleEnglish}
+          badge={t('god.kathaBadge')}
           colors={colors}
-          isFavorite={favoriteIds.includes(favKey)}
-          onToggleFavorite={() => toggleFavorite(favKey)}
-          onPress={() => router.push(`/chalisa/${c.deity}`)}
+          onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: k.slug } })}
         />
       );
     },
@@ -150,7 +173,7 @@ export default function GodDetailScreen() {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item) => `${item.type}-${item.data.deity}`}
+        keyExtractor={(item) => `${item.type}-${item.data.slug}`}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         contentContainerStyle={styles.listContent}
@@ -315,8 +338,10 @@ interface ContentCardProps {
   badge: string;
   secondary?: string;
   colors: ColorPalette;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
+  /** Favorite controls are optional — kathas have no favorite, so the card
+   *  falls back to a chevron when `onToggleFavorite` is omitted. */
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onPress: () => void;
 }
 
@@ -359,14 +384,18 @@ const ContentCard = memo(function ContentCard({
           )}
         </View>
       </View>
-      <FavoriteHeart
-        active={isFavorite}
-        onPress={onToggleFavorite}
-        size={20}
-        inactiveColor={colors.textMuted}
-        activeColor={colors.accent}
-        accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
-      />
+      {onToggleFavorite ? (
+        <FavoriteHeart
+          active={!!isFavorite}
+          onPress={onToggleFavorite}
+          size={20}
+          inactiveColor={colors.textMuted}
+          activeColor={colors.accent}
+          accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+        />
+      ) : (
+        <Icon name="chevron-right" size={18} color={colors.textMuted} />
+      )}
     </TouchableOpacity>
   );
 });

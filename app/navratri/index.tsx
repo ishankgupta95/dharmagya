@@ -351,13 +351,17 @@ function DayCard({
       </View>
 
       {/* ── Dhyana shloka ─────────────────────────────────────────────── */}
-      {form.dhyana && (
-        <SectionCard title={t('navratri.dhyanaLabel')} colors={colors}>
-          <Text variant="deva" style={[styles.dhyana, { color: colors.textPrimary }]}>
-            {form.dhyana[lang]}
-          </Text>
-        </SectionCard>
-      )}
+      <SectionCard title={t('navratri.dhyanaLabel')} colors={colors}>
+        <Text variant="deva" style={[styles.dhyana, { color: colors.textPrimary }]}>
+          {form.dhyana.devanagari}
+        </Text>
+        <Text variant="body-italic" style={[styles.mantraIast, { color: colors.textTertiary }]}>
+          {form.dhyana.iast}
+        </Text>
+        <Text variant="body" style={[styles.mantraMeaning, { color: colors.textSecondary }]}>
+          {form.dhyana.meaning[lang]}
+        </Text>
+      </SectionCard>
 
       {/* ── Bhog ──────────────────────────────────────────────────────── */}
       <SectionCard title={t('navratri.bhogLabel')} colors={colors}>
@@ -367,21 +371,6 @@ function DayCard({
             {form.bhog[lang]}
           </Text>
         </View>
-        {form.bhogAlt && (
-          <View style={[styles.bulletRow, { marginTop: 4 }]}>
-            <View style={[styles.bulletDot, { backgroundColor: colors.accent }]} />
-            <Text variant="body" style={[styles.bulletText, { color: colors.textSecondary }]}>
-              {form.bhogAlt[lang]}
-            </Text>
-          </View>
-        )}
-      </SectionCard>
-
-      {/* ── Chakra ────────────────────────────────────────────────────── */}
-      <SectionCard title={t('navratri.chakraLabel')} colors={colors}>
-        <Text variant="body" style={[styles.paragraph, { color: colors.textSecondary }]}>
-          {form.chakra[lang]}
-        </Text>
       </SectionCard>
 
       {/* ── Day 1: Ghatasthapana muhurat ──────────────────────────────── */}
@@ -429,12 +418,23 @@ function DayCard({
 
       {/* ── Day 8 / 9: Kanya Pujan + havan callout ────────────────────── */}
       {isEighthOrNinth && (
-        <View style={[styles.calloutCard, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}>
+        <TouchableOpacity
+          onPress={() => router.push('/navratri/kanya-pujan')}
+          activeOpacity={0.88}
+          style={[styles.calloutCard, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('navratri.a11yOpenKanyaPujan')}>
           <Kicker color={palette.goldLeaf} size={10}>{t('navratri.kanyaPujanKicker')}</Kicker>
           <Text variant="body" style={[styles.paragraph, { color: colors.textPrimary, marginTop: 10 }]}>
             {t(day.day === 9 ? 'navratri.day9HavanText' : 'navratri.kanyaPujanText', { lang })}
           </Text>
-        </View>
+          <View style={styles.kanyaCtaRow}>
+            <Text variant="mono-caps" style={[styles.kanyaCtaText, { color: palette.goldLeaf }]}>
+              {t('navratri.kanyaPujanCardCta')}
+            </Text>
+            <Icon name="chevron-right" size={13} color={palette.goldLeaf} />
+          </View>
+        </TouchableOpacity>
       )}
 
       {/* ── Day 9: Vijayadashami / Dussehra preview ───────────────────── */}
@@ -693,6 +693,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   saptashatiCta: { fontSize: 9.5, letterSpacing: 1.6 },
+
+  // Kanya Pujan callout CTA (Day 8/9 → /navratri/kanya-pujan)
+  kanyaCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 },
+  kanyaCtaText: { fontSize: 9.5, letterSpacing: 1.6 },
 
   // Cross links
   crossLinksRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.cardGap },

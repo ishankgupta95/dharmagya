@@ -23,6 +23,7 @@ import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/pan
 import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
 import { useShareSheet } from '@/store/useShareSheet';
 import { getPujaForFestivalName } from '@/config/pujas';
+import { getKathaForFestivalName } from '@/config/kathas';
 import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
@@ -498,6 +499,7 @@ function FestivalRowImpl({
             secondary = localizeFestivalDescription(f.description, i18n.language);
           }
           const matchedPuja = getPujaForFestivalName(f.name, f.description);
+          const matchedKatha = getKathaForFestivalName(f.name, f.description);
           const pujaLang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
           return (
             <View key={i} style={styles.festivalItem}>
@@ -524,6 +526,20 @@ function FestivalRowImpl({
                     <Icon name="gift" size={11} color={colors.accent} />
                     <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
                       {t('puja.openNamedPuja', { name: matchedPuja.name[pujaLang] })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {matchedKatha && (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: matchedKatha.slug } })}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    style={styles.pujaCtaRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('katha.a11yOpenKatha', { name: matchedKatha.titleEnglish })}>
+                    <Icon name="text" size={11} color={colors.accent} />
+                    <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
+                      {t('katha.festivalCta')}
                     </Text>
                   </TouchableOpacity>
                 )}

@@ -16,6 +16,7 @@ import i18n, { resolveLanguage } from '@/i18n';
 
 import {
   NAVRATRI_SOURCES,
+  SAPTASHATI_ABOUT,
   SAPTASHATI_CHAPTERS,
   SAPTASHATI_DAY_MAP,
   SAPTASHATI_DAY_MAP_CAPTION,
@@ -125,9 +126,7 @@ export default function ScriptureDetailScreen() {
           <View style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Kicker color={colors.accent} size={10}>{tForLang('scripture.aboutLabel')}</Kicker>
             <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
-              {lang === 'hi'
-                ? 'दुर्गा सप्तशती — मार्कण्डेय पुराण के ८१–९३ अध्याय। तीन चरित्र (मध्यम-पाठ): प्रथम चरित्र — महाकाली; मध्यम चरित्र — महालक्ष्मी; उत्तम चरित्र — महासरस्वती। नवरात्रि की नौ रात्रियों में पारंपरिक पाठ-क्रम के अनुसार पठित।'
-                : "The Durga Saptashati (chapters 81–93 of the Mārkaṇḍeya Purāṇa) is the foundational scripture of Devī worship. Three caritas: Prathama (Mahakali, ch 1), Madhyama (Mahalakshmi, ch 2–4), Uttama (Mahasaraswati, ch 5–13). Read across the 9 nights of Navratri in the schedule below."}
+              {SAPTASHATI_ABOUT[lang]}
             </Text>
             <Text variant="body-italic" style={[styles.aboutReviewNote, { color: colors.textMuted }]}>
               {tForLang('scripture.reviewNote')}
