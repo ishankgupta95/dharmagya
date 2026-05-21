@@ -209,6 +209,7 @@ export default {
     aartiBadge: 'आरती',
     chalisaBadge: 'चालीसा',
     kathaBadge: 'व्रत कथा',
+    scriptureBadge: 'ग्रंथ',
     chaupaiCount: '{{count}} चौपाई',
     noContent: 'अभी कोई सामग्री उपलब्ध नहीं',
     deityNotFound: 'देवता नहीं मिले',
@@ -1163,9 +1164,16 @@ export default {
     a11yOpenKanyaPujan: 'कन्या पूजन मार्गदर्शिका खोलें',
   },
 
-  // ── Scripture reader (P14.3) ────────────────────────────────────────────
+  // ── Scripture reader (P14.3 outline + library scriptures) ──────────────
   scripture: {
     notFound: 'यह ग्रंथ उपलब्ध नहीं है।',
+    // Index screen
+    indexTitle: 'ग्रंथ',
+    indexEyebrow: 'पवित्र ग्रंथ',
+    indexIntro: 'भगवद्गीता एवं तुलसी-सुन्दरकाण्ड के पूर्ण मूल पाठ, तथा नवरात्रि पाठ हेतु प्रयुक्त दुर्गा सप्तशती की रूपरेखा। पढ़ने हेतु किसी ग्रंथ पर स्पर्श करें।',
+    sourcesLabel: 'इसके विषय में',
+    a11yOpenScripture: '{{name}} खोलें',
+    // Saptashati branch
     kickerSaptashati: 'दुर्गा माहात्म्य',
     aboutLabel: 'इस ग्रंथ के विषय में',
     reviewNote: 'श्लोक-दर-श्लोक पूर्ण पाठ विद्वत्-समीक्षाधीन है तथा इस संस्करण में सम्मिलित नहीं है। अध्याय-रूपरेखा एवं नौ-दिवसीय पाठ-तालिका साधना-आधार के रूप में प्रस्तुत है।',
@@ -1174,6 +1182,19 @@ export default {
     chapterKicker: 'अध्याय {{num}}',
     chaptersN_one: 'अध्याय {{list}}',
     chaptersN_other: 'अध्याय {{list}}',
+    // Library-scripture detail
+    subtitleVersesOnly_one: '{{count}} श्लोक',
+    subtitleVersesOnly_other: '{{count}} श्लोक',
+    subtitleChaptersVerses: '{{chapters}} अध्याय · {{verses}} श्लोक',
+    chapterListLabel: 'अध्याय',
+    versesNCount_one: '{{count}} श्लोक',
+    versesNCount_other: '{{count}} श्लोक',
+    readCtaKicker: 'पाठ आरम्भ',
+    readAllVerses_one: '{{count}} श्लोक पढ़ें',
+    readAllVerses_other: 'समस्त {{count}} श्लोक पढ़ें',
+    a11yOpenChapter: 'अध्याय {{num}} खोलें',
+    // Verse reader
+    verseKicker: 'श्लोक {{num}}',
   },
 
   // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────
@@ -1213,6 +1234,10 @@ export default {
     kathas: {
       title: 'व्रत कथाएँ',
       subtitle: 'व्रत रखते समय पठित कथाएँ — सत्यनारायण, करवा चौथ, वैभव लक्ष्मी, संतोषी माता, सोलह सोमवार, अहोई अष्टमी।',
+    },
+    scriptures: {
+      title: 'ग्रंथ',
+      subtitle: 'भगवद्गीता, सुन्दरकाण्ड एवं दुर्गा सप्तशती की रूपरेखा।',
     },
   },
 

@@ -140,6 +140,16 @@ export default function PracticeTab() {
             t={t}
           />
 
+          {/* ── Scriptures (hindu-devotional-texts scriptures/ + Saptashati outline) ── */}
+          <PracticeRow
+            icon="school"
+            title={t('practice.scriptures.title')}
+            subtitle={t('practice.scriptures.subtitle')}
+            onPress={() => router.push('/scripture')}
+            colors={colors}
+            t={t}
+          />
+
           <View style={styles.adWrap}>
             <AdBanner colors={colors} placement="astrologyInline" inline />
           </View>

@@ -215,6 +215,7 @@ export default {
     aartiBadge: 'Aarti',
     chalisaBadge: 'Chalisa',
     kathaBadge: 'Vrat Katha',
+    scriptureBadge: 'Scripture',
     chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
@@ -1178,9 +1179,16 @@ export default {
     a11yOpenKanyaPujan: 'Open the Kanya Pujan guide',
   },
 
-  // ── Scripture reader (P14.3) ────────────────────────────────────────────
+  // ── Scripture reader (P14.3 outline + library scriptures) ──────────────
   scripture: {
     notFound: 'Scripture not available.',
+    // Index screen
+    indexTitle: 'Scriptures',
+    indexEyebrow: 'SACRED TEXTS',
+    indexIntro: 'The Bhagavad Geeta and the Tulsi Sundarkand in their full source text, plus the Durga Saptashati outline used during Navratri recitation. Tap a scripture to read.',
+    sourcesLabel: 'About this',
+    a11yOpenScripture: 'Open {{name}}',
+    // Saptashati branch (kept verbatim from P14.3)
     kickerSaptashati: 'DURGĀ MĀHĀTMYA',
     aboutLabel: 'About this text',
     reviewNote: 'Full verse-by-verse text is under scholarly review and not shipped in this version. The chapter outline + the 9-day pāṭha map are surfaced here as the practice scaffold.',
@@ -1189,6 +1197,19 @@ export default {
     chapterKicker: 'CHAPTER {{num}}',
     chaptersN_one: 'Chapter {{list}}',
     chaptersN_other: 'Chapters {{list}}',
+    // Library-scripture detail
+    subtitleVersesOnly_one: '{{count}} verse',
+    subtitleVersesOnly_other: '{{count}} verses',
+    subtitleChaptersVerses: '{{chapters}} chapters · {{verses}} verses',
+    chapterListLabel: 'The chapters',
+    versesNCount_one: '{{count}} verse',
+    versesNCount_other: '{{count}} verses',
+    readCtaKicker: 'TAP TO READ',
+    readAllVerses_one: 'Read the {{count}} verse',
+    readAllVerses_other: 'Read all {{count}} verses',
+    a11yOpenChapter: 'Open chapter {{num}}',
+    // Verse reader
+    verseKicker: 'VERSE {{num}}',
   },
 
   // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────
@@ -1228,6 +1249,10 @@ export default {
     kathas: {
       title: 'Vrat Kathas',
       subtitle: 'The stories recited when keeping a vrat — Satyanarayan, Karva Chauth, Vaibhav Lakshmi, Santoshi Mata, Solah Somvar, Ahoi Ashtami.',
+    },
+    scriptures: {
+      title: 'Scriptures',
+      subtitle: 'Bhagavad Geeta, Sundarkand, and the Durga Saptashati outline.',
     },
   },
 

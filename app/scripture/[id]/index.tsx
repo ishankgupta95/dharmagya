@@ -21,22 +21,37 @@ import {
   SAPTASHATI_DAY_MAP,
   SAPTASHATI_DAY_MAP_CAPTION,
 } from '@/config/navratri';
+import {
+  getScriptureBySlug,
+  SCRIPTURE_DISCLAIMER,
+  type Scripture,
+} from '@/config/scriptures';
 
 type Lang = ContentLang;
 
 /**
- * Scripture reader — currently surfaces the Durga Saptashati outline + the
- * 9-day chapter map. Full verses are deferred (700-verse content-review pass
- * out of v1 scope); this screen ships the chapter outline + day-mapping per
- * PLAN §8 P14.3 exit criteria.
- *
- * Route is `/scripture/[id]` so future scriptures (Devi Bhagavatam, Lalita
- * Sahasranama, etc.) can land here without a re-architect — for v1 only the
- * id `'durga-saptashati'` is supported.
+ * Scripture detail — dispatches to one of three screens:
+ *   • Durga Saptashati outline + 9-day pāṭha map (no verses; sourced from
+ *     `@/config/navratri`).
+ *   • Library scriptures from `hindu-devotional-texts` (Bhagavad Geeta,
+ *     Sundarkand) — hero + About + chapter list (Geeta) or a single
+ *     "Read all verses" CTA (Sundarkand, which is a single-chapter scripture).
+ *   • A not-found screen if the id matches neither.
  */
 export default function ScriptureDetailScreen() {
-  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
+  if (id === 'durga-saptashati') return <SaptashatiOutlineScreen />;
+
+  const scripture = getScriptureBySlug(id);
+  if (scripture) return <LibraryScriptureDetailScreen scripture={scripture} />;
+
+  return <ScriptureNotFoundScreen />;
+}
+
+// ─── Saptashati outline (unchanged from P14.3) ──────────────────────────────
+
+function SaptashatiOutlineScreen() {
+  const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
   const ornamentTone = isDarkMode ? 'dark' : 'light';
@@ -47,32 +62,8 @@ export default function ScriptureDetailScreen() {
   // the in-screen toggle — same pattern as aarti/chalisa.
   const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
-  // Both hooks must run before any conditional return — Saptashati is the
-  // only scripture in v1, but the same hook order has to hold even on the
-  // not-found branch.
   const dayMap = useMemo(() => SAPTASHATI_DAY_MAP, []);
   const chapters = useMemo(() => SAPTASHATI_CHAPTERS, []);
-
-  if (id !== 'durga-saptashati') {
-    return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-        <View style={styles.notFoundWrap}>
-          <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
-            {t('scripture.notFound')}
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[styles.notFoundBtn, { borderColor: colors.accent }]}
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.back')}>
-            <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
-              {t('common.back') ?? 'Back'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   const titleByLang: Record<Lang, string> = {
     en: 'Durga Saptashati',
@@ -211,6 +202,182 @@ export default function ScriptureDetailScreen() {
   );
 }
 
+// ─── Library-scripture detail (Geeta / Sundarkand) ──────────────────────────
+
+function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
+  const { t } = useTranslation();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const colors = isDarkMode ? darkColors : lightColors;
+  const ornamentTone = isDarkMode ? 'dark' : 'light';
+  const appLanguage = useStore(s => s.language);
+
+  // In-screen LangToggle mirrors the aarti / chalisa / Saptashati pattern —
+  // chrome (kickers, labels, CTAs) and content (hero title, About, chapter
+  // titles) both follow the toggle, not the global app language.
+  const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
+  const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
+
+  const isSingleChapter = scripture.chapters.length === 1;
+  const totalVerses = useMemo(
+    () => scripture.chapters.reduce((n, ch) => n + ch.verses.length, 0),
+    [scripture],
+  );
+  const heroTitle = lang === 'hi' ? scripture.titleHindi : scripture.titleEnglish;
+
+  return (
+    <ScreenMount>
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+
+        {/* ── Header ────────────────────────────────────────────────────── */}
+        <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.back')}>
+            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <View style={[styles.navPill, { borderWidth: 0 }]} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.bodyScroll, { paddingHorizontal: spacing.screenH }]}
+          showsVerticalScrollIndicator={false}>
+
+          {/* ── Hero ─────────────────────────────────────────────────────── */}
+          <View style={styles.heroBlock}>
+            <Text
+              variant={lang === 'hi' ? 'deva-bold' : 'display-italic'}
+              style={[styles.libHeroTitle, { color: colors.textPrimary }]}>
+              {heroTitle}
+            </Text>
+            <Text variant="body-italic" style={[styles.heroSubtitle, { color: colors.textTertiary }]}>
+              {isSingleChapter
+                ? tForLang('scripture.subtitleVersesOnly', { count: totalVerses })
+                : tForLang('scripture.subtitleChaptersVerses', {
+                    chapters: scripture.chapters.length,
+                    verses: totalVerses,
+                  })}
+            </Text>
+            <Ornament variant="lotus" tone={ornamentTone} style={styles.heroRule} />
+          </View>
+
+          {/* ── Lang toggle (shared component) ──────────────────────────── */}
+          <LangToggle lang={lang} onChange={setLang} colors={colors} />
+
+          {/* ── About ───────────────────────────────────────────────────── */}
+          {scripture.about[lang].trim().length > 0 && (
+            <View style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Kicker color={colors.accent} size={10}>{tForLang('scripture.aboutLabel')}</Kicker>
+              <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
+                {scripture.about[lang]}
+              </Text>
+            </View>
+          )}
+
+          {/* ── Read CTA (single-chapter scriptures) OR chapter list ────── */}
+          {isSingleChapter ? (
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/scripture/[id]/[chapter]',
+                  params: { id: scripture.slug, chapter: String(scripture.chapters[0].number) },
+                })
+              }
+              activeOpacity={0.88}
+              style={[styles.readCta, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
+              accessibilityRole="button"
+              accessibilityLabel={tForLang('scripture.readAllVerses', { count: totalVerses })}>
+              <View style={{ flex: 1 }}>
+                <Text variant="mono-caps" style={[styles.readCtaKicker, { color: colors.accent }]}>
+                  {tForLang('scripture.readCtaKicker')}
+                </Text>
+                <Text variant="body" style={[styles.readCtaText, { color: colors.textPrimary }]}>
+                  {tForLang('scripture.readAllVerses', { count: totalVerses })}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.accent} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.section}>
+              <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
+                {tForLang('scripture.chapterListLabel')}
+              </Kicker>
+              {scripture.chapters.map((ch) => (
+                <TouchableOpacity
+                  key={ch.number}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/scripture/[id]/[chapter]',
+                      params: { id: scripture.slug, chapter: String(ch.number) },
+                    })
+                  }
+                  activeOpacity={0.88}
+                  style={[styles.chapterCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={tForLang('scripture.a11yOpenChapter', { num: ch.number })}>
+                  <View style={styles.chapterHead}>
+                    <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider}
+                      wrapperStyle={styles.chapterKickerWrap}>
+                      {tForLang('scripture.chapterKicker', { num: ch.number })}
+                    </Kicker>
+                  </View>
+                  <Text
+                    variant={lang === 'hi' ? 'deva-bold' : 'body'}
+                    style={[styles.chapterSanskrit, { color: colors.textPrimary }]}>
+                    {lang === 'hi' ? (ch.titleSanskrit ?? ch.titleEnglish ?? '') : (ch.titleEnglish ?? ch.titleSanskrit ?? '')}
+                  </Text>
+                  <Text variant="mono-caps" style={[styles.chapterVerseCount, { color: colors.textMuted }]}>
+                    {tForLang('scripture.versesNCount', { count: ch.verses.length })}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* ── Sources / disclaimer ──────────────────────────────────── */}
+          <View style={styles.sourcesBlock}>
+            <Kicker color={colors.textMuted} size={9}>{tForLang('scripture.sourcesLabel')}</Kicker>
+            <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
+              {SCRIPTURE_DISCLAIMER[lang]}
+            </Text>
+          </View>
+
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      </SafeAreaView>
+    </ScreenMount>
+  );
+}
+
+// ─── Not-found ──────────────────────────────────────────────────────────────
+
+function ScriptureNotFoundScreen() {
+  const { t } = useTranslation();
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const colors = isDarkMode ? darkColors : lightColors;
+
+  return (
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+      <View style={styles.notFoundWrap}>
+        <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
+          {t('scripture.notFound')}
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.notFoundBtn, { borderColor: colors.accent }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
+            {t('common.back') ?? 'Back'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -240,7 +407,8 @@ const styles = StyleSheet.create({
   heroBlock: { alignItems: 'center', marginBottom: 22, paddingTop: 8 },
   heroEyebrow: { letterSpacing: 4.0, textAlign: 'center', marginBottom: 12 },
   heroTitle: { lineHeight: 32, letterSpacing: 2.8, textAlign: 'center', paddingHorizontal: 12 },
-  heroSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 8, textAlign: 'center' },
+  libHeroTitle: { fontSize: 28, lineHeight: 36, textAlign: 'center', paddingHorizontal: 12 },
+  heroSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' },
   heroRule: { marginTop: 16, width: '60%' },
 
   // About block
@@ -252,6 +420,20 @@ const styles = StyleSheet.create({
   },
   aboutText: { fontSize: 14, lineHeight: 22, marginTop: 10 },
   aboutReviewNote: { fontSize: 11.5, lineHeight: 17, marginTop: 12 },
+
+  // Read-CTA (single-chapter scriptures)
+  readCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: spacing.cardPadLg,
+    paddingVertical: 16,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    marginBottom: spacing.cardGap,
+  },
+  readCtaKicker: { fontSize: 9, letterSpacing: 1.6 },
+  readCtaText: { fontSize: 15.5, lineHeight: 22, marginTop: 4 },
 
   // Section
   section: { marginBottom: 8 },
@@ -280,7 +462,7 @@ const styles = StyleSheet.create({
   dayMapChapters: { fontSize: 14, lineHeight: 21, padding: 14, paddingBottom: 4 },
   dayMapNote: { fontSize: 12.5, lineHeight: 18, paddingHorizontal: 14, paddingBottom: 12 },
 
-  // Chapter
+  // Chapter card
   chapterCard: {
     borderRadius: borderRadius.card,
     borderWidth: 1,
@@ -292,6 +474,7 @@ const styles = StyleSheet.create({
   chapterSanskrit: { fontSize: 18, lineHeight: 26, marginTop: 4 },
   chapterTitle: { fontSize: 13, lineHeight: 19, marginTop: 4 },
   chapterTheme: { fontSize: 14, lineHeight: 22, marginTop: 10 },
+  chapterVerseCount: { fontSize: 9, letterSpacing: 1.4, marginTop: 10 },
 
   // Sources
   sourcesBlock: { marginTop: 4, gap: 8 },

@@ -37,6 +37,7 @@ import { getDeityImage } from '@/config/deityImages';
 import { useShareSheet } from '@/store/useShareSheet';
 import { getPujasForDeity } from '@/config/pujas';
 import { getKathasForDeity, type Katha } from '@/config/kathas';
+import { getScripturesForDeity, type Scripture } from '@/config/scriptures';
 import {
   getAartiForDeity,
   getChalisaForDeity,
@@ -50,7 +51,8 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 type ListItem =
   | { type: 'aarti'; data: Recitation }
   | { type: 'chalisa'; data: Chalisa }
-  | { type: 'katha'; data: Katha };
+  | { type: 'katha'; data: Katha }
+  | { type: 'scripture'; data: Scripture };
 
 interface ListSection {
   title: string;
@@ -74,6 +76,7 @@ export default function GodDetailScreen() {
   const aarti = useMemo(() => (deity ? getAartiForDeity(deity.id) : undefined), [deity]);
   const chalisa = useMemo(() => (deity ? getChalisaForDeity(deity.id) : undefined), [deity]);
   const kathas = useMemo(() => (deity ? getKathasForDeity(deity.id) : []), [deity]);
+  const scriptures = useMemo(() => (deity ? getScripturesForDeity(deity.id) : []), [deity]);
 
   const sections = useMemo<ListSection[]>(() => {
     const result: ListSection[] = [];
@@ -85,8 +88,14 @@ export default function GodDetailScreen() {
         data: kathas.map((k) => ({ type: 'katha', data: k })),
       });
     }
+    if (scriptures.length > 0) {
+      result.push({
+        title: t('god.scriptureBadge'),
+        data: scriptures.map((s) => ({ type: 'scripture', data: s })),
+      });
+    }
     return result;
-  }, [aarti, chalisa, kathas, t]);
+  }, [aarti, chalisa, kathas, scriptures, t]);
 
   const renderItem = useCallback(
     ({ item }: SectionListRenderItemInfo<ListItem, ListSection>) => {
@@ -122,16 +131,30 @@ export default function GodDetailScreen() {
           />
         );
       }
-      // Katha — no favorite (favorites are aarti/chalisa-keyed); the card
-      // shows a chevron and pushes the katha reader.
-      const k = item.data;
+      if (item.type === 'katha') {
+        // Katha — no favorite (favorites are aarti/chalisa-keyed); the card
+        // shows a chevron and pushes the katha reader.
+        const k = item.data;
+        return (
+          <ContentCard
+            titleHindi={k.titleHindi}
+            titleEnglish={k.titleEnglish}
+            badge={t('god.kathaBadge')}
+            colors={colors}
+            onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: k.slug } })}
+          />
+        );
+      }
+      // Scripture — same chevron treatment as katha; pushes the scripture
+      // detail screen (chapter list for Geeta, single-CTA for Sundarkand).
+      const s = item.data;
       return (
         <ContentCard
-          titleHindi={k.titleHindi}
-          titleEnglish={k.titleEnglish}
-          badge={t('god.kathaBadge')}
+          titleHindi={s.titleHindi}
+          titleEnglish={s.titleEnglish}
+          badge={t('god.scriptureBadge')}
           colors={colors}
-          onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: k.slug } })}
+          onPress={() => router.push({ pathname: '/scripture/[id]', params: { id: s.slug } })}
         />
       );
     },
