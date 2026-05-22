@@ -23,6 +23,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { MotionPressable } from '@/components/common/MotionPressable';
+import { SadhanaStreakBadge } from '@/components/common/SadhanaStreakBadge';
 import { resolveLanguage } from '@/i18n';
 import {
   getAllAppMantras,
@@ -187,6 +188,10 @@ export default function JaapPickerScreen() {
               <Text variant="body-italic" style={[styles.statsHint, { color: colors.textTertiary }]}>
                 {t('jaap.statsSessionCount', { count: stats.sessionCount })}  →
               </Text>
+              {/* Sadhana streak (P14.4) — sits inside the stats card so the
+                  three private metrics (total reps / malas / streak) read
+                  together as "your practice today." */}
+              <SadhanaStreakBadge colors={colors} large style={styles.statsStreakBadge} />
             </TouchableOpacity>
           )}
 
@@ -478,6 +483,7 @@ const styles = StyleSheet.create({
   },
   statsDivider: { width: StyleSheet.hairlineWidth, height: 38 },
   statsHint: { fontSize: 12.5, marginTop: 12 },
+  statsStreakBadge: { marginTop: 12, alignSelf: 'flex-start' },
 
   customCard: {
     borderRadius: borderRadius.card,

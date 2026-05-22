@@ -34,9 +34,14 @@ import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { getDeityImage } from '@/config/deityImages';
+import { useShareSheet } from '@/store/useShareSheet';
+import { getPujasForDeity } from '@/config/pujas';
+import { getKathasForDeity, type Katha } from '@/config/kathas';
+import { getScripturesForDeity, type Scripture } from '@/config/scriptures';
 import {
   getAartiForDeity,
   getChalisaForDeity,
+  getAllAppMantras,
   type Recitation,
   type Chalisa,
 } from '@/services/content';
@@ -45,7 +50,9 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 type ListItem =
   | { type: 'aarti'; data: Recitation }
-  | { type: 'chalisa'; data: Chalisa };
+  | { type: 'chalisa'; data: Chalisa }
+  | { type: 'katha'; data: Katha }
+  | { type: 'scripture'; data: Scripture };
 
 interface ListSection {
   title: string;
@@ -68,13 +75,27 @@ export default function GodDetailScreen() {
 
   const aarti = useMemo(() => (deity ? getAartiForDeity(deity.id) : undefined), [deity]);
   const chalisa = useMemo(() => (deity ? getChalisaForDeity(deity.id) : undefined), [deity]);
+  const kathas = useMemo(() => (deity ? getKathasForDeity(deity.id) : []), [deity]);
+  const scriptures = useMemo(() => (deity ? getScripturesForDeity(deity.id) : []), [deity]);
 
   const sections = useMemo<ListSection[]>(() => {
     const result: ListSection[] = [];
     if (aarti) result.push({ title: t('god.aartiBadge'), data: [{ type: 'aarti', data: aarti }] });
     if (chalisa) result.push({ title: t('god.chalisaBadge'), data: [{ type: 'chalisa', data: chalisa }] });
+    if (kathas.length > 0) {
+      result.push({
+        title: t('god.kathaBadge'),
+        data: kathas.map((k) => ({ type: 'katha', data: k })),
+      });
+    }
+    if (scriptures.length > 0) {
+      result.push({
+        title: t('god.scriptureBadge'),
+        data: scriptures.map((s) => ({ type: 'scripture', data: s })),
+      });
+    }
     return result;
-  }, [aarti, chalisa, t]);
+  }, [aarti, chalisa, kathas, scriptures, t]);
 
   const renderItem = useCallback(
     ({ item }: SectionListRenderItemInfo<ListItem, ListSection>) => {
@@ -93,19 +114,47 @@ export default function GodDetailScreen() {
           />
         );
       }
-      const c = item.data;
-      const favKey = `chalisa-${c.deity}`;
-      const chaupaiCount = c.chaupai.hindi.length;
+      if (item.type === 'chalisa') {
+        const c = item.data;
+        const favKey = `chalisa-${c.deity}`;
+        const chaupaiCount = c.chaupai.hindi.length;
+        return (
+          <ContentCard
+            titleHindi={c.titleHindi}
+            titleEnglish={c.titleEnglish}
+            badge={t('god.chalisaBadge')}
+            secondary={chaupaiCount > 0 ? t('god.chaupaiCount', { count: chaupaiCount }) : undefined}
+            colors={colors}
+            isFavorite={favoriteIds.includes(favKey)}
+            onToggleFavorite={() => toggleFavorite(favKey)}
+            onPress={() => router.push(`/chalisa/${c.deity}`)}
+          />
+        );
+      }
+      if (item.type === 'katha') {
+        // Katha — no favorite (favorites are aarti/chalisa-keyed); the card
+        // shows a chevron and pushes the katha reader.
+        const k = item.data;
+        return (
+          <ContentCard
+            titleHindi={k.titleHindi}
+            titleEnglish={k.titleEnglish}
+            badge={t('god.kathaBadge')}
+            colors={colors}
+            onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: k.slug } })}
+          />
+        );
+      }
+      // Scripture — same chevron treatment as katha; pushes the scripture
+      // detail screen (chapter list for Geeta, single-CTA for Sundarkand).
+      const s = item.data;
       return (
         <ContentCard
-          titleHindi={c.titleHindi}
-          titleEnglish={c.titleEnglish}
-          badge={t('god.chalisaBadge')}
-          secondary={chaupaiCount > 0 ? t('god.chaupaiCount', { count: chaupaiCount }) : undefined}
+          titleHindi={s.titleHindi}
+          titleEnglish={s.titleEnglish}
+          badge={t('god.scriptureBadge')}
           colors={colors}
-          isFavorite={favoriteIds.includes(favKey)}
-          onToggleFavorite={() => toggleFavorite(favKey)}
-          onPress={() => router.push(`/chalisa/${c.deity}`)}
+          onPress={() => router.push({ pathname: '/scripture/[id]', params: { id: s.slug } })}
         />
       );
     },
@@ -147,7 +196,7 @@ export default function GodDetailScreen() {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item) => `${item.type}-${item.data.deity}`}
+        keyExtractor={(item) => `${item.type}-${item.data.slug}`}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         contentContainerStyle={styles.listContent}
@@ -195,9 +244,16 @@ interface HeroBlockProps {
 }
 
 function HeroBlock({ deityId, deityColor, displayName, description, image, colors, onBack }: HeroBlockProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
   const meta = DEITY_BY_ID[deityId];
   const initial = meta?.initial ?? 'ॐ';
+  const openShare = useShareSheet(s => s.open);
+  const sigMantra = useMemo(
+    () => getAllAppMantras().find(m => m.deity === deityId)?.text.devanagari?.split('\n')[0],
+    [deityId],
+  );
+  const featuredPuja = useMemo(() => getPujasForDeity(deityId)[0], [deityId]);
   // Hero photo fades 0→1 over 320ms once decoded (P11.6). Deity-color gradient
   // sits at full opacity underneath as the always-visible scrim, so the user
   // never sees a blank container — only the gradient, then the photo settling
@@ -263,6 +319,32 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         <Text variant="body-italic" style={[styles.heroDescription, { color: colors.textTertiary }]}>
           {description}
         </Text>
+        <View style={styles.heroCtaRow}>
+          <TouchableOpacity
+            onPress={() => openShare({ kind: 'deity-blessing', deityId, mantraHi: sigMantra })}
+            activeOpacity={0.85}
+            style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('share.a11yShare')}>
+            <Icon name="share" size={13} color={colors.accent} />
+            <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
+              {t('share.ctaDeity')}
+            </Text>
+          </TouchableOpacity>
+          {featuredPuja && (
+            <TouchableOpacity
+              onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: featuredPuja.slug } })}
+              activeOpacity={0.85}
+              style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('puja.openDeityPuja', { name: featuredPuja.name[lang] })}>
+              <Icon name="gift" size={13} color={colors.accent} />
+              <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
+                {t('puja.openPujaCta')}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Ornament variant="lotus" style={styles.heroOrnament} />
       </View>
     </View>
@@ -279,8 +361,10 @@ interface ContentCardProps {
   badge: string;
   secondary?: string;
   colors: ColorPalette;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
+  /** Favorite controls are optional — kathas have no favorite, so the card
+   *  falls back to a chevron when `onToggleFavorite` is omitted. */
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onPress: () => void;
 }
 
@@ -323,14 +407,18 @@ const ContentCard = memo(function ContentCard({
           )}
         </View>
       </View>
-      <FavoriteHeart
-        active={isFavorite}
-        onPress={onToggleFavorite}
-        size={20}
-        inactiveColor={colors.textMuted}
-        activeColor={colors.accent}
-        accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
-      />
+      {onToggleFavorite ? (
+        <FavoriteHeart
+          active={!!isFavorite}
+          onPress={onToggleFavorite}
+          size={20}
+          inactiveColor={colors.textMuted}
+          activeColor={colors.accent}
+          accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+        />
+      ) : (
+        <Icon name="chevron-right" size={18} color={colors.textMuted} />
+      )}
     </TouchableOpacity>
   );
 });
@@ -418,6 +506,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: spacing.cardPadLg,
   },
+  heroCtaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  heroShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: borderRadius.chip,
+    borderWidth: 1,
+  },
+  heroShareText: { fontSize: 9 },
   heroOrnament: {
     marginTop: 12,
     width: '55%',

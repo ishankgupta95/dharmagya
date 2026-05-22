@@ -1,6 +1,6 @@
 # SYSTEM CONTEXT: Hindu Devotional App (dharmSetu / MVP Phase)
 
-> **Note:** Done phases are summarized in §6 below. Full sub-phase decisions live in `memory/project_*.md` files and git history. Pending work is in §7 onward, ordered by priority — **optimizations + features first, language support last.**
+> **Note:** Done phases are summarized in §6. Full sub-phase decisions live in `memory/project_*.md` files and git history. Pending work is in §7 onward, ordered by priority — **optimizations + features first, language support last.**
 
 ## 1. Project Objective
 
@@ -17,8 +17,9 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 - Local Database: `expo-sqlite` — currently used for the muhurat scan cache (`muhurat_cache` table) and (future) the Jaap session table. Aartis/chalisas come from the `hindu-devotional-texts` package at runtime. Favorites + preferences live in Zustand (persisted via `expo-sqlite/kv-store`).
 - UI Library: `react-native-paper` (Material Design 3 — for UI components like Cards, Buttons, Surfaces only).
 - Animations: `react-native-reanimated` v4.1.1 + `react-native-gesture-handler` v2.28 (already installed; do NOT reinstall).
-- Typography (post-P6.9.1): `@expo-google-fonts/fraunces` (display serif), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body), `@expo-google-fonts/jetbrains-mono` (mono caps + numeric). **Mukta is removed**; do not reinstall.
-- Icons (post-P6.9.2): custom `<Icon>` component in `src/components/common/Icon.tsx` (react-native-svg, 60 glyphs). `@expo/vector-icons` is no longer a direct dep.
+- Typography (post-P6.9.1): `@expo-google-fonts/fraunces` (display serif), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body). **Mukta and JetBrainsMono are removed**; do not reinstall.
+- Icons (post-P6.9.2): custom `<Icon>` component in `src/components/common/Icon.tsx` (react-native-svg). `@expo/vector-icons` is no longer a direct dep.
+- Backend: **none** — the app is fully offline; all user data is local (SQLite + Zustand-on-kv-store). Phase 15 (§9) would add the first backend.
 - App Loading: `expo-splash-screen` (already installed).
 
 ## 3. Architectural Rules & Conventions
@@ -33,11 +34,13 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 
 ### 3.1 `panchang-ts` API Contract
 
-Pure TypeScript, no native modules, RN-compatible. Wraps as `getPanchangam`, `computeKundli`, `computeAshtakoot`, `computeMangalDosha`, `computeKaalSarp`, `computePitruDosha`, `computeSadeSati`, `computeShadbala`, `computeDignity`, `computeVimshottariDashaFromBirth`, `computeAshtottariDasha`, `computeYoginiDasha`, `computeCharaDasha`, `computeDivisionalChart`, `scoreMuhurta`, etc. Library handles ayanamsa, house system, varga math; consumers cache via LRU keyed on input hash. See [`src/services/astrology/`](src/services/astrology/) for the existing wrapper pattern.
+Pure TypeScript, no native modules, RN-compatible. Wraps as `getPanchangam`, `computeKundli`, `computeAshtakoot`, `computeMangalDosha`, `computeKaalSarp`, `computePitruDosha`, `computeSadeSati`, `computeShadbala`, `computeDignity`, `computeVimshottariDashaFromBirth`, `computeAshtottariDasha`, `computeYoginiDasha`, `computeCharaDasha`, `computeDivisionalChart`, `scoreMuhurta`, plus the 4.0/4.1-era advanced surface (`computeYogas`, `computeJaiminiKarakas`, `computeAshtakavarga`, `computeBhavaBala`, `computeVarshaphala`, `computeTithiPravesha`, `computeUpagrahas`, `computeSpecialLagnas`, `computeArgala`, `matchPathuPorutham`, `computeNarayanDasha`, KP + Prashna helpers), etc. Library handles ayanamsa, house system, varga math; consumers cache via LRU keyed on input hash. See [`src/services/astrology/`](src/services/astrology/) for the existing wrapper pattern.
 
 **Timezone handling:** birth times are wallclock-in-birthplace-tz. Always pass through [`src/utils/time.ts`](src/utils/time.ts) `wallclockInZoneToUtc` before handing to library — `new Date('YYYY-MM-DDTHH:mm:00')` parses in device tz, which breaks any user travelling outside India.
 
 **Performance:** ~5–20ms per kundli compute. LRU caches keep re-renders cheap.
+
+**`abhijitMuhurta` is nullable** (null on Wednesdays, Drik convention) since panchang-ts 4.0.0.
 
 ### 3.2 `expo-sqlite` API (SDK 54+)
 
@@ -65,7 +68,7 @@ Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typ
 
 **Palette ground:** parchment (light) ↔ deep ink (dark). **Accent:** sindoor (light) / goldLeaf (dark) via `colors.accent`. **Emphasis:** sindoorDeep / goldLeaf via `colors.emphasis`. Hardcoded `palette.*` allowed only for CTA backgrounds, parchment-only onboarding steps, content-semantic dark plinths (eclipse), and component-internal defaults all callers override.
 
-**Typography:** Fraunces (display serif + italic), Noto Serif Devanagari (Devanāgarī body, 400/500/700), JetBrains Mono (mono caps + numeric).
+**Typography:** Fraunces (display serif + italic), Noto Serif Devanagari (Devanāgarī body, 400/500/700). Mono caps + numeric fall back to the platform mono font (JetBrainsMono dropped in P11.4).
 
 **Spacing:** 24px screen horizontal padding; 16–20px card internal padding; 16–20px vertical card gap; 12–14px grid gap; tab bar 10px top / `Math.max(insets.bottom, 10)` bottom.
 
@@ -73,7 +76,7 @@ Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typ
 - Theme-responsive surfaces use `colors.surface` / `colors.surfaceRecessed` / `colors.border` / `colors.text*` / `colors.accent` / `colors.emphasis`. Hardcoded palette only in the four exceptions above.
 - Alpha-tinted alert banners: `color + '1E'` (bg) / `+ '66'` (border) / full-color foreground.
 - Plain screen names, not decorative kickers (per `feedback_no_decorative_taglines.md`).
-- No new deities (per `feedback_content_accuracy_audit.md`); 19-deity roster is fixed.
+- No new deities (per `feedback_content_accuracy_audit.md`); the existing roster is fixed — new content (weekday deities, puja vidhi, Navadurga forms) maps onto existing roster entries, it does not add Library deities. (Roster size: **19** — see `src/config/deities.ts` / the `Deity` type in `hindu-devotional-texts`. The content-audit memory's "26" was an over-count; the real, authoritative number is 19. A day's deity that isn't in the roster — Shani Dev, Murugan/Kartikeya, Brihaspati on the Vaar Devata pages — is named as text only: no avatar, no `/god/[id]` page.)
 - SafeAreaView edges: non-tab screens `['top','bottom']`; tab screens `['top']`.
 - Post-task gate: `tsc --noEmit` clean + `npx expo lint` ≤ 8 warnings.
 
@@ -83,7 +86,7 @@ Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typ
 - 220ms default duration, `Easing.out(Easing.cubic)`. Max 320ms for interaction feedback.
 - Stagger cap **120ms total** (post-P11.2; was 400ms); max 6 simultaneous animations per screen.
 - Reduced motion respected via `useReducedMotion()` hook in every animated component.
-- Haptics paired: `Selection` on state change, `Light` on confirmation. Never `Heavy`.
+- Haptics paired: `Selection` on state change, `Light` on confirmation. Never `Heavy` — except the Mantra Counter per-tap `impactAsync(Heavy)` (deliberate, after user feedback that lighter haptics weren't felt).
 - Ambient loops > 2s pause off-screen.
 
 **Compute-behind-animation rule (P11.2, durable — see `memory/feedback_animation_kept_when.md`):** an animation is kept iff (a) it runs on the UI thread without JS jank AND (b) its duration is used to mask compute (cache fetch, kundli compute, route mount, validateCandidates) OR it pairs with an action the user just took (haptic, press, toggle). Cut only if neither holds. Decorative-only animations are OK only if they're *free* — never if they delay content the user is asking for. Concretely: schedule masking animations with Reanimated's native-side primitives (`entering={FadeIn…}`, layout animations, gestures) so they start at mount without waiting for a post-commit `useEffect` to schedule the worklet on a busy JS thread. `ScreenMount` is the canonical example.
@@ -113,31 +116,38 @@ Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typ
 | 12 | Festivals              | `app/festivals.tsx`            |
 | 13 | Kundli Match           | `app/kundli/match.tsx`         |
 | 14 | Muhurat                | `app/muhurat/index.tsx`, `app/muhurat/[occasion].tsx` |
-| 15 | Onboarding             | `app/onboarding/*` (3 steps + walkthrough) |
-| 16 | Location Permission    | `app/location-permission.tsx`  |
+| 15 | Kundli sub-routes      | `app/kundli/varshaphala.tsx`, `app/kundli/prashna.tsx` |
+| 16 | Jaap                   | `app/jaap/index.tsx`, `app/jaap/[slug].tsx`, `app/jaap/history.tsx` |
+| 17 | Onboarding             | `app/onboarding/*` (3 steps + walkthrough) |
+| 18 | Location Permission    | `app/location-permission.tsx`  |
 
 **Removed:** `app/katha/`, `app/rashifal/`, standalone `app/dasha.tsx` (now folded into Astrology tab).
+
+**Added (Phase 14):** `app/vaar/[day].tsx` — Vaar Devata detail screen (P14.1, shipped). `src/components/share/*` + `src/store/useShareSheet.ts` — shareable-card host (P14.5, shipped; off-screen renderer, no route). `app/navratri/{index,vrat}.tsx` + `app/scripture/[id].tsx` — Navratri 9-day guide + vrat-rules screen + Saptashati outline (P14.3, shipped). **`app/puja/{index,[slug]}.tsx`** — Puja Vidhi listing + detail (P14.2, shipped).
 
 ---
 
 ## 6. Shipped phases — summary
 
-All phase decisions and per-sub-phase notes live in `memory/project_*.md`.
+All phase decisions and per-sub-phase notes live in `memory/project_*.md`. **Everything below is in production as of 2026-05-12** (`app.json` shipped, SQLite at `user_version` 5).
 
 - **Phase 1 — MVP** ✅. All 17 steps shipped (initial release).
 - **Phase 1.5 — Follow-ups** ✅ except: Read-Along Mode (deferred — tied to P5.1 audio), Expo Go reminder verification (needs dev build, not Expo Go).
 - **Phase 2 — Daily habit drivers** ✅ partial. P2B reminders + P2C muhurats shipped. P2A vrat katha and P2D rashifal removed (tables dropped on init; do not revive without fresh design — see git log).
 - **Phase 3.3 — Isht Devata personalization** ✅ (2026-04-13). Home re-ranking, "Your Deities" strip, Search re-ranking, Settings → Manage Your Deities.
 - **Phase 6 — Sacred Editorial redesign** ✅ (2026-04-20). All 10 sub-phases. Mukta + Ionicons fully dropped; theme tokens drive everything.
-- **Phase 7.1–7.3 — Motion foundation + system micro-interactions + editorial reveals** ✅ (2026-04-22). Motion tokens, FavoriteHeart, SegmentedChip, ScreenMount, verse stagger, refrain highlight, CornerBrackets draw-in.
+- **Phase 7.1–7.3 — Motion foundation + system micro-interactions + editorial reveals** ✅ (2026-04-22). Motion tokens, FavoriteHeart, SegmentedChip, ScreenMount, verse stagger, refrain highlight, CornerBrackets draw-in. (P7.4 screen transitions → shipped as P11.6; P7.6 perf gate → P11.5; P7.5 signature moments dropped — out of scope, continuous animation with no compute window.)
 - **Phase 8.1 — panchang-ts v2.4 surface** ✅ (2026-05-01). Tarabala, Varjyam, Ganda Mula, Madhyahna, Sandhya, Do Ghati, ayanamsa setting, Chandra Balam, Adhika Masa, instant snapshot, eclipses, GRAHA_ABBR chip, PanchangError diagnostics.
-- **Phase 8.2 — Kundli + Matching + Sade Sati** ✅ (shipped in 1.7.0, 2026-05-06). Astrology tab, North + South charts, D1 + D9, doshas (Mangal + Kaal Sarp + Pitru), Ashtakoot match with saved-charts store, Sade Sati banner, chart style + house system selectors, True Chitra + Thirukanitham ayanamsas.
-- **Phase 8.3 (most of)** ✅ (1.7.0, 2026-05-06). Divisional D2–D30, four dasha systems (Vimshottari/Ashtottari/Yogini/Chara), Shadbala chart, library-backed muhurat (custom RULES dropped, `scoreMuhurta` is source of truth), bundled-candidate fast path, instant-cache render. **Remaining:** Aspects view (now in §10).
-- **panchang-ts 3.1.0 surface** ✅ (2026-05-06). Kaal Sarp + Pitru doshas, Shadbala, D2–D30 divisional charts, Ashtottari/Yogini/Chara dashas wired up.
+- **Phase 8.2 — Kundli + Matching + Sade Sati** ✅ (1.7.0, 2026-05-06). Astrology tab, North + South charts, D1 + D9, doshas (Mangal + Kaal Sarp + Pitru), Ashtakoot match with saved-charts store, Sade Sati banner, chart style + house system selectors, True Chitra + Thirukanitham ayanamsas.
+- **Phase 8.3 — divisional charts + dashas + library-backed muhurat** ✅ (1.7.0, 2026-05-06). Divisional D2–D30, four dasha systems (Vimshottari/Ashtottari/Yogini/Chara), Shadbala chart, library-backed muhurat (custom RULES dropped, `scoreMuhurta` is source of truth), bundled-candidate fast path, instant-cache render. panchang-ts 3.1.0 surface wired up alongside (Kaal Sarp + Pitru doshas, Shadbala, D2–D30, Ashtottari/Yogini/Chara).
 - **1.7.0 Play Store launch** ✅. Screenshots, AAB, staged rollout. Bug fixes flagged 2026-05-06 all resolved (muhurat low-end perf, walkthrough off-screen clamp, screenshots).
-- **Phase 9 — Panchang Densification** ✅ (2026-05-06 → 2026-05-07). The originally-scoped fullscreen calendar route was reversed; instead the Panchang tab was densified into a "Sacred Almanac" ledger. Shipped: layout toggle (compact ↔ dense transposed grid) persisted in Zustand, lazy `useLazyDailyPanchang` hook (daily compute deferred until first accordion expand), category accordions (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), glance section reading from `CalendarDay` snapshot only, Pancha Anga "Sacred Almanac entry" redesign (italic Fraunces kickers replacing 96pt mono-caps label column; auto static/dynamic limb modes), full Hi localisation in dense cells (tithi / paksha / event / Devanagari numerals), default-open Pancha Anga, store v12/v13 migrations (`panchangCategoriesOpen` reset, `xl`/`xxl` font sizes dropped). Yearly drilldown lists (Ekadashi / Sankranti / Upcoming Eclipses) bundled into [`src/services/astrology/calendarService.ts`](src/services/astrology/calendarService.ts).
+- **Phase 9 — Panchang Densification** ✅ (2026-05-06 → 2026-05-07). Fullscreen-calendar route reversed; instead the Panchang tab was densified into a "Sacred Almanac" ledger. Shipped: layout toggle (compact ↔ dense transposed grid) persisted in Zustand, lazy `useLazyDailyPanchang` hook (daily compute deferred until first accordion expand), category accordions (Pancha Anga / Sun & Moon / Auspicious / Inauspicious / Eclipse / Time Quality / For You / Planetary), glance section reading from `CalendarDay` snapshot only, Pancha Anga "Sacred Almanac entry" redesign (italic Fraunces kickers; auto static/dynamic limb modes), full Hi localisation in dense cells, default-open Pancha Anga, store v12/v13 migrations. Yearly drilldown lists (Ekadashi / Sankranti / Upcoming Eclipses) in [`src/services/astrology/calendarService.ts`](src/services/astrology/calendarService.ts).
 - **P4.2 — Today's Panchang widget (Android scaffold)** ✅ (2026-05-06). Android-only AppWidgetProvider drop with system fonts + dark register + foreground+tap-refresh. **iOS WidgetKit deferred** (see §11).
-- **Phase 10 — Aspects + Mantra Counter** ✅ (2026-05-08). P10.3 Mantra Counter (jaap routes + 21 mantras + history; SQLite `jaap_sessions`, user_version 2 → 3) and P10.2 Aspects view (Drishti card inside Kundli, default-closed AccordionSection, surfaces existing `bundle.aspects`). P10.1 (landscape calendar) dropped, not deferred.
+- **Phase 10 — Aspects + Mantra Counter** ✅ (2026-05-08). Drishti card inside Kundli (surfaces `bundle.aspects`, default-closed accordion, row-per-graha + "sits with" chips). Mantra Counter — `app/jaap/*` routes (picker / whole-screen-tap counter with Reanimated SVG progress ring / last-30 history); 21 mantras + custom presets from `hindu-devotional-texts`; mala sizes 27–1008; SQLite `jaap_sessions`, `user_version` 2→3; `custom_mantras` table; entry from Home QuickRow + Settings. P10.1 landscape calendar dropped (out of scope). Notes: `memory/project_p10_2_landed.md`, `project_p10_3_landed.md`, `project_jaap_mantra_polish_2026_05_08.md`.
+- **Phase 11 — Lean Pass (cleanup + low-end perf)** ✅ (2026-05-08 → 2026-05-10). Panchang cold-start fixed (resolved organically by the cuts below — user-verified on device). Compute-behind-animation rule adopted (§4): `STAGGER_CAP_MS` 400→120, `ScreenMount` rebuilt on native-side `FadeIn` layout animation. State-surface trim: `useShallow` collapsing 16 selectors in `KundliSection`, `React.memo` on Dasha rows, dead `usePanchang.ts` deleted. Dependency/asset trim: JetBrainsMono dropped, logo PNGs → webp, 46 i18n keys + 5 Icon glyphs + 4 deps removed. Custom screen transitions (P11.6, lifts P7.4): panchang date crossfade + horizontal swipe gesture, modal-up settings sub-screens, fade for search, god hero photo fade. P11.5 perf gate closed informally (no `perf-baseline.md` artifact; thresholds ≤350ms first paint / ≥58 FPS / ≤5MB delta become the diagnostic target if a regression surfaces). Notes: `memory/project_p11_{2,3,4,6}_landed.md`, `project_phase11_closed.md`.
+- **Phase 12 — panchang-ts 4.0.0 surface** ✅ (2026-05-10). 14 new compute APIs surfaced. In Kundli view: Yogas accordion (named classical yogas + reasons), Jaimini Karakas card, Ashtakavarga heat-grid (Sarva/Bhinna toggle), Bhava Bala 12-bar chart, Advanced Points accordion (Arudhas + Argala + Upagrahas + special lagnas, lazy-computed on open), KP cuspal sub-lords + significators card, Narayan dasha (5th system chip). In match: Pathu Porutham 36-point / 10-fold toggle alongside Ashtakoot. New routes: `/kundli/varshaphala` (Varshaphala annual chart + Tithi Pravesha, system + 1-indexed age toggle, 27-Saham accordion, N/S chart toggle via `cellsFromLagnaPlanets`) and `/kundli/prashna` (query date/time/location form, casts a Prashna chart). Cached entries (LRU) for all time-shifted recomputes; pure-D1 helpers ride along `KundliBundle`. Notes: `memory/project_p12_{1,2,3,4,5}_landed.md`.
+- **Phase 13 — panchang-ts 4.1.0 / 4.1.1 surface** ✅ (2026-05-11). Four opt-ins surfaced: `yoga.bhanga` cancellation tags (strikethrough + "Cancelled by" sub-block); Ashtakoot Bhakoot enrichment via enriched `NatalMoon` (`lagnaRashi` + `navamsaRashi` → 3 extra cancellations), `BirthChartEntry.derived.navamsaRashi` added with forced recompute on old cache rows; 8-Jaimini Karaka variant toggle (default stays 7-Parashara); Sripati cusps + Trikonargala in Advanced Points. Mangal Dosha severity (`none`/`anshik`/`purna`) + cancellation prominence replaces the old binary "afflicted" UI. Muhurat score pills (0..100, banded goldLeaf/gold/amber/sindoor) + "Why this day" reasons on every DayRow + expanded detail; `muhurat_cache` wiped, `user_version` 4→5. Shadbala value-range change (sthana 0–420 V, total +30..+150 V) is invisible to the per-chart-normalised `ShadbalaChart`. Patch-bumped 4.1.0 → 4.1.1 (type-check clean, no surface change). Notes: `memory/project_p13_landed.md`, `project_panchang_ts_4_1_1_landed.md`.
+- **Bundled production release — Phases 10–13 + Jaap polish** ✅ (2026-05-12). Everything in the codebase through panchang-ts 4.1.1 shipped to production. The next ship boundary is clean. Note: `memory/project_phase10_13_in_production.md`.
 
 ---
 
@@ -147,25 +157,187 @@ Add `@sentry/react-native` + `sentry-expo` config plugin (decision 2026-05-02). 
 
 Setup: install plugin, register DSN, set `SENTRY_AUTH_TOKEN` as EAS Build secret so source maps + Hermes bytecode maps upload at build time, wrap root in `Sentry.wrap()`. Ship as a patch — no UI surface change.
 
-Half-day of work. **Deferred until staged rollout reaches 100%** — Play Vitals covers the launch window.
+Half-day of work. **Gated on the staged rollout reaching 100%** — Play Vitals covers the launch window. Small + orthogonal; can slot in anytime after that gate clears.
 
 ---
 
-## 8. Pending — Phase 7 finishing — subsumed into Phase 11 (2026-05-08)
+## 8. Pending — Phase 14 — Devotional Practice & Engagement ⏳ — next active feature work
 
-P7.1–P7.3 shipped (see §6). Remaining sub-phases reorganized:
+**Why (2026-05-12, researched against Sri Mandir / Drik Panchang / AstroSage·AstroTalk + content & technical sources):** Five user-requested features that deepen daily engagement and close competitive gaps — three new devotional-content surfaces (weekday deity worship, puja procedures, a Navratri guide) and two retention/virality mechanics (practice streaks, shareable cards). All are app-internal — no backend, no native modules beyond `react-native-view-shot` / `expo-sharing` / `expo-media-library` for P14.5. Sri Mandir is the only competitor with developed gamification + share-everywhere in this space; nobody offers an interactive guided puja or a panchang-computed Navratri guide — those are genuine gaps. Suggested order within the phase: P14.1 → P14.5 → P14.4 → P14.3 (before its seasonal deadline) → P14.2 (highest effort/risk).
 
-- **P7.4 Screen-level transitions → P11.6** — lifted with compute-masking framing (panchang date crossfade, swipe gesture, muhurat detail fade, god hero fade). The transition's duration becomes the budget for the new-context compute.
-- **P7.5 Signature moments → dropped** — mandala drift = continuous animation with no compute window (battery cost on low-end Android), DeityAvatar Pranam = 700ms with nothing to mask. Both contradict the compute-behind-animation principle. Not deferred — out of scope.
-- **P7.6 Pixel 3a perf gate → P11.5** — full thresholds + artifact specced inside Phase 11.
+**Content-accuracy posture (P14.1–P14.3, hard):** the no-new-deities roster constraint holds (§4). Devotional content (puja steps, mantras, vrat rules, Navadurga details) is sourced from the consumed text package + cross-checked against authoritative references (Drik Panchang's per-deity vidhi pages, Sanskrit Documents Archive for mantra text, scriptural sources for Navadurga iconography), and gets a qualified-reviewer pass before shipping — web sources gave transliterations, not authoritative editions. Where traditions genuinely diverge, the UI states the variation rather than silently picking one. Frame procedures as "a standard home practice," not as any sampradaya's authoritative rite; carry source attribution + a "regional/family variations exist; a pandit's guidance supersedes this app for major ceremonies" disclaimer on puja content.
 
-Phase 7 conventions in §4 (UI thread / transform+opacity / 220ms / reduced-motion / haptics) remain forward-applicable. Phase 11 adds: animations must mask compute or be free; never delay content the user is asking for.
+### P14.1 — Vaar Devata (weekday deity worship) ✅ (2026-05-12 — mantra reviewer-pass still pending)
+
+A daily contextual surface answering "which deities today, and what to do." Each weekday is named for a graha and carries one or more deities + practices. Data + bilingual text live in [`src/config/vaarDevata.ts`](src/config/vaarDevata.ts) (mirrors `festivalNames.ts`); chrome in `vaar.*` i18n. Verified day→deity table (cross-checked across Drik Panchang's Saptavara Vrat list, 99Pandit, AstroVed, pujayagna.com, venupayyanur.com):
+
+| Day (graha) | Deities — **all equal weight, none "primary"** | Color | Top offerings | Weekday mantra | Variant / practice notes |
+| --- | --- | --- | --- | --- | --- |
+| Sun · Ravivar (Surya) | Surya | Red/orange | Red flowers, wheat, jaggery, water arghya at sunrise | `Om Suryaya Namah` | Bhairava Ravivara Vrat (Shaiva tradition) |
+| Mon · Somvar (Chandra) | Shiva · Parvati | White | Bel patra, cold milk, panchamrit, white sweets | `Om Namah Shivaya` | Solah Somvar (16 Mondays); Shravan Somvar |
+| Tue · Mangalvar (Mangal) | Hanuman *(North India)* · Murugan/Kartikeya *(South India / Tamil Nadu)* | Red | Sindoor, mustard-oil diya, boondi/ladoo, bananas | `Om Ham Hanumate Namah` | Mangala Gauri Vrat (Shravan Tuesdays) |
+| Wed · Budhvar (Budh) | Ganesha · Vitthal/Krishna *(Maharashtra)* | Green | Durva grass, modak, banana | `Om Gan Ganapataye Namah` | Budha-graha shanti |
+| Thu · Guruvar (Brihaspati) | Vishnu · Brihaspati *(the day's graha-deity)* · Sai Baba | Yellow | Chana dal + ghee, yellow sweets, tulsi | `Om Namo Bhagavate Vasudevaya` | Brihaspativar Vrat Katha. **Sai Baba is one of the day's deities at equal standing** — not a footnote, not "the Thursday deity" to the exclusion of Vishnu/Brihaspati. |
+| Fri · Shukravar (Shukra) | Lakshmi/Mahalakshmi · Santoshi Mata | White/pink | Kheer, lotus, coconut | `Om Shreem Mahalakshmyai Namah` | Santoshi Mata 16-Friday vrat (no sour food); Vaibhava Lakshmi Vrat (MH/GJ) |
+| Sat · Shanivar (Shani) | Shani Dev · Hanuman | Black/dark blue | Black sesame (til), sesame-oil lamp, urad dal | `Om Sham Shanaishcharaye Namah` | Maa Kali Shanivara Vrat (Shakta tradition); Peepal worship |
+
+**Design — equal-weight deities (no per-day "major" god):** a day's `deities` list is unordered in standing; a deity may carry a neutral `context` chip ("North India", "Maharashtra", "Shakta tradition", …) saying *where / in which tradition* an association holds — never *how important*. The Home card shows the day's roster deities' avatars in a row (no single "lead" image) plus every name; the detail screen lists every deity at equal visual weight (avatar — a neutral `ॐ` monogram for the roster-absent ones — name, context chip, note, and a per-deity Library link where one exists). The per-day mantra is *the weekday mantra by tradition*, surfaced under a "mantra for the day" label — it doesn't designate any listed deity as primary.
+
+**Surfaces (shipped):** Home card "Today's Deities" ([`TodaysDeityCard.tsx`](src/components/common/TodaysDeityCard.tsx)) → Vaar Devata detail screen ([`app/vaar/[day].tsx`](app/vaar/[day].tsx) — 7-day picker, ruling graha + colour, deities of the day, weekday mantra + one-tap "Start Jaap", offerings/bhog, fasting/vrat, variant notes, disclaimer). **Isht Devata tie-in:** if one of the day's deities is one of the user's selected deities, the home card flags "Your Isht Devata is in focus today." **Kundli-remedy tie-in** ([`RemedyNudge.tsx`](src/components/kundli/RemedyNudge.tsx)): contextual nudges keyed to the user's chart — debilitated Chandra → Monday Shiva worship (under the dignity strip); Mangal Dosha (active, uncancelled) → Hanuman on Tuesday; active Sade Sati → Shani + Hanuman on Saturday; running mahādaśā lord → its weekday — framed as "traditionally", never as a fix.
+
+**V1 cap:** 7 days with deities / graha / color / top-3 offerings / the weekday mantra / fasting-rule summary; variants as labeled notes. Per-day Vrat Katha text deferred. **All mantra strings carry `reviewPending: true`** and the detail screen shows a "provisional — transliteration under scholarly review" caption; four of the seven match the `hindu-devotional-texts` package mantras verbatim, but the flag stays set across the board until a qualified-reviewer pass lands (that pass is the one remaining P14.1 item).
+
+### P14.2 — Puja Vidhi (major puja procedures) ✅ (2026-05-14)
+
+A new "Puja" content type — structured worship procedures, surfaced from the Library (pujas are deity-linked) and cross-linked from Festivals, Muhurat, Vaar Devata, and the Jaap counter.
+
+**Reusable framework:** **Shodashopachara** — the 16-upachara sequence: Dhyana/Avahana → Asana → Padya → Arghya → Achamana → Madhuparka → Snana (plain water; Panchamrita for extended) → Vastra → Yajnopavita → Gandha → Pushpa/Archana → Dhupa → Deepa → Naivedya → Tambula → Neerajanam/Aarti, then Pradakshina + Namaskara/Kshama-prarthana to close; **Panchopachara** (Gandha/Pushpa/Dhupa/Deepa/Naivedya) as the lite path. The Sanskrit step names are stable across major sources (Brihat Tantrasara is the cited Agama basis); minor substitutions (Alankara vs Abhara, expanded Panchamrita snana) are acceptable variation. Implement the 16-step skeleton once as a template; each named puja is a parameterization (deity, snana substances, flower, bhog, mantra, stotra/katha). Surrounding liturgical arc per named puja: purification (achamana/pranayama/lamp/Ganesh-dhyana) → **Sankalpa** (gotra/name/place/tithi/nakshatra + intention — obligatory for a named puja) → Kalash puja (+ Prana Pratishtha for new idols only) → the 16 upacharas → stotra/katha (+ optional havan/purnahuti) → close → visarjana (for temporarily-installed images only; permanent home shrines do Uttapana instead).
+
+**V1 named pujas (~7), each = a "when/why" blurb + interactive samagri checklist + numbered steps (Sanskrit name + plain-language line) + deep links (deity aarti / mantra → Jaap counter / relevant muhurat / linked festival):** Satyanarayan Katha Puja (most-performed household puja; ties to next Purnima muhurat), Lakshmi/Diwali Puja, Ganesh Puja, Rudrabhishek (ties to next Pradosh/Monday), Hanuman Puja (ties to Vaar Devata Tue/Sat), Navagraha Shanti Puja (ties to Kundli/Dosha), Navratri Ghatasthapana (ties to P14.3). **Deferred:** Vishnu Sahasranama archana, Saraswati Puja, Mahamrityunjaya jaap (partly served by the counter), Griha Pravesh (needs a priest; complex).
+
+**P14.2b — Guided Mode (deferred):** step-by-step walkthrough screens (reuse the existing walkthrough UI pattern), auto-starting the Jaap counter at the mantra step. High differentiation; out of v1.
+
+**Risks (highest in Phase 14):** (1) accuracy — wrong mantras/step order is a trust-killer → expert-review pass, in-app source attribution, the "variations exist / a pandit supersedes this app" disclaimer; (2) scope creep — "where's X puja" will be immediate → frame as "Featured Pujas," add a request mechanism, don't claim "complete library"; (3) regional/sampradaya variation in samagri + order → label the source tradition, flag major deviations. Drik Panchang's per-deity vidhi pages are the best structured source; cross-validate against a temple/pandit source + Sanskrit Documents Archive for mantra text.
+
+### P14.3 — Navratri / Navadurga 9-day guide ✅ (2026-05-14)
+
+The full nine-day Navratri practice, tied into the existing Festivals screen + panchang computation + daily notifications.
+
+**Navadurga (verified canonical order — Wikipedia, Drik Panchang, Art of Living, JKYog all agree):** Day 1 Shailaputri → 2 Brahmacharini → 3 Chandraghanta → 4 Kushmanda → 5 Skandamata → 6 Katyayani → 7 Kalaratri → 8 Mahagauri → 9 Siddhidatri. Per day surface: form name + iconography (mount, attributes), 2–3-sentence significance, the day's mantra (`ॐ देवी <form>ायै नमः` + the dhyana shloka where available), traditional bhog/prasad (ghee → sugar/mishri → kheer → malpua → banana → honey → jaggery/gur → coconut → sesame; Day 9 also commonly halwa-puri-chana for Kanya Pujan — show both), and the color of the day. (Chakra associations Muladhara→Sahasrara are consistent across sources and safe to include.)
+
+> **⚠️ Colors are NOT fixed per Navadurga form.** The "Yellow=Day1, Green=Day2…" lists online are a 2003 *Maharashtra Times* circulation gimmick, not tradition. Drik Panchang's authoritative system assigns colors by **the weekday Navratri starts**, then a fixed 9-color weekly cycle — so they change every year. **Compute the colors from the panchang (day-of-week on Ashwin Shukla Pratipada → weekday color cycle); never hardcode a color per goddess.** Tell the user: "Colors follow the weekday — this year Day 1 falls on <weekday>, so it's <color>."
+>
+> **⚠️ The Navadurga ↔ Navagraha planet mapping is fringe, not canonical.** Some astrology blogs map each form to a planet, but the mappings contradict each other across sources and Drik Panchang / Wikipedia don't carry it. If surfaced at all, label it "some astrological traditions associate…" — never as scriptural fact.
+
+**Rituals & vidhi:** Ghatasthapana / Kalash Sthapana on Day 1 (kalash + sapta-dhanya/barley sowing + akhand jyot) with its muhurat — first one-third of the day while Pratipada prevails, or Abhijit muhurat fallback; not at night/afternoon, not within Amavasya; avoid Chitra nakshatra & Vaidhriti yoga (advised, not prohibited — **verify whether `panchang-ts` exposes Vaidhriti-yoga / Chitra-nakshatra flags for the muhurat window; surface if it does, else just compute the time window**). Daily routine: sankalpa → panchopachara/shodashopachara to the kalash + day's form → 108× the day's mantra → the day's Durga Saptashati chapter(s) (the 13 chapters map onto the 9 days — Day1: ch1; Day2: ch2–4; … Day9: ch13) → Durga aarti; akhand jyot kept lit all 9 days. **Kanya Pujan / Kanjak** on Ashtami **or** Navami (both valid; Ashtami more common in North India; West Bengal does Maha Ashtami Kumari Puja) — 9 girls aged 2–10 (optionally one boy as Bhairav), wash feet, tilak, offer halwa-puri-chana, gift clothes/money; the 9 ages have traditional names (Kumarika → Subhadra). **Durga Visarjan / Vijayadashami** on Dashami — final puja, purna ahuti, idol/kalash immersion; Dussehra in the North, Sindoor Khela / Darpan Visarjan in Bengal.
+
+**Vrat (fasting) rules screen:** intensity tiers (Nirjala / Phalahar / partial-satvik / two-day Day1+Day9). Allowed: kuttu (buckwheat), singhara (water-chestnut), rajgira (amaranth), sama/barnyard millet, sabudana, makhana; potato/sweet-potato/yam, pumpkin/lauki/cucumber, raw banana; nuts & dry fruit; dairy (milk/curd/paneer/ghee); jaggery/honey/sugar; **sendha namak (rock salt) only**; cumin/pepper/ginger/green-chili/lemon/ajwain. Forbidden: all true grains (wheat/rice/maida/sooji/besan/corn), all dals/legumes, onion/garlic/brinjal, regular iodized salt, turmeric/hing/mustard/fenugreek/garam-masala, meat/fish/egg, alcohol/tobacco.
+
+**The four Navratris:** Sharad/Shardiya (Ashwin, Sep–Oct) — *primary, "Maha Navratri"*; Chaitra/Vasanta (Chaitra, Mar–Apr) — second-most-observed, Hindu New Year; Magha Gupt (Magha, Jan–Feb) and Ashadha Gupt (Ashadha, Jun–Jul) — tantra/sadhana-focused, worship the **ten Mahavidyas** (not the Navadurga), kept private. All four anchor to **Shukla Pratipada → Navami** of their month — fully panchang-computable. **Build the full 9-day guide for Sharad (reuse it for Chaitra); for the two Gupt Navratris, just a calendar entry + a short informational card** (different deity set, sensitive, private practice).
+
+**Surfaces:** Festivals screen → Navratri card with auto-computed dates + Ghatasthapana muhurat; a 9-day guide screen (day picker, current day highlighted during Navratri); daily push notifications during the 9 days (morning: day#, form, color, bhog, mantra; Day1: Ghatasthapana muhurat; Day8/9: Kanya Pujan reminder; Day9: Navami close + havan; Day10: Visarjan); the vrat-guide screen; the Durga Saptashati added to the existing chalisa/aarti reader with the 9-day chapter map. The Navadurga forms are Navratri *content*, not 9 new Library entries.
+
+### P14.4 — Sadhana streaks + milestones (gamification) ✅ (2026-05-14)
+
+A retention layer built on data the app already records (`jaap_sessions`), tuned for a devotional context — private milestones, no leaderboards, gentle framing.
+
+**v1 mechanics:** (1) **Sadhana streak** — counts any calendar day with ≥1 completed jaap session; a small flame/counter under the Mantra Jaap card on Home. (2) **Cumulative mantra/mala counter** — total across all time (derivable from `jaap_sessions`), shown on the Jaap screen, with milestone acknowledgments at *sacred* numbers (108 / 1,008 / 10,800 / 108,000 mantras) — not arbitrary round ones. (3) **Session-count milestones** — 7 / 21 / 30 / 108 / 365 sessions, in-app celebration screen (not a push by default); persisted in a new `milestones_achieved` table (SQLite `user_version` bump).
+
+**Offline handling:** store `last_active_date` (calendar-date string) + `current_streak` + `last_event_epoch`; on a qualifying action compare to `last_active_date` (same → no-op; yesterday → +1; ≥2 days → reset to 1); allow a **26-hour grace window** (not midnight-strict — kinder to night worshippers + time zones); sanity-check `now() ≥ last_event_epoch − 60s` to detect a rolled-back clock and freeze rather than silently break. Accept that a determined user can game an offline streak and that reinstall wipes it (same as Calm/Headspace) — **Phase 15 account sync is what makes a streak survive reinstall** (note the dependency).
+
+**Cultural-sensitivity rules (hard):** no public leaderboards, ever; no user-to-user comparison; name it from tradition ("Sadhana streak" / "Nitya Abhyas" — not "Pray Streak"); a missed day resets quietly with "every day is a new beginning," never "Streak lost!"; the streak-at-risk evening notification is **opt-in only** and worded as a gentle practice reminder, not a loss threat; a streak-freeze analogue, if added later, is "Vishram Divas" (rest day). **Not in v1:** streak freeze, streak-at-risk push (beyond the existing opt-in daily reminder), festival/reading streaks, profiles.
+
+### P14.5 — Shareable cards (WhatsApp / status images) ✅ (2026-05-12)
+
+Render styled cards off-screen → hand them to the system share sheet: deity blessings, festival greetings, verse/mantra cards, jaap-completion cards. The biggest viral lever; Sri Mandir pushes context-aware "share this blessing" on nearly every screen (and generates name-personalized puja-completion *videos* — out of scope for us).
+
+**Technical (verified):** `react-native-view-shot` (`captureRef`, re-exported by Expo) — current versions support the New Architecture (RN ≥ 0.76; this app is on 0.81.5, fine) — captures an off-screen `<View>` to PNG; render the card at **1080×1920** (9:16, WhatsApp Status spec; keep content in the centre ~1080×1350 safe zone) or **1080×1080** (1:1, better for chat); share via `expo-sharing` `shareAsync` (system sheet) + offer `expo-media-library` `saveToLibraryAsync` ("Save to Gallery" — many users curate then post separately). **Reality check:** there is **no API to post directly to WhatsApp Status** — the user always taps "My status" inside WhatsApp after the share sheet; `whatsapp://send?text=` deep-links can't attach an image. Skip `react-native-share` (WhatsApp-direct) in v1 — New-Architecture support unverified; the system sheet is enough.
+
+**v1 card types:** (1) **festival greeting** — one template per major festival (deity image + festival name in Devanagari + English + app watermark; "Share greeting" on the Festivals screen; ties to P14.3 for Navratri); (2) **deity blessing** — 1:1, deity image + name + one signature mantra/verse; "Share" on the deity detail screen; (3) **verse/mantra card** — from the aarti/chalisa reader, "Share this verse" on any verse with "From <text name>" attribution; from the Jaap counter, a post-session "I completed 108 repetitions of <mantra> today" card. Reuse the app's fonts (NotoSerifDevanagari / Fraunces). **Content/rights:** deity images are existing licensed assets; watermark cards with the app name (small, lower corner) — identifies the source, makes no authenticity claim. Chalisa/aarti/mantra text is classical/public-domain; share one or two lines (not a whole chalisa) with a source label. **Not in v1:** name-personalized greetings (needs a name-input form), video status cards (Skia/ffmpeg — much bigger), WhatsApp-direct sharing.
+
+### P14.6 — Audit-driven content + accuracy fixes ⏳ — bundled-release blocker
+
+**Why (2026-05-14, audit on `phase_14`):** A full audit of the bundled-pending Phase 14 surfaced **four critical content errors**, **eight significant concerns**, and **one implementation gap** that go beyond the existing mantra-reviewer debt. Unlike the mantras (which carry `reviewPending: true` and surface a "provisional" caption everywhere they render), these items are **not flagged in the UI**, so a user reading them takes them as authoritative — every wrong fact is a trust hit. P14.6 is the cleanup pass that closes the audit before the bundle ships. Independent of, and in parallel with, the still-pending Sanskrit-reviewer mantra pass (the existing combined open item).
+
+**Scope:** content + one notification-scheduler edit. **No new screens, no schema changes, no new deities, no new package dependencies.** All edits to existing `src/config/*.ts` files plus one `src/services/reminderScheduler.ts` change. ~1–2 hours of focused work for someone with the audit punch list in hand.
+
+**Critical (must fix before bundled release):**
+
+1. **`src/config/pujas.ts:1262, 1273` — Hanuman Chalisa meter error.** "40 dohas" / "forty-doha hymn" → "40 chaupais (framed by 3 dohas)" / "forty-chaupai hymn". Tulsidas wrote *cālīsā* in chaupai meter, not doha. Hindi readers will catch it.
+2. **`src/config/navratri.ts:715-716` — Besan miscategorised as a grain.** Besan (chickpea flour) is a legume flour, not a grain. Move from the "All grains" line to the "All dals/legumes" line. The forbidden ruling itself is correct; only the categorisation is wrong.
+3. **`src/config/navratri.ts:719` — Turmeric/hing rule too strict.** Currently lists both as universally forbidden; in fact regional practice (Maharashtra/Gujarat/Bengal) commonly permits a pinch. Either reword the line with a `(strict tradition only)` caveat or add a screen-level variant note. Decision: lean strict (Smarta-North-Indian) but disclose the variation.
+4. **`src/services/reminderScheduler.ts:256-260` — 11th Navratri push notification missing.** Plan §8 P14.3 says 11; only 10 are scheduled (Days 1–9 + Day 10). Decide: schedule a Day-1 Ghatasthapana muhurat reminder (~30 min before muhurat start) as the 11th, or update the plan + closure to reflect the deliberate 10-only schedule.
+
+**Significant (resolve or document deferral):**
+
+5. **`src/config/navratri.ts:351-356, 378-383` — Chakra ascent discontinuity.** Day 7 → Day 8 currently goes Sahasrara → Soma ("between Ajna and Sahasrara"), reading as a regression. Either move Day 7 Kalaratri to "between Ajna and Sahasrara" OR relabel Soma chakra as transcendent ("above Sahasrara"). Pick one and apply consistently.
+6. **`src/config/navratri.ts:397` — Ardhanarishvara-from-Siddhidatri claim.** A 19th-century Bengali tradition reading presented as canonical; classical sources derive Ardhanarishvara from Shiva-Parvati union, not Siddhidatri-grace. Drop or properly attribute.
+7. **`src/config/pujas.ts:919-920` — Source attribution mismatch.** Says "Ganesha Purana" for the durva-21 + tulsi-forbidden rule; the variant note at line 927 (correctly) cites Brahmavaivarta Purana. Change to "Brahmavaivarta Purana, Prakriti Khanda ch 21".
+8. **`src/config/pujas.ts:1326-1328` — Navagraha grain/flower issues.** Add variant notes: (a) Chandra/Shukra both being "rice" / "white rice" is regional; (b) Ketu's flower "red oleander" is one of several options (kusha grass / multi-color also valid); (c) "durva" (Budh) is a grass, not a flower — relabel section as "botanicals".
+9. **`src/config/pujas.ts:1376-1381` — Navagraha invocation mantra mislabel.** "Brahma Murari Tripurantakari…" is a *morning navagraha vandana* (prabhāta-stuti), not the formal avahana. Relabel; or supplement with the per-graha bīja-mantras as a separate sub-step.
+10. **`src/config/navratri.ts:727-730` — Mantra-pattern lineage undisclosed.** The 9 Navadurga mantras all use the simple `oṁ devī <form>āyai namaḥ` pattern (Devi-Mahatmya commentary lineage). Other lineages prefix bījas (`hrīṁ`, `śrīṁ`, `klīṁ`). Extend `NAVRATRI_SOURCES` to disclose the lineage choice.
+11. **`src/config/pujas.ts:434, 603, 776, 944, 1146, 1314, 1478` — 7 puja `kicker` strings.** Borderline against `feedback_no_decorative_taglines.md` ("THE PURNIMA HOUSEHOLD PUJA", "PRATHAM PUJYA · BEGIN ANY UNDERTAKING", "BAJRANGBALI", etc.). They're more descriptive (when/who) than the rejected examples ("The Pantheon", "Thirty-three koṭi"), but still embellished. Decide: drop them all OR add a JSDoc comment explicitly justifying them as descriptive context.
+12. **`src/config/vaarDevata.ts` — Weekday-mantra type inconsistency.** Mon = pure deity (`oṁ namaḥ śivāya`); Tue/Sat = graha-bīja (`oṁ haṁ hanumate`, `oṁ śaṁ śanaiścarāya`); Fri = deity-bīja (`oṁ śrīṁ mahālakṣmyai`); Thu = Vishnu mantra (`oṁ namo bhagavate vāsudevāya`). No internal rule. Decide on a consistent rule across all 7 days OR add a per-day `mantraVariantNote` documenting the choice.
+
+**Minor (fold in opportunistically):**
+
+13. `src/config/vaarDevata.ts:189-194` — Bhairava-Ravivara-Vrat note: rare tradition, weak attribution. Replace with Aditya Hridaya Stotra reference (already in Sunday's deity note) OR strengthen with citation.
+14. `src/config/pujas.ts:813-823` — Ganesh Prana-Pratishtha step says "with the prescribed mantra" but cites no mantra. Either include a placeholder Prana-Pratishtha mantra (with `reviewPending: true`) or reword to "follow the household's tradition; consult a pandit for the formal mantra".
+15. `src/config/pujas.ts:1416-1422` — Navagraha Stotra (Vyasa) referenced but its opening shloka isn't inline. Other pujas show their headline mantras (Mahamrityunjaya, kshama-prarthana). Add `japākusumasaṅkāśam…` opening with `reviewPending: true`.
+16. `src/config/navratri.ts:294-296` — Skandamata iconography "seated on a lotus … rides a lion" parses contradictory. Reword: "rides a lion, seated on a lotus throne on its back".
+17. `src/config/navratri.ts:474-475` — "Tripura Sundari" → "Tripurasundari" (canonical Sanskrit).
+18. `src/config/navratri.ts` Saptashati outline — surface the JSDoc note about other-tradition chapter groupings on the screen as a one-line caption.
+
+**Hard rules (carried over from Phase 14, unchanged):**
+
+- **No new deities** to `src/config/deities.ts` — the 19-deity roster is fixed. Any figure outside the roster (Murugan, Brihaspati, Shani Dev, Bhairava, Mahavidyas, Navagrahas, Satyanarayan-as-Vishnu) appears as text only.
+- **Do not flip any `reviewPending: true` to `false`** — that's the Sanskrit-reviewer pass, not P14.6. P14.6 may *add* `reviewPending: true` flags to newly-introduced mantra text (items 14, 15) but cannot clear existing ones.
+- **No decorative editorial taglines** (`feedback_no_decorative_taglines.md`).
+- **Roster-side cross-link discipline** unchanged: cross-links live in `src/config/pujas.ts` lookups, never inline in `app/festivals.tsx` or `app/(tabs)/panchang.tsx`.
+
+**Out of scope for P14.6:**
+
+- The Sanskrit-reviewer pass on existing mantra strings (separate combined item — see closure note).
+- The full verse-by-verse Durga Saptashati text (separate ~700-verse content project, deferred under P14.3).
+- Live-device smoke testing of the bundled branch (separate pre-release gate, see closure note).
+
+### Phase 14 Exit Criteria
+
+- P14.1: ✅ 7-day Vaar Devata — Home card + detail screen, **deities shown at equal weight (no per-day "primary")**, variant notes labeled, Isht Devata + Kundli-remedy tie-ins wired (dignity / Dosha / Sade Sati / Dasha). **Remaining:** the qualified-reviewer pass on the mantra strings — until then they ship `reviewPending: true` with a "provisional" caption (4 of 7 already match the `hindu-devotional-texts` package verbatim).
+- P14.2: ✅ Seven Featured Pujas on the Shodashopachara template ([`src/config/pujas.ts`](src/config/pujas.ts) — Satyanarayan Katha, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha Shanti, Navratri Ghatasthapana). Detail route [`app/puja/[slug].tsx`](app/puja/[slug].tsx) + listing [`app/puja/index.tsx`](app/puja/index.tsx). Each puja = bilingual "when/why" blurb, interactive samagri checklist (transient per-session, grouped by category), Sankalpa template with gotra/name/place placeholders, pre-arc (purification → Sankalpa → Kalash → Prana Pratishtha for new idols → Ganesh-smarana), the 16 upacharas (parameterised over `STANDARD_UPACHARAS`), post-arc (havan / katha / visarjana-vs-Uttapana), stotra/katha cross-link card, post-puja deep links (aarti / chalisa / Jaap counter / Vaar Devata / Festivals / informational muhurat chips), source attribution, regional variant notes, accuracy-banner + footer disclaimer. **Cross-links wired from the puja side** (no festival-specific code added to `festivals.tsx`): Pujas tab "Puja Vidhi" row flipped active → `/puja`; deity detail (Ganesh/Lakshmi/Hanuman/Vishnu/Shiva/Durga) gets an "Open the Puja" CTA chip; Festivals rows whose name/description match a puja's `festivalMatchers` show "OPEN {{name}}"; Vaar Devata renders all featured pujas whose primary deity is in today's roster (Mon→Rudrabhishek, Tue+Sat→Hanuman, Wed→Ganesh, Thu→Satyanarayan, Fri→Lakshmi); Navratri Day-1 Ghatasthapana muhurat card links into the Ghatasthapana puja vidhi. Mantras all carry `reviewPending: true` with a "provisional — under scholarly review" banner; the roster constraint holds (Navagraha and Satyanarayan-as-Vishnu named as text only). **Remaining:** qualified-reviewer pass on the mantra strings — folded into the combined Sanskrit-reviewer debt with P14.1 + P14.3 (see Phase 14 closure note). **Deferred:** P14.2b Guided Mode (auto-start Jaap counter at the mantra step, step-by-step walkthrough), Vishnu Sahasranama archana, Saraswati Puja, Mahamrityunjaya jaap (partly served by counter), Griha Pravesh.
+- P14.3: ✅ Sharad-Navratri 9-day guide — Day-1 read from `festivals.json` (`Sharad Navaratri` entry); Days 2–9 = Day 1 + N days; Day 10 from the `Dussehra` entry. **Chaitra Day 1 derived from `Rama Navami` − 8 days.** No `convertHinduToGregorian` at app-time — the dates are already baked into the pre-generated `festivals.json` from the build script, and we re-used that. Ghatasthapana muhurat (first-third-of-day-while-Pratipada window + Abhijit fallback + Chitra/Vaidhriti caption flags) is the only panchang-ts call left in the screen, `getDailyPanchang` on Day 1 only, memoised per-render. Per-day form/iconography/mantra (`reviewPending: true`)/dhyana/bhog/chakra in `src/config/navratri.ts`. **Panchang-computed colors via the Drik 9-day weekday cycle** (primary + secondary on weekday recurrence, never hardcoded per goddess) in `src/services/astrology/navratri.ts`. Daily notifications (Days 1–9 + Day 10 Vijayadashami) gated by `prefs.festival.major`. Vrat-guide screen with 4 tiers + allowed/forbidden food lists. Durga Saptashati outline + 9-day chapter map at `/scripture/durga-saptashati` (chapter titles + theme paragraphs `reviewPending`; full verses deferred to a separate content-review pass). Four Navratris handled — Sharad/Chaitra share the full guide, Magha + Ashadha Gupt surface a "Ten Mahavidyas, kept private" info card. **Surface:** dedicated 5th bottom tab **Practice** (`app/(tabs)/practice.tsx`) — replaces the earlier "Navratri header card on Festivals" decision (reverted; was a 2–3 s open-time regression on the calendar tab). Practice tab lists Navratri / Vrats / Saptashati / Vaar Devata / (Puja Vidhi coming soon) with subtitle text only — no panchang compute on tab mount. **Remaining:** a qualified-reviewer pass on the 9 bīja mantras + the dhyāna shlokas (until then they ship `reviewPending: true` with a "provisional" caption — same pattern as P14.1); the full verse-by-verse Saptashati Sanskrit text (its own ~700-verse content-review project).
+- P14.4: ✅ Sadhana streak (`useStore.sadhana` slice with 26-hr grace + clock-rollback freeze in [`src/services/sadhana.ts`](src/services/sadhana.ts)) + cumulative counter derived from `getJaapStats` + sacred-number milestones (sessions 7/21/30/108/365; reps 108/1008/10800/108000; streak 7/21/30/108/365). Celebration overlay ([`src/components/common/MilestoneCelebrationHost.tsx`](src/components/common/MilestoneCelebrationHost.tsx)) mounted in `app/_layout.tsx`; Share button opens the new 5th `ShareCardSpec` kind `milestone`. Zero leaderboards/comparisons; opt-in evening reminder ([`src/services/sadhanaReminders.ts`](src/services/sadhanaReminders.ts), default off, 20:30, 14-day rolling horizon, skips today if already practised). SQLite `user_version` 5→6 for `milestones_achieved(kind, threshold, achieved_at)` with `UNIQUE(kind, threshold)` so re-crossings are idempotent. Zustand persist v14→v15. Streak badge on Home (under QuickRow) + Jaap picker stats card. **Aarti reader is NOT a streak signal in v1** — jaap-only, per PLAN; deferred until a clear "completed" event is added to the reader.
+- P14.5: ✅ festival + deity + verse + jaap-completion cards via `captureRef` → `expo-sharing` (+ `expo-media-library` save-to-gallery), 1080-px renders (Story 9:16 / Square 1:1 toggle), app-watermarked, source-labelled text. Off-screen `<ShareCardHost>` in `app/_layout.tsx`; entry points on Festivals (major rows), deity detail hero, aarti verses, chalisa dohas, and the Jaap counter. **Plus** a separate "Share full text" affordance in the aarti + chalisa headers using RN `Share.share({ message })` — paste-into-WhatsApp ready, source + "shared via dharmagya" tail (image cards stay scoped to one-or-two lines per the source-text rule). **Not in v1 (unchanged):** name-personalized greetings, video status cards, WhatsApp-direct sharing.
+- **P14.6:** ⏳ All 4 critical items resolved (Hanuman Chalisa meter, besan re-categorisation, turmeric/hing softening, Navratri 11th notification decision). All 8 significant items either resolved or explicitly deferred with a JSDoc note explaining why. Minor items folded in opportunistically. New memory entry `project_p14_6_landed.md` capturing what shipped and what was deferred. Phase 14 closure note updated to reflect P14.6 status.
+- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings throughout. New content carries source attribution; the no-new-deities roster constraint holds.
+
+### Phase 14 — closure note (2026-05-14, updated for P14.6)
+
+Phase 14 is **feature-complete on the branch but not bundle-ready** — five sub-phases (P14.1–P14.5) shipped to the working tree on branch `phase_14`, plus a sixth (P14.6, audit-driven content fixes) is now scoped and pending. The next ship is a single bundled release that includes P14.1 + P14.2 + P14.3 + P14.4 + P14.5 + P14.6 together (per `feedback_release_cadence`).
+
+**Two open items now block the bundle:**
+
+1. **P14.6 — Audit-driven content fixes.** Surface-level inaccuracies found in the bundled-pending audit (Hanuman Chalisa meter error, besan miscategorisation, over-strict turmeric/hing rule, missing 11th Navratri notification, chakra-ascent discontinuity, fringe Ardhanarishvara claim, mislabeled Navagraha vandana, +12 more). **Not** the mantra-reviewer pass — these are non-mantra content errors that surface to the user without the "provisional" caption and so need a hard fix, not a flag. Scope + punch list in P14.6 above. ~1–2 hours.
+
+2. **Sanskrit-reviewer pass on every mantra string.** P14.1 (the seven weekday mantras in `src/config/vaarDevata.ts`) + P14.2 (the puja-step mantras + closing kshama-prarthana + all preset-linked mantras in `src/config/pujas.ts`) + P14.3 (the nine Navadurga bīja-mantras + dhyāna shlokas in `src/config/navratri.ts`). All three carry `reviewPending: true` today and surface a "transliteration under scholarly review — treat as provisional" caption everywhere they render. **Until the reviewer pass lands, do not flip the flag.** P14.6 may *add* `reviewPending: true` flags to newly-introduced mantra text (Prana-Pratishtha placeholder, Navagraha Stotra opening) but cannot clear existing ones. (A separate, larger content-review project — the full verse-by-verse Durga Saptashati Sanskrit text, ~700 verses — remains deferred and is tracked under P14.3.)
+
+**Live-device smoke is still pending** on the bundled branch: the 6-tab edge-to-edge bar (P14.3); the streak + milestone celebration flow and the share-card kinds (P14.4 / P14.5); the new Puja Vidhi detail screen with its samagri checklist + step-mantra plinths + post-puja chips (P14.2). All of these compile clean and pass type-check + lint, but have not been run on a physical device yet.
 
 ---
 
-## 9. Pending — Phase 3 — Multilingual Expansion (P3.1) ⏳
+## 9. Pending — Phase 15 — Accounts & Sync (Google Sign-In) ⏳
 
-**Sequencing note:** Languages are last in the active queue. Will be its own dedicated PR after current feature work lands. Regional rollout is content-heavy and shouldn't compete with feature velocity.
+**Why (2026-05-12, researched against Expo/Firebase/Google/Apple official docs):** requested feature. The app is currently 100% offline with no accounts and no backend; sign-in is the first backend the app has had, so it's deliberately phased — and gated on a clear answer to "what is login *for*." The answer: **so a user's mantra/sadhana streak (P14.4), birth charts, favorites, and settings survive a reinstall or a new phone** — the highest-value, lowest-controversy use. (Indian devotional apps mostly use phone-OTP; Google sign-in skews to the kundli-literate user this app already serves, so it's a fine first provider — phone-OTP can be added later.) **Genuinely free at this app's scale:** Google OAuth for `email`+`profile`+`openid` is free and exempt from sensitive-scope verification — the only setup cost is a privacy-policy URL on the consent screen.
+
+### P15.A — Google Sign-In, local-only ⏳ (smallest viable step, ~1–2 days)
+
+`@react-native-google-signin/google-signin` (the library Expo's docs now point to; needs a dev build — already how this app ships; not Expo Go). Google Cloud project + OAuth client IDs (Android + Web now; iOS later), **all three SHA-1s registered** (local-debug, EAS, Play-Store signing key — the #1 setup gotcha; use the config-doctor), `google-services.json` checked in. Sign-in/out UI in Settings; store the ID token + profile in the existing Zustand KV. **No backend yet** — ship this, see if users actually sign in. (If uptake is low, P15.B can be deferred — A alone cost ~2 days.)
+
+### P15.B — Sync backend ⏳ (~3–5 days)
+
+Stand up the app's first backend. Cheapest path that fits — **Cloudflare Workers + D1** (the plan already anticipates Cloudflare R2 for P5.1 audio; Workers Free ≈ 100k req/day, D1 Free ≈ 5M row-reads + 100k row-writes/day — verify current limits; effectively free at any realistic scale here). The Worker verifies the Google ID token server-side (`oauth2.googleapis.com/tokeninfo`), issues a session; D1 holds `user_profile / favorites / birth_charts / jaap_history+streak / settings` (~5–50 KB/user). App syncs on sign-in (last-write-wins on a client timestamp for v1) + a delete-account endpoint. **Managed alternative if preferred:** Firebase Auth (≈50k MAU free) + Firestore (≈50k reads / 20k writes per day free) — less code, but vendor lock-in + a Blaze-plan cliff. Supabase free tier pauses idle projects after a week (bad for production).
+
+### P15.C — Compliance ⏳ (parallel with B, ~0.5–1 day)
+
+Triggered the moment accounts exist: privacy-policy update covering Google-data handling + storage vendor + retention + deletion; **in-app "Delete Account"** flow (Settings → Account) wiping all synced data; a **web account-deletion page** (a form/support page qualifies) — both mandatory under Google Play's account-deletion policy (enforced since May 2024); Play Console Data Safety form updated (email/name/synced-data, encryption in transit + at rest); privacy-policy URL registered on the OAuth consent screen; honour Google's limited-use terms (no ad use of Google data).
+
+### P15.D — Sign in with Apple ⏳ (at iOS launch only, ~1 day)
+
+App Store Guideline 4.8: an iOS app offering Google sign-in for the primary account must also offer an equivalent — Apple is the practical choice (`expo-apple-authentication`, dev-build friendly). Not needed for Android. Just another provider on the same user record once the backend exists. **Until this lands, don't tell users their account works on iOS** — it'll wall at App Review.
+
+### Phase 15 Exit Criteria
+
+- P15.A: Google sign-in works across local-debug / EAS / Play-Store builds; sign-in state in Settings; no backend.
+- P15.B: backend live; favorites + birth charts + jaap-streak + settings round-trip on sign-in; account-deletion endpoint exists.
+- P15.C: privacy policy updated + URL on consent screen; in-app + web account deletion live; Data Safety form updated.
+- P15.D: (iOS only) Sign in with Apple offered alongside Google.
+- Decision gate before B: if P15.A shows low sign-in uptake, B can be deferred.
+
+---
+
+## 10. Pending — Phase 3 — Multilingual Expansion (P3.1) ⏳
+
+**Sequencing note:** Languages are last in the active queue (after Phase 14 + 15). Will be its own dedicated PR. Regional rollout is content-heavy and shouldn't compete with feature velocity.
 
 **Why:** Drik Panchang supports 10 languages, AstroSage 9. Without regional languages we can't compete in Maharashtra, Gujarat, Tamil Nadu, Andhra/Telangana.
 
@@ -175,7 +347,7 @@ Phase 7 conventions in §4 (UI thread / transform+opacity / 220ms / reduced-moti
 - Font loading: NSD already covers Devanāgarī (Marathi). Add `@expo-google-fonts/noto-serif-tamil`, `noto-serif-telugu`, `noto-serif-gujarati`. Verify no Android rendering regressions.
 - Panchang terminology: extend `src/config/panchang-labels.ts` with regional transliterations (tithi/nakshatra/yoga).
 - Settings language picker: 4 new rows below en/hi/sa.
-- **Gate:** do not ship a language publicly until Tier 1 UI strings are QA-passed and devotional content for that language exists in the consumed text package.
+- **Gate:** do not ship a language publicly until Tier 1 UI strings are QA-passed AND devotional content for that language exists in the consumed text package. Keep it behind a flag until then.
 
 **Order:** Marathi first (largest contiguous market, NSD already loaded), then Gujarati, then Tamil, then Telugu. One language per release.
 
@@ -185,272 +357,11 @@ Phase 7 conventions in §4 (UI thread / transform+opacity / 220ms / reduced-moti
 
 ---
 
-## 10. Phase 10 — Aspects + Mantra Counter ✅ (2026-05-08)
-
-**Why now:** Following the Phase 9 panchang densification (see §6), two high-impact features remain that pair well into a single release: a planetary aspects (Drishti) view that finally surfaces `bundle.aspects` data, and the long-pending mantra counter (originally P4.3). Both are app-internal, no native modules, no platform asymmetry.
-
-**Removed from this phase (2026-05-08):** Landscape detailed calendar route was originally P10.1. Dropped per user — the dense Panchang grid (Phase 9) is sufficient for the almanac-page use case, and the orientation-lock complexity (`expo-screen-orientation`, portrait→landscape→portrait flicker, "Auto-rotate off" handling) wasn't worth the marginal info density gain over the existing in-tab densified grid. Not deferred — out of scope.
-
-### Step P10.2 — Aspects view in Astrology tab ✅ 2026-05-08
-
-Shipped: `AspectsCard` collapsible inside `KundliSection` (default-closed via `AccordionSection`, after the Shadbala block). One row per graha (Sun..Ketu) with the GRAHA_ABBR text label, "From {{rashi}} (House {{n}})" subtitle (`localizeRashi` + `useLocaleFormatters` for Devanagari digits when the language is Hindi), `aspects[graha]` rendered as a comma-separated mono house list, and a "Sits with" chip strip listing every other planet that occupies an aspected house (`{GRAHA_ABBR} · {house}` per chip). Empty `sitsWith` collapses gracefully — chips block hides instead of printing a placeholder. Aspect data comes straight from `bundle.aspects: AspectMap` (already returned by `computeKundli`); no recompute. `aspects.*` i18n namespace added to en + hi (4 keys).
-
-**Why:** `bundle.aspects: AspectMap` is already returned by `computeKundli` and currently unused in the UI. Aspects (Drishti) describe how planets influence other houses beyond the one they sit in: all planets aspect the 7th from themselves; Mars also aspects 4th + 8th; Jupiter also 5th + 9th; Saturn also 3rd + 10th. Surfacing this is standard Vedic chart-reading depth — competitors all show it.
-
-**File:** add to existing [`app/(tabs)/astrology.tsx`](app/(tabs)/astrology.tsx) as a new expandable section below the existing chart + dasha + dosha cards. No new route.
-
-**Layout:**
-- Section header "Aspects (Drishti)" / "दृष्टि" via `SectionLabel`.
-- One row per graha (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu).
-- Each row:
-  - Graha icon (existing `<GrahaIcon>` per planet).
-  - "From {{rashi}} (House {{n}})" subtitle.
-  - "Aspects: {{house list}}" — comma-separated aspected house numbers, with the planets sitting in those houses chip-listed underneath.
-- Collapsible default-closed (uses existing `AccordionSection` from [`src/components/panchang/AccordionSection.tsx`](src/components/panchang/AccordionSection.tsx) — reuse, don't duplicate).
-
-**Localisation:** house numbers are numeric (digits via `useLocaleFormatters`), graha + rashi names via existing `localizeRashi` / planet localisation maps.
-
-### Step P10.3 — Mantra Counter (P4.3 lifted) ✅ 2026-05-08
-
-**Content dependency:** mantra text + transliteration + meaning is consumed from the `hindu-devotional-texts` package. The 0.2.0 release expanded the original 6-mantra plan to 21 mantras spanning the full deity roster (Om Namah Shivaya, Om Namo Narayanaya, Gayatri, Maha Mrityunjaya, Hare Krishna mahamantra, Om Gan Ganapataye Namah, Hanuman, Lakshmi, Rama Taraka, Durga, Saraswati, Parvati, Kali, Surya Gayatri, Brahma, Sai Ram, Santoshi, Sita, Khatu Shyam, Vaishno Devi, Narasimha). App calls `getMantra(slug)` / `getAllAppMantras()` (filtered to roster) — content lives in the package, not the app.
-
-**Shipped:**
-- Routes: `app/jaap/index.tsx` (picker), `app/jaap/[slug].tsx` (counter), `app/jaap/history.tsx`.
-- Picker groups mantras into "Universal" (Gayatri, Mahamrityunjaya) + deity-tagged sections; expandable Custom-mantra card; lifetime stats card (only when there's history) routes to history.
-- Counter: whole-screen tap zone (mantra at top stays visible during chanting; the entire body below the header is the tap target — chips and ±buttons capture their own taps via the standard responder chain). Reanimated SVG progress ring (UI-thread `useAnimatedProps` strokeDashoffset), `expo-haptics` `impactAsync(Heavy)` on each tap (revised up from Selection then Medium after user feedback that vibration was too weak), Success notification haptic + 800ms accent flash on mala completion.
-- Adaptive mantra typography: 22pt Devanagari for 1–2 line mantras (most), 19pt for 3-line, 17pt for 4-line (Gayatri); IAST scales 13 → 11pt similarly. Body height budgeted against worst case (Gayatri + IAST + chips + bottom bar) on a Pixel 3a (~590dp). Ring is 180dp.
-- Mala size selector: 27 / 54 / 108 / 216 / 1008 chips; mid-session size change prompts to discard count.
-- Decrement (-1) underflows into the previous mala; Reset asks before clearing.
-- SQLite `jaap_sessions(id, started_at, ended_at, mantra_slug, mantra_label, mala_size, mala_count, total_count)` with `idx_jaap_sessions_started_at` for the history query — gated by `PRAGMA user_version` bump v2 → v3.
-- Save flow: hardware/UI back prompts "Save this session?" when count > 0; checkmark in nav saves immediately. `mantra_label` snapshots the title at write time so custom mantras persist intact.
-- History screen: last 30 sessions grouped by date (newest first); each row shows time, mantra label, total count, mala count, mala size, duration; per-row delete with confirmation; empty state with CTA.
-- **No ads on the counter screen.** AdBanner kept on history (banner OK there per plan).
-- Entry points: Home tab QuickRow (replaced "Search" tile, lotus glyph) + Settings → Deities section row.
-- i18n: full `jaap.*` namespace in en + hi (~50 keys).
-
-**Schema notes:** Uses an autoincrementing `id` and stores `mantra_label` text at insert time so the history list never has to re-resolve via `getMantra()` — this means renamed package slugs won't break old rows.
-
-**Post-ship iteration (2026-05-08):** First counter draft used a ScrollView with the mantra above the counter — user reported the mantra scrolled out of view during tapping, and the Selection-strength haptic was too weak to feel. Redesigned to (a) drop the ScrollView and pin the mantra at the top of a whole-screen Pressable tap zone so reading + tapping happen on the same surface, (b) bump haptic to `impactAsync(Heavy)` for unmistakable per-tap feedback, (c) enlarge mantra typography with adaptive sizing per line count and shrink the ring 240 → 180dp to give the mantra clear visual primacy.
-
-### Phase 10 Exit Criteria ✅
-
-- Aspects view renders for all 9 grahas with correct house references against a known reference chart. ✅
-- Mantra counter: presets pickable from package, 5 mala sizes selectable, session writes to SQLite, history shows last 30 sessions. ✅
-- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings. ✅
-
----
-
-## 11. Phase 11 — Lean Pass: cleanup + low-end perf ✅ (2026-05-10)
-
-**Why now (2026-05-08):** App has accumulated 10 phases of feature work. User reports the **Panchang screen takes ~1s on cold open** (instant once warm), and wants the codebase trimmed for low-end Android (Pixel 3a target). High-priority polish phase — no new features, just cleanup + perf.
-
-**Animation principle (Phase 11 convention, durable):** Animations are kept if (a) they run on UI thread without JS jank AND (b) the animation duration is used to mask compute. Cut only if neither holds. Decorative-only animations are OK if they're free; never if they delay content the user is asking for.
-
-### P11.1 — Panchang cold-start fix ✅ (resolved organically 2026-05-10)
-
-Original symptom: first open of Panchang tab after cold-start took ~1s. Resolved without the planned cache-prewarm / tomorrow-precompute work — the upstream cuts in P11.2 (`STAGGER_CAP_MS` 400→120, `ScreenMount` on native-side FadeIn), P11.3 (`useShallow` collapsing 16 store subscriptions in `KundliSection`, `React.memo` on Dasha rows, dead `usePanchang.ts` deleted), and P11.4 (JetBrainsMono dropped, logo→webp, 46 i18n keys + 4 deps trimmed) collectively closed the gap. User-verified on device: Panchang tab cold-open is no longer slow.
-
-If a regression resurfaces in the future, the original plan above remains the playbook: profile first (`console.time` at SQLite open, panchang-ts call, AccordionSection mount counts, first paint), then layer the splash-window prewarm + tomorrow-precompute on top.
-
-### P11.2 — Compute-behind-animation pattern + decorative-stagger removal ✅
-
-Audit ran across every `useSharedValue` / `withTiming` / `useAnimatedStyle` / `Animated.View` / `useEntranceStagger` / `ScreenMount` site in `src/` + `app/`.
-
-**Cuts shipped:**
-- `STAGGER_CAP_MS` 400 → 120 in [`src/config/motion.ts`](src/config/motion.ts). `useEntranceStagger` and `useRefrainHighlight` consume the new cap; aarti / chalisa verse cascades and refrain settle are now bounded under 120ms regardless of `VERSE_STAGGER_MAX`.
-- `ScreenMount` rewritten ([`src/components/common/ScreenMount.tsx`](src/components/common/ScreenMount.tsx)) on Reanimated's `entering={FadeIn.duration(durations.base)}` layout-animation primitive. Native-side scheduled at mount, no longer dependent on a post-commit `useEffect` that gets queued behind cold-start compute. The 220ms fade now actually masks the screen's mount-time compute window. `useAnimatedMount` deleted (only consumer was `ScreenMount`).
-
-**Keeps (audit verified):**
-- `FavoriteHeart` pulse / `MotionPressable` press / `SegmentedChip` color+scale — paired with user action.
-- `SkeletonCrossfade` + `SkeletonBlock` shimmer — masks load.
-- Mantra counter ring (`useAnimatedProps`) + tap scale + completion flash — masks tap feedback compute.
-- `useRefrainHighlight` — fires once per reader instance, doesn't delay content (only changes refrain emphasis post-stagger).
-- `CornerBrackets` draw-in, `SectionLabel` settle — one-shot worklets, do not delay content.
-- `AccordionSection` chevron rotation — paired with toggle.
-- Aarti / chalisa scroll-driven hero parallax — gesture-bound only.
-- `WalkthroughOverlay` spotlight pulse — overlay attention cue, runs only during walkthrough.
-
-**Documented:** §4 Phase 7 conventions extended with the compute-behind-animation rule + pointer to `memory/feedback_animation_kept_when.md`.
-
-### P11.3 — State surface + memoization ⏳
-
-- [`src/components/kundli/KundliSection.tsx:47-61`](src/components/kundli/KundliSection.tsx#L47-L61) — collapse 16 individual Zustand selectors into one `useShallow()` selector. Single re-render instead of 16 on theme/language toggle.
-- DashaSection rows ([`src/components/astrology/DashaSection.tsx`](src/components/astrology/DashaSection.tsx)) — add `React.memo` to row/leaf components (currently re-render on parent state churn).
-- Slice the panchang state — instead of holding full `IPanchangDay` in `usePanchang` ([`src/hooks/usePanchang.ts`](src/hooks/usePanchang.ts)), store only the fields a screen reads. Cuts memory pressure on Pixel 3a.
-- Fix unmemoed `computeShadbalaCached` call ([`src/components/kundli/KundliSection.tsx:247`](src/components/kundli/KundliSection.tsx#L247)) — currently fires on every parent render.
-- Sweep inline style arrays/object literals in hot paths (KundliSection chip strip lines 285–308).
-
-### P11.4 — Dependency + asset trim ⏳
-
-- **Drop `@expo-google-fonts/jetbrains-mono`** — only used for kickers/timestamps; system mono on Android renders identically. Update typeScale to fall back.
-- **`assets/dharmagya_logo.png` (144 KB) → SVG component or webp.** Same for `dharmagya_logo_small.png` (60 KB).
-- **Sweep unused i18n keys** in [`src/i18n/locales/en.ts`](src/i18n/locales/en.ts) + [`hi.ts`](src/i18n/locales/hi.ts) (grown organically through 10 phases).
-- **Sweep unused glyphs** in custom Icon component ([`src/components/common/Icon.tsx`](src/components/common/Icon.tsx)) — verify all 60 glyphs are still referenced.
-- **Audit `package.json`** for any dep that's no longer imported anywhere.
-
-### P11.5 — Pixel 3a perf gate ✅ (informal verification 2026-05-10)
-
-Closed without the formal `perf-baseline.md` artifact. Device-verification on user's hardware confirmed Panchang cold-start is no longer slow (the explicit P11.1 symptom that motivated the gate) and no other screen has surfaced perf regressions through Phases 9–12. **If a regression appears post-launch, the original thresholds above (≤350ms first paint / ≥58 FPS UI / ≤5MB memory delta) become the diagnostic target — re-spec a perf pass at that point.**
-
-### P11.6 — Custom screen transitions with compute-masking (lifts P7.4) ⏳
-
-Reanimated v4.1.1 + gesture-handler v2.28 already installed. Today they're used for **in-screen** animation only — screen-to-screen transitions are still default `expo-router` / `react-native-screens`. Make transitions richer + functional:
-
-- **Panchang date change** ([`app/(tabs)/panchang.tsx`](app/(tabs)/panchang.tsx)) — content area `opacity 1→0` (140ms), kick off `getCachedPanchangDay()` for new date during the fade-out, new content `opacity 0→1 + translateY 4→0` (220ms) when ready. Skeleton fallback if compute exceeds 350ms. Calendar cells reuse P7.2 chip interpolation. Haptic `Selection` on cell tap.
-- **Panchang horizontal swipe** — pan-gesture day change. Commit if `|dx| > 80px` OR `|v| > 400px/s`; spring back otherwise. Worklet via `useAnimatedGestureHandler`. `activeOffsetX` so vertical scroll wins on scrollable bodies.
-- **Custom `expo-router` screen options** per route — modal slide-up for sub-screens like Settings → Birth Place; fade for content swaps. Configure via `<Stack.Screen options={{ animation, presentation }} />`.
-- **Muhurat occasion → detail** ([`app/muhurat/[occasion].tsx`](app/muhurat/[occasion].tsx)) — title + icon fade in over 220ms after route mount. Compute (validateCandidates if needed) fires during the fade.
-- **God detail hero image fade** — hero photo `opacity 0→1` over 320ms once loaded. Deity-gradient scrim at full opacity underneath.
-
-**Skip:** `react-native-shared-element` — crashes on Android + Fabric in RN 0.81 (existing PLAN.md note retained).
-
-**Exit:** date changes feel cohesive (no flash); swipe doesn't hijack vertical scroll; 60fps holds during rapid date navigation on Pixel 3a; transitions actually mask compute (skeleton fallback rarely visible on warm cache).
-
-### Phase 11 Exit Criteria ✅ (closed 2026-05-10)
-
-- ✅ Panchang cold-start no longer slow (resolved organically by P11.2/3/4 work; user-verified on device).
-- ✅ Decorative stagger removed; compute-behind-animation pattern documented in §4.
-- ✅ KundliSection + DashaSection + panchang state surface trimmed; no measurable re-render regressions on theme/language toggle.
-- ✅ JetBrainsMono dropped, logo PNGs optimized, i18n + Icon glyph sweeps complete.
-- ✅ Pixel 3a perf gate informally verified (formal `perf-baseline.md` artifact dropped — see P11.5 above).
-- ✅ P7.4 transitions shipped as P11.6 with compute-masking.
-- `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings.
-
----
-
-## 12. Phase 12 — panchang-ts 4.0.0 surface ✅ (2026-05-10)
-
-**Why (2026-05-10):** panchang-ts 4.0.0 published with **14 new compute APIs** spanning advanced Jyotish (yogas, karakas, ashtakavarga, bhava bala, varshaphala, tithi pravesha, arudhas, argala, upagrahas, special lagnas, pathu porutham, narayan dasha, KP layer, prashna). All additive — every 3.1.0 export is preserved. One minor breaking-change-by-typing: `result.abhijitMuhurta` is now nullable (null on Wednesdays, Drik convention). Patched at the single call site.
-
-**Phasing principle:** keep each sub-phase shippable on its own; defer technical/niche features to later sub-phases or post-launch.
-
-### P12.1 — Yogas + Karakas + Ashtakavarga (Tier A — high value, in-place additions to Kundli) ⏳
-
-Three additive surfaces inside the existing Kundli view; no new routes.
-
-- **Yogas** — `computeYogas(d1, { navamsa: d9 })`. Render named classical yogas (Pancha Mahapurusha / Gajakesari / Raja / Dhana / etc.) as a default-open accordion. Each row: `name · type` + `reasons[]`. Empty-state copy when nothing matches.
-- **Jaimini Karakas** — `computeJaiminiKarakas(d1)`. 7-row list (Atmakaraka → Darakaraka). Compact card, no accordion.
-- **Ashtakavarga** — `computeAshtakavarga(d1)`. 12-cell heat-grid; segmented chip switches between Sarvashtaka (sum, 0..56) and per-graha Bhinnashtaka. Default-collapsed accordion (math-heavy).
-
-**Cache:** all three are pure functions of `d1` (Yogas + Ashtakavarga also accept `d9`); add LRU keyed on `inputKey(inp)` matching the existing `KUNDLI_CACHE` pattern.
-
-**Strings:** Yoga names (`'Gajakesari'`) and Karaka names (`'Atmakaraka'`) are intentionally not locale-resolved by the library — render as-is in both languages, matching the existing convention for nakshatra-derived proper nouns.
-
-### P12.2 — Bhava Bala + Pathu Porutham (Tier B — paired surface upgrades) ✅ (2026-05-10)
-
-- **Bhava Bala** — `computeBhavaBalaCached(inputs)` added next to `computeShadbalaCached` (LRU on `inputKey`). New `BhavaBalaChart` component renders 12 stacked bars (Bhavadhipati / Dik / Drishti / Sthana) sized to each bhava's `total`, normalised against the strongest bhava in the chart. Slotted between Shadbala and Yogas in `KundliSection.tsx`.
-- **Pathu Porutham** — `matchPathuPorutham(boy, girl)` added next to `matchAshtakoot`. Result screen now has a 36-point / 10-fold segmented toggle (default Ashtakoot). Veto-failed koots get a sindoor outline so the user reads which koot flipped the recommendation. Both systems consume the same boy/girl role assignment so no extra inputs are needed.
-
-### P12.3 — Varshaphala annual chart + Tithi Pravesha (Tier B — new screen) ✅ (2026-05-10)
-
-Shipped:
-- New route `app/kundli/varshaphala.tsx` with shared shell — system toggle (`SOLAR · VARSHAPHALA` / `SOLI-LUNAR · TITHI PRAVESHA`, default Varshaphala), 1-indexed yearAge picker (default = `Math.floor((now − birth) / 365.25636d)`), and one body per mode.
-- **Varshaphala body** — Varsha Lagna + Year Lord (with Shadbala basis) + solar-return-instant timestamp inside one NightCard. Muntha card (rashi · lord · house) with a per-age advancement hint. 27-Saham accordion (`storageKey="kundli.varshaphala.sahams"`, **default-collapsed** mirroring Ashtakavarga, `rightHint="27"`); each row = `name kicker · rashi · longitude° · house chip`.
-- **Tithi Pravesha body** — Pravesha lagna NightCard with the natal tithi (`Shukla / Krishna {{n}}`) reproduced from `praveshTithi`. North/South chart toggle reusing existing `NorthChart` / `SouthChart` via a new `cellsFromLagnaPlanets(lagnaRashi, planets, lang)` adapter in `chartCells.ts`. Bhava cusps strip (12 rows: house · rashi · °) under the configured house system. Planets-at-pravesha card (graha abbr · name · rashi · house).
-- Service: `computeVarshaphalaCached(inp, yearAge)` + `computeTithiPraveshaCached(inp, yearAge)` in `kundliService.ts`, both with LRU(4) keyed on `inputKey | v{age}` / `| tp{age}` — outside `KundliBundle` since they're time-shifted recomputes.
-- Entry point: card in `KundliSection.tsx` between MatchOthers and Your Details — kicker `ANNUAL CHART`, calendar icon, `router.push('/kundli/varshaphala')`. Not folded into the existing accordion stack since this is its own route.
-- `kundli.openVarshaphala*` / `kundli.varshaphala.*` / `kundli.tithiPravesha.*` namespaces added to en + hi (~30 keys); proper-noun terms (Saham names, Year Lord planet, Muntha lord) stay un-localized per library convention.
-- ScreenMount + SafeAreaView edges `['top','bottom']` per non-tab convention.
-
-### P12.4 — Sensitive points sweep ✅ (2026-05-10)
-
-Shipped: single "Advanced Points" `AccordionSection` (`storageKey="kundli.advancedPoints"`) slotted between Aspects and the Compatibility CTAs in `KundliSection.tsx`, default-collapsed. Inside the accordion, four sub-surfaces stacked:
-- **Arudhas** — 12 padas (AL/A2..A12), `bundle.arudhas` ride-along; AL highlighted with `palette.goldLeaf` / `palette.sindoor` per theme.
-- **Argala** — `bundle.argala` ride-along; per-bhava badge + two `ChipStrip`s (argala / virodhargala) of GRAHA_ABBR chips.
-- **Upagrahas** — `computeUpagrahasCached(inp)` (LRU 8 on inputKey, gated on accordion open). 7 rows: name · localized rashi · longitude° · house badge.
-- **Special lagnas** — `computeSpecialLagnasCached(inp)` returns `{ hora, ghati, bhava, sripati }` (LRU 8); 4-row table with un-localized lagna kind labels per the proper-noun convention.
-
-Pure-D1 helpers ride along inside `KundliBundle`; time-and-location-dependent ones (Upagrahas + special lagnas) live outside as their own `*Cached` entries with the established LRU pattern. Lazy compute — both Cached calls are gated by the accordion's `open` flag in `KundliSection.tsx` so cold open of the Kundli view doesn't pay 11 lib calls.
-
-### P12.5 — KP layer + Narayan Dasha + Prashna chart ✅ (2026-05-10)
-
-Three independent surfaces, landed bundled in one PR (Phase 12 close-out):
-
-1. **Narayan Dasha** — `computeNarayanCached(inp)` in `kundliService.ts` (LRU 8 mirroring `computeCharaCached`). `DashaSystem` union extended with `'narayan'`; 5th chip in the system-toggle strip; `NarayanTimeline` body in `DashaSection.tsx` reusing the Chara MahaDasha row layout, with the `direction: 'forward' | 'backward'` flag surfaced in the current-card subtitle. New i18n: `dasha.system.narayan`, `dasha.narayan.directionForward/Backward`, `dasha.narayanFullCycle` (en + hi).
-
-2. **KP layer** — `KpCard` accordion slot (`storageKey="kundli.kp"`) below "Advanced Points", default-collapsed. Two sub-sections: cuspal sub-lords table (12 rows: house · cusp degree · sign-lord · star-lord · sub-lord, all GRAHA_ABBR) + per-graha significators list (4-fold rule). `computeKpCuspalSubLordsCached(inp)` (LRU 8, lazy on accordion open) — the lib forces Placidus-KP cusps internally regardless of `inp.houseSystem`, harmless. `bundle.kpSignificators` rides along (pure-d1). Inline ayanamsa note tells the user KP is canonical under Krishnamurti ayanamsa; we don't force-switch it (global Settings preference). New i18n: `kundli.kp.*` namespace (en + hi).
-
-3. **Prashna chart** — new route `app/kundli/prashna.tsx` with the same shell as varshaphala (header back pill + ScreenMount + SafeAreaView edges `['top','bottom']`). Form: query date + time pickers (default = now) + location field that defaults to `userLocation` (canonical Prashna anchor — "where the question is asked from"), falling back to `userBirthPlace` so users without GPS aren't dead-ended. "Cast Prashna" CTA triggers `computePrashnaChartCached({ timestamp, location, ayanamsa, language, houseSystem })` (LRU 4 on the prashna-specific key). Result body: NightCard with prashna lagna (rashi + degree + nakshatra/pada) → North/South chart toggle reusing `cellsFromLagnaPlanets` → bhava cusps strip (12 rows under the configured house system) → planets-at-query card (GRAHA_ABBR + retrograde flag + house badge). Entry point: a second card in `KundliSection.tsx` directly below the Varshaphala CTA, kicker `PRASHNA · QUERY CHART`, compass icon. New i18n: `kundli.prashna.*` + `kundli.openPrashna*` (en + hi).
-
-Service-layer additions (all in `kundliService.ts`): bundle now also rides along `arudhas`, `argala`, `kpSignificators`. New cached entries: `computeUpagrahasCached`, `computeSpecialLagnasCached`, `computeNarayanCached`, `computeKpCuspalSubLordsCached`, `computePrashnaChartCached`. `SpecialLagnas` and `PrashnaInputs` types exported.
-
-`KundliSection.tsx` final section order: chart → doshas → dignity → strength (Shadbala + Bhava Bala) → yogas → karakas → ashtakavarga → aspects → **advanced points → kp** → compatibility → varshaphala CTA → **prashna CTA** → your details.
-
-### Phase 12 Exit Criteria ✅
-
-- ✅ P12.1 Yogas + Karakas + Ashtakavarga shipped in Kundli view.
-- ✅ P12.2 Bhava Bala + Pathu Porutham shipped (2026-05-10).
-- ✅ P12.3 Varshaphala / Tithi Pravesha shipped on dedicated `/kundli/varshaphala` route (2026-05-10).
-- ✅ P12.4 sensitive-points sweep shipped (2026-05-10).
-- ✅ P12.5 KP / Narayan / Prashna shipped (2026-05-10).
-- `tsc --noEmit` clean throughout; `npx expo lint` holds at the 8-warning baseline.
-
----
-
-## 13. Phase 13 — panchang-ts 4.1.0 surface ✅ (2026-05-11)
-
-**Why (2026-05-11):** panchang-ts 4.1.0 published. Mostly result-shift bug fixes (Mangal Dosha now also checks Mars from Venus; Pitru Dosha rewritten on a 9-rule classical catalog; Neecha Bhanga more permissive with 5 rules; Shadbala combust-check fix) — all rendered automatically because the affected cards (`DoshaCard`, `YogasCard`) read library-supplied reasons/strings rather than re-deriving them. One **breaking** change: Shadbala's `bala.<Graha>.sthana` range extends from 0–60 V to 0–420 V, and `bala.<Graha>.total` shifts up by +30 to +150 V per graha. The `ShadbalaChart` already renders bars as a percentage of the strongest graha in the same chart, so the visualisation is invariant under the new range; only the absolute number after the bar grows (JSDoc updated to flag the new range).
-
-### Shipped surface additions (all four opt-ins from the release notes)
-
-1. **`yoga.bhanga`** — `YogasCard.tsx`. The optional `bhanga: { applies: boolean; reasons: string[] }` field on Pancha Mahapurusha + Gajakesari is now rendered: when `applies` is true the row gets a `CANCELLED` tag, the name strikes through, the bullet flips to sindoor, and a "Cancelled by:" sub-block lists the bhanga reasons under the positive ones. Existing yogas without a catalog bhanga rule (Raja, Lakshmi, Dhana, etc.) render unchanged.
-
-2. **Ashtakoot Bhakoot enrichment** — `match.tsx` + `useBirthStore.ts`. `natalMoonFromChart(d1, navamsa)` now fills the optional `lagnaRashi` (ascendant) and `navamsaRashi` (Moon's D9 rashi) fields per the 4.1 `NatalMoon` extension. When both natives carry them, `computeAshtakoot` enables three extra Bhakoot cancellations (same lagna-lord, same 7th-lord, same Navamsa-lord). `BirthChartEntry.derived` extended with `navamsaRashi?: number`; old cached entries without the field force a recompute on next access so the opt-in fires. `match.tsx` reads partner navamsa from the freshly-computed kundli + persists it back. The existing cancellations strip in the result view picks the new entries up automatically — no UI rework.
-
-3. **8-Jaimini Karaka variant** — `KarakasCard.tsx`. New segmented toggle (`7 · PARASHARA` / `8 · JAIMINI`); default stays on the 7-Parashara variant so historical readers see the same table. Switching to the 8-variant adds the Pitrukaraka (father) row at position 5 and includes Rahu by descending reversed degree. `KundliBundle.karakas8: Jaimini8Karakas` is pre-computed in `computeKundli` (pure D1 walk, microseconds) so the toggle is purely cosmetic. New i18n keys: `kundli.karakas.variant7/8`, `kundli.karakas.roles.Pitrukaraka`.
-
-4. **Sripati cusps + Trikonargala** — `AdvancedPointsCard.tsx` + `kundliService.ts`. `computeSripatiLagna` now called with `{ includeCusps: true }` so `SpecialLagnas.sripati` carries the 12 bhava-madhya longitudes; a new `SRIPATI CUSPS · 12 BHAVA MADHYAS` sub-section in the advanced-points accordion renders one row per bhava (rashi name + degree-in-rashi). `computeArgala` now called with `{ includeTrikonargala: true }` so each `ArgalaPerBhava` carries the optional `trikona` field with `sources` (5th from bhava) and `virodhakas` (9th from bhava, Ketu reversed); when present, two extra `ChipStrip`s render under the primary 2/4/11 vs 3/10/12 split. Both compute on the existing cached path, no new LRU entries.
-
-### Result-shift APIs (re-verified, no code changes needed)
-
-- **Mangal Dosha** — `DoshaCard.tsx` already reads `mangal.fromVenus.house` / `.afflicted` since the field is in the type. The new Venus-axis flagging surfaces as additional reasons under the existing 3-chart card.
-- **Pitru Dosha** — `DoshaCard.tsx` renders `pitru.reasons[]` verbatim; the 9-rule catalog rewrites the reason list but the rendering loop is unchanged.
-- **Kaal Sarp** — unchanged.
-- **Neecha Bhanga** — not explicitly surfaced in our UI; it flows through `computeYogas`' yoga list as a named yoga and rides along the existing rendering.
-- **Shadbala combust-fix** — value changes invisible to the user because of the per-chart normalisation in `ShadbalaChart`.
-
-### Service-layer summary
-
-`kundliService.ts`:
-- New type imports: `Jaimini8Karakas`, `SripatiLagnaInfo`.
-- `KundliBundle.karakas8: Jaimini8Karakas` added (rides along, pure-D1).
-- `KundliBundle.argala` now carries Trikonargala via `{ includeTrikonargala: true }` to `computeArgala`.
-- `SpecialLagnas.sripati: SripatiLagnaInfo` (with 12 cusps) via `{ includeCusps: true }` to `computeSripatiLagna`.
-- `natalMoonFromChart(chart, navamsa?)` returns the enriched `NatalMoon` with `lagnaRashi` + optional `navamsaRashi`.
-
-### P13b — Mangal severity + muhurat scores ✅ (2026-05-11)
-
-Surfaced two already-existing library fields that the UI had been ignoring (both available pre-4.1 in the lib's type surface; 4.1 was the natural moment to expose them alongside the new opt-ins).
-
-**Mangal Dosha severity + cancellation prominence** — `DoshaCard.tsx`. The Mangal row now branches on `mangal.severity: 'none' | 'anshik' | 'purna'` instead of just `afflicted: boolean`:
-- `severity: 'none'` → green check, "Not Manglik".
-- `afflicted: true` (no cancellation) → sindoor alert, "Anshik Manglik · Partial" or "Purna Manglik · Full".
-- `severity !== 'none'` && `afflicted: false` (cancelled) → amber info icon, severity label with a `CANCELLED` pill tag and a prominent inline callout listing the cancellation reasons (`mangal.cancellations[]`). This is the case the old UI hid in a tiny italic footnote — readers couldn't tell "you're technically partial-manglik but neutralized by Mars-Jupiter conjunction" without squinting.
-
-New i18n: `kundli.mangal.severity.{none,anshik,purna}`, `kundli.mangal.cancelledTag`, `kundli.mangal.cancelledBy`. Old `mangalAfflicted` / `mangalNotAfflicted` keys removed (replaced by the severity nesting).
-
-**Muhurat score badges + reasons** — `muhurat.ts` + `[occasion].tsx`. `MuhuratMatch` now carries `score: number` (0..100) and `reasons: string[]` from `scoreMuhurta`, persisted through the SQLite `muhurat_cache`. `user_version` bumped 4 → 5 and `muhurat_cache` wiped once on upgrade so every row backfills with the new fields.
-
-Each DayRow renders a band-colored score pill between the day-info column and the chevron (font: display-italic 18pt over a tinted background, suffixed with the localized "/ 100"). Bands: 90+ goldLeaf (`Highly auspicious`), 70+ gold (`Auspicious`), 50+ amber (`Mildly auspicious`), <50 sindoor (`Marginally auspicious`). The expanded detail leads with a "Why this day" block — band label + localized score + bullet list of reasons (`tithi · purnima · auspicious tithi`, etc.) — above the existing Best Slots / Rahu Kalam sections. Accessibility label now includes `"Score X out of 100"`.
-
-New i18n: `muhurat.scoreKicker`, `muhurat.scoreOutOf`, `muhurat.scoreAccessibility`, `muhurat.whyThisDay`, `muhurat.scoreBand.{excellent,good,mild,marginal}`. Hindi versions use Devanagari numerals via `useLocaleFormatters().formatNumber`.
-
-### Phase 13 Exit Criteria ✅
-
-- ✅ Package bumped to ^4.1.0.
-- ✅ All four new opt-ins surfaced (yoga.bhanga, Bhakoot enrichment, 8-Jaimini variant, Sripati cusps + Trikonargala).
-- ✅ Mangal Dosha severity (Anshik/Purna) + cancellation prominence surfaced; old binary afflicted UI replaced.
-- ✅ Muhurat scores + reasons surfaced on every DayRow + expanded detail; SQLite cache bumped to v5.
-- ✅ Shadbala value-range breaking-change documented; visualization unaffected by the per-chart normalisation.
-- ✅ `tsc --noEmit` clean; `npx expo lint` holds at the 8-warning baseline.
-
----
-
-## 14. Deferred — iOS widget + Phase 5
+## 11. Deferred — iOS widget + Phase 5
 
 ### iOS WidgetKit (originally P4.2 second half) ⏸
 
-Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension deferred — app currently ships Android-only on Play Store; iOS launch will happen after broader app refinement. Pick up the iOS half once the app is stabilised enough to be worth a parallel App Store rollout.
+Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension deferred — app currently ships Android-only on Play Store; iOS launch will happen after broader app refinement. Pick up the iOS half once the app is stabilised enough to be worth a parallel App Store rollout. (Sign in with Apple — P15.D — also blocks on the iOS launch.)
 
 ### Phase 5 — Audio / booking / social (on hold)
 
@@ -458,34 +369,49 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 
 - **P5.1 Audio playback** for aarti/chalisa/mantra. Single biggest retention feature per competitor analysis. Unblocks Read Along Mode. Significant content-licensing budget. Cloudflare R2 for hosting.
 - **P5.2 Puja booking / astrologer consult / e-commerce.** Sri Mandir's primary revenue driver (~$12M ARR). Requires temple partnerships, Razorpay/UPI, ops team. Don't start without an ops co-founder.
-- **P5.3 Social / community / sharing / video.** Native share sheet shippable any time; community + video need infrastructure + moderation overhead.
+- **P5.3 Social / community / sharing / video.** Static-card sharing ships in P14.5; native share sheet is shippable any time; community + video need infrastructure + moderation overhead.
 
 ---
 
-## 15. Out-of-Scope / Explicitly Not Doing
+## 12. Out-of-Scope / Explicitly Not Doing
 
 - Paid subscription tier.
 - Live streaming temple darshan.
 - AI chat astrologer (hallucination risk on religious content).
 - Cryptocurrency / NFTs / Web3.
 - Landscape detailed calendar route (originally P10.1, dropped 2026-05-08). Densified Panchang grid from Phase 9 covers the almanac-page use case; not worth the orientation-lock complexity.
+- `react-native-shared-element` for shared-element screen transitions — crashes on Android + Fabric in RN 0.81. Use Reanimated layout animations / opacity fades instead.
+- Public leaderboards / "most prayers" rankings of any kind (P14.4 is private milestones only — gamifying devotion competitively is culturally wrong here; every Hindu/meditation app that works avoids it).
+- Posting programmatically to WhatsApp Status — no such API exists; P14.5 hands images to the system share sheet, the user posts.
+- New Library deities (the existing roster is fixed; Phase 14 content maps onto it).
 
 ---
 
-## 16. Phase Dependencies Summary
+## 13. Phase Dependencies Summary
 
 **Sequencing principle:** ship optimizations + features first, language support last.
 
 ```
-Done: Phase 1 ✅ → 1.5 ✅ → 2 ✅ → 3.3 ✅ → 6 ✅ → 7.1–7.3 ✅ → 8.1 ✅ → 8.2 ✅ → 8.3 (mostly) ✅ → 9 ✅ → P4.2 (Android) ✅ → Phase 10 ✅ → Phase 11 ✅ → Phase 12 ✅ → Phase 13 ✅
-                                                                                                                                                                          ↓
-                                                                                                                                        Bundled release (next ship)
-                                                                                                                                                                          ↓
-                                                                                                                                        Phase 3 (P3.1 languages — separate PR)
-                                                                                                                                                                          ↓
-                                                                                                                                        Sentry (post-rollout) + iOS widget (after iOS launch)
-                                                                                                                                                                          ↓
-                                                                                                                                        Phase 5 (on hold)
+Shipped to production (2026-05-12):
+  Phase 1 → 1.5 → 2 → 3.3 → 6 → 7.1–7.3 → 8.1 → 8.2 → 8.3 (+ panchang-ts 3.1.0)
+  → 1.7.0 launch → 9 → P4.2 (Android) → Phase 10 → Phase 11 (incl. P7.4→P11.6, P7.6→P11.5)
+  → Phase 12 (panchang-ts 4.0.0) → Phase 13 (panchang-ts 4.1.1)
+        ↓
+  Phase 14 — Devotional Practice & Engagement (P14.1–P14.5 ✅ shipped to branch
+                                                 2026-05-14, bundle blocked on
+                                                 P14.6 + Sanskrit-reviewer pass)
+      P14.1 Vaar Devata ✅ → P14.5 Shareable cards ✅ → P14.4 Sadhana streaks ✅
+      → P14.3 Navratri guide ✅ → P14.2 Puja Vidhi ✅
+      → P14.6 Audit-driven content fixes ⏳ (~1–2 h, blocks the bundled release)
+        ↓
+  Phase 15 — Accounts & Sync (Google Sign-In, phased A→D; A is the small first step;
+      makes the P14.4 streak / birth charts survive reinstall; D = Sign in with Apple, at iOS launch)
+        ↓
+  Phase 3 (P3.1 languages — Marathi first, separate PR)
+        ↓
+  Sentry (whenever staged rollout hits 100% — small, can slot in anytime) + iOS widget (after iOS launch)
+        ↓
+  Phase 5 (on hold — audio / booking / social)
 ```
 
 **Release cadence:** the user decides when to ship. Bundle multiple phases into one larger release rather than shipping each phase independently — the user prefers one substantive update over many small ones.

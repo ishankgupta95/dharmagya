@@ -71,7 +71,7 @@ export default function OnboardingStep1() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.parchment },
-  watermarkWrap: { ...StyleSheet.absoluteFillObject },
+  watermarkWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   content: {
     flex: 1,

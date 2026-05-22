@@ -300,22 +300,16 @@ export default function SettingsScreen() {
 
   return (
     <ScreenMount>
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('a11y.back')}>
-          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+      {/* Settings is now a bottom tab — back-button dropped; users switch
+          tabs via the bar instead of popping a stack. Title left-aligned to
+          match the other hub tabs (Astrology, Library). */}
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary, textAlign: 'left' }]}>
           {t('settings.title')}
         </Text>
-        <View style={{ width: 36, height: 36 }} />
       </View>
 
       <ScrollView
@@ -734,7 +728,7 @@ export default function SettingsScreen() {
             accessibilityLabel={t('settings.replayWalkthrough')}
             onPress={() => {
               setWalkthroughStep(1);
-              router.back();
+              router.navigate('/');
             }}>
             <SettingRow
               icon="walk"

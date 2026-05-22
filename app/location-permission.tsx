@@ -245,7 +245,7 @@ export default function LocationPickerScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  watermarkWrap: { ...StyleSheet.absoluteFillObject },
+  watermarkWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   // Header
   headerRow: {

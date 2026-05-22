@@ -15,6 +15,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
+import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useLocaleFormatters } from '@/utils/format';
 
@@ -51,8 +52,55 @@ export default function RemindersScreen() {
   const setFestivalReminderTime = useStore(s => s.setFestivalReminderTime);
   const { formatTime: formatDisplayTime } = useLocaleFormatters();
 
+  // Sadhana practice reminder (P14.4) — opt-in evening nudge if the user
+  // hasn't begun their sadhana yet today.
+  const sadhana = useStore(s => s.sadhana);
+  const sadhanaReminderEnabled = useStore(s => s.sadhanaReminderEnabled);
+  const setSadhanaReminderEnabled = useStore(s => s.setSadhanaReminderEnabled);
+  const sadhanaReminderTime = useStore(s => s.sadhanaReminderTime);
+  const setSadhanaReminderTime = useStore(s => s.setSadhanaReminderTime);
+  const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
+  const quietHoursStart = useStore(s => s.quietHoursStart);
+  const quietHoursEnd = useStore(s => s.quietHoursEnd);
+
   const [tithiTimePickerOpen, setTithiTimePickerOpen] = useState(false);
   const [festivalTimePickerOpen, setFestivalTimePickerOpen] = useState(false);
+  const [sadhanaTimePickerOpen, setSadhanaTimePickerOpen] = useState(false);
+
+  // Re-schedule the sadhana horizon when the toggle / time changes. Same
+  // debounce semantics as the tithi/festival reminders above, but a separate
+  // effect so the two namespaces don't interfere.
+  const sadhanaDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (sadhanaDebounceRef.current) clearTimeout(sadhanaDebounceRef.current);
+    sadhanaDebounceRef.current = setTimeout(() => {
+      void rescheduleSadhanaReminder({
+        enabled: sadhanaReminderEnabled,
+        timeHHmm: sadhanaReminderTime,
+        sadhana,
+        quietHours: quietHoursEnabled
+          ? { enabled: true, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }
+          : undefined,
+      });
+    }, 300);
+    return () => {
+      if (sadhanaDebounceRef.current) clearTimeout(sadhanaDebounceRef.current);
+    };
+  }, [sadhanaReminderEnabled, sadhanaReminderTime, sadhana, quietHoursEnabled, quietHoursStart, quietHoursEnd]);
+
+  async function handleSadhanaToggle(val: boolean) {
+    if (val && !sadhanaReminderEnabled) {
+      const ok = await ensurePermission(t);
+      if (!ok) return;
+    }
+    setSadhanaReminderEnabled(val);
+  }
+
+  // Navratri context — `prefs.festival.major` triggers the 9-day Navratri
+  // sequence, which needs panchang-compute inputs.
+  const userLocation = useStore(s => s.userLocation);
+  const ayanamsa = useStore(s => s.ayanamsa);
+  const masaSystem = useStore(s => s.masaSystem);
 
   // Debounce: reschedule after the user stops tapping toggles or changing
   // times for 300ms.
@@ -61,7 +109,12 @@ export default function RemindersScreen() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (hasAnyReminderEnabled(prefs)) {
-        void rescheduleReminders(prefs, { tithi: tithiReminderTime, festival: festivalReminderTime });
+        void rescheduleReminders(
+          prefs,
+          { tithi: tithiReminderTime, festival: festivalReminderTime },
+          undefined,
+          { coords: userLocation, ayanamsa, masaSystem },
+        );
       } else {
         void cancelAllReminders();
       }
@@ -69,7 +122,7 @@ export default function RemindersScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [prefs, tithiReminderTime, festivalReminderTime]);
+  }, [prefs, tithiReminderTime, festivalReminderTime, userLocation, ayanamsa, masaSystem]);
 
   async function handleTithiToggle(key: TithiReminderKey, val: boolean) {
     if (val && !hasAnyReminderEnabled(prefs)) {
@@ -113,6 +166,29 @@ export default function RemindersScreen() {
         <Text variant="body-italic" style={[styles.intro, { color: colors.textTertiary }]}>
           {t('reminders.intro')}
         </Text>
+
+        {/* ── Sadhana practice (P14.4) ────────────────────────────────── */}
+        <SectionLabel style={styles.sectionLabelSpacing}>{t('reminders.sadhanaSection')}</SectionLabel>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <ToggleRow
+            icon="flame"
+            label={t('reminders.sadhanaLabel')}
+            sublabel={t('reminders.sadhanaSublabel')}
+            value={sadhanaReminderEnabled}
+            onChange={handleSadhanaToggle}
+            colors={colors}
+            showDivider={sadhanaReminderEnabled}
+          />
+          {sadhanaReminderEnabled && (
+            <TimeRow
+              icon="clock"
+              label={t('reminders.sadhanaTimeLabel')}
+              value={formatDisplayTime(sadhanaReminderTime)}
+              onPress={() => setSadhanaTimePickerOpen(true)}
+              colors={colors}
+            />
+          )}
+        </View>
 
         {/* ── Tithi Reminders ─────────────────────────────────────────── */}
         <SectionLabel style={styles.sectionLabelSpacing}>{t('reminders.tithiSection')}</SectionLabel>
@@ -183,6 +259,14 @@ export default function RemindersScreen() {
         value={festivalReminderTime}
         onPick={setFestivalReminderTime}
         title={t('reminders.festivalTimePickerTitle')}
+      />
+
+      <TimePickerModal
+        visible={sadhanaTimePickerOpen}
+        onClose={() => setSadhanaTimePickerOpen(false)}
+        value={sadhanaReminderTime}
+        onPick={setSadhanaReminderTime}
+        title={t('reminders.sadhanaTimePickerTitle')}
       />
     </SafeAreaView>
     </ScreenMount>

@@ -9,6 +9,7 @@ import {
   WIDGET_FIELD_IDS,
   type WidgetFieldId,
 } from '@/services/widgets/widgetFields';
+import { INITIAL_SADHANA_STATE, type SadhanaState } from '@/services/sadhana';
 
 export type FontSize = 'small' | 'normal' | 'medium' | 'large';
 export type MasaSystem = 'purnimanta' | 'amanta';
@@ -171,6 +172,15 @@ interface AppStore {
    *  (top-main, mid-main, footer-left, footer-right). Each entry is a field
    *  ID from the widget catalog (tithi/yoga/sunset/...). */
   widgetSlots: [WidgetFieldId, WidgetFieldId, WidgetFieldId, WidgetFieldId];
+  /** Sadhana streak state (P14.4). Pure data — math lives in
+   *  [`src/services/sadhana.ts`](../services/sadhana.ts); the store is only
+   *  the persistence + reactive surface. */
+  sadhana: SadhanaState;
+  /** Opt-in evening at-risk reminder. Off by default — gentle nudge, not a
+   *  loss threat. See [`src/services/sadhanaReminders.ts`](../services/sadhanaReminders.ts). */
+  sadhanaReminderEnabled: boolean;
+  /** HH:mm 24h — evening time the at-risk reminder fires when enabled. */
+  sadhanaReminderTime: string;
 
   // Actions (not persisted)
   setThemeMode: (mode: ThemeMode) => void;
@@ -211,6 +221,11 @@ interface AppStore {
   setWalkthroughStep: (step: number) => void;
   initFirstOpen: () => void;
   setWidgetSlot: (index: 0 | 1 | 2 | 3, fieldId: WidgetFieldId) => void;
+  /** Replace the entire sadhana slice — used by the streak recorder which
+   *  passes in the result of `recordSadhanaEvent`. */
+  setSadhanaState: (next: SadhanaState) => void;
+  setSadhanaReminderEnabled: (val: boolean) => void;
+  setSadhanaReminderTime: (timeHHmm: string) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -253,6 +268,9 @@ export const useStore = create<AppStore>()(
       walkthroughStep: 1,
       firstOpenTimestamp: 0,
       widgetSlots: [...DEFAULT_WIDGET_SLOTS],
+      sadhana: { ...INITIAL_SADHANA_STATE },
+      sadhanaReminderEnabled: false,
+      sadhanaReminderTime: '20:30',
 
       setThemeMode: (mode) => set({ themeMode: mode }),
       setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
@@ -323,11 +341,14 @@ export const useStore = create<AppStore>()(
           next[index] = fieldId;
           return { widgetSlots: next };
         }),
+      setSadhanaState: (next) => set({ sadhana: next }),
+      setSadhanaReminderEnabled: (val) => set({ sadhanaReminderEnabled: val }),
+      setSadhanaReminderTime: (timeHHmm) => set({ sadhanaReminderTime: timeHHmm }),
     }),
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 14,
+      version: 15,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -516,6 +537,23 @@ export const useStore = create<AppStore>()(
             && slots.every((id) => typeof id === 'string' && (WIDGET_FIELD_IDS as string[]).includes(id));
           if (!valid) {
             state.widgetSlots = [...DEFAULT_WIDGET_SLOTS];
+          }
+        }
+
+        // v14 → v15: Sadhana streak slice + opt-in at-risk reminder introduced
+        // (P14.4). Existing users start at zero streak — they earn it from
+        // their next jaap session forward; we don't retro-fill from history
+        // because the 26h-grace event chain isn't reconstructable from raw
+        // session timestamps alone (gaps near the boundary are ambiguous).
+        if (version < 15) {
+          if (state.sadhana === undefined) {
+            state.sadhana = { ...INITIAL_SADHANA_STATE };
+          }
+          if (state.sadhanaReminderEnabled === undefined) {
+            state.sadhanaReminderEnabled = false;
+          }
+          if (state.sadhanaReminderTime === undefined) {
+            state.sadhanaReminderTime = '20:30';
           }
         }
 

@@ -41,6 +41,8 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { Ornament } from '@/components/common/Ornament';
+import { TodaysDeityCard } from '@/components/common/TodaysDeityCard';
+import { SadhanaStreakBadge } from '@/components/common/SadhanaStreakBadge';
 import { HomePanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
@@ -260,9 +262,7 @@ export default function HomeScreen() {
 
   // ── Walkthrough refs & measurement ────────────────────────────────────────
   const panchangCardRef = useRef<View>(null);
-  const settingsBtnRef = useRef<View>(null);
   const [panchangRect, setPanchangRect] = useState<SpotlightRect | null>(null);
-  const [settingsRect, setSettingsRect] = useState<SpotlightRect | null>(null);
 
   const measurePanchang = useCallback(() => {
     panchangCardRef.current?.measureInWindow((x, y, width, height) => {
@@ -270,22 +270,20 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const measureSettings = useCallback(() => {
-    settingsBtnRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0) setSettingsRect({ x, y, width, height });
-    });
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
-      if (walkthroughStep === 1 || walkthroughStep === 4) {
-        const timer = setTimeout(() => {
-          if (walkthroughStep === 1) measurePanchang();
-          if (walkthroughStep === 4) measureSettings();
-        }, 300);
+      // Step 4 used to spotlight the gear in the Home header; Settings is
+      // now a bottom-tab so the gear was removed — auto-finish the walk-
+      // through when step 4 fires.
+      if (walkthroughStep === 4) {
+        setWalkthroughStep(0);
+        return;
+      }
+      if (walkthroughStep === 1) {
+        const timer = setTimeout(measurePanchang, 300);
         return () => clearTimeout(timer);
       }
-    }, [walkthroughStep, measurePanchang, measureSettings])
+    }, [walkthroughStep, measurePanchang, setWalkthroughStep])
   );
 
   const skipWalkthrough = useCallback(() => setWalkthroughStep(0), [setWalkthroughStep]);
@@ -300,6 +298,8 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}>
 
         {/* ── Header ───────────────────────────────────────────────────── */}
+        {/* Settings now lives in the bottom tab bar; the header keeps just the
+            date stack and breathes wider into the space the gear used to fill. */}
         <View style={styles.header}>
           <View style={styles.dateStack}>
             <Text variant="mono-caps" style={[styles.weekday, { color: colors.textMuted }]}>
@@ -317,15 +317,14 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            ref={settingsBtnRef}
-            onPress={() => router.push('/settings')}
-            style={[styles.gear, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.openSettings')}>
-            <Icon name="gear" size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
+        </View>
+
+        {/* ── Sadhana streak (P14.4) — top placement, non-interactive ─── */}
+        {/* Anchors the daily-engagement loop. Renders at the top of Home so
+            it's the first thing the user reads on opening the app. Pure
+            indicator — not a button — so it never traps a tap. */}
+        <View style={styles.streakRow}>
+          <SadhanaStreakBadge colors={colors} large />
         </View>
 
         {/* ── Greeting ─────────────────────────────────────────────────── */}
@@ -405,6 +404,9 @@ export default function HomeScreen() {
             </SkeletonCrossfade>
           </NightCard>
         </MotionPressable>
+
+        {/* ── Today's Deity (Vaar Devata) ───────────────────────────────── */}
+        <TodaysDeityCard colors={colors} />
 
         {/* ── Your Deities strip ────────────────────────────────────────── */}
         {selectedDeityMetas.length > 0 && (
@@ -623,18 +625,9 @@ export default function HomeScreen() {
         />
       )}
 
-      {walkthroughStep === 4 && settingsRect && (
-        <WalkthroughSpotlight
-          spotlight={settingsRect}
-          title={t('walkthrough.step4Title')}
-          description={t('walkthrough.step4Desc')}
-          tooltipPosition="below"
-          stepIndex={3}
-          totalSteps={4}
-          onSpotlightTap={() => setWalkthroughStep(0)}
-          onSkip={skipWalkthrough}
-        />
-      )}
+      {/* Walkthrough step 4 (settings spotlight) was removed when Settings
+          became a bottom-tab — the focus effect auto-finishes the walkthrough
+          when this step fires (see useFocusEffect above). */}
 
     </SafeAreaView>
     </ScreenMount>
@@ -927,6 +920,9 @@ const styles = StyleSheet.create({
 
   // Quick row
   quickRow: { flexDirection: 'row', gap: spacing.gridGap, marginBottom: 16 },
+  // Top streak row — sits between header and greeting; right-aligned so it
+  // visually balances the gear above and reads as a private metric, not a CTA.
+  streakRow: { alignItems: 'flex-end', marginTop: 6, marginBottom: 4 },
   quickCard: {
     flex: 1,
     borderRadius: 14,

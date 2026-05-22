@@ -1,8 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, type ColorValue } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabBar } from '@react-navigation/bottom-tabs';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { AppText } from '@/components/common/AppText';
@@ -35,17 +34,20 @@ export default function TabLayout() {
 
   const activeColor = isDark ? ACTIVE_DARK : ACTIVE_LIGHT;
   const inactiveColor = isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
-  const barBg = isDark ? 'rgba(43,26,15,0.94)' : 'rgba(251,243,222,0.96)';
+  const barBg = isDark ? palette.nightPlinth : palette.parchmentBright;
   const barBorder = isDark ? 'rgba(201,155,58,0.22)' : 'rgba(156,118,35,0.22)';
   const sceneBg = isDark ? darkColors.base : lightColors.base;
 
+  // Edge-to-edge tab bar — no horizontal margin, no border-radius, no floating
+  // shadow. Anchored to the bottom edge with safe-area inset padding so the
+  // labels clear the gesture pill on Android / the home indicator on iOS.
+  // Height + insets sized so 6 tabs (Home / Panchang / Gods / Pujas /
+  // Astrology / Settings) fit without wrapping the longer labels.
+  const TAB_BAR_INNER_HEIGHT = 56;
+  const tabBarHeight = TAB_BAR_INNER_HEIGHT + Math.max(insets.bottom, 6);
+
   return (
     <Tabs
-      tabBar={(props) => (
-        <View style={{ backgroundColor: sceneBg }}>
-          <BottomTabBar {...props} />
-        </View>
-      )}
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
@@ -55,37 +57,25 @@ export default function TabLayout() {
         tabBarStyle: walkthroughActive
           ? { display: 'none' }
           : {
-              // Floating pill. Solid at 94–96% opacity — RN can't do
-              // backdrop-filter, so the bg is just near-opaque.
               backgroundColor: barBg,
-              borderTopWidth: 0,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: barBorder,
-              borderRadius: 22,
-              height: 60,
-              marginHorizontal: 18,
-              marginBottom: Math.max(insets.bottom, 10),
-              paddingTop: 8,
-              paddingBottom: 8,
-              // Soft shadow — iOS reads this; Android uses elevation.
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: isDark ? 0.28 : 0.16,
-              shadowRadius: 14,
-              elevation: 10,
-              // Intentionally not absolute — keeps screens' bottom insets correct
-              // during the transition. Floating pill look still comes through via
-              // the horizontal margin + border radius + shadow.
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: barBorder,
+              height: tabBarHeight,
+              paddingTop: 6,
+              paddingBottom: Math.max(insets.bottom, 6),
             },
         tabBarItemStyle: {
           paddingTop: 0,
+          paddingHorizontal: 0,
         },
-        tabBarLabel: ({ focused, color, children }) => (
+        tabBarLabel: ({ color, focused, children }) => (
           <AppText
             variant="mono-caps"
+            numberOfLines={1}
+            allowFontScaling={false}
             style={[
               styles.label,
-              { color, opacity: focused ? 1 : 0.85 },
+              { color, opacity: focused ? 1 : 0.78 },
             ]}>
             {children}
           </AppText>
@@ -109,7 +99,18 @@ export default function TabLayout() {
         name="library"
         options={{
           title: t('tabs.gods'),
-          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="people" />,
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="flower" />,
+        }}
+      />
+      <Tabs.Screen
+        name="practice"
+        options={{
+          // Label resolves from `tabs.pujas` (was `tabs.practice` pre-rename).
+          // File still named `practice.tsx` since the URL `/practice` is
+          // already referenced from other screens / notifications; renaming
+          // the file would invalidate those without payoff.
+          title: t('tabs.pujas'),
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="flame" />,
         }}
       />
       <Tabs.Screen
@@ -117,6 +118,13 @@ export default function TabLayout() {
         options={{
           title: t('tabs.astrology'),
           tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="diamond" />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: t('tabs.settings'),
+          tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="gear" />,
         }}
       />
     </Tabs>
@@ -130,29 +138,36 @@ function TabIcon({
   name,
 }: {
   focused: boolean;
-  color: string;
-  emberColor: string;
+  color: ColorValue;
+  emberColor: ColorValue;
   name: IconName;
 }) {
+  // tab system types color as ColorValue (string | OpaqueColorValue) but we
+  // only ever feed it palette literals, so the string cast is safe here.
   return (
     <View style={styles.iconSlot}>
       {focused && <View style={[styles.ember, { backgroundColor: emberColor, shadowColor: emberColor }]} />}
-      <Icon name={name} size={22} color={color} />
+      <Icon name={name} size={20} color={color as string} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // 6 tabs on a 360-dp screen → each cell ~60 dp. Label fits 5–7 chars at
+  // fontSize 8 with letterSpacing 1.2 in one line; longer labels truncate
+  // with an ellipsis instead of wrapping.
   label: {
-    fontSize: 8.5,
+    fontSize: 8,
     marginTop: 2,
-    letterSpacing: 1.6,
+    letterSpacing: 1.2,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   iconSlot: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 36,
-    height: 28,
+    width: 32,
+    height: 24,
   },
   ember: {
     position: 'absolute',

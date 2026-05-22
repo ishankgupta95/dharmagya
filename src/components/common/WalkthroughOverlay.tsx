@@ -104,7 +104,7 @@ export function WalkthroughSpotlight({
   // the user. Auto-flip when the requested side doesn't fit, then clamp into
   // the visible area as a final safety net.
   const SAFE_MARGIN = 16;
-  const rootHeight = dims.height; // root is StyleSheet.absoluteFillObject — close enough
+  const rootHeight = dims.height; // root is absolutely positioned full-screen — close enough
   const spaceAbove = s.y;
   const spaceBelow = rootHeight - oy - (s.y + s.h);
   const requiredSpace = (tooltipHeight || 220) + TOOLTIP_GAP + SAFE_MARGIN;
@@ -156,7 +156,7 @@ export function WalkthroughSpotlight({
     <Animated.View
       entering={FadeIn.duration(300)}
       exiting={FadeOut.duration(200)}
-      style={StyleSheet.absoluteFillObject}
+      style={StyleSheet.absoluteFill}
       pointerEvents="box-none"
     >
       {overlayReady && (
@@ -307,7 +307,11 @@ export function WalkthroughSpotlight({
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 9999,
   },
   strip: {

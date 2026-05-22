@@ -20,6 +20,8 @@ import { SectionLabel } from '@/components/common/SectionLabel';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
+import { RemedyNudge } from './RemedyNudge';
+import { getVaarDevataByGraha, type GrahaKey } from '@/config/vaarDevata';
 import { useStore } from '@/store/useStore';
 import {
   borderRadius,
@@ -67,6 +69,19 @@ const DASHA_LORD_TO_KEY: Record<DashaLord, string> = {
   Ketu: 'ketu',
 };
 
+// Graha-ruled mahādaśā lords → their Vaar Devata day. Rāhu/Ketu have no
+// weekday, so they're absent — the daśā-lord remedy nudge simply doesn't show
+// for those periods.
+const DASHA_LORD_GRAHA: Partial<Record<DashaLord, GrahaKey>> = {
+  Sun: 'surya',
+  Moon: 'chandra',
+  Mars: 'mangal',
+  Mercury: 'budh',
+  Jupiter: 'guru',
+  Venus: 'shukra',
+  Saturn: 'shani',
+};
+
 function formatRangeDate(d: Date, lang: string): string {
   return d.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', {
     month: 'short',
@@ -82,6 +97,7 @@ function formatYears(years: number, t: (k: string, o?: Record<string, unknown>) 
 
 export function DashaSection() {
   const { t, i18n } = useTranslation();
+  const lang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
   const isDarkMode = useStore((s) => s.isDarkMode);
   const language = useStore((s) => s.language);
   const userBirthDate = useStore((s) => s.userBirthDate);
@@ -338,6 +354,27 @@ export function DashaSection() {
               )}
             </NightCard>
           </View>
+
+          {/* Remedy nudge — links the running mahādaśā lord to its weekday's
+              Vaar Devata. Only for graha lords (Rāhu/Ketu have no weekday), and
+              only on the graha-based systems (Vimshottari / Ashtottari) — the
+              Chara/Yogini/Narayan tabs run on rāśis/yoginis, not grahas. */}
+          {(() => {
+            const gk = DASHA_LORD_GRAHA[dashaResult.currentMahaDashaLord];
+            const vaar = gk ? getVaarDevataByGraha(gk) : undefined;
+            if (!vaar) return null;
+            return (
+              <RemedyNudge
+                text={t('vaar.nudgeDashaLord', {
+                  planet: t(`dasha.planet.${DASHA_LORD_TO_KEY[dashaResult.currentMahaDashaLord]}`),
+                  day: vaar.dayName[lang],
+                })}
+                dayKey={vaar.dayKey}
+                colors={colors}
+                style={styles.dashaNudge}
+              />
+            );
+          })()}
 
           <SectionLabel style={styles.sectionLabelSpacing}>
             {t('dasha.fullCycle')}
@@ -922,6 +959,7 @@ const styles = StyleSheet.create({
   prompt: { fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 24 },
 
   currentWrap: { marginTop: 24 },
+  dashaNudge: { marginTop: 14 },
   currentMahaLord: { fontSize: 26, lineHeight: 32, marginTop: 10, marginBottom: 4 },
   currentUntil: { fontSize: 11, letterSpacing: 0.2 },
   currentDivider: { height: StyleSheet.hairlineWidth, marginVertical: 14 },

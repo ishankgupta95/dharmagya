@@ -21,6 +21,9 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import festivalsData from '@/data/static/festivals.json';
 import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
 import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
+import { useShareSheet } from '@/store/useShareSheet';
+import { getPujaForFestivalName } from '@/config/pujas';
+import { getKathaForFestivalName } from '@/config/kathas';
 import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
@@ -424,6 +427,7 @@ function FestivalRowImpl({
   const dayName = item.date.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNum = item.date.getDate();
   const highlighted = isToday || isSoon;
+  const openShare = useShareSheet(s => s.open);
 
   return (
     <View
@@ -494,6 +498,9 @@ function FestivalRowImpl({
           ) {
             secondary = localizeFestivalDescription(f.description, i18n.language);
           }
+          const matchedPuja = getPujaForFestivalName(f.name, f.description);
+          const matchedKatha = getKathaForFestivalName(f.name, f.description);
+          const pujaLang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
           return (
             <View key={i} style={styles.festivalItem}>
               <View style={{ marginTop: 3 }}>
@@ -508,7 +515,50 @@ function FestivalRowImpl({
                     {secondary}
                   </Text>
                 )}
+                {matchedPuja && (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: matchedPuja.slug } })}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    style={styles.pujaCtaRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('puja.openNamedPuja', { name: matchedPuja.name[pujaLang] })}>
+                    <Icon name="gift" size={11} color={colors.accent} />
+                    <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
+                      {t('puja.openNamedPuja', { name: matchedPuja.name[pujaLang] })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {matchedKatha && (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: matchedKatha.slug } })}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    style={styles.pujaCtaRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('katha.a11yOpenKatha', { name: matchedKatha.titleEnglish })}>
+                    <Icon name="text" size={11} color={colors.accent} />
+                    <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
+                      {t('katha.festivalCta')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
+              {f.type === 'major' && (
+                <TouchableOpacity
+                  onPress={() => openShare({
+                    kind: 'festival-greeting',
+                    festivalNameEn: localizeFestivalName(f.name, 'en'),
+                    festivalNameHi: localizeFestivalName(f.name, 'hi'),
+                    dateLabel: item.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+                  })}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginTop: 1 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('share.ctaGreeting')}>
+                  <Icon name="share" size={15} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
             </View>
           );
         })}
@@ -591,6 +641,8 @@ const styles = StyleSheet.create({
   festivalItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   festivalName: { fontSize: 14, lineHeight: 19 },
   festivalSecondary: { fontSize: 11, lineHeight: 15, marginTop: 1 },
+  pujaCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  pujaCtaText: { fontSize: 8.5, letterSpacing: 1.4, flexShrink: 1 },
 
   soonBadge: {
     alignSelf: 'flex-start',

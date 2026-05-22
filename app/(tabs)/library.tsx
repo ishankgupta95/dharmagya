@@ -171,8 +171,9 @@ export default function LibraryScreen() {
             </Text>
           </View>
         }
-        ListFooterComponent={<AdBanner colors={colors} placement="libraryGodsInline" inline />}
       />
+
+      <AdBanner colors={colors} placement="libraryGodsInline" />
 
       {walkthroughStep === 3 && deityGridRect && (
         <WalkthroughSpotlight
@@ -330,7 +331,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   portraitImage: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
   },

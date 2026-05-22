@@ -49,7 +49,13 @@ export default {
     home: 'Home',
     panchang: 'Panchang',
     gods: 'Gods',
-    astrology: 'Astrology',
+    // "Jyotish" (Sanskrit jyotiṣa) is the canonical name for Vedic astrology
+    // and matches the existing Hindi label; keeps the bar from ellipsising on
+    // 6-tab edge-to-edge layouts. The in-screen title (`astrology.title`)
+    // still reads "Astrology" so the meaning is unambiguous on entry.
+    astrology: 'Jyotish',
+    pujas: 'Pujas',
+    settings: 'Settings',
   },
 
   // ── Home Screen ─────────────────────────────────────────────────────────
@@ -208,6 +214,8 @@ export default {
   god: {
     aartiBadge: 'Aarti',
     chalisaBadge: 'Chalisa',
+    kathaBadge: 'Vrat Katha',
+    scriptureBadge: 'Scripture',
     chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
@@ -432,8 +440,8 @@ export default {
     appVersion: 'App Version',
     replayWalkthrough: 'App Walkthrough',
     replayWalkthroughDesc: 'Learn how to use the app',
-    festivalTithiReminders: 'Festival & Tithi Reminders',
-    festivalTithiRemindersDesc: 'Recurring reminders for Ekadashi, Pradosha, festivals',
+    festivalTithiReminders: 'Sadhana, Tithi & Festival Reminders',
+    festivalTithiRemindersDesc: 'Daily sadhana nudge + Ekadashi, Pradosha, festivals',
     sendFeedback: 'Send Feedback',
     sendFeedbackDesc: 'Report a bug or request a feature',
     rateApp: 'Rate Dharmagya',
@@ -517,6 +525,12 @@ export default {
     festivalTimeLabel: 'Reminder Time (evening before)',
     tithiTimePickerTitle: 'Tithi Reminder Time',
     festivalTimePickerTitle: 'Festival Reminder Time',
+    // Sadhana practice (P14.4) — opt-in evening nudge, off by default.
+    sadhanaSection: 'SADHANA PRACTICE',
+    sadhanaLabel: 'Evening sadhana reminder',
+    sadhanaSublabel: 'A gentle nudge if you haven’t begun today',
+    sadhanaTimeLabel: 'Reminder time',
+    sadhanaTimePickerTitle: 'Sadhana Reminder Time',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -1053,5 +1067,295 @@ export default {
     universalMantra: 'Universal',
     deityChip: 'For {{name}}',
     homeBody: 'Begin a mantra jaap',
+  },
+
+  vaar: {
+    // Home "Today's Deities" card
+    todaysDeityKicker: "TODAY'S DEITIES",
+    rulingGraha: 'Ruled by {{graha}}',
+    dayColorLabel: "Day's colour",
+    ishtDevataInFocus: 'Your Isht Devata is in focus today',
+    startJaap: 'Start Jaap',
+    // Detail screen
+    detailTitle: "{{day}}'s Deities",
+    deitiesSectionLabel: 'Deities of the day',
+    openInLibrary: 'Open {{name}} in the Library',
+    offeringsLabel: 'Offerings & bhog',
+    fastingLabel: 'Fasting & vrat',
+    mantraLabel: 'Mantra for the day',
+    mantraReviewNote: 'Transliteration is under scholarly review — treat as provisional.',
+    variantNotesLabel: 'Regional & traditional variants',
+    linkedPujaLabel: 'Linked puja vidhi',
+    sourcesLabel: 'About this',
+    // Kundli remedy nudges (Dignity / Dosha / Sade Sati / Dasha cards)
+    nudgeWeakChandra: 'Born with a weak (debilitated) Moon? Monday is traditionally for Shiva worship — see the Monday Vaar Devata.',
+    nudgeMangal: 'Facing Mangal Dosha? Tuesday is traditionally for Hanuman worship — see the Tuesday Vaar Devata.',
+    nudgeSadeSati: 'During Sade Sati, Saturday worship of Shani Dev (with Hanuman) is the classical observance.',
+    nudgeDashaLord: 'You are in {{planet}} mahādaśā — {{day}} is its weekday. See its Vaar Devata.',
+    // Accessibility
+    a11yTodaysDeities: "Today's deities: {{names}}, ruled by {{graha}}. Open for details.",
+    a11yStartJaap: 'Start a jaap of this mantra',
+    a11yBrowseDay: '{{day}} — Vaar Devata',
+    a11yRemedyNudgeHint: 'Opens the related Vaar Devata page',
+  },
+
+  // ── Navratri / Navadurga 9-day guide (P14.3) ────────────────────────────
+  navratri: {
+    title: 'Navratri',
+    sharadName: 'Sharad Navratri',
+    dayShortLabel: 'DAY',
+    // Index screen
+    dayKicker: 'DAY {{day}} · {{name}}',
+    colorLabel: "Today's colour",
+    colorComputedNote: 'Anchored to {{weekday}} — colours follow the weekday, not the goddess.',
+    iconographyLabel: 'Iconography',
+    significanceLabel: 'Significance',
+    mantraLabel: 'Mantra for the day',
+    mantraReviewNote: 'Transliteration is under scholarly review — treat as provisional.',
+    startJaap: 'Start Jaap',
+    dhyanaLabel: 'Dhyana shloka',
+    bhogLabel: 'Bhog / prasad',
+    ghatasthapanaLabel: 'Ghatasthapana muhurat',
+    ghatasthapanaWindowNote: 'Computed for your location — the first one-third of the day while Pratipada prevails.',
+    ghatasthapanaAbhijitFallback: 'Pratipada ends before sunrise — use the Abhijit muhurta window instead.',
+    warnChitra: 'Chitra nakshatra is active — classically advised against, not prohibited.',
+    warnVaidhriti: 'Vaidhriti yoga is active — classically advised against, not prohibited.',
+    kanyaPujanKicker: 'KANYA PUJAN',
+    kanyaPujanText: 'Ashtami or Navami is the day for Kanya Pujan / Kanjak — nine girls aged 2–10 (optionally one boy as Bhairav); wash their feet, tilak, offer halwa-puri-chana, and gift clothes or money. Both Ashtami and Navami are valid; Ashtami is more common in North India.',
+    day9HavanText: 'Navami closes the navratri with a havan and purna ahuti. Many households also keep Kanya Pujan on this day — nine girls aged 2–10, halwa-puri-chana, and a gift.',
+    vijayadashamiLabel: 'Vijayadashami / Dussehra',
+    vijayadashamiText: 'Day 10 — {{date}} — is Vijayadashami / Dussehra. Durga visarjan and, in many traditions, Ravan Dahan and Shami Pujan.',
+    saptashatiTodayLabel: "Today's Saptashati pāṭha",
+    saptashatiChapters_one: 'Chapter {{list}}',
+    saptashatiChapters_other: 'Chapters {{list}}',
+    saptashatiOpenCta: 'Open the Saptashati outline',
+    vratCta: 'Vrat & food rules',
+    saptashatiCta: 'Durga Saptashati',
+    guptKicker: 'GUPT NAVRATRI',
+    // Vrat screen
+    vratTitle: 'Navratri Vrat',
+    vratEyebrow: 'NINE-DAY OBSERVANCE',
+    vratIntro: 'Navratri vrat varies by intensity — pick the tier that suits your day and your health. Sendha namak (rock salt) is the rule; regular iodised salt is not.',
+    vratTiersLabel: 'Tiers of practice',
+    allowedLabel: 'Allowed',
+    forbiddenLabel: 'Forbidden',
+    sourcesLabel: 'About this',
+    // Festivals-screen header card
+    headerKickerUpcoming: 'UPCOMING · 9-DAY GUIDE',
+    headerKickerActive: 'DAY {{day}} OF 9 · IN PROGRESS',
+    headerGhatasthapanaLine: 'Ghatasthapana · {{range}}',
+    headerAbhijitLine: 'Abhijit muhurta · {{range}}',
+    // Daily push notifications
+    notif: {
+      dayTitle: 'Day {{day}} · {{form}}',
+      day1Body: "Ghatasthapana is the morning's main rite — auspicious window {{muhurat}}. Today is {{form}}'s day.",
+      dayBody: "Today's colour is {{color}}; offer {{bhog}} to {{form}}.",
+      dayKanyaBody: "Today is for {{form}} — colour {{color}}, bhog {{bhog}}. Kanya Pujan is kept on Ashtami or Navami.",
+      day10Title: 'Vijayadashami · Dussehra',
+      day10Body: 'Durga visarjan today. Ravan Dahan and Shami Pujan in many traditions.',
+      day1MuhuratTitle: 'Ghatasthapana muhurat starts soon',
+      day1MuhuratBody: 'The auspicious window for Kalash Sthapana begins in about 30 minutes — {{range}}.',
+    },
+    // Accessibility
+    a11yOpenGuide: 'Open the Navratri 9-day guide',
+    a11ySwitchKind: 'Switch to {{name}}',
+    a11yPickDay: 'Day {{day}}',
+    a11yStartJaap: 'Start a jaap of this mantra',
+    a11yOpenVrat: 'Open the Navratri vrat guide',
+    a11yOpenSaptashati: 'Open the Durga Saptashati outline',
+    // P14.2 cross-link: Ghatasthapana puja vidhi
+    openGhatasthapanaPuja: 'Open the Ghatasthapana puja vidhi',
+    // Kanya Pujan (dedicated guide — /navratri/kanya-pujan)
+    kanyaPujanCardCta: 'Read the Kanya Pujan guide',
+    kanyaTitle: 'Kanya Pujan',
+    kanyaEyebrow: 'NINE GIRLS HONOURED AS THE DEVI',
+    kanyaAboutLabel: 'About the rite',
+    kanyaWhenLabel: 'When it is kept',
+    kanyaAgeNamesLabel: 'The nine kanyas',
+    kanyaAgeLabel: 'AGE {{age}}',
+    kanyaProtocolLabel: 'The rite, step by step',
+    kanyaOfferingsLabel: 'Offerings',
+    kanyaNotesLabel: 'Notes',
+    a11yOpenKanyaPujan: 'Open the Kanya Pujan guide',
+  },
+
+  // ── Scripture reader (P14.3 outline + library scriptures) ──────────────
+  scripture: {
+    notFound: 'Scripture not available.',
+    // Index screen
+    indexTitle: 'Scriptures',
+    indexEyebrow: 'SACRED TEXTS',
+    indexIntro: 'The Bhagavad Geeta and the Tulsi Sundarkand in their full source text, plus the Durga Saptashati outline used during Navratri recitation. Tap a scripture to read.',
+    sourcesLabel: 'About this',
+    a11yOpenScripture: 'Open {{name}}',
+    // Saptashati branch (kept verbatim from P14.3)
+    kickerSaptashati: 'DURGĀ MĀHĀTMYA',
+    aboutLabel: 'About this text',
+    reviewNote: 'Full verse-by-verse text is under scholarly review and not shipped in this version. The chapter outline + the 9-day pāṭha map are surfaced here as the practice scaffold.',
+    dayMapLabel: '9-day pāṭha schedule',
+    chaptersLabel: 'The thirteen chapters',
+    chapterKicker: 'CHAPTER {{num}}',
+    chaptersN_one: 'Chapter {{list}}',
+    chaptersN_other: 'Chapters {{list}}',
+    // Library-scripture detail
+    subtitleVersesOnly_one: '{{count}} verse',
+    subtitleVersesOnly_other: '{{count}} verses',
+    subtitleChaptersVerses: '{{chapters}} chapters · {{verses}} verses',
+    chapterListLabel: 'The chapters',
+    versesNCount_one: '{{count}} verse',
+    versesNCount_other: '{{count}} verses',
+    readCtaKicker: 'TAP TO READ',
+    readAllVerses_one: 'Read the {{count}} verse',
+    readAllVerses_other: 'Read all {{count}} verses',
+    a11yOpenChapter: 'Open chapter {{num}}',
+    // Verse reader
+    verseKicker: 'VERSE {{num}}',
+  },
+
+  // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────
+  katha: {
+    indexTitle: 'Vrat Kathas',
+    indexEyebrow: 'RECITED WHEN A VRAT IS KEPT',
+    indexIntro: 'The traditional narratives recited when a vrat is observed — each paired with its puja samagri and vidhi. Tap a katha to read it in full.',
+    notFound: 'This katha is not available.',
+    aboutLabel: 'About this katha',
+    samagriLabel: 'Puja Samagri',
+    vidhiLabel: 'Puja Vidhi',
+    adhyayKicker: 'ADHYAY {{num}}',
+    sourcesLabel: 'About this',
+    a11yOpenKatha: 'Open {{name}}',
+    festivalCta: 'READ THE VRAT KATHA',
+  },
+
+  // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
+  practice: {
+    title: 'Pujas',
+    eyebrow: 'PUJA · SADHANA',
+    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide, the Vaar Devata, seven Featured Pujas with samagri checklists and step-by-step upacharas, and six vrat kathas. Festival dates (Ekadashi, Maha Shivaratri, …) are tracked on the Festivals tab.',
+    comingSoon: 'COMING SOON',
+    navratri: {
+      title: 'Navratri 9-day guide',
+      defaultSubtitle: 'Sharad Navratri · per-day form, mantra, bhog, vrat rules, and the Durga Saptashati',
+      activeSubtitle: 'In progress · Day {{day}} of 9',
+    },
+    vaar: {
+      title: 'Vaar Devata',
+      subtitle: '{{day}} — {{deities}}',
+    },
+    pujaVidhi: {
+      title: 'Puja Vidhi',
+      subtitle: 'Step-by-step household pujas — Satyanarayan, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha, Ghatasthapana.',
+    },
+    kathas: {
+      title: 'Vrat Kathas',
+      subtitle: 'The stories recited when keeping a vrat — Satyanarayan, Karva Chauth, Vaibhav Lakshmi, Santoshi Mata, Solah Somvar, Ahoi Ashtami.',
+    },
+    scriptures: {
+      title: 'Scriptures',
+      subtitle: 'Bhagavad Geeta, Sundarkand, and the Durga Saptashati outline.',
+    },
+  },
+
+  // ── Puja Vidhi (P14.2) ──────────────────────────────────────────────────
+  puja: {
+    // Index screen
+    indexTitle: 'Puja Vidhi',
+    indexEyebrow: 'FEATURED PUJAS',
+    indexIntro: 'Seven of the most-performed household pujas, each on the classical Shodashopachara template — when and why, an interactive samagri checklist, numbered steps, and deep links to the aarti, chalisa, jaap, and the matching festival or muhurat.',
+    notFound: 'This puja is not available.',
+    // Detail-screen section labels
+    whenWhyLabel: 'When & why',
+    samagriLabel: 'Samagri · supplies',
+    samagriHint: 'Tap items as you gather them — your checks reset when you leave the page.',
+    sankalpaLabel: 'Sankalpa · dedication',
+    sankalpaHint: "Recite mentally; substitute your gotra, name, place, and intention where shown in brackets.",
+    preArcLabel: 'Opening steps',
+    shodashopacharaLabel: 'The sixteen upacharas',
+    shodashopacharaHint: 'The classical Shodashopachara sequence, parameterised for this puja.',
+    postArcLabel: 'Closing steps',
+    afterTheLabel: 'After the puja',
+    variantsLabel: 'Regional & traditional variants',
+    sourcesLabel: 'About this',
+    // Banners + buttons
+    reviewBanner: "Mantras are under scholarly review — treat as provisional. Regional and family variations exist; a pandit's guidance supersedes this app for any major ceremony.",
+    startJaap: 'Start Jaap',
+    openAarti: 'Open the aarti',
+    openChalisa: 'Open the chalisa',
+    // Cross-link CTAs (used by Library / Festivals / Vaar / Navratri)
+    openPujaCta: 'Open the Puja',
+    openNamedPuja: 'OPEN {{name}}',
+    openDeityPuja: 'Open the {{name}}',
+    // Accessibility
+    a11yStartJaap: 'Start a jaap of this mantra',
+  },
+  share: {
+    // Sheet chrome
+    title: 'Share a card',
+    shareBtn: 'Share',
+    saveBtn: 'Save',
+    shapeStory: 'Story · 9:16',
+    shapeSquare: 'Square · 1:1',
+    statusHint: 'For WhatsApp Status, open the share sheet, pick WhatsApp, then tap "My status".',
+    savedToast: 'Saved to your gallery.',
+    permissionDenied: 'Gallery access was denied.',
+    error: "Couldn't create the card. Please try again.",
+    // Card kickers (the small label on the card)
+    kickerDeityBlessing: 'Deity Blessing',
+    kickerFestival: 'Festival Greeting',
+    kickerVerse: 'Sacred Verse',
+    kickerJaap: 'Jaap Complete',
+    jaapCountLine: '{{count}} repetitions today',
+    kickerMilestone: 'Sadhana Milestone',
+    milestoneSubline: {
+      sessions: 'completed sessions',
+      repetitions: 'sacred repetitions',
+      streak: 'day sadhana',
+    },
+    from: 'From {{name}}',
+    // Entry-point buttons
+    ctaGreeting: 'Share greeting',
+    ctaDeity: 'Share',
+    ctaVerse: 'Share verse',
+    ctaJaap: 'Share',
+    shareFullText: 'Share full text',
+    viaDharmagya: 'shared via dharmagya',
+    a11yShare: 'Create a shareable image',
+    a11yShareFullText: 'Share the full text via WhatsApp or another app',
+  },
+
+  // ── Sadhana streak + milestones (P14.4) ─────────────────────────────────
+  sadhana: {
+    // Streak badge on Home / Jaap picker
+    streakLabel: 'Sadhana',
+    streakDays_one: 'day',
+    streakDays_other: 'days',
+    dayStreakLabel_one: 'DAY SADHANA',
+    dayStreakLabel_other: 'DAYS SADHANA',
+    a11yStreakBadge_one: 'Your current sadhana streak: {{count}} day',
+    a11yStreakBadge_other: 'Your current sadhana streak: {{count}} days',
+
+    // Milestone celebration overlay
+    milestoneEyebrow: 'SADHANA MILESTONE',
+    milestoneKicker: {
+      sessions: 'सत्र · sessions',
+      repetitions: 'जप · repetitions',
+      streak: 'साधना · days of practice',
+    },
+    milestoneSub: {
+      // Plural-safe — count interpolated below the big numeral.
+      sessions_one: 'session completed',
+      sessions_other: 'sessions completed',
+      repetitions_one: 'sacred repetition',
+      repetitions_other: 'sacred repetitions',
+      streak_one: 'day of unbroken sadhana',
+      streak_other: 'days of unbroken sadhana',
+    },
+    milestoneBlessing: 'May your practice deepen.',
+    continueBtn: 'Continue',
+    shareBtn: 'Share',
+
+    // Opt-in evening reminder (off by default; gentle wording)
+    reminderTitle: '🪔 A quiet moment',
+    reminderBody: 'Begin your sadhana when you have a moment today.',
   },
 } as const;
