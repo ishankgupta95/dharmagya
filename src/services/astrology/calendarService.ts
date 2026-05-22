@@ -100,8 +100,8 @@ export interface CalendarMonthOptions {
 // ─── Static festivals.json index (built once at module load) ─────────────────
 // `festivals.json` is ~3300 entries across 2016..2036. Flatten into a single
 // `Map<YYYY-MM-DD, row>` so per-cell lookup is O(1). The whole bundle is
-// already eagerly imported by `vrat.ts` + `calendarMonth.ts`, so this only
-// pays an indexing cost (≈1ms), not a JSON-parse cost.
+// already eagerly imported by `vrat.ts`, so this only pays an indexing cost
+// (≈1ms), not a JSON-parse cost.
 
 interface FestivalJsonRow {
   date: string;

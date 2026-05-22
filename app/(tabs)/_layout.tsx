@@ -1,8 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, type ColorValue } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabBar } from '@react-navigation/bottom-tabs';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { AppText } from '@/components/common/AppText';
@@ -49,11 +48,6 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      tabBar={(props) => (
-        <View style={{ backgroundColor: sceneBg }}>
-          <BottomTabBar {...props} />
-        </View>
-      )}
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
@@ -144,14 +138,16 @@ function TabIcon({
   name,
 }: {
   focused: boolean;
-  color: string;
-  emberColor: string;
+  color: ColorValue;
+  emberColor: ColorValue;
   name: IconName;
 }) {
+  // tab system types color as ColorValue (string | OpaqueColorValue) but we
+  // only ever feed it palette literals, so the string cast is safe here.
   return (
     <View style={styles.iconSlot}>
       {focused && <View style={[styles.ember, { backgroundColor: emberColor, shadowColor: emberColor }]} />}
-      <Icon name={name} size={20} color={color} />
+      <Icon name={name} size={20} color={color as string} />
     </View>
   );
 }

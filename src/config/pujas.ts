@@ -50,9 +50,6 @@ export { PUJA_DISCLAIMER } from 'hindu-devotional-texts';
 /** All seven featured pujas, in display order. */
 export const FEATURED_PUJAS: readonly PujaContent[] = getAllPujas();
 
-/** All featured-puja slugs, in display order. Used by the Pujas index screen. */
-export const ALL_PUJA_SLUGS: readonly string[] = FEATURED_PUJAS.map((p) => p.slug);
-
 /** Look up a featured puja by slug; `undefined` for an unknown key. */
 export function getPujaBySlug(slug: string | undefined): PujaContent | undefined {
   if (!slug) return undefined;

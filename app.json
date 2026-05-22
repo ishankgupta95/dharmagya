@@ -2,12 +2,11 @@
   "expo": {
     "name": "dharmagya",
     "slug": "dharmSetu",
-    "version": "1.8.0",
+    "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./assets/images/dharmagya_logo_small.png",
     "scheme": "dharmagya",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ishank1995.dharmagya"
@@ -17,10 +16,9 @@
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/dharmagya_logo_small.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.ishank1995.dharmagya",
-      "versionCode": 10
+      "versionCode": 11
     },
     "web": {
       "output": "static",
@@ -66,7 +64,10 @@
       ],
       "react-native-edge-to-edge",
       "@react-native-community/datetimepicker",
-      "./plugins/withTodayPanchangWidget"
+      "./plugins/withTodayPanchangWidget",
+      "expo-font",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

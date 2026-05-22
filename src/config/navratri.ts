@@ -48,10 +48,7 @@ import {
 } from 'hindu-devotional-texts';
 import type {
   NavadurgaForm,
-  NavadurgaMantra,
-  DhyanaShloka,
   KanyaPujanData,
-  KanyaAgeName,
 } from 'hindu-devotional-texts';
 
 // ─── Shared types ────────────────────────────────────────────────────────────
@@ -75,7 +72,7 @@ export interface Bilingual {
  * SOURCES.md`) and `bhogAlt` folded into the library's single `bhog`.
  * Nothing in the app rendered either field.
  */
-export type { NavadurgaForm, NavadurgaMantra, DhyanaShloka, KanyaPujanData, KanyaAgeName };
+export type { NavadurgaForm, KanyaPujanData };
 
 // ─── Durga Saptashati — 13-chapter → 9-day map ───────────────────────────────
 
@@ -121,25 +118,6 @@ export interface VratTier {
   slug: 'nirjala' | 'phalahar' | 'satvik' | 'two-day';
   label: Bilingual;
   description: Bilingual;
-}
-
-export interface VratFoodList {
-  allowed: Bilingual[];
-  forbidden: Bilingual[];
-}
-
-// ─── Gupt Navratri (info-only) ───────────────────────────────────────────────
-
-export interface GuptNavratriInfo {
-  slug: 'magha-gupt' | 'ashadha-gupt';
-  /** Localised name ("Magha Gupt Navratri" / "माघ गुप्त नवरात्रि"). */
-  name: Bilingual;
-  /** Approximate Gregorian window ("Jan–Feb" / etc.). */
-  windowLabel: Bilingual;
-  /** purnimanta masaIndex used by `convertHinduToGregorian` (10 / 3). */
-  masaIndex: number;
-  /** Short informational text — Ten Mahavidyas, not Navadurga, kept private. */
-  info: Bilingual;
 }
 
 // ─── The nine forms (canonical Day 1 → Day 9 order) ──────────────────────────
@@ -254,15 +232,6 @@ export const NAVRATRI_SOURCES: Bilingual = {
 
 // ─── Lookup helpers ──────────────────────────────────────────────────────────
 
-export function getNavadurgaFormByDay(day: number): NavadurgaForm | undefined {
-  if (day < 1 || day > 9) return undefined;
-  return NAVADURGA_FORMS[day - 1];
-}
-
-export function getNavadurgaFormBySlug(slug: string): NavadurgaForm | undefined {
-  return NAVADURGA_FORMS.find(f => f.slug === slug);
-}
-
 export function getNavratriMasa(kind: NavratriKind): NavratriMasaInfo {
   const m = NAVRATRI_MASAS.find(x => x.kind === kind);
   if (!m) throw new Error(`Unknown Navratri kind: ${kind}`);
@@ -271,8 +240,4 @@ export function getNavratriMasa(kind: NavratriKind): NavratriMasaInfo {
 
 export function getSaptashatiDay(day: number): SaptashatiDayMapEntry | undefined {
   return SAPTASHATI_DAY_MAP.find(d => d.day === day);
-}
-
-export function getSaptashatiChapter(num: number): SaptashatiChapter | undefined {
-  return SAPTASHATI_CHAPTERS.find(c => c.number === num);
 }

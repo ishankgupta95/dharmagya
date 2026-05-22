@@ -149,14 +149,9 @@ export default function PracticeTab() {
             colors={colors}
             t={t}
           />
-
-          <View style={styles.adWrap}>
-            <AdBanner colors={colors} placement="astrologyInline" inline />
-          </View>
-
-          {/* Bottom space so the last card clears the floating tab bar. */}
-          <View style={{ height: 96 }} />
         </ScrollView>
+
+        <AdBanner colors={colors} placement="astrologyInline" />
       </SafeAreaView>
     </ScreenMount>
   );
@@ -265,5 +260,4 @@ const styles = StyleSheet.create({
   },
   comingSoonText: { fontSize: 8.5, letterSpacing: 1.5 },
 
-  adWrap: { marginTop: 16 },
 });

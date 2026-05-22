@@ -69,14 +69,9 @@ export default function AstrologyTab() {
           {section === 'kundli' && <KundliSection />}
           {section === 'dasha' && <DashaSection />}
           {section === 'sadeSati' && <SadeSatiSection />}
-
-          <View style={styles.adWrap}>
-            <AdBanner colors={colors} placement="astrologyInline" inline />
-          </View>
-
-          {/* Bottom space so the last card clears the floating tab bar. */}
-          <View style={{ height: 96 }} />
         </ScrollView>
+
+        <AdBanner colors={colors} placement="astrologyInline" />
       </SafeAreaView>
     </ScreenMount>
   );
@@ -110,5 +105,4 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  adWrap: { marginTop: 16 },
 });
