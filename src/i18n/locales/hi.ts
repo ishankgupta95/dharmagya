@@ -1280,12 +1280,9 @@ export default {
     // Sheet chrome
     title: 'कार्ड साझा करें',
     shareBtn: 'साझा करें',
-    saveBtn: 'सेव करें',
     shapeStory: 'स्टोरी · 9:16',
     shapeSquare: 'वर्ग · 1:1',
     statusHint: 'व्हाट्सऐप स्टेटस के लिए — शेयर शीट खोलें, व्हाट्सऐप चुनें, फिर "My status" पर टैप करें।',
-    savedToast: 'आपकी गैलरी में सेव हो गया।',
-    permissionDenied: 'गैलरी की अनुमति नहीं मिली।',
     error: 'कार्ड नहीं बन सका। कृपया फिर से प्रयास करें।',
     // Card kickers
     kickerDeityBlessing: 'देव आशीर्वाद',

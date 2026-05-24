@@ -54,14 +54,6 @@
         }
       ],
       "expo-localization",
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow dharmagya to save shareable cards to your photos.",
-          "savePhotosPermission": "Allow dharmagya to save shareable cards to your gallery.",
-          "isAccessMediaLocationEnabled": false
-        }
-      ],
       "react-native-edge-to-edge",
       "@react-native-community/datetimepicker",
       "./plugins/withTodayPanchangWidget",

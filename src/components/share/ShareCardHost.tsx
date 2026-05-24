@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from '@/components/common/AppText';
@@ -21,8 +20,8 @@ const CAPTURE_SCALE = 2;
  * Singleton host for shareable cards (P14.5) — mounted once in `app/_layout.tsx`.
  * Renders the requested `ShareCard` off-screen, captures it to a 1080-px PNG via
  * `react-native-view-shot`, and presents a preview sheet with a Story/Square
- * toggle, "Share" (system share sheet via `expo-sharing`) and "Save to Gallery"
- * (`expo-media-library`). All app chrome here is themed + bilingual; the card
+ * toggle and "Share" (system share sheet via `expo-sharing`, which also lets the
+ * user save the image). All app chrome here is themed + bilingual; the card
  * itself is fixed-pixel and language-independent.
  */
 export function ShareCardHost() {
@@ -113,22 +112,6 @@ export function ShareCardHost() {
     }
   }, [uri, t]);
 
-  const onSave = useCallback(async () => {
-    if (!uri) return;
-    setWorking(true);
-    try {
-      // write-only: this feature only saves a card to the gallery, never reads.
-      const perm = await MediaLibrary.requestPermissionsAsync(true);
-      if (!perm.granted) { Alert.alert(t('share.permissionDenied')); return; }
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert(t('share.savedToast'));
-    } catch {
-      Alert.alert(t('share.error'));
-    } finally {
-      setWorking(false);
-    }
-  }, [uri, t]);
-
   if (!spec || !content) return null;
 
   const previewDim = CARD_DIMS[shape];
@@ -193,15 +176,6 @@ export function ShareCardHost() {
 
             {/* Actions */}
             <View style={styles.actionRow}>
-              <TouchableOpacity
-                onPress={onSave}
-                disabled={!uri || working}
-                activeOpacity={0.85}
-                style={[styles.actionBtn, styles.actionSecondary, { borderColor: colors.borderAccent, opacity: !uri || working ? 0.5 : 1 }]}
-                accessibilityRole="button">
-                <Icon name="apps" size={15} color={colors.accent} />
-                <Text variant="mono-caps" style={[styles.actionText, { color: colors.accent }]}>{t('share.saveBtn')}</Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 onPress={onShare}
                 disabled={!uri || working}
@@ -269,7 +243,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: borderRadius.button,
   },
-  actionSecondary: { borderWidth: 1 },
   actionPrimary: {},
   actionText: { fontSize: 10 },
 

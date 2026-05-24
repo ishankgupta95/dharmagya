@@ -1296,12 +1296,9 @@ export default {
     // Sheet chrome
     title: 'Share a card',
     shareBtn: 'Share',
-    saveBtn: 'Save',
     shapeStory: 'Story · 9:16',
     shapeSquare: 'Square · 1:1',
     statusHint: 'For WhatsApp Status, open the share sheet, pick WhatsApp, then tap "My status".',
-    savedToast: 'Saved to your gallery.',
-    permissionDenied: 'Gallery access was denied.',
     error: "Couldn't create the card. Please try again.",
     // Card kickers (the small label on the card)
     kickerDeityBlessing: 'Deity Blessing',
