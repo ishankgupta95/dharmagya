@@ -70,7 +70,7 @@ function SaptashatiOutlineScreen() {
     hi: 'दुर्गा सप्तशती',
   };
   const subtitleByLang: Record<Lang, string> = {
-    en: 'Devī Māhātmya · 13 chapters · 700 verses',
+    en: 'Devi Mahatmya · 13 chapters · 700 verses',
     hi: 'देवी माहात्म्य · त्रयोदश अध्याय · सात सौ श्लोक',
   };
 

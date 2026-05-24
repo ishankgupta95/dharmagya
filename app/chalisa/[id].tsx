@@ -216,6 +216,10 @@ export default function ChalisaDetailScreen() {
           );
         })}
 
+        <Text variant="body-italic" style={[styles.verifyNote, { color: colors.textMuted }]}>
+          {tForLang('reader.verifyNote')}
+        </Text>
+
         <View style={{ height: 48 }} />
       </Animated.ScrollView>
 
@@ -366,6 +370,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: 8 },
   sectionHeader: { marginBottom: 14, marginTop: 6 },
   sectionBreak: { marginTop: 14, marginBottom: 4 },
+  verifyNote: { fontSize: 11.5, lineHeight: 17, marginTop: 8, textAlign: 'center' },
 
   // Doha / Soratha
   dohaBlock: {

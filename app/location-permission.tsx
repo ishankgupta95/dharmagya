@@ -8,6 +8,7 @@ import {
   TextInput,
   Keyboard,
   ListRenderItemInfo,
+  Alert,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -84,6 +85,8 @@ export default function LocationPickerScreen() {
         setUserLocation({ lat: latitude, lon: longitude }, name);
         if (match) maybeAutoSetRegion(match);
         router.back();
+      } else {
+        Alert.alert(t('locationPermission.gpsDenied'), t('locationPermission.gpsDeniedDesc'));
       }
     } finally {
       setGpsLoading(false);

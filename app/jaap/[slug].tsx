@@ -535,6 +535,9 @@ export default function JaapCounterScreen() {
                 {resolved.bodyIast}
               </Text>
             )}
+            <Text variant="body-italic" style={[styles.mantraVerifyNote, { color: colors.textMuted }]}>
+              {t('reader.verifyNote')}
+            </Text>
           </View>
 
           {/* ── Mala size chips ───────────────────────────────────────────── */}
@@ -847,6 +850,12 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center',
     marginTop: 10,
+  },
+  mantraVerifyNote: {
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 14,
   },
 
   // Mala chips — slim row directly under the mantra.

@@ -187,6 +187,10 @@ export default function AartiDetailScreen() {
           />
         ))}
 
+        <Text variant="body-italic" style={[styles.verifyNote, { color: colors.textMuted }]}>
+          {tForLang('reader.verifyNote')}
+        </Text>
+
         <View style={{ height: 48 }} />
       </Animated.ScrollView>
 
@@ -359,6 +363,7 @@ const styles = StyleSheet.create({
 
   // Verses
   verseBlock: { marginBottom: 22 },
+  verifyNote: { fontSize: 11.5, lineHeight: 17, marginTop: 8, textAlign: 'center' },
   verseHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   verseKickerRow: { marginBottom: 10 },
   verseKickerFlex: { flex: 1 },

@@ -117,7 +117,8 @@ export function ShareCardHost() {
     if (!uri) return;
     setWorking(true);
     try {
-      const perm = await MediaLibrary.requestPermissionsAsync();
+      // write-only: this feature only saves a card to the gallery, never reads.
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) { Alert.alert(t('share.permissionDenied')); return; }
       await MediaLibrary.saveToLibraryAsync(uri);
       Alert.alert(t('share.savedToast'));

@@ -14,6 +14,7 @@ export default {
     close: 'Close',
     pickDate: 'Pick a date',
     pickTime: 'Pick a time',
+    year: 'Year',
     gpsLabel: 'GPS',
     locationDefault: 'Varanasi',
     locationDefaultLong: 'Varanasi (default)',
@@ -96,7 +97,7 @@ export default {
   // ── Panchang Screen ─────────────────────────────────────────────────────
   panchang: {
     title: 'Panchang',
-    headerTitle: 'Panchāng',
+    headerTitle: 'Panchang',
     datePickerTitle: 'Pick a date',
     todayChip: 'Today',
     jumpToToday: 'Jump to Today',
@@ -236,6 +237,7 @@ export default {
     dohaLabel: 'Doha',
     sorathaLabel: 'Soratha',
     chaupaiLabel: 'Chaupai',
+    verifyNote: 'Text and pronunciation vary by tradition — verify with a pandit before any ritual use.',
   },
   langToggle: {
     english: 'English',
@@ -618,6 +620,8 @@ export default {
     orSearchCity: 'or search a city',
     searchPlaceholder: 'Search city...',
     noCitiesFound: 'No cities found for "{{query}}"',
+    gpsDenied: 'Location access denied',
+    gpsDeniedDesc: 'Search for your city below to set your location manually.',
   },
 
   // ── Onboarding ──────────────────────────────────────────────────────────
@@ -1125,7 +1129,7 @@ export default {
     day9HavanText: 'Navami closes the navratri with a havan and purna ahuti. Many households also keep Kanya Pujan on this day — nine girls aged 2–10, halwa-puri-chana, and a gift.',
     vijayadashamiLabel: 'Vijayadashami / Dussehra',
     vijayadashamiText: 'Day 10 — {{date}} — is Vijayadashami / Dussehra. Durga visarjan and, in many traditions, Ravan Dahan and Shami Pujan.',
-    saptashatiTodayLabel: "Today's Saptashati pāṭha",
+    saptashatiTodayLabel: "Today's Saptashati paath",
     saptashatiChapters_one: 'Chapter {{list}}',
     saptashatiChapters_other: 'Chapters {{list}}',
     saptashatiOpenCta: 'Open the Saptashati outline',
@@ -1189,10 +1193,10 @@ export default {
     sourcesLabel: 'About this',
     a11yOpenScripture: 'Open {{name}}',
     // Saptashati branch (kept verbatim from P14.3)
-    kickerSaptashati: 'DURGĀ MĀHĀTMYA',
+    kickerSaptashati: 'DURGA MAHATMYA',
     aboutLabel: 'About this text',
-    reviewNote: 'Full verse-by-verse text is under scholarly review and not shipped in this version. The chapter outline + the 9-day pāṭha map are surfaced here as the practice scaffold.',
-    dayMapLabel: '9-day pāṭha schedule',
+    reviewNote: 'Full verse-by-verse text is under scholarly review and not shipped in this version. The chapter outline + the 9-day paath map are surfaced here as the practice scaffold.',
+    dayMapLabel: '9-day paath schedule',
     chaptersLabel: 'The thirteen chapters',
     chapterKicker: 'CHAPTER {{num}}',
     chaptersN_one: 'Chapter {{list}}',

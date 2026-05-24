@@ -14,6 +14,7 @@ export default {
     close: 'बंद करें',
     pickDate: 'दिनांक चुनें',
     pickTime: 'समय चुनें',
+    year: 'वर्ष',
     gpsLabel: 'GPS',
     locationDefault: 'वाराणसी',
     locationDefaultLong: 'वाराणसी (डिफ़ॉल्ट)',
@@ -230,6 +231,7 @@ export default {
     dohaLabel: 'दोहा',
     sorathaLabel: 'सोरठा',
     chaupaiLabel: 'चौपाई',
+    verifyNote: 'पाठ एवं उच्चारण परंपरा अनुसार भिन्न होते हैं — किसी भी अनुष्ठान से पूर्व पंडित जी से पुष्टि करें।',
   },
   langToggle: {
     english: 'English',
@@ -608,6 +610,8 @@ export default {
     orSearchCity: 'या शहर खोजें',
     searchPlaceholder: 'शहर खोजें...',
     noCitiesFound: '"{{query}}" के लिए कोई शहर नहीं मिला',
+    gpsDenied: 'स्थान अनुमति अस्वीकृत',
+    gpsDeniedDesc: 'अपना स्थान स्वयं सेट करने हेतु नीचे अपना शहर खोजें।',
   },
 
   // ── Onboarding ──────────────────────────────────────────────────────────
