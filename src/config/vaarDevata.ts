@@ -19,8 +19,8 @@ import type { Deity, MantraSlug } from 'hindu-devotional-texts';
  * artifact (mirrors `src/i18n/festivalNames.ts` / `panchangNames.ts`); only
  * screen *chrome* goes through i18n (`vaar.*`).
  *
- * Content-accuracy posture (PLAN §8 — verified across Drik Panchang's
- * Saptavara Vrat list, 99Pandit, AstroVed, pujayagna.com, venupayyanur.com):
+ * Content-accuracy posture (PLAN §8 — verified across multiple authoritative
+ * Saptavara Vrat references):
  *  - No new Library deities. A day's deity that isn't in the 19-deity roster
  *    (`src/config/deities.ts`) — Shani Dev, Murugan/Kartikeya, Brihaspati — is
  *    named here as text only (`rosterId: null`): no avatar, no `/god/[id]`

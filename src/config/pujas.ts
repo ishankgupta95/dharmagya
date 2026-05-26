@@ -11,8 +11,9 @@
  *   library `Puja`            → app `PujaContent`
  *   library `PujaSamagriItem` → app `SamagriItem`
  *
- * The library carries `reviewPending: true` on every mantra and a per-module
- * `SOURCES.md`; see the library README's "Content review debt" section.
+ * The library carries `reviewPending: true` on every mantra and documents its
+ * per-claim citations in its own module docs; see the library README's
+ * "Content review debt" section.
  */
 import {
   getAllPujas,

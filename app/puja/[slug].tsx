@@ -347,9 +347,6 @@ export default function PujaDetailScreen() {
           <View style={styles.sourcesBlock}>
             <Kicker color={colors.textMuted} size={9}>{tForLang('puja.sourcesLabel')}</Kicker>
             <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
-              {puja.sources[lang]}
-            </Text>
-            <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
               {PUJA_DISCLAIMER[lang]}
             </Text>
           </View>

@@ -9,15 +9,15 @@
  *
  *  - **Colours are NOT hardcoded per Navadurga form.** The "Yellow = Day 1,
  *    Green = Day 2" lists online are a 2003 *Maharashtra Times* circulation
- *    gimmick, not tradition. Drik Panchang's authoritative system assigns
- *    colours by the weekday Navratri starts → a fixed 9-colour weekly cycle.
+ *    gimmick, not tradition. The authoritative system assigns colours by the
+ *    weekday Navratri starts → a fixed 9-colour weekly cycle.
  *    Colours are computed in [`navratri.ts`](../services/astrology/navratri.ts)
  *    from Day 1's weekday — they change every year. No `color:` field on
  *    `NavadurgaForm`.
  *
  *  - **Navadurga ↔ Navagraha planet mapping is fringe, not canonical.** Some
  *    astrology blogs map each form to a planet, but the mappings contradict
- *    each other across sources and Drik Panchang / Wikipedia don't carry it.
+ *    each other across sources and authoritative references don't carry it.
  *    Not surfaced here.
  *
  *  - **Navadurga forms are Navratri *content*, not new Library deities.** The
@@ -30,8 +30,8 @@
  *
  * **Source of record.** The nine Navadurga forms, the four vrat tiers +
  * the vrat food lists, and the Durga Saptashati outline are sourced from
- * the `hindu-devotional-texts` library's `navratri/` module — see that
- * module's `SOURCES.md` for the per-claim citations and flagged soft spots.
+ * the `hindu-devotional-texts` library's `navratri/` module, which carries
+ * the per-claim citations and flagged soft spots in its own module docs.
  */
 
 // The Navadurga forms, the vrat tiers + foods, and the Durga Saptashati
@@ -68,8 +68,8 @@ export interface Bilingual {
  * carries: slug, day, name, iconography, significance, mantra, dhyana, bhog.
  *
  * The previous app-side `chakra` and `bhogAlt` fields are gone — `chakra`
- * was a non-canonical Tantric overlay (see the library's `navratri/
- * SOURCES.md`) and `bhogAlt` folded into the library's single `bhog`.
+ * was a non-canonical Tantric overlay (documented in the library's `navratri/`
+ * module) and `bhogAlt` folded into the library's single `bhog`.
  * Nothing in the app rendered either field.
  */
 export type { NavadurgaForm, KanyaPujanData };
@@ -226,8 +226,8 @@ export const KANYA_PUJAN: KanyaPujanData = kanyaPujan;
 // ─── Disclaimer ──────────────────────────────────────────────────────────────
 
 export const NAVRATRI_SOURCES: Bilingual = {
-  en: "Navratri practice varies by region, sampradaya and family tradition — this is one widely-kept form. Dates and the Ghatasthapana muhurat are computed from the panchang for your location. The nine per-day mantras use the plain `oṁ devī <form>āyai namaḥ` pattern from the Devī Māhātmya commentary lineage (also given in Drik Panchang and the Gita Press editions); other Shakta and Tantric lineages prefix bīja-syllables — `hrīṁ` (Bhuvaneshvarī-bīja), `śrīṁ` (Lakṣmī-bīja), `klīṁ` (Kāma-bīja), `aiṁ` (Vāgbhava-bīja) — and a guru or family pandit would teach the form belonging to that initiation. For any major observance, follow a pandit's guidance.",
-  hi: 'नवरात्रि साधना क्षेत्र, सम्प्रदाय एवं पारिवारिक परंपरा के अनुसार भिन्न होती है — यह एक प्रचलित रूप है। तिथियाँ एवं घटस्थापना मुहूर्त आपके स्थान के पंचांग से गणित हैं। नौ दैनिक मन्त्र देवी-माहात्म्य टीका परंपरा के सरल `ॐ देवी <स्वरूप>ायै नमः` स्वरूप में हैं (यह स्वरूप Drik Panchang एवं गीता प्रेस संस्करणों में भी दिया गया है); अन्य शाक्त एवं तान्त्रिक परंपराओं में बीज-अक्षर — `ह्रीं` (भुवनेश्वरी-बीज), `श्रीं` (लक्ष्मी-बीज), `क्लीं` (काम-बीज), `ऐं` (वाग्भव-बीज) — पूर्व में जोड़े जाते हैं, तथा गुरु अथवा कुल-पंडित अपनी दीक्षा-अनुसार स्वरूप सिखाते हैं। किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
+  en: "Navratri practice varies by region, sampradaya and family tradition — this is one widely-kept form. Dates and the Ghatasthapana muhurat are computed from the panchang for your location. The nine per-day mantras use the plain `oṁ devī <form>āyai namaḥ` pattern from the Devī Māhātmya commentary lineage; other Shakta and Tantric lineages prefix bīja-syllables — `hrīṁ` (Bhuvaneshvarī-bīja), `śrīṁ` (Lakṣmī-bīja), `klīṁ` (Kāma-bīja), `aiṁ` (Vāgbhava-bīja) — and a guru or family pandit would teach the form belonging to that initiation. For any major observance, follow a pandit's guidance.",
+  hi: 'नवरात्रि साधना क्षेत्र, सम्प्रदाय एवं पारिवारिक परंपरा के अनुसार भिन्न होती है — यह एक प्रचलित रूप है। तिथियाँ एवं घटस्थापना मुहूर्त आपके स्थान के पंचांग से गणित हैं। नौ दैनिक मन्त्र देवी-माहात्म्य टीका परंपरा के सरल `ॐ देवी <स्वरूप>ायै नमः` स्वरूप में हैं; अन्य शाक्त एवं तान्त्रिक परंपराओं में बीज-अक्षर — `ह्रीं` (भुवनेश्वरी-बीज), `श्रीं` (लक्ष्मी-बीज), `क्लीं` (काम-बीज), `ऐं` (वाग्भव-बीज) — पूर्व में जोड़े जाते हैं, तथा गुरु अथवा कुल-पंडित अपनी दीक्षा-अनुसार स्वरूप सिखाते हैं। किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
 };
 
 // ─── Lookup helpers ──────────────────────────────────────────────────────────

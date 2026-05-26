@@ -37,8 +37,8 @@ export const ALL_OCCASIONS: Occasion[] = [
 // Our occasion ids predate the library's stock rules. The mapping below is the
 // only place that translates between the two — drop a line here when the lib
 // adds new occasions we want to expose. Sources for the stock rules:
-// Muhurta-chintamani, Muhurta-darpana, BPHS Ch. 28, cross-checked against
-// drikpanchang (see panchang-ts dist for the per-rule citations).
+// Muhurta-chintamani, Muhurta-darpana, BPHS Ch. 28 (see panchang-ts dist for
+// the per-rule citations).
 const OCCASION_TO_RULE: Record<Occasion, MuhurtaRule> = {
   vivah: vivahRule,
   'griha-pravesh': grihaPraveshRule,

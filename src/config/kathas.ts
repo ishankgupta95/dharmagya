@@ -9,9 +9,9 @@
  * directly — so the underlying storage can evolve without churn in the UI.
  *
  * Content posture: Satyanarayan is hand-typed and `verified`; the five vrat
- * kathas are researched-and-cited, shipped at `draft` (see the library's
- * `kathas/SOURCES.md`). The reader surfaces `KATHA_DISCLAIMER` to match the
- * accuracy posture the Puja Vidhi screens already carry.
+ * kathas are researched-and-cited, shipped at `draft` (the library documents
+ * their citations in its own module docs). The reader surfaces
+ * `KATHA_DISCLAIMER` to match the accuracy posture the Puja Vidhi screens carry.
  *
  * Note: the narrative prose is English-primary — `hindi` exists only on a few
  * titles and samagri item names — so the reader is an English narrative reader
@@ -82,7 +82,7 @@ export function getKathaForFestivalName(
 /**
  * App-side accuracy disclaimer for the katha reader. The library ships no
  * `KATHA_DISCLAIMER` constant (unlike `PUJA_DISCLAIMER`) — kathas carry their
- * citations in the module's `kathas/SOURCES.md`. This mirrors the tone of
+ * citations in the library's own module docs. This mirrors the tone of
  * `PUJA_DISCLAIMER` / `NAVRATRI_SOURCES`.
  */
 export const KATHA_DISCLAIMER: Bilingual = {

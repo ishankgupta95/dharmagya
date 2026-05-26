@@ -3,17 +3,18 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { MONO_FONT, palette, type ColorPalette } from '@/config/theme';
+import { localizeFestivalName } from '@/i18n/festivalNames';
 import { localizeTithi } from '@/i18n/panchangNames';
 import type { CalendarDay } from '@/services/astrology/calendarService';
 
 import { eventDotColor } from './calendarColors';
 
-// Hindi mappings for the generic almanac fallbacks that `pickPrimaryEvent`
-// emits when there's no specific festival name for a cell. Tithi-based names
-// (Pratipada, Purnima, Amavasya, etc.) flow through `localizeTithi`; the
-// remaining generics live here. Festival descriptions / names from
-// festivals.json stay in their bundled language — translating those is a
-// content task, not a UI one.
+// Hindi mappings for the bare almanac markers that `pickPrimaryEvent` emits
+// (e.g. "Ekadashi", "Sankranti", "Pradosh", bare eclipse labels) when no named
+// festival applies. Tithi-based names (Pratipada, Purnima, Amavasya, …) flow
+// through `localizeTithi`. Specific festival names and Ekadashi names from
+// festivals.json are translated via `localizeFestivalName`, which has full
+// coverage of the bundled catalogue.
 const HI_GENERIC_EVENT: Record<string, string> = {
   Ekadashi: 'एकादशी',
   Sankranti: 'संक्रांति',
@@ -26,7 +27,8 @@ function localizePrimaryEvent(name: string, lang: string): string {
   if (lang !== 'hi' || !name) return name;
   const tithiHit = localizeTithi(name, lang);
   if (tithiHit !== name) return tithiHit;
-  return HI_GENERIC_EVENT[name] ?? name;
+  if (HI_GENERIC_EVENT[name]) return HI_GENERIC_EVENT[name];
+  return localizeFestivalName(name, lang);
 }
 
 // Single-letter paksha tag rendered after the tithi name in each cell.

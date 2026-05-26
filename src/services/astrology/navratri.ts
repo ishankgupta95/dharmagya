@@ -45,7 +45,7 @@ export interface NavratriDay {
   date: Date;
   /** The Navadurga form worshipped on this day. */
   form: NavadurgaForm;
-  /** Computed colour per Drik Panchang's weekday-anchored 9-day cycle. */
+  /** Computed colour per the weekday-anchored 9-day cycle. */
   color: NavratriColor;
 }
 
@@ -104,11 +104,11 @@ export interface GhatasthapanaMuhurat {
   };
 }
 
-// ─── Colour cycle (Drik Panchang) ────────────────────────────────────────────
-// Each weekday has a primary colour (Drik's published "fasting colour"); when
+// ─── Colour cycle ─────────────────────────────────────────────────────────────
+// Each weekday has a primary colour (the published "fasting colour"); when
 // the weekday recurs on Day 8 or 9 of Navratri, a secondary colour is used.
 //
-// Verified against Drik Panchang's published Navadurga calendars for multiple
+// Verified against published Navadurga calendars for multiple
 // years (e.g. Sharad 2023 started on Sunday → Day 8 was Purple, Day 9 Peacock
 // Green; Sharad 2024 started on Thursday → Day 8 was Pink, Day 9 Purple).
 // The rule: PRIMARY[weekday] for the first appearance of the weekday in
@@ -266,7 +266,7 @@ export function computeNavratriDates(
   }
 
   // Day 10 — Vijayadashami. Use the "Dussehra" entry when present, else
-  // Day 9 + 1 day (the calendar-day default; Drik's aparahna refinement
+  // Day 9 + 1 day (the calendar-day default; the aparahna refinement
   // is a separate concern).
   const dussehra = festivalDateInYear(year, 'Dussehra');
   const vijayadashami = dussehra ? startOfLocalDay(dussehra) : (() => {
@@ -349,7 +349,7 @@ function elementRange<T extends DailyTithiInfo | DailyNakshatraInfo | DailyYogaI
 /**
  * Compute the Ghatasthapana muhurat window on a given date.
  *
- * Classical rule (Drik Panchang):
+ * Classical rule:
  *   1. The auspicious window is the **first one-third of the day**
  *      (sunrise → sunrise + dayDuration/3), **while Pratipada prevails**.
  *   2. Not within Amavasya, not at night/afternoon.

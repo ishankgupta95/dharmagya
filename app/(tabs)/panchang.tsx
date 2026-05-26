@@ -45,6 +45,7 @@ import {
   localizeTithi,
   localizeYoga,
 } from '@/i18n/panchangNames';
+import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
@@ -749,13 +750,16 @@ export default function PanchangScreen() {
     const out: FlagStripItem[] = [];
     selectedCell.festivals.forEach((f, i) => {
       const showDesc = !!f.description && (descCounts.get(f.description) ?? 0) === 1;
-      const label = showDesc ? `${f.name} · ${f.description}` : f.name;
+      const name = localizeFestivalName(f.name, panchangLang);
+      const label = showDesc
+        ? `${name} · ${localizeFestivalDescription(f.description!, panchangLang)}`
+        : name;
       if (seen.has(label)) return;
       seen.add(label);
       out.push({ key: `fest-${i}`, label, tone: 'gold' as const });
     });
     return out;
-  }, [selectedCell]);
+  }, [selectedCell, panchangLang]);
 
   const glanceLine = useMemo(() => {
     if (!selectedCell) return '';

@@ -10,8 +10,7 @@ export const AUSPICIOUS_GREEN = '#5DA85D';
  * Per-cell event accent for both the compact and dense calendar grids.
  * Returns null when there's nothing meaningful to highlight (out-of-month or
  * `plain` category). Mirrors the priority used by `pickPrimaryEvent` in
- * calendarService so scanning down a month reads like Drik Panchang's
- * printed-almanac key:
+ * calendarService so scanning down a month reads like a printed-almanac key:
  *   red       – eclipse
  *   sindoor   – major / user-deity festival (gold in dark mode for legibility)
  *   sindoor+  – sankranti

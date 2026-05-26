@@ -26,8 +26,29 @@ export type { Scripture, ScriptureSlug, ScriptureVerse, Chapter, Bilingual };
 
 // ─── The two library scriptures + lookups ────────────────────────────────────
 
+/**
+ * Strip the upstream library's reviewer-facing citation artifacts out of any
+ * prose the app renders to users — e.g. a trailing parenthetical pointing at
+ * the library's internal source-citation file, baked into a scripture's
+ * `about` text. Those notes are for the library's own content reviewers and
+ * mean nothing to an app user. Applied at this boundary so the UI stays clean
+ * even after the package is reinstalled or bumped.
+ */
+function stripSourceRefs(text: string): string {
+  return text
+    .replace(/\s*\((?:see|देखें)\s+SOURCES\.md\)/gi, '')
+    .replace(/\s*[—–-]?\s*(?:see\s+)?SOURCES\.md[.।]?\s*$/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function sanitizeScripture(s: Scripture): Scripture {
+  if (!s.about) return s;
+  return { ...s, about: { en: stripSourceRefs(s.about.en), hi: stripSourceRefs(s.about.hi) } };
+}
+
 /** All library scriptures, in registry order (Geeta first, Sundarkand second). */
-export const ALL_SCRIPTURES: readonly Scripture[] = getAllScriptures();
+export const ALL_SCRIPTURES: readonly Scripture[] = getAllScriptures().map(sanitizeScripture);
 
 /** Look up a scripture by slug; `undefined` for an unknown key. */
 export function getScriptureBySlug(slug: string | undefined): Scripture | undefined {
@@ -46,8 +67,8 @@ export function getScripturesForDeity(deityId: string): Scripture[] {
 // ─── Disclaimer ──────────────────────────────────────────────────────────────
 
 /**
- * App-side accuracy disclaimer for scripture readers. The library carries
- * its scripture citations in `scriptures/SOURCES.md` but exports no constant.
+ * App-side accuracy disclaimer for scripture readers. The library documents
+ * its scripture citations in its own module docs but exports no constant.
  * This mirrors the tone of `KATHA_DISCLAIMER` / `PUJA_DISCLAIMER`.
  */
 export const SCRIPTURE_DISCLAIMER: Bilingual = {

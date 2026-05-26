@@ -1080,7 +1080,7 @@ export default {
     mantraReviewNote: 'लिप्यंतरण विद्वानों की समीक्षा में है — अभी अंतिम न मानें।',
     variantNotesLabel: 'क्षेत्रीय एवं पारंपरिक भेद',
     linkedPujaLabel: 'सम्बद्ध पूजा-विधि',
-    sourcesLabel: 'स्रोत',
+    sourcesLabel: 'इसके विषय में',
     // कुंडली उपाय संकेत (ग्रह-स्थिति / दोष / साढ़े साती / दशा कार्ड)
     nudgeWeakChandra: 'कुंडली में चंद्र निर्बल (नीच) है? सोमवार पारंपरिक रूप से शिव उपासना का दिन है — सोमवार का वार देवता देखें।',
     nudgeMangal: 'मंगल दोष है? मंगलवार पारंपरिक रूप से हनुमान पूजा का दिन है — मंगलवार का वार देवता देखें।',
@@ -1263,7 +1263,7 @@ export default {
     postArcLabel: 'समापन-क्रम',
     afterTheLabel: 'पूजा के पश्चात्',
     variantsLabel: 'क्षेत्रीय एवं पारंपरिक भेद',
-    sourcesLabel: 'स्रोत',
+    sourcesLabel: 'इसके विषय में',
     // Banners + buttons
     reviewBanner: 'मंत्र विद्वत्-समीक्षाधीन हैं — अस्थायी मानें। क्षेत्रीय एवं पारिवारिक भेद विद्यमान हैं; किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
     startJaap: 'जप आरंभ करें',
@@ -1320,8 +1320,8 @@ export default {
 
     milestoneEyebrow: 'साधना मील-पत्थर',
     milestoneKicker: {
-      sessions: 'sessions · सत्र',
-      repetitions: 'जप · repetitions',
+      sessions: 'सत्र · अभ्यास',
+      repetitions: 'जप · आवृत्ति',
       streak: 'साधना · दिनों का अभ्यास',
     },
     milestoneSub: {
