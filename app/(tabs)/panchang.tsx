@@ -45,7 +45,7 @@ import {
   localizeTithi,
   localizeYoga,
 } from '@/i18n/panchangNames';
-import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
+import { localizeFestivalName, localizeFestivalDescription, localizePrimaryEvent } from '@/i18n/festivalNames';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
@@ -1030,7 +1030,7 @@ export default function PanchangScreen() {
           <Text variant="display-italic" style={[styles.glanceEvent, {
             color: eventDotColor(selectedCell, isDarkMode, colors) ?? colors.textPrimary,
           }]} numberOfLines={2}>
-            {selectedCell.primaryEventName}
+            {localizePrimaryEvent(selectedCell.primaryEventName, panchangLang)}
           </Text>
         )}
 

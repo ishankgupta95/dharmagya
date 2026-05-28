@@ -6,7 +6,7 @@
 // templates (eclipse obscuration, deferred ekadashi, post-Bhadra observance)
 // — those are decomposed and reassembled in the target language.
 
-import { localizeChandraMasa } from './panchangNames';
+import { localizeChandraMasa, localizeTithi } from './panchangNames';
 
 const NAMES: Record<string, string> = {
   'Akshaya Tritiya': 'अक्षय तृतीया',
@@ -236,4 +236,29 @@ export function localizeFestivalDescription(desc: string, lang: string): string 
   }
 
   return desc;
+}
+
+// ── Calendar primary-event label ─────────────────────────────────────────────
+
+// `pickPrimaryEvent` (calendarService) collapses a day to a single headline
+// string. It's either a real festival/Ekadashi name (translate via the maps
+// above), a tithi-based marker like "Purnima"/"Amavasya" (→ localizeTithi), or
+// one of the bare generic markers below. This helper is the single source of
+// truth for that label so the dense calendar grid AND the Panchang glance
+// headline stay in sync — they previously had divergent copies, which let
+// festival names leak through untranslated on the glance headline.
+const HI_GENERIC_EVENT: Record<string, string> = {
+  Ekadashi: 'एकादशी',
+  Sankranti: 'संक्रांति',
+  Pradosh: 'प्रदोष',
+  'Surya Grahan': 'सूर्य ग्रहण',
+  'Chandra Grahan': 'चन्द्र ग्रहण',
+};
+
+export function localizePrimaryEvent(name: string, lang: string): string {
+  if (lang !== 'hi' || !name) return name;
+  const tithiHit = localizeTithi(name, lang);
+  if (tithiHit !== name) return tithiHit;
+  if (HI_GENERIC_EVENT[name]) return HI_GENERIC_EVENT[name];
+  return localizeFestivalName(name, lang);
 }

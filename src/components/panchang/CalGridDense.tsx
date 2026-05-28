@@ -3,33 +3,11 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { MONO_FONT, palette, type ColorPalette } from '@/config/theme';
-import { localizeFestivalName } from '@/i18n/festivalNames';
+import { localizePrimaryEvent } from '@/i18n/festivalNames';
 import { localizeTithi } from '@/i18n/panchangNames';
 import type { CalendarDay } from '@/services/astrology/calendarService';
 
 import { eventDotColor } from './calendarColors';
-
-// Hindi mappings for the bare almanac markers that `pickPrimaryEvent` emits
-// (e.g. "Ekadashi", "Sankranti", "Pradosh", bare eclipse labels) when no named
-// festival applies. Tithi-based names (Pratipada, Purnima, Amavasya, …) flow
-// through `localizeTithi`. Specific festival names and Ekadashi names from
-// festivals.json are translated via `localizeFestivalName`, which has full
-// coverage of the bundled catalogue.
-const HI_GENERIC_EVENT: Record<string, string> = {
-  Ekadashi: 'एकादशी',
-  Sankranti: 'संक्रांति',
-  Pradosh: 'प्रदोष',
-  'Surya Grahan': 'सूर्य ग्रहण',
-  'Chandra Grahan': 'चन्द्र ग्रहण',
-};
-
-function localizePrimaryEvent(name: string, lang: string): string {
-  if (lang !== 'hi' || !name) return name;
-  const tithiHit = localizeTithi(name, lang);
-  if (tithiHit !== name) return tithiHit;
-  if (HI_GENERIC_EVENT[name]) return HI_GENERIC_EVENT[name];
-  return localizeFestivalName(name, lang);
-}
 
 // Single-letter paksha tag rendered after the tithi name in each cell.
 // English uses 'S'/'K'; Hindi uses 'शु'/'कृ' (Devanagari short forms of
