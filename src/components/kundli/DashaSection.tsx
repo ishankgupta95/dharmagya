@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   computeVimshottariPratyantar,
   type AntarDasha,
@@ -231,8 +232,8 @@ export function DashaSection() {
         <SectionLabel style={styles.sectionLabelSpacing}>
           {t('dasha.birthDateLabel')}
         </SectionLabel>
-        <TouchableOpacity
-          activeOpacity={0.85}
+        <MotionPressable
+          pressedScale={0.97}
           onPress={() => setPickerOpen(true)}
           style={[styles.setBirthBtn, { backgroundColor: palette.sindoor }]}
           accessibilityRole="button"
@@ -241,7 +242,7 @@ export function DashaSection() {
           <Text variant="mono-caps" style={styles.setBirthText}>
             {t('dasha.setBirthDate')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="body-italic" style={[styles.prompt, { color: colors.textMuted }]}>
           {t('dasha.notSetPrompt')}
         </Text>
@@ -264,8 +265,8 @@ export function DashaSection() {
       <SectionLabel style={styles.sectionLabelSpacing}>
         {t('dasha.birthDateLabel')}
       </SectionLabel>
-      <TouchableOpacity
-        activeOpacity={0.85}
+      <MotionPressable
+        pressedScale={0.97}
         onPress={() => setPickerOpen(true)}
         style={[styles.birthRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
         accessibilityRole="button"
@@ -277,7 +278,7 @@ export function DashaSection() {
         <Text variant="mono-caps" style={[styles.birthChangeText, { color: colors.accent }]}>
           {t('dasha.changeBirthDate')}
         </Text>
-      </TouchableOpacity>
+      </MotionPressable>
 
       {/* ── Dasha system selector ─────────────────────────────────────────
           Vimshottari is the headline; Ashtottari, Yogini, and Chara are
@@ -521,8 +522,8 @@ const MahadashaRow = memo(function MahadashaRow({
           borderWidth: isActive ? 1.5 : 1,
         },
       ]}>
-      <TouchableOpacity
-        activeOpacity={0.85}
+      <MotionPressable
+        pressedScale={0.97}
         onPress={handlePress}
         style={styles.mahaRowHeader}
         accessibilityRole="button"
@@ -544,7 +545,7 @@ const MahadashaRow = memo(function MahadashaRow({
           </Text>
         </View>
         <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
-      </TouchableOpacity>
+      </MotionPressable>
 
       {expanded && (
         <View style={[styles.antarWrap, { borderTopColor: colors.divider }]}>
@@ -597,8 +598,8 @@ const AntardashaRow = memo(function AntardashaRow({
 
   return (
     <View>
-      <TouchableOpacity
-        activeOpacity={0.85}
+      <MotionPressable
+        pressedScale={0.97}
         onPress={handlePress}
         style={styles.antarRow}
         accessibilityRole="button"
@@ -628,7 +629,7 @@ const AntardashaRow = memo(function AntardashaRow({
           size={12}
           color={colors.textMuted}
         />
-      </TouchableOpacity>
+      </MotionPressable>
 
       {expanded && (
         <View style={[styles.pratyantarWrap, { borderLeftColor: colors.borderAccent }]}>

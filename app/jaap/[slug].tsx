@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   TouchableOpacity,
@@ -29,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useStore } from '@/store/useStore';
+import { useLocaleFormatters } from '@/utils/format';
 import { darkColors, lightColors, MONO_FONT, palette, spacing, borderRadius } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
@@ -181,6 +183,8 @@ export default function JaapCounterScreen() {
     }
     return { body: 22, bodyLh: 33, iast: 13, iastLh: 19 };
   }, [resolved?.bodyDevanagari]);
+
+  const { digits } = useLocaleFormatters();
 
   // ── Counter state ──────────────────────────────────────────────────────
   const [count, setCount] = useState(0); // current within-mala count [0..malaSize-1]
@@ -411,7 +415,7 @@ export default function JaapCounterScreen() {
           <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
             {t('jaap.title')}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.notFoundBtn, { borderColor: colors.accent }]}
             accessibilityRole="button"
@@ -419,7 +423,7 @@ export default function JaapCounterScreen() {
             <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
               {t('common.back')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </SafeAreaView>
     );
@@ -472,18 +476,18 @@ export default function JaapCounterScreen() {
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         {/* ── Header (outside the tap zone) ───────────────────────────────── */}
         <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={confirmAndExit}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="body-italic" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {resolved.label}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={handleSaveExit}
             disabled={!hasCounted}
             style={[
@@ -498,7 +502,7 @@ export default function JaapCounterScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('jaap.saveSession')}>
             <Icon name="check" size={16} color={hasCounted ? colors.accent : colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         {/* ── Whole-screen tap zone ───────────────────────────────────────── */}
@@ -625,7 +629,7 @@ export default function JaapCounterScreen() {
                   {t('jaap.countLabel')}
                 </Text>
                 <Text style={[styles.counterValue, { color: colors.textPrimary }]}>
-                  {count}
+                  {digits(String(count))}
                 </Text>
                 <Text variant="body-italic" style={[styles.counterTotal, { color: colors.textTertiary }]}>
                   {t('jaap.progressOf', { current: count, total: malaSize })}
@@ -641,18 +645,18 @@ export default function JaapCounterScreen() {
                 {t('jaap.malaLabel', { count: malaCount })}
               </Text>
               <Text style={[styles.summaryInlineValue, { color: colors.textPrimary }]}>
-                {malaCount}
+                {digits(String(malaCount))}
               </Text>
               <View style={[styles.summaryInlineDivider, { backgroundColor: colors.divider }]} />
               <Text variant="mono-caps" style={[styles.summaryInlineKicker, { color: colors.accent }]}>
                 {t('jaap.countLabel')}
               </Text>
               <Text style={[styles.summaryInlineValue, { color: colors.textPrimary }]}>
-                {totalCount}
+                {digits(String(totalCount))}
               </Text>
             </View>
             <View style={styles.actionRow}>
-              <TouchableOpacity
+              <MotionPressable
                 onPress={handleDecrement}
                 disabled={!hasCounted}
                 style={[
@@ -665,8 +669,8 @@ export default function JaapCounterScreen() {
                 <Text variant="mono-caps" style={[styles.actionBtnText, { color: colors.textSecondary }]}>
                   {t('jaap.decrement')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </MotionPressable>
+              <MotionPressable
                 onPress={handleReset}
                 disabled={!hasCounted}
                 style={[
@@ -679,8 +683,8 @@ export default function JaapCounterScreen() {
                 <Text variant="mono-caps" style={[styles.actionBtnText, { color: colors.textSecondary }]}>
                   {t('jaap.reset')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </MotionPressable>
+              <MotionPressable
                 onPress={() => openShare({
                   kind: 'jaap-completion',
                   count: totalCount,
@@ -698,7 +702,7 @@ export default function JaapCounterScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('share.a11yShare')}>
                 <Icon name="share" size={13} color={hasCounted ? colors.accent : colors.textSecondary} />
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
         </Pressable>
@@ -745,15 +749,15 @@ export default function JaapCounterScreen() {
                 ]}
               />
               <View style={styles.customSizeActions}>
-                <TouchableOpacity
+                <MotionPressable
                   onPress={() => setCustomSizeModalVisible(false)}
                   style={[styles.customSizeBtn, { borderColor: colors.border }]}
                   accessibilityRole="button">
                   <Text variant="mono-caps" style={[styles.customSizeBtnText, { color: colors.textSecondary }]}>
                     {t('common.cancel')}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </MotionPressable>
+                <MotionPressable
                   onPress={handleCustomSizeSubmit}
                   disabled={!isValidCustomDraft(customSizeDraft)}
                   style={[
@@ -767,7 +771,7 @@ export default function JaapCounterScreen() {
                   <Text variant="mono-caps" style={[styles.customSizeBtnText, { color: colors.accent }]}>
                     {t('common.done')}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>

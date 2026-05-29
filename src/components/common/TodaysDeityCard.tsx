@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -119,9 +119,9 @@ export const TodaysDeityCard = memo(function TodaysDeityCard({ colors }: TodaysD
         <Text variant="deva" style={[styles.mantra, { color: colors.textPrimary }]} numberOfLines={1}>
           {vaar.mantra.devanagari}
         </Text>
-        <TouchableOpacity
+        <MotionPressable
           onPress={startJaap}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={[styles.jaapPill, { borderColor: colors.borderAccent, backgroundColor: colors.surfaceRecessed }]}
           accessibilityRole="button"
@@ -130,7 +130,7 @@ export const TodaysDeityCard = memo(function TodaysDeityCard({ colors }: TodaysD
           <Text variant="mono-caps" style={[styles.jaapPillText, { color: colors.accent }]}>
             {t('vaar.startJaap')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
       {inFocus && (

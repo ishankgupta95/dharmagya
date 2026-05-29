@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -10,6 +10,7 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 export default function ManageDeitiesScreen() {
   const { t } = useTranslation();
@@ -30,14 +31,14 @@ export default function ManageDeitiesScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('settings.manageDeitiesTitle')}
         </Text>
@@ -61,14 +62,14 @@ export default function ManageDeitiesScreen() {
         <Text variant="mono-caps" style={[styles.countLabel, { color: colors.textMuted }]}>
           {t('onboarding.selectedCount', { count: local.length })}
         </Text>
-        <TouchableOpacity
+        <MotionPressable
           onPress={handleSave}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           style={[styles.saveBtn, { backgroundColor: palette.sindoor }]}
           accessibilityRole="button"
           accessibilityLabel={t('common.save')}>
           <Text variant="mono-caps" style={styles.saveText}>{t('common.save')}</Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
     </SafeAreaView>

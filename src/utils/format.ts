@@ -15,6 +15,16 @@ export function formatNumber(value: number | string, useDevanagari: boolean): st
   return useDevanagari ? toDevanagariDigits(s) : s;
 }
 
+/**
+ * Format a count with Indian digit grouping (1,00,000 not 100,000) and
+ * optional Devanagari conversion. Use for jaap totals, milestone counts,
+ * session totals — anywhere a large integer might reach lakhs.
+ */
+export function formatCount(value: number, useDevanagari: boolean): string {
+  const grouped = value.toLocaleString('en-IN');
+  return useDevanagari ? toDevanagariDigits(grouped) : grouped;
+}
+
 /** Format an HH:mm string per the user's time-format preference + numerals flag. */
 export function formatTime(
   hhmm: string,
@@ -89,6 +99,7 @@ export function useLocaleFormatters() {
     useDevanagari,
     timeFormat,
     formatNumber: (v: number | string) => formatNumber(v, useDevanagari),
+    formatCount: (n: number) => formatCount(n, useDevanagari),
     formatTime: (hhmm: string) => formatTime(hhmm, { timeFormat, useDevanagari }),
     formatDateTime: (d: Date) => formatDateTime(d, { timeFormat, useDevanagari }),
     digits: (s: string) => (useDevanagari ? toDevanagariDigits(s) : s),

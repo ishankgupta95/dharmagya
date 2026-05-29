@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   ALL_SAHAM_NAMES,
   GRAHA_ABBR,
@@ -132,8 +133,8 @@ export default function VarshaphalaScreen() {
             <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
               {t('kundli.varshaphala.noBirthDetails')}
             </Text>
-            <TouchableOpacity
-              activeOpacity={0.85}
+            <MotionPressable
+              pressedScale={0.97}
               onPress={() => router.push('/settings')}
               style={[styles.emptyCta, { borderColor: colors.borderAccent }]}
               accessibilityRole="button"
@@ -142,7 +143,7 @@ export default function VarshaphalaScreen() {
               <Text variant="mono-caps" style={[styles.emptyCtaText, { color: colors.accent }]}>
                 {t('kundli.openSettings')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         </SafeAreaView>
       </ScreenMount>
@@ -276,7 +277,7 @@ function Header({ title, colors, t }: HeaderProps) {
         styles.header,
         { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider },
       ]}>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.back()}
         hitSlop={12}
         style={[
@@ -286,7 +287,7 @@ function Header({ title, colors, t }: HeaderProps) {
         accessibilityRole="button"
         accessibilityLabel={t('a11y.back')}>
         <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </MotionPressable>
       <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
         {title}
       </Text>
@@ -318,7 +319,7 @@ function YearAgePicker({ value, onChange, colors, digits, t }: YearAgePickerProp
           {t('kundli.varshaphala.ageN', { n: digits(String(value)) })}
         </Text>
       </View>
-      <TouchableOpacity
+      <MotionPressable
         onPress={dec}
         disabled={value <= 1}
         hitSlop={10}
@@ -333,8 +334,8 @@ function YearAgePicker({ value, onChange, colors, digits, t }: YearAgePickerProp
         accessibilityRole="button"
         accessibilityLabel={t('kundli.varshaphala.decAge')}>
         <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
-      <TouchableOpacity
+      </MotionPressable>
+      <MotionPressable
         onPress={inc}
         disabled={value >= 120}
         hitSlop={10}
@@ -349,7 +350,7 @@ function YearAgePicker({ value, onChange, colors, digits, t }: YearAgePickerProp
         accessibilityRole="button"
         accessibilityLabel={t('kundli.varshaphala.incAge')}>
         <Icon name="chevron-right" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }

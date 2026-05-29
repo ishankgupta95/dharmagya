@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,6 +15,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import i18n, { resolveLanguage } from '@/i18n';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   getVaarDevataByKey,
   VAAR_DEVATA,
@@ -87,14 +88,14 @@ export default function VaarDevataScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {tForLang('vaar.detailTitle', { day: vaar.dayName[lang] })}
           </Text>
@@ -179,15 +180,15 @@ export default function VaarDevataScreen() {
             <Text variant="body-italic" style={[styles.mantraVariantNote, { color: colors.textTertiary }]}>
               {vaar.mantra.variantNote[lang]}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => startJaap(vaar)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.jaapBtn, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
               accessibilityRole="button"
               accessibilityLabel={t('vaar.a11yStartJaap')}>
               <Icon name="flower" size={14} color={palette.parchmentBright} />
               <Text variant="mono-caps" style={styles.jaapBtnText}>{tForLang('vaar.startJaap')}</Text>
-            </TouchableOpacity>
+            </MotionPressable>
             <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
               {tForLang('vaar.mantraReviewNote')}
             </Text>
@@ -197,10 +198,10 @@ export default function VaarDevataScreen() {
           {linkedPujas.length > 0 && (
             <SectionCard title={tForLang('vaar.linkedPujaLabel')} colors={colors}>
               {linkedPujas.map((p) => (
-                <TouchableOpacity
+                <MotionPressable
                   key={p.slug}
                   onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: p.slug } })}
-                  activeOpacity={0.85}
+                  pressedScale={0.97}
                   style={[styles.linkedPujaRow, { borderColor: colors.borderAccent, backgroundColor: colors.surfaceRecessed }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('puja.openNamedPuja', { name: p.name[lang] })}>
@@ -214,7 +215,7 @@ export default function VaarDevataScreen() {
                     </Text>
                   </View>
                   <Icon name="chevron-right" size={14} color={colors.textMuted} />
-                </TouchableOpacity>
+                </MotionPressable>
               ))}
             </SectionCard>
           )}
@@ -332,15 +333,15 @@ function DeityRow({
 
   if (deity.rosterId) {
     return (
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.push(`/god/${deity.rosterId}`)}
-        activeOpacity={0.85}
+        pressedScale={0.97}
         style={[styles.deityRow, divider]}
         accessibilityRole="button"
         accessibilityLabel={t('vaar.openInLibrary', { name: deity.name[lang] })}>
         <DeityRowInner deity={deity} lang={lang} colors={colors} />
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
-      </TouchableOpacity>
+      </MotionPressable>
     );
   }
   return (

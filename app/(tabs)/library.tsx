@@ -3,11 +3,11 @@ import {
   View,
   FlatList,
   TextInput,
-  TouchableOpacity,
-  Image,
   StyleSheet,
   type ListRenderItemInfo,
 } from 'react-native';
+import { MotionPressable } from '@/components/common/MotionPressable';
+import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -148,13 +148,13 @@ export default function LibraryScreen() {
                 autoCorrect={false}
               />
               {query.length > 0 && (
-                <TouchableOpacity
+                <MotionPressable
                   onPress={() => setQuery('')}
                   hitSlop={10}
                   accessibilityRole="button"
                   accessibilityLabel={t('a11y.clearSearch')}>
                   <Icon name="close-circle" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
+                </MotionPressable>
               )}
             </View>
           </View>
@@ -230,8 +230,8 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
   const isHindi = i18n.language?.startsWith('hi');
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.88}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={() => router.push(`/god/${deity.id}`)}
       style={[
         styles.card,
@@ -242,7 +242,12 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
 
       <View style={[styles.portrait, !image && { backgroundColor: deity.color + '22' }]}>
         {image && (
-          <Image source={image} style={styles.portraitImage} resizeMode="cover" />
+          <Animated.Image
+            source={image}
+            style={styles.portraitImage}
+            resizeMode="cover"
+            sharedTransitionTag={`deity-portrait-${deity.id}`}
+          />
         )}
         <LinearGradient
           colors={gradientColors}
@@ -277,7 +282,7 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
           {pillText}
         </Text>
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 

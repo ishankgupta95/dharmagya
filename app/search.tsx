@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   TextInput,
   SectionList,
-  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
@@ -142,14 +142,14 @@ export default function SearchScreen() {
 
       {/* ── Header ───────────────────────────────────────────────────── */}
       <View style={[styles.searchBar, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
 
         <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Icon name="search" size={16} color={colors.textMuted} />
@@ -165,13 +165,13 @@ export default function SearchScreen() {
             autoCorrect={false}
           />
           {hasQuery && (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setQuery('')}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           )}
         </View>
       </View>
@@ -231,8 +231,8 @@ interface ResultCardProps {
 
 const ResultCard = memo(function ResultCard({ item, query, colors, onPress }: ResultCardProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={onPress}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
@@ -262,7 +262,7 @@ const ResultCard = memo(function ResultCard({ item, query, colors, onPress }: Re
         />
       </View>
       <Icon name="chevron-right" size={14} color={colors.textMuted} />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 

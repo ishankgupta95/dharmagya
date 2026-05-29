@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, type ReactNode } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/common/AppText';
@@ -7,6 +7,7 @@ import { Icon } from '@/components/common/Icon';
 import { durations, easings } from '@/config/motion';
 import { type ColorPalette } from '@/config/theme';
 import { pAccordionMount } from '@/utils/perfProfile';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 interface AccordionSectionProps {
   /** Stable slug used as the persisted-state key on the store. */
@@ -79,8 +80,7 @@ export const AccordionSection = memo(function AccordionSection({
 
   return (
     <View style={styles.root}>
-      <TouchableOpacity
-        activeOpacity={0.65}
+      <MotionPressable
         onPress={onToggle}
         style={styles.header}
         accessibilityRole="button"
@@ -107,7 +107,7 @@ export const AccordionSection = memo(function AccordionSection({
         <Animated.View style={chevronStyle}>
           <Icon name="chevron-down" size={16} color={accentColor ?? colors.textTertiary} />
         </Animated.View>
-      </TouchableOpacity>
+      </MotionPressable>
 
       {open && (
         <View style={styles.body}>

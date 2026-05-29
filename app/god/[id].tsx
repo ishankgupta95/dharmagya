@@ -1,10 +1,10 @@
 import { useCallback, useMemo, memo } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   Image,
   Dimensions,
   SectionList,
-  TouchableOpacity,
   StyleSheet,
   SectionListRenderItemInfo,
   SectionListData,
@@ -277,6 +277,7 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
               source={image}
               style={[styles.heroImage, heroAnimStyle]}
               resizeMode="cover"
+              sharedTransitionTag={`deity-portrait-${deityId}`}
               onLoad={() => {
                 heroOpacity.value = withTiming(1, {
                   duration: dur(durations.slow),
@@ -303,14 +304,14 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         )}
       </View>
 
-      <TouchableOpacity
+      <MotionPressable
         onPress={onBack}
         style={styles.heroBackBtn}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         accessibilityRole="button"
         accessibilityLabel={t('a11y.back')}>
         <Icon name="chevron-left" size={18} color={palette.parchmentBright} />
-      </TouchableOpacity>
+      </MotionPressable>
 
       <View style={styles.heroMeta}>
         <Text variant="display-italic" style={[styles.heroName, { color: colors.textPrimary }]}>
@@ -320,9 +321,9 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
           {description}
         </Text>
         <View style={styles.heroCtaRow}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => openShare({ kind: 'deity-blessing', deityId, mantraHi: sigMantra })}
-            activeOpacity={0.85}
+            pressedScale={0.97}
             style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
             accessibilityRole="button"
             accessibilityLabel={t('share.a11yShare')}>
@@ -330,11 +331,11 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
             <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
               {t('share.ctaDeity')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
           {featuredPuja && (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: featuredPuja.slug } })}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
               accessibilityRole="button"
               accessibilityLabel={t('puja.openDeityPuja', { name: featuredPuja.name[lang] })}>
@@ -342,7 +343,7 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
               <Text variant="mono-caps" style={[styles.heroShareText, { color: colors.accent }]}>
                 {t('puja.openPujaCta')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           )}
         </View>
         <Ornament variant="lotus" style={styles.heroOrnament} />
@@ -380,8 +381,8 @@ const ContentCard = memo(function ContentCard({
 }: ContentCardProps) {
   const { t } = useTranslation();
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={onPress}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
@@ -419,7 +420,7 @@ const ContentCard = memo(function ContentCard({
       ) : (
         <Icon name="chevron-right" size={18} color={colors.textMuted} />
       )}
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 

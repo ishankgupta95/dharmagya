@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { AppText as Text, FONT_SCALE } from '@/components/common/AppText';
@@ -83,7 +83,7 @@ export default function ChalisaDetailScreen() {
           <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
             {t('chalisa.notFound')}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.notFoundBtn, { borderColor: colors.accent }]}
             accessibilityRole="button"
@@ -91,7 +91,7 @@ export default function ChalisaDetailScreen() {
             <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
               {t('common.back') ?? 'Back'}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </SafeAreaView>
     );
@@ -116,14 +116,14 @@ export default function ChalisaDetailScreen() {
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
 
         <Animated.View style={[styles.compactTitle, compactTitleAnimatedStyle]} pointerEvents="none">
           <Text variant="body-italic" style={[styles.compactTitleText, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -132,14 +132,14 @@ export default function ChalisaDetailScreen() {
         </Animated.View>
 
         <View style={styles.navRightGroup}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => { void shareChalisaText(chalisa, lang); }}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('share.a11yShareFullText')}>
             <Icon name="share" size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <FavoriteHeart
             active={isFavorite}
             onPress={() => toggleFavorite(favoriteKey)}
@@ -269,7 +269,7 @@ function VerseBlock({
             {line}
           </Text>
         ))}
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => openShare({ kind: 'verse', deityId, verseHi, verseEn, sourceLabel: t('share.from', { name: sourceName }) })}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.dohaShareBtn}
@@ -279,7 +279,7 @@ function VerseBlock({
           <Text variant="mono-caps" style={[styles.dohaShareText, { color: colors.textMuted }]}>
             {t('share.ctaVerse')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </Animated.View>
     );
   }

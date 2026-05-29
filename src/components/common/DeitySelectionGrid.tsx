@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View, TouchableOpacity, FlatList, StyleSheet, Dimensions, ListRenderItemInfo } from 'react-native';
+import { View, FlatList, StyleSheet, Dimensions, ListRenderItemInfo } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/common/Icon';
@@ -8,6 +8,7 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { useStore } from '@/store/useStore';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const NUM_COLUMNS = 2;
@@ -72,8 +73,7 @@ interface DeityCardProps {
 const DeityCard = memo(function DeityCard({ deity, isSelected, colors, onPress }: DeityCardProps) {
   const { t } = useTranslation();
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <MotionPressable
       onPress={onPress}
       style={[
         styles.card,
@@ -96,7 +96,7 @@ const DeityCard = memo(function DeityCard({ deity, isSelected, colors, onPress }
           <Icon name="check" size={10} color="#FFFFFF" />
         </View>
       )}
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 

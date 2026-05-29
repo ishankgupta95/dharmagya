@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { View, ScrollView, Modal, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -10,6 +10,7 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   WIDGET_FIELD_IDS,
   getWidgetField,
@@ -45,14 +46,14 @@ export default function WidgetSettingsScreen() {
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             hitSlop={12}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
             {t('widgetSettings.title')}
           </Text>
@@ -142,8 +143,7 @@ interface SlotRowProps {
 
 function SlotRow({ icon, slotLabel, slotDesc, fieldLabel, onPress, colors }: SlotRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${slotLabel} — ${fieldLabel}`}>
@@ -167,7 +167,7 @@ function SlotRow({ icon, slotLabel, slotDesc, fieldLabel, onPress, colors }: Slo
         </Text>
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -197,9 +197,8 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
               const active = id === value;
               const last = i === WIDGET_FIELD_IDS.length - 1;
               return (
-                <TouchableOpacity
+                <MotionPressable
                   key={id}
-                  activeOpacity={0.7}
                   onPress={() => onChange(id)}
                   style={[
                     styles.sheetItem,
@@ -215,11 +214,11 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
                     </Text>
                   </View>
                   {active && <Icon name="check" size={18} color={colors.accent} />}
-                </TouchableOpacity>
+                </MotionPressable>
               );
             })}
           </ScrollView>
-          <TouchableOpacity
+          <MotionPressable
             onPress={onClose}
             style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
             accessibilityRole="button"
@@ -227,7 +226,7 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
             <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
               {t('common.done')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </View>
     </Modal>

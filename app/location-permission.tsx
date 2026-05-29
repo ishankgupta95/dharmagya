@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   FlatList,
@@ -108,9 +108,8 @@ export default function LocationPickerScreen() {
         Math.abs(userLocation.lon - item.lon) < 0.01);
 
     return (
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => handleSelectCity(item)}
-        activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.state}`}
         accessibilityState={{ selected: !!isActive }}
@@ -124,7 +123,7 @@ export default function LocationPickerScreen() {
           <Text variant="body-italic" style={[styles.cityState, { color: colors.textTertiary }]}>{item.state}</Text>
         </View>
         {isActive && <Icon name="check-circle" size={18} color={colors.accent} />}
-      </TouchableOpacity>
+      </MotionPressable>
     );
   }
 
@@ -146,14 +145,14 @@ export default function LocationPickerScreen() {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('locationPermission.title')}
         </Text>
@@ -171,9 +170,9 @@ export default function LocationPickerScreen() {
 
       {/* ── GPS Button ────────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: spacing.screenH, paddingTop: 14, paddingBottom: 8 }}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={handleUseGPS}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           disabled={gpsLoading}
           style={[styles.gpsBtn, { backgroundColor: palette.sindoor, opacity: gpsLoading ? 0.7 : 1 }]}
           accessibilityRole="button"
@@ -189,7 +188,7 @@ export default function LocationPickerScreen() {
               </Text>
             </>
           )}
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
       {/* ── Divider with lotus ornament ───────────────────────────────── */}
@@ -215,13 +214,13 @@ export default function LocationPickerScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           )}
         </View>
       </View>

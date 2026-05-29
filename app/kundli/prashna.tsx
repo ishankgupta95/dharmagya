@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { NorthChart } from '@/components/kundli/NorthChart';
 import { SouthChart } from '@/components/kundli/SouthChart';
 import { cellsFromLagnaPlanets } from '@/components/kundli/chartCells';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   borderRadius,
   darkColors,
@@ -186,8 +187,8 @@ export default function PrashnaScreen() {
           </View>
 
           {/* ── Cast button ──────────────────────────────────────────────── */}
-          <TouchableOpacity
-            activeOpacity={0.85}
+          <MotionPressable
+            pressedScale={0.97}
             onPress={onCast}
             disabled={!canCast}
             style={[
@@ -213,7 +214,7 @@ export default function PrashnaScreen() {
               ]}>
               {t('kundli.prashna.castCta')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
 
           {/* ── Result body ──────────────────────────────────────────────── */}
           {chart ? (
@@ -282,7 +283,7 @@ function Header({ title, colors, t }: HeaderProps) {
         styles.header,
         { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider },
       ]}>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.back()}
         hitSlop={12}
         style={[
@@ -292,7 +293,7 @@ function Header({ title, colors, t }: HeaderProps) {
         accessibilityRole="button"
         accessibilityLabel={t('a11y.back')}>
         <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </MotionPressable>
       <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
         {title}
       </Text>
@@ -311,8 +312,7 @@ interface FormFieldRowProps {
 
 function FormFieldRow({ icon, label, value, onPress, colors }: FormFieldRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       style={styles.formRow}
       accessibilityRole="button"
@@ -329,7 +329,7 @@ function FormFieldRow({ icon, label, value, onPress, colors }: FormFieldRowProps
         </Text>
       </View>
       <Icon name="chevron-right" size={14} color={colors.textMuted} />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 

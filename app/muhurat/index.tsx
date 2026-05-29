@@ -1,4 +1,4 @@
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -10,6 +10,7 @@ import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
 import { ALL_OCCASIONS, type Occasion } from '@/services/astrology/muhurat';
 import { AdBanner } from '@/components/common/AdBanner';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 const OCCASION_ICON: Record<Occasion, IconName> = {
   vivah: 'heart',
@@ -31,14 +32,14 @@ export default function MuhuratIndexScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           hitSlop={12}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('muhurat.title')}
         </Text>
@@ -55,9 +56,9 @@ export default function MuhuratIndexScreen() {
 
         <View style={styles.grid}>
           {ALL_OCCASIONS.map(occ => (
-            <TouchableOpacity
+            <MotionPressable
               key={occ}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               onPress={() => router.push(`/muhurat/${occ}`)}
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
@@ -71,7 +72,7 @@ export default function MuhuratIndexScreen() {
               <Text variant="body-italic" style={[styles.cardDesc, { color: colors.textTertiary }]} numberOfLines={2}>
                 {t(`muhurat.occasion.${occ}.desc`)}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           ))}
         </View>
 

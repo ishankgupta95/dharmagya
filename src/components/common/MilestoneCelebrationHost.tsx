@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -160,19 +161,19 @@ export function MilestoneCelebrationHost() {
             </Text>
 
             <View style={styles.actions}>
-              <TouchableOpacity
+              <MotionPressable
                 onPress={dismiss}
-                activeOpacity={0.85}
+                pressedScale={0.97}
                 style={[styles.btn, styles.btnSecondary, { borderColor: colors.border }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('sadhana.continueBtn')}>
                 <Text variant="mono-caps" style={[styles.btnText, { color: colors.textSecondary }]}>
                   {t('sadhana.continueBtn')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </MotionPressable>
+              <MotionPressable
                 onPress={handleShare}
-                activeOpacity={0.85}
+                pressedScale={0.97}
                 style={[styles.btn, styles.btnPrimary, { backgroundColor: colors.accent }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('sadhana.shareBtn')}>
@@ -180,7 +181,7 @@ export function MilestoneCelebrationHost() {
                 <Text variant="mono-caps" style={[styles.btnText, { color: palette.parchmentBright }]}>
                   {t('sadhana.shareBtn')}
                 </Text>
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
           </TouchableOpacity>

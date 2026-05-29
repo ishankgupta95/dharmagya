@@ -1,9 +1,9 @@
 import { Fragment, memo, useEffect, useMemo, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   ScrollView,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
@@ -257,14 +257,14 @@ export default function FestivalsScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* ── Header ─────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.screenTitle, { color: colors.textPrimary }]}>
           {t('festivals.title')}
         </Text>
@@ -273,7 +273,7 @@ export default function FestivalsScreen() {
 
       {/* ── Year selector ──────────────────────────────────────────── */}
       <View style={[styles.yearRow, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => setYear(y => y - 1)}
           hitSlop={12}
           disabled={!canGoBack}
@@ -281,11 +281,11 @@ export default function FestivalsScreen() {
           accessibilityLabel={`${year - 1}`}
           accessibilityState={{ disabled: !canGoBack }}>
           <Icon name="chevron-left" size={20} color={canGoBack ? colors.textSecondary : colors.textMuted} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.yearLabel, { color: colors.textPrimary }]}>
           {year}
         </Text>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => setYear(y => y + 1)}
           hitSlop={12}
           disabled={!canGoForward}
@@ -293,7 +293,7 @@ export default function FestivalsScreen() {
           accessibilityLabel={`${year + 1}`}
           accessibilityState={{ disabled: !canGoForward }}>
           <Icon name="chevron-right" size={20} color={canGoForward ? colors.textSecondary : colors.textMuted} />
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
       {/* ── Search bar ─────────────────────────────────────────────── */}
@@ -311,13 +311,13 @@ export default function FestivalsScreen() {
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setSearchQuery('')}
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           )}
         </View>
       </View>
@@ -516,9 +516,8 @@ function FestivalRowImpl({
                   </Text>
                 )}
                 {matchedPuja && (
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: matchedPuja.slug } })}
-                    activeOpacity={0.7}
                     hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     style={styles.pujaCtaRow}
                     accessibilityRole="button"
@@ -527,12 +526,11 @@ function FestivalRowImpl({
                     <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
                       {t('puja.openNamedPuja', { name: matchedPuja.name[pujaLang] })}
                     </Text>
-                  </TouchableOpacity>
+                  </MotionPressable>
                 )}
                 {matchedKatha && (
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: matchedKatha.slug } })}
-                    activeOpacity={0.7}
                     hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     style={styles.pujaCtaRow}
                     accessibilityRole="button"
@@ -541,11 +539,11 @@ function FestivalRowImpl({
                     <Text variant="mono-caps" style={[styles.pujaCtaText, { color: colors.accent }]}>
                       {t('katha.festivalCta')}
                     </Text>
-                  </TouchableOpacity>
+                  </MotionPressable>
                 )}
               </View>
               {f.type === 'major' && (
-                <TouchableOpacity
+                <MotionPressable
                   onPress={() => openShare({
                     kind: 'festival-greeting',
                     festivalNameEn: localizeFestivalName(f.name, 'en'),
@@ -557,7 +555,7 @@ function FestivalRowImpl({
                   accessibilityRole="button"
                   accessibilityLabel={t('share.ctaGreeting')}>
                   <Icon name="share" size={15} color={colors.textMuted} />
-                </TouchableOpacity>
+                </MotionPressable>
               )}
             </View>
           );

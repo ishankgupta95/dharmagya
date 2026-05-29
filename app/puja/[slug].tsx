@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import i18n, { resolveLanguage } from '@/i18n';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   getPujaBySlug,
   PUJA_DISCLAIMER,
@@ -104,14 +105,14 @@ export default function PujaDetailScreen() {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {tForLang('puja.indexTitle')}
           </Text>
@@ -132,14 +133,14 @@ export default function PujaDetailScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {puja.name[lang]}
           </Text>
@@ -267,26 +268,26 @@ export default function PujaDetailScreen() {
                 {puja.stotraKathaRef.note[lang]}
               </Text>
               {puja.stotraKathaRef.kind === 'aarti' && puja.stotraKathaRef.deity && (
-                <TouchableOpacity
+                <MotionPressable
                   onPress={() => router.push(`/aarti/${puja.stotraKathaRef!.deity!}`)}
-                  activeOpacity={0.85}
+                  pressedScale={0.97}
                   style={[styles.stotraCta, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
                   accessibilityRole="button"
                   accessibilityLabel={tForLang('puja.openAarti')}>
                   <Icon name="flower" size={14} color={palette.parchmentBright} />
                   <Text variant="mono-caps" style={styles.stotraCtaText}>{tForLang('puja.openAarti')}</Text>
-                </TouchableOpacity>
+                </MotionPressable>
               )}
               {puja.stotraKathaRef.kind === 'chalisa' && puja.stotraKathaRef.deity && (
-                <TouchableOpacity
+                <MotionPressable
                   onPress={() => router.push(`/chalisa/${puja.stotraKathaRef!.deity!}`)}
-                  activeOpacity={0.85}
+                  pressedScale={0.97}
                   style={[styles.stotraCta, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
                   accessibilityRole="button"
                   accessibilityLabel={tForLang('puja.openChalisa')}>
                   <Icon name="ribbon" size={14} color={palette.parchmentBright} />
                   <Text variant="mono-caps" style={styles.stotraCtaText}>{tForLang('puja.openChalisa')}</Text>
-                </TouchableOpacity>
+                </MotionPressable>
               )}
             </View>
           )}
@@ -297,7 +298,7 @@ export default function PujaDetailScreen() {
               <View style={styles.linksGrid}>
                 {puja.postPujaLinks.map((link, i) => {
                   const clickable = isClickable(link);
-                  const Container = clickable ? TouchableOpacity : View;
+                  const Container = clickable ? MotionPressable : View;
                   const label = 'label' in link && link.label
                     ? link.label[lang]
                     : '';
@@ -305,7 +306,7 @@ export default function PujaDetailScreen() {
                     <Container
                       key={`${link.kind}-${i}`}
                       onPress={clickable ? () => handlePostPujaLink(link) : undefined}
-                      activeOpacity={clickable ? 0.85 : undefined}
+                      pressedScale={0.97}
                       style={[
                         styles.linkChip,
                         { backgroundColor: colors.surfaceRecessed, borderColor: colors.border },
@@ -409,10 +410,9 @@ function SamagriList({ items, checked, onToggle, lang, colors }: SamagriListProp
           {g.items.map(({ key, item }) => {
             const isChecked = checked.has(key);
             return (
-              <TouchableOpacity
+              <MotionPressable
                 key={key}
                 onPress={() => onToggle(key)}
-                activeOpacity={0.7}
                 hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                 style={styles.samagriRow}
                 accessibilityRole="checkbox"
@@ -435,7 +435,7 @@ function SamagriList({ items, checked, onToggle, lang, colors }: SamagriListProp
                   {item.label[lang]}
                   {item.optional ? (lang === 'hi' ? ' · (वैकल्पिक)' : ' · (optional)') : ''}
                 </Text>
-              </TouchableOpacity>
+              </MotionPressable>
             );
           })}
         </View>
@@ -537,9 +537,9 @@ function StepMantra({ mantra, lang, colors, isDarkMode }: StepMantraProps) {
       <Text variant="body" style={[styles.stepMantraMeaning, { color: colors.textSecondary }]}>
         {mantra.meaning[lang]}
       </Text>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => openMantraJaap(mantra.jaapSlug, mantra.devanagari)}
-        activeOpacity={0.85}
+        pressedScale={0.97}
         style={[styles.stepMantraJaapBtn, { borderColor: colors.borderAccent }]}
         accessibilityRole="button"
         accessibilityLabel={t('puja.a11yStartJaap')}>
@@ -547,7 +547,7 @@ function StepMantra({ mantra, lang, colors, isDarkMode }: StepMantraProps) {
         <Text variant="mono-caps" style={[styles.stepMantraJaapText, { color: isDarkMode ? palette.goldLeaf : palette.sindoor }]}>
           {tForLang('puja.startJaap')}
         </Text>
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }

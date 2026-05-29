@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,6 +15,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import i18n, { resolveLanguage } from '@/i18n';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   GUPT_NAVRATRI_INFO,
   NAVRATRI_MASAS,
@@ -91,14 +92,14 @@ export default function NavratriGuideScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {tForLang('navratri.title')}
           </Text>
@@ -336,15 +337,15 @@ function DayCard({
         <Text variant="body" style={[styles.mantraMeaning, { color: colors.textSecondary }]}>
           {form.mantra.meaning[lang]}
         </Text>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => startJaap(form)}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           style={[styles.jaapBtn, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
           accessibilityRole="button"
           accessibilityLabel={t('navratri.a11yStartJaap')}>
           <Icon name="flower" size={14} color={palette.parchmentBright} />
           <Text variant="mono-caps" style={styles.jaapBtnText}>{t('navratri.startJaap')}</Text>
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
           {t('navratri.mantraReviewNote')}
         </Text>
@@ -401,9 +402,9 @@ function DayCard({
             </View>
           )}
           {/* Link into the Ghatasthapana puja vidhi (P14.2). */}
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: 'navratri-ghatasthapana' } })}
-            activeOpacity={0.85}
+            pressedScale={0.97}
             style={[styles.ghatasthapanaPujaCta, { borderColor: colors.borderAccent }]}
             accessibilityRole="button"
             accessibilityLabel={t('navratri.openGhatasthapanaPuja')}>
@@ -412,15 +413,15 @@ function DayCard({
               {t('navratri.openGhatasthapanaPuja')}
             </Text>
             <Icon name="chevron-right" size={13} color={colors.accent} />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       )}
 
       {/* ── Day 8 / 9: Kanya Pujan + havan callout ────────────────────── */}
       {isEighthOrNinth && (
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.push('/navratri/kanya-pujan')}
-          activeOpacity={0.88}
+          pressedScale={0.97}
           style={[styles.calloutCard, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}
           accessibilityRole="button"
           accessibilityLabel={t('navratri.a11yOpenKanyaPujan')}>
@@ -434,7 +435,7 @@ function DayCard({
             </Text>
             <Icon name="chevron-right" size={13} color={palette.goldLeaf} />
           </View>
-        </TouchableOpacity>
+        </MotionPressable>
       )}
 
       {/* ── Day 9: Vijayadashami / Dussehra preview ───────────────────── */}
@@ -449,9 +450,9 @@ function DayCard({
 
       {/* ── Today's Saptashati chapters ────────────────────────────────── */}
       {saptashati && (
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.push('/scripture/durga-saptashati')}
-          activeOpacity={0.88}
+          pressedScale={0.97}
           style={[styles.saptashatiCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('navratri.a11yOpenSaptashati')}>
@@ -471,7 +472,7 @@ function DayCard({
             </Text>
             <Icon name="chevron-right" size={14} color={colors.accent} />
           </View>
-        </TouchableOpacity>
+        </MotionPressable>
       )}
     </>
   );
@@ -503,9 +504,9 @@ interface CrossLinksProps {
 function CrossLinksCard({ colors, t }: CrossLinksProps) {
   return (
     <View style={styles.crossLinksRow}>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.push('/navratri/vrat')}
-        activeOpacity={0.88}
+        pressedScale={0.97}
         style={[styles.crossLinkBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
         accessibilityRole="button"
         accessibilityLabel={t('navratri.a11yOpenVrat')}>
@@ -513,11 +514,11 @@ function CrossLinksCard({ colors, t }: CrossLinksProps) {
         <Text variant="mono-caps" style={[styles.crossLinkText, { color: colors.textSecondary }]}>
           {t('navratri.vratCta')}
         </Text>
-      </TouchableOpacity>
+      </MotionPressable>
 
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.push('/scripture/durga-saptashati')}
-        activeOpacity={0.88}
+        pressedScale={0.97}
         style={[styles.crossLinkBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
         accessibilityRole="button"
         accessibilityLabel={t('navratri.a11yOpenSaptashati')}>
@@ -525,7 +526,7 @@ function CrossLinksCard({ colors, t }: CrossLinksProps) {
         <Text variant="mono-caps" style={[styles.crossLinkText, { color: colors.textSecondary }]}>
           {t('navratri.saptashatiCta')}
         </Text>
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }

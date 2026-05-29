@@ -1,4 +1,4 @@
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
 import { ALL_SCRIPTURES, SCRIPTURE_DISCLAIMER } from '@/config/scriptures';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 /**
  * Scripture index — three entries: Bhagavad Geeta + Durga Saptashati (outline)
@@ -42,14 +43,14 @@ export default function ScriptureIndexScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('scripture.indexTitle')}
           </Text>
@@ -73,10 +74,10 @@ export default function ScriptureIndexScreen() {
 
           {/* ── Scripture rows ──────────────────────────────────────────── */}
           {rows.map((r) => (
-            <TouchableOpacity
+            <MotionPressable
               key={r.id}
               onPress={() => router.push({ pathname: '/scripture/[id]', params: { id: r.id } })}
-              activeOpacity={0.88}
+              pressedScale={0.97}
               style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('scripture.a11yOpenScripture', { name: r.titleEn })}>
@@ -92,7 +93,7 @@ export default function ScriptureIndexScreen() {
                 </Text>
               </View>
               <Icon name="chevron-right" size={14} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           ))}
 
           {/* ── Disclaimer footer ───────────────────────────────────────── */}

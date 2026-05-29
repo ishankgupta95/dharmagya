@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ import { Icon, type IconName } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 import { getVaarDevataForDate, vaarDeityNames } from '@/config/vaarDevata';
 import {
@@ -171,19 +172,8 @@ interface PracticeRowProps {
 
 function PracticeRow({ icon, title, subtitle, onPress, colors, t }: PracticeRowProps) {
   const disabled = onPress === null;
-  const Container = disabled ? View : TouchableOpacity;
-  return (
-    <Container
-      onPress={disabled ? undefined : onPress!}
-      activeOpacity={disabled ? undefined : 0.88}
-      style={[
-        styles.rowCard,
-        { backgroundColor: colors.surface, borderColor: colors.border },
-        disabled && { opacity: 0.55 },
-      ]}
-      accessibilityRole={disabled ? undefined : 'button'}
-      accessibilityLabel={title}
-      accessibilityState={disabled ? { disabled: true } : undefined}>
+  const body = (
+    <>
       <View style={[styles.rowIcon, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
         <Icon name={icon} size={18} color={colors.accent} />
       </View>
@@ -204,7 +194,35 @@ function PracticeRow({ icon, title, subtitle, onPress, colors, t }: PracticeRowP
       ) : (
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
       )}
-    </Container>
+    </>
+  );
+
+  if (disabled) {
+    return (
+      <View
+        style={[
+          styles.rowCard,
+          { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.55 },
+        ]}
+        accessibilityLabel={title}
+        accessibilityState={{ disabled: true }}>
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <MotionPressable
+      onPress={onPress!}
+      pressedScale={0.97}
+      style={[
+        styles.rowCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={title}>
+      {body}
+    </MotionPressable>
   );
 }
 

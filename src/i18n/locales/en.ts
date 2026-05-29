@@ -475,6 +475,25 @@ export default {
     footerHint: 'Changes apply the next time the widget refreshes (or instantly when you tap the ↻ icon on it).',
   },
 
+  // ── Notification permission pre-prompt ──────────────────────────────────
+  permissionPrompt: {
+    sadhana: {
+      title: 'Stay on your path',
+      body: 'A gentle nudge in the evening if you haven\'t begun your practice — sent only on days you haven\'t completed a jaap session yet.',
+    },
+    tithi: {
+      title: 'Honour every tithi',
+      body: 'One notification the evening before each Ekadashi, Pradosh, Purnima, Amavasya and other tithis you\'ve selected — so the date never slips by.',
+    },
+    festival: {
+      title: 'Festivals at hand',
+      body: 'A single notification the evening before each festival you\'ve chosen. Navratri opens its own nine-day sequence on Day 1.',
+    },
+    systemHint: 'The next screen is your phone\'s permission prompt. You can change this anytime in Settings.',
+    continueBtn: 'Continue',
+    cancelBtn: 'Not now',
+  },
+
   // ── Reminders Screen ────────────────────────────────────────────────────
   reminders: {
     title: 'Reminders',
@@ -1214,6 +1233,11 @@ export default {
     a11yOpenChapter: 'Open chapter {{num}}',
     // Verse reader
     verseKicker: 'VERSE {{num}}',
+    // Chapter footer navigation
+    prevChapter: 'PREVIOUS',
+    nextChapter: 'NEXT',
+    prevChapterA11y: 'Previous chapter — chapter {{num}}',
+    nextChapterA11y: 'Next chapter — chapter {{num}}',
   },
 
   // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────

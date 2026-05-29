@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { AppText as Text } from './AppText';
 import { Ornament } from './Ornament';
 import { borderRadius, palette, spacing } from '@/config/theme';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 /**
  * Editorial time picker. iOS shows an inline `@react-native-community/datetimepicker`
@@ -95,8 +96,8 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
             />
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.85}
+          <MotionPressable
+            pressedScale={0.97}
             onPress={handleDone}
             style={[styles.doneBtn, { backgroundColor: palette.sindoor }]}
             accessibilityRole="button"
@@ -104,7 +105,7 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
             <Text variant="mono-caps" style={styles.doneText}>
               {t('common.done')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
 
         </TouchableOpacity>
       </TouchableOpacity>

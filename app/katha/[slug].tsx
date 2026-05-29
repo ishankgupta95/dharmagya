@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   getKathaBySlug,
   KATHA_DISCLAIMER,
@@ -45,14 +46,14 @@ export default function KathaReaderScreen() {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('katha.indexTitle')}
           </Text>
@@ -73,14 +74,14 @@ export default function KathaReaderScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
 

@@ -3,13 +3,13 @@ import { router, useFocusEffect } from 'expo-router';
 import {
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
   InteractionManager,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/common/Icon';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import { useTranslation } from 'react-i18next';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -400,9 +400,8 @@ const CalendarViewToggle = memo(function CalendarViewToggle({
     const isSelected = layout === key;
     const tone = isSelected ? colors.accent : colors.textTertiary;
     return (
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => onSelect(key)}
-        activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${label} · ${a11yHint}`}
         accessibilityState={{ selected: isSelected }}
@@ -421,7 +420,7 @@ const CalendarViewToggle = memo(function CalendarViewToggle({
             { backgroundColor: isSelected ? palette.gold : 'transparent' },
           ]}
         />
-      </TouchableOpacity>
+      </MotionPressable>
     );
   };
 
@@ -803,10 +802,10 @@ export default function PanchangScreen() {
         {error ? t('panchang.calculationFailed') : (loading ? '…' : t('panchang.tapToReveal'))}
       </Text>
       {error && (
-        <TouchableOpacity onPress={retry} hitSlop={8} style={[styles.placeholderRetry, { borderColor: colors.accent }]}
+        <MotionPressable onPress={retry} hitSlop={8} style={[styles.placeholderRetry, { borderColor: colors.accent }]}
           accessibilityRole="button" accessibilityLabel={t('common.retry')}>
           <Text style={[styles.placeholderRetryText, { color: colors.accent }]}>{t('common.retry')}</Text>
-        </TouchableOpacity>
+        </MotionPressable>
       )}
     </View>
   );
@@ -848,18 +847,17 @@ export default function PanchangScreen() {
 
         {/* ── Month strip ──────────────────────────────────────────────────── */}
         <View style={styles.monthStrip}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={goPrevMonth}
             hitSlop={12}
             style={styles.monthBtn}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.previousMonth')}>
             <Icon name="chevron-left" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-          <TouchableOpacity
+          </MotionPressable>
+          <MotionPressable
             onPress={() => setPickerOpen(true)}
-            activeOpacity={0.7}
-            hitSlop={6}
+                hitSlop={6}
             style={[
               styles.monthLabelRow,
               { backgroundColor: colors.surface, borderColor: colors.borderAccent },
@@ -874,30 +872,29 @@ export default function PanchangScreen() {
             </Text>
             <View style={[styles.monthDialDivider, { backgroundColor: colors.border }]} />
             <Icon name="caret-down" size={12} color={colors.accent} />
-          </TouchableOpacity>
-          <TouchableOpacity
+          </MotionPressable>
+          <MotionPressable
             onPress={goNextMonth}
             hitSlop={12}
             style={styles.monthBtn}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.nextMonth')}>
             <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         {!isViewingToday && (
           <View style={styles.todayRow}>
-            <TouchableOpacity
+            <MotionPressable
               onPress={goToday}
-              activeOpacity={0.7}
-              style={[styles.todayChip, { borderColor: colors.accent }]}
+                    style={[styles.todayChip, { borderColor: colors.accent }]}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.today')}>
               <Icon name="return-back" size={12} color={colors.accent} />
               <Text variant="mono-caps" style={[styles.todayChipText, { color: colors.accent }]}>
                 {t('panchang.todayChip')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         )}
 
@@ -977,10 +974,9 @@ export default function PanchangScreen() {
                         : colors.textPrimary;
 
                   return (
-                    <TouchableOpacity
+                    <MotionPressable
                       key={idx}
-                      activeOpacity={0.7}
-                      onPress={() => handlePickDay(cellDate)}
+                                    onPress={() => handlePickDay(cellDate)}
                       style={styles.calCell}
                       accessibilityRole="button"
                       accessibilityLabel={cellDate.toDateString()}
@@ -999,7 +995,7 @@ export default function PanchangScreen() {
                           <View style={[styles.festivalDot, { backgroundColor: dotColor }]} />
                         )}
                       </View>
-                    </TouchableOpacity>
+                    </MotionPressable>
                   );
                 })}
               </View>
@@ -1060,8 +1056,8 @@ export default function PanchangScreen() {
         )}
 
         {/* ── Muhurat finder entry ── */}
-        <TouchableOpacity
-          activeOpacity={0.85}
+        <MotionPressable
+          pressedScale={0.97}
           onPress={() => router.push('/muhurat')}
           style={[styles.muhuratEntry, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
           accessibilityRole="button"
@@ -1071,7 +1067,7 @@ export default function PanchangScreen() {
             {t('panchang.findAuspiciousDate')}
           </Text>
           <Icon name="chevron-right" size={14} color={colors.accent} />
-        </TouchableOpacity>
+        </MotionPressable>
 
         {/* ── Inline Ad ── */}
         <AdBanner colors={colors} placement="panchangInline" inline />
@@ -1124,17 +1120,16 @@ export default function PanchangScreen() {
                             panchangLang,
                           )}
                         </Text>
-                        <TouchableOpacity
+                        <MotionPressable
                           onPress={() => setMasaSystem(masaSystem === 'purnimanta' ? 'amanta' : 'purnimanta')}
-                          activeOpacity={0.7}
-                          style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}
+                                            style={[styles.masaChip, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '40' }]}
                           accessibilityRole="button"
                           accessibilityLabel={masaSystem === 'purnimanta' ? t('panchang.amanta') : t('panchang.purnimanta')}>
                           <Text style={[styles.masaChipText, { color: colors.accent }]} numberOfLines={1}>
                             {masaSystem === 'purnimanta' ? t('panchang.purnimanta') : t('panchang.amanta')}
                           </Text>
                           <Icon name="swap-horizontal" size={11} color={colors.accent} />
-                        </TouchableOpacity>
+                        </MotionPressable>
                       </View>
                     </>
                   )}

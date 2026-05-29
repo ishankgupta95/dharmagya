@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, ScrollView, Switch, StyleSheet, Alert } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   useStore,
   type TithiReminderKey,
@@ -17,6 +18,10 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
 import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
+import {
+  NotificationPermissionPrompt,
+  type PermissionPromptKind,
+} from '@/components/common/NotificationPermissionPrompt';
 import { useLocaleFormatters } from '@/utils/format';
 
 const TITHI_KEYS: TithiReminderKey[] = ['ekadashi', 'pradosha', 'purnima', 'amavasya', 'sankashti', 'shivaratri'];
@@ -67,6 +72,41 @@ export default function RemindersScreen() {
   const [festivalTimePickerOpen, setFestivalTimePickerOpen] = useState(false);
   const [sadhanaTimePickerOpen, setSadhanaTimePickerOpen] = useState(false);
 
+  // Permission pre-prompt: when the user flips a reminder ON for the first
+  // time we show an editorial card explaining what they'll receive before the
+  // OS dialog appears. The ref holds the resolver of an in-flight prompt so
+  // toggles can `await` the user's choice.
+  const [prePromptKind, setPrePromptKind] = useState<PermissionPromptKind | null>(null);
+  const prePromptResolveRef = useRef<((proceed: boolean) => void) | null>(null);
+
+  const ensurePermissionWithPreprompt = useCallback(
+    async (kind: PermissionPromptKind): Promise<boolean> => {
+      const { hasNotificationPermission, requestNotificationPermission } =
+        await import('@/services/notifications');
+      if (await hasNotificationPermission()) return true;
+
+      const proceed = await new Promise<boolean>((resolve) => {
+        prePromptResolveRef.current = resolve;
+        setPrePromptKind(kind);
+      });
+      if (!proceed) return false;
+
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        Alert.alert(t('settings.permissionRequired'), t('settings.permissionRequiredDesc'));
+      }
+      return granted;
+    },
+    [t],
+  );
+
+  const closePrePrompt = useCallback((proceed: boolean) => {
+    const resolve = prePromptResolveRef.current;
+    prePromptResolveRef.current = null;
+    setPrePromptKind(null);
+    resolve?.(proceed);
+  }, []);
+
   // Re-schedule the sadhana horizon when the toggle / time changes. Same
   // debounce semantics as the tithi/festival reminders above, but a separate
   // effect so the two namespaces don't interfere.
@@ -90,7 +130,7 @@ export default function RemindersScreen() {
 
   async function handleSadhanaToggle(val: boolean) {
     if (val && !sadhanaReminderEnabled) {
-      const ok = await ensurePermission(t);
+      const ok = await ensurePermissionWithPreprompt('sadhana');
       if (!ok) return;
     }
     setSadhanaReminderEnabled(val);
@@ -126,7 +166,7 @@ export default function RemindersScreen() {
 
   async function handleTithiToggle(key: TithiReminderKey, val: boolean) {
     if (val && !hasAnyReminderEnabled(prefs)) {
-      const ok = await ensurePermission(t);
+      const ok = await ensurePermissionWithPreprompt('tithi');
       if (!ok) return;
     }
     setTithi(key, val);
@@ -134,7 +174,7 @@ export default function RemindersScreen() {
 
   async function handleFestivalToggle(key: FestivalReminderKey, val: boolean) {
     if (val && !hasAnyReminderEnabled(prefs)) {
-      const ok = await ensurePermission(t);
+      const ok = await ensurePermissionWithPreprompt('festival');
       if (!ok) return;
     }
     setFestival(key, val);
@@ -145,14 +185,14 @@ export default function RemindersScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           hitSlop={12}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('reminders.title')}
         </Text>
@@ -268,6 +308,13 @@ export default function RemindersScreen() {
         onPick={setSadhanaReminderTime}
         title={t('reminders.sadhanaTimePickerTitle')}
       />
+
+      <NotificationPermissionPrompt
+        visible={prePromptKind !== null}
+        kind={prePromptKind ?? 'sadhana'}
+        onCancel={() => closePrePrompt(false)}
+        onContinue={() => closePrePrompt(true)}
+      />
     </SafeAreaView>
     </ScreenMount>
   );
@@ -283,8 +330,7 @@ interface TimeRowProps {
 
 function TimeRow({ icon, label, value, onPress, colors }: TimeRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}>
@@ -300,19 +346,8 @@ function TimeRow({ icon, label, value, onPress, colors }: TimeRowProps) {
         </Text>
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function ensurePermission(t: (k: string) => string): Promise<boolean> {
-  const { requestNotificationPermission } = await import('@/services/notifications');
-  const granted = await requestNotificationPermission();
-  if (!granted) {
-    Alert.alert(t('settings.permissionRequired'), t('settings.permissionRequiredDesc'));
-  }
-  return granted;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

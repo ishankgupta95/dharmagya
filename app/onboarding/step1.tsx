@@ -1,4 +1,4 @@
-import { Image, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Image, View, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { borderRadius, palette, spacing } from '@/config/theme';
 import { Ornament } from '@/components/common/Ornament';
 import { MandalaWatermark } from '@/components/common/MandalaWatermark';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 export default function OnboardingStep1() {
   const { t } = useTranslation();
@@ -51,16 +52,16 @@ export default function OnboardingStep1() {
 
       {/* ── Bottom ──────────────────────────────────────────────────── */}
       <View style={styles.bottom}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.push('/onboarding/step2')}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           style={styles.cta}
           accessibilityRole="button"
           accessibilityLabel={t('onboarding.beginJourney')}>
           <Text variant="mono-caps" style={styles.ctaText}>
             {t('onboarding.beginJourney')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
     </SafeAreaView>

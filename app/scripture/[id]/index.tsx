@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -14,6 +14,7 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import i18n, { resolveLanguage } from '@/i18n';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   NAVRATRI_SOURCES,
   SAPTASHATI_ABOUT,
@@ -80,14 +81,14 @@ function SaptashatiOutlineScreen() {
 
         {/* ── Header ────────────────────────────────────────────────────── */}
         <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <View style={[styles.navPill, { borderWidth: 0 }]} />
         </View>
 
@@ -230,14 +231,14 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
 
         {/* ── Header ────────────────────────────────────────────────────── */}
         <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <View style={[styles.navPill, { borderWidth: 0 }]} />
         </View>
 
@@ -278,14 +279,14 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
 
           {/* ── Read CTA (single-chapter scriptures) OR chapter list ────── */}
           {isSingleChapter ? (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() =>
                 router.push({
                   pathname: '/scripture/[id]/[chapter]',
                   params: { id: scripture.slug, chapter: String(scripture.chapters[0].number) },
                 })
               }
-              activeOpacity={0.88}
+              pressedScale={0.97}
               style={[styles.readCta, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
               accessibilityRole="button"
               accessibilityLabel={tForLang('scripture.readAllVerses', { count: totalVerses })}>
@@ -298,14 +299,14 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
                 </Text>
               </View>
               <Icon name="chevron-right" size={16} color={colors.accent} />
-            </TouchableOpacity>
+            </MotionPressable>
           ) : (
             <View style={styles.section}>
               <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
                 {tForLang('scripture.chapterListLabel')}
               </Kicker>
               {scripture.chapters.map((ch) => (
-                <TouchableOpacity
+                <MotionPressable
                   key={ch.number}
                   onPress={() =>
                     router.push({
@@ -313,7 +314,7 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
                       params: { id: scripture.slug, chapter: String(ch.number) },
                     })
                   }
-                  activeOpacity={0.88}
+                  pressedScale={0.97}
                   style={[styles.chapterCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   accessibilityRole="button"
                   accessibilityLabel={tForLang('scripture.a11yOpenChapter', { num: ch.number })}>
@@ -331,7 +332,7 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
                   <Text variant="mono-caps" style={[styles.chapterVerseCount, { color: colors.textMuted }]}>
                     {tForLang('scripture.versesNCount', { count: ch.verses.length })}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               ))}
             </View>
           )}
@@ -364,7 +365,7 @@ function ScriptureNotFoundScreen() {
         <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
           {t('scripture.notFound')}
         </Text>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.notFoundBtn, { borderColor: colors.accent }]}
           accessibilityRole="button"
@@ -372,7 +373,7 @@ function ScriptureNotFoundScreen() {
           <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
             {t('common.back') ?? 'Back'}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
     </SafeAreaView>
   );

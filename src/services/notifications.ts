@@ -50,6 +50,16 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return status === 'granted';
 }
 
+/**
+ * Read-only check used by the UI to decide whether to show a pre-prompt
+ * before triggering the OS permission dialog. Does NOT prompt.
+ */
+export async function hasNotificationPermission(): Promise<boolean> {
+  if (!Notifications) return false;
+  const { status } = await Notifications.getPermissionsAsync();
+  return status === 'granted';
+}
+
 // ─── Daily Reminder (user-configurable time) ─────────────────────────────────
 //
 // We schedule one DATE-triggered notification per day for the next

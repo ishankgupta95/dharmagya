@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -9,6 +9,7 @@ import { Icon } from '@/components/common/Icon';
 import { useStore } from '@/store/useStore';
 import { borderRadius, lightColors, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 // Onboarding renders on the parchment ground — the grid component colorises its
 // cells from the palette passed in, so we hand it the light palette explicitly.
@@ -28,14 +29,14 @@ export default function OnboardingStep2() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
 
       <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="mono-caps" style={[styles.headerStep, { color: palette.inkQuiet }]}>
           {t('onboarding.step2of3')}
         </Text>
@@ -65,15 +66,15 @@ export default function OnboardingStep2() {
       )}
 
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={handleContinue}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           style={styles.cta}
           accessibilityRole="button"
           accessibilityLabel={t('common.continue')}>
           <Text variant="mono-caps" style={styles.ctaText}>{t('common.continue')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+        </MotionPressable>
+        <MotionPressable
           onPress={handleContinue}
           hitSlop={10}
           accessibilityRole="button"
@@ -81,7 +82,7 @@ export default function OnboardingStep2() {
           <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
             {t('common.skip')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
     </SafeAreaView>

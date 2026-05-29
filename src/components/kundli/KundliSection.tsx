@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, TextInput, ScrollView, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, TextInput, ScrollView, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -16,6 +16,7 @@ import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useStore, type Sex } from '@/store/useStore';
 import { borderRadius, darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
 import { resolveLanguage } from '@/i18n';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   computeKundli,
   computeDivisional,
@@ -573,8 +574,8 @@ export function KundliSection() {
           1. Match the user with a partner (uses userBirth* + a saved chart).
           2. Match two other people (both selected from saved charts) —
              useful for parents matching their children's prospects, etc. */}
-      <TouchableOpacity
-        activeOpacity={0.88}
+      <MotionPressable
+        pressedScale={0.97}
         onPress={() => router.push('/kundli/match')}
         style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         accessibilityRole="button"
@@ -591,7 +592,7 @@ export function KundliSection() {
           </Text>
         </View>
         <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-      </TouchableOpacity>
+      </MotionPressable>
 
       <MatchOthersCard colors={colors} t={t} />
 
@@ -599,8 +600,8 @@ export function KundliSection() {
           Lives on its own screen (rather than the existing Kundli accordion
           stack) because every recompute is time-shifted by yearAge — the
           screen owns its own age picker + system toggle. */}
-      <TouchableOpacity
-        activeOpacity={0.88}
+      <MotionPressable
+        pressedScale={0.97}
         onPress={() => router.push('/kundli/varshaphala')}
         style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         accessibilityRole="button"
@@ -617,7 +618,7 @@ export function KundliSection() {
           </Text>
         </View>
         <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-      </TouchableOpacity>
+      </MotionPressable>
 
       {/* ── Prashna (horary) CTA ─────────────────────────────────────────
           Cast-on-demand chart for the moment a question is asked, anchored
@@ -625,8 +626,8 @@ export function KundliSection() {
           classical Prashna doctrine. Lives on its own route because the
           input flow (timestamp picker + cast button) is independent of the
           natal chart. */}
-      <TouchableOpacity
-        activeOpacity={0.88}
+      <MotionPressable
+        pressedScale={0.97}
         onPress={() => router.push('/kundli/prashna')}
         style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         accessibilityRole="button"
@@ -643,7 +644,7 @@ export function KundliSection() {
           </Text>
         </View>
         <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }
@@ -659,8 +660,7 @@ interface FormFieldRowProps {
 
 function FormFieldRow({ icon, label, value, valueIsSet, onPress, colors }: FormFieldRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       style={styles.formRow}
       accessibilityRole="button"
@@ -680,7 +680,7 @@ function FormFieldRow({ icon, label, value, valueIsSet, onPress, colors }: FormF
         </Text>
       </View>
       <Icon name="chevron-right" size={14} color={colors.textMuted} />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -810,8 +810,8 @@ interface MatchOthersCardProps {
 
 function MatchOthersCard({ colors, t }: MatchOthersCardProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.88}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={() => router.push('/kundli/match?mode=others')}
       style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
@@ -828,7 +828,7 @@ function MatchOthersCard({ colors, t }: MatchOthersCardProps) {
         </Text>
       </View>
       <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 

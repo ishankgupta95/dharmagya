@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import i18n, { resolveLanguage } from '@/i18n';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   getScriptureBySlug,
   SCRIPTURE_DISCLAIMER,
@@ -52,18 +53,30 @@ export default function ScriptureChapterScreen() {
     return scripture.chapters.find((c) => c.number === chapterNum);
   }, [scripture, chapterNum]);
 
+  // Adjacent-chapter navigation: only show in scriptures with >1 chapter
+  // (Sundarkand has one, Geeta has 18). The chapter list is in registry order,
+  // so find current index then peek ±1.
+  const { prevChapter, nextChapter } = useMemo(() => {
+    if (!scripture || !chapterData) return { prevChapter: null, nextChapter: null };
+    const idx = scripture.chapters.findIndex((c) => c.number === chapterData.number);
+    return {
+      prevChapter: idx > 0 ? scripture.chapters[idx - 1] : null,
+      nextChapter: idx >= 0 && idx < scripture.chapters.length - 1 ? scripture.chapters[idx + 1] : null,
+    };
+  }, [scripture, chapterData]);
+
   if (!scripture || !chapterData) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
         <View style={styles.emptyWrap}>
@@ -88,14 +101,14 @@ export default function ScriptureChapterScreen() {
 
         {/* ── Header ────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="body-italic" style={[styles.headerCrumb, { color: colors.textTertiary }]} numberOfLines={1}>
             {scriptureTitle}
           </Text>
@@ -136,6 +149,58 @@ export default function ScriptureChapterScreen() {
               t={tForLang}
             />
           ))}
+
+          {/* ── Chapter navigation ──────────────────────────────────────── */}
+          {(prevChapter || nextChapter) && (
+            <View style={styles.chapterNav}>
+              {prevChapter ? (
+                <MotionPressable
+                  pressedScale={0.97}
+                  onPress={() => router.replace({
+                    pathname: '/scripture/[id]/[chapter]',
+                    params: { id: scripture.slug, chapter: String(prevChapter.number) },
+                  })}
+                  style={[styles.chapterNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={tForLang('scripture.prevChapterA11y', { num: prevChapter.number })}>
+                  <Icon name="chevron-left" size={14} color={colors.accent} />
+                  <View style={styles.chapterNavTextWrap}>
+                    <Text variant="mono-caps" style={[styles.chapterNavKicker, { color: colors.textMuted }]}>
+                      {tForLang('scripture.prevChapter')}
+                    </Text>
+                    <Text variant="body-italic" style={[styles.chapterNavTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {tForLang('scripture.chapterKicker', { num: prevChapter.number })}
+                    </Text>
+                  </View>
+                </MotionPressable>
+              ) : (
+                <View style={styles.chapterNavSpacer} />
+              )}
+              {nextChapter ? (
+                <MotionPressable
+                  pressedScale={0.97}
+                  onPress={() => router.replace({
+                    pathname: '/scripture/[id]/[chapter]',
+                    params: { id: scripture.slug, chapter: String(nextChapter.number) },
+                  })}
+                  style={[styles.chapterNavBtn, styles.chapterNavBtnNext, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={tForLang('scripture.nextChapterA11y', { num: nextChapter.number })}>
+                  <View style={[styles.chapterNavTextWrap, { alignItems: 'flex-end' }]}>
+                    <Text variant="mono-caps" style={[styles.chapterNavKicker, { color: colors.textMuted }]}>
+                      {tForLang('scripture.nextChapter')}
+                    </Text>
+                    <Text variant="body-italic" style={[styles.chapterNavTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {tForLang('scripture.chapterKicker', { num: nextChapter.number })}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={14} color={colors.accent} />
+                </MotionPressable>
+              ) : (
+                <View style={styles.chapterNavSpacer} />
+              )}
+            </View>
+          )}
 
           {/* ── Sources / disclaimer ──────────────────────────────────── */}
           <View style={styles.sourcesBlock}>
@@ -244,6 +309,30 @@ const styles = StyleSheet.create({
   // Sources
   sourcesBlock: { marginTop: 12, gap: 8 },
   sourcesText: { fontSize: 12, lineHeight: 19 },
+
+  chapterNav: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  chapterNavBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  chapterNavBtnNext: {
+    justifyContent: 'flex-end',
+  },
+  chapterNavSpacer: { flex: 1 },
+  chapterNavTextWrap: { flex: 1 },
+  chapterNavKicker: { fontSize: 8.5, letterSpacing: 1.4 },
+  chapterNavTitle: { fontSize: 14, marginTop: 3 },
 
   // Empty / not-found
   emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },

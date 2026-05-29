@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
 import { type ColorPalette } from '@/config/theme';
 import type { IQualitySlot } from '@/types';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 const MUTED_GREEN = '#3F7A3F';
 
@@ -34,7 +35,7 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
         <Text variant="mono-caps" style={[styles.label, { color: colors.accent }]}>{label}</Text>
         <View style={styles.tabs}>
           {(['day', 'night'] as const).map((key, i) => (
-            <TouchableOpacity
+            <MotionPressable
               key={key}
               onPress={() => setTab(key)}
               hitSlop={6}
@@ -51,7 +52,7 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
                 {key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
               </Text>
               {tab === key && <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />}
-            </TouchableOpacity>
+            </MotionPressable>
           ))}
         </View>
       </View>

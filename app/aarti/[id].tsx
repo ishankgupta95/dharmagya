@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
@@ -85,7 +85,7 @@ export default function AartiDetailScreen() {
           <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
             {t('aarti.notFound')}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.notFoundBtn, { borderColor: colors.accent }]}
             accessibilityRole="button"
@@ -93,7 +93,7 @@ export default function AartiDetailScreen() {
             <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
               {t('common.back') ?? 'Back'}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
         {!aarti && deitySlug == null && <ActivityIndicator color={colors.accent} />}
       </SafeAreaView>
@@ -110,14 +110,14 @@ export default function AartiDetailScreen() {
 
       {/* ── Header: back + compact-on-scroll title + favorite ───────────────── */}
       <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
 
         <Animated.View style={[styles.compactTitle, compactTitleAnimatedStyle]} pointerEvents="none">
           <Text variant="body-italic" style={[styles.compactTitleText, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -126,14 +126,14 @@ export default function AartiDetailScreen() {
         </Animated.View>
 
         <View style={styles.navRightGroup}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => { void shareAartiText(aarti, lang); }}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('share.a11yShareFullText')}>
             <Icon name="share" size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <FavoriteHeart
             active={isFavorite}
             onPress={() => toggleFavorite(favoriteKey)}
@@ -237,13 +237,13 @@ function VerseBlock({
           {t('reader.verseLabel', { num: verseNumber })}
           {isFirstVerse && ` · ${t('reader.refrainTag')}`}
         </Kicker>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => openShare({ kind: 'verse', deityId, verseHi, verseEn, sourceLabel: t('share.from', { name: sourceName }) })}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('share.ctaVerse')}>
           <Icon name="share" size={14} color={colors.textMuted} />
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
       {lines.map((line, idx) => {
         const isRefrain = refrainLines.has(normalize(line));

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
   Modal,
   TextInput,
@@ -223,14 +223,14 @@ export default function KundliMatchScreen() {
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             hitSlop={12}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.title, { color: colors.textPrimary }]}>
             {isOthersMode ? t('match.titleOthers') : t('match.title')}
           </Text>
@@ -259,13 +259,13 @@ export default function KundliMatchScreen() {
                       {userBirthPlace ? ` · ${userBirthPlace.name}` : ''}
                     </Text>
                   </View>
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => router.push('/settings')}
                     hitSlop={10}
                     accessibilityRole="button"
                     accessibilityLabel={t('match.editYourDetails')}>
                     <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                  </TouchableOpacity>
+                  </MotionPressable>
                 </View>
               ) : (
                 <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -273,21 +273,21 @@ export default function KundliMatchScreen() {
                   <Text variant="body-italic" style={[styles.cardTitle, { color: colors.textSecondary, flex: 1 }]}>
                     {t('match.yourDetailsMissing')}
                   </Text>
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => router.push('/settings')}
                     hitSlop={10}
                     accessibilityRole="button"
                     accessibilityLabel={t('kundli.openSettings')}>
                     <Icon name="chevron-right" size={16} color={colors.accent} />
-                  </TouchableOpacity>
+                  </MotionPressable>
                 </View>
               )}
 
               {/* User's sex CTA — Ashtakoot's Varna scoring is asymmetric
                   (boy ≥ girl), so we need to know who is boy and who is girl. */}
               {yourMoon && !userSex && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
+                <MotionPressable
+                  pressedScale={0.97}
                   onPress={() => router.push('/settings')}
                   style={[styles.sexMissingCard, { backgroundColor: 'rgba(165,48,28,0.12)', borderColor: 'rgba(165,48,28,0.40)' }]}
                   accessibilityRole="button"
@@ -297,7 +297,7 @@ export default function KundliMatchScreen() {
                     {t('match.userSexMissing')}
                   </Text>
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                </TouchableOpacity>
+                </MotionPressable>
               )}
 
               {/* Partner — picker / list */}
@@ -325,8 +325,8 @@ export default function KundliMatchScreen() {
               )}
 
               {charts.length < MAX_SECONDARY_CHARTS && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
+                <MotionPressable
+                  pressedScale={0.97}
                   onPress={() => handleAddPartner('B')}
                   style={[styles.addBtn, { borderColor: colors.borderAccent }]}
                   accessibilityRole="button"
@@ -335,7 +335,7 @@ export default function KundliMatchScreen() {
                   <Text variant="mono-caps" style={[styles.addBtnText, { color: colors.accent }]}>
                     {t('match.addPartner')}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               )}
             </>
           ) : (
@@ -630,8 +630,8 @@ function PersonSlot({
       )}
 
       {charts.length < MAX_SECONDARY_CHARTS && (
-        <TouchableOpacity
-          activeOpacity={0.85}
+        <MotionPressable
+          pressedScale={0.97}
           onPress={onAdd}
           style={[styles.addBtn, { borderColor: colors.borderAccent }]}
           accessibilityRole="button"
@@ -640,7 +640,7 @@ function PersonSlot({
           <Text variant="mono-caps" style={[styles.addBtnText, { color: colors.accent }]}>
             {t('match.addPerson')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       )}
     </>
   );
@@ -658,8 +658,8 @@ interface PartnerRowProps {
 
 function PartnerRow({ entry, selected, onSelect, onEdit, onDelete, colors, t }: PartnerRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={onSelect}
       style={[
         styles.partnerRow,
@@ -691,13 +691,13 @@ function PartnerRow({ entry, selected, onSelect, onEdit, onDelete, colors, t }: 
           {entry.dateTimeIso.replace('T', ' · ')} · {entry.place.name}
         </Text>
       </View>
-      <TouchableOpacity onPress={onEdit} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.edit')}>
+      <MotionPressable onPress={onEdit} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.edit')}>
         <Icon name="text" size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onDelete} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.delete')}>
+      </MotionPressable>
+      <MotionPressable onPress={onDelete} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.delete')}>
         <Icon name="close" size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+      </MotionPressable>
+    </MotionPressable>
   );
 }
 
@@ -887,9 +887,9 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
             <Text variant="display-italic" style={[styles.modalTitle, { color: colors.textPrimary }]}>
               {existing ? t('match.editPartner') : t('match.addPartner')}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+            <MotionPressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Icon name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
 
           <ScrollView contentContainerStyle={styles.modalScroll}>
@@ -953,9 +953,9 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldBirthDate')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setDatePickerOpen(true)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.input, styles.inputPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('match.fieldBirthDate')}>
@@ -963,15 +963,15 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 {date ? ymd(date) : t('match.pickDate')}
               </Text>
               <Icon name="calendar" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </MotionPressable>
 
             {/* Time */}
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldBirthTime')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setTimePickerOpen(true)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.input, styles.inputPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('match.fieldBirthTime')}>
@@ -979,15 +979,15 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 {time}
               </Text>
               <Icon name="clock" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </MotionPressable>
 
             {/* Place */}
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldBirthPlace')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setCityPickerOpen(true)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.input, styles.inputPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('match.fieldBirthPlace')}>
@@ -995,18 +995,18 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 {place?.name ?? t('match.pickPlace')}
               </Text>
               <Icon name="map" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </MotionPressable>
 
-            <TouchableOpacity
+            <MotionPressable
               onPress={handleSave}
-              activeOpacity={0.88}
+              pressedScale={0.97}
               disabled={!canSave}
               style={[styles.saveBtn, { backgroundColor: canSave ? palette.sindoor : colors.border, opacity: canSave ? 1 : 0.6 }]}
               accessibilityRole="button">
               <Text variant="mono-caps" style={styles.saveBtnText}>
                 {existing ? t('common.save') : t('match.addPartner')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </ScrollView>
 
           <DatePickerModal
@@ -1072,9 +1072,9 @@ function CityPickerModal({ visible, onClose, onPick }: CityPickerModalProps) {
             <Text variant="display-italic" style={[styles.modalTitle, { color: colors.textPrimary }]}>
               {t('match.fieldBirthPlace')}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10}>
+            <MotionPressable onPress={onClose} hitSlop={10}>
               <Icon name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
           <View style={{ paddingHorizontal: 18 }}>
             <TextInput

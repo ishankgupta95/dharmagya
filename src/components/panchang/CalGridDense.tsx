@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { MONO_FONT, palette, type ColorPalette } from '@/config/theme';
@@ -8,6 +8,7 @@ import { localizeTithi } from '@/i18n/panchangNames';
 import type { CalendarDay } from '@/services/astrology/calendarService';
 
 import { eventDotColor } from './calendarColors';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 // Single-letter paksha tag rendered after the tithi name in each cell.
 // English uses 'S'/'K'; Hindi uses 'शु'/'कृ' (Devanagari short forms of
@@ -149,9 +150,8 @@ export const CalGridDense = memo(function CalGridDense({
                 : eventColor ?? colors.textTertiary;
 
               return (
-                <TouchableOpacity
+                <MotionPressable
                   key={`${weekdayIdx}-${weekIdx}`}
-                  activeOpacity={0.7}
                   onPress={() => onPickDay(cellDate)}
                   style={[
                     styles.cell,
@@ -180,7 +180,7 @@ export const CalGridDense = memo(function CalGridDense({
                       {eventLabel}
                     </Text>
                   ) : null}
-                </TouchableOpacity>
+                </MotionPressable>
               );
             })}
           </View>

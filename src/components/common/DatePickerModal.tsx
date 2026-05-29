@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  Modal,
   TouchableOpacity,
+  Modal,
   StyleSheet,
   FlatList,
 } from 'react-native';
@@ -250,7 +251,7 @@ export function DatePickerModal({
                   label is tappable and opens the year picker (year → month →
                   back to day grid). */}
               <View style={styles.monthRow}>
-                <TouchableOpacity
+                <MotionPressable
                   onPress={prevMonth}
                   hitSlop={12}
                   disabled={!canPrev}
@@ -258,11 +259,10 @@ export function DatePickerModal({
                   accessibilityLabel={t('a11y.previousMonth')}
                   accessibilityState={{ disabled: !canPrev }}>
                   <Icon name="chevron-left" size={20} color={canPrev ? colors.textSecondary : colors.textDisabled} />
-                </TouchableOpacity>
-                <TouchableOpacity
+                </MotionPressable>
+                <MotionPressable
                   onPress={openYearPage}
                   hitSlop={6}
-                  activeOpacity={0.7}
                   style={[
                     styles.monthLabelRow,
                     { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent },
@@ -274,8 +274,8 @@ export function DatePickerModal({
                   </Text>
                   <View style={[styles.monthLabelDivider, { backgroundColor: colors.border }]} />
                   <Icon name="caret-down" size={11} color={colors.accent} />
-                </TouchableOpacity>
-                <TouchableOpacity
+                </MotionPressable>
+                <MotionPressable
                   onPress={nextMonth}
                   hitSlop={12}
                   disabled={!canNext}
@@ -283,7 +283,7 @@ export function DatePickerModal({
                   accessibilityLabel={t('a11y.nextMonth')}
                   accessibilityState={{ disabled: !canNext }}>
                   <Icon name="chevron-right" size={20} color={canNext ? colors.textSecondary : colors.textDisabled} />
-                </TouchableOpacity>
+                </MotionPressable>
               </View>
 
               {/* Day headers */}
@@ -321,7 +321,7 @@ export function DatePickerModal({
                         : isOutOfRange ? colors.textDisabled
                         : isWeekend ? colors.textDisabled : colors.textSecondary;
                       return (
-                        <TouchableOpacity
+                        <MotionPressable
                           key={cell}
                           style={styles.cell}
                           disabled={isOutOfRange}
@@ -336,7 +336,7 @@ export function DatePickerModal({
                           ]}>
                             <Text style={[styles.dayNum, { color: textColor }]}>{cell}</Text>
                           </View>
-                        </TouchableOpacity>
+                        </MotionPressable>
                       );
                     })}
                     {row.length < 7 && Array.from({ length: 7 - row.length }, (_, i) => (
@@ -348,7 +348,7 @@ export function DatePickerModal({
 
               <View style={styles.bottomRow}>
                 {onClear && (
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => { onClear(); onClose(); }}
                     style={[styles.bottomBtn, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}
                     accessibilityRole="button"
@@ -356,9 +356,9 @@ export function DatePickerModal({
                     <Text variant="mono-caps" style={[styles.bottomBtnText, { color: colors.textSecondary }]}>
                       {t('common.clear', { defaultValue: 'Clear' })}
                     </Text>
-                  </TouchableOpacity>
+                  </MotionPressable>
                 )}
-                <TouchableOpacity
+                <MotionPressable
                   onPress={onClose}
                   style={[styles.bottomBtn, styles.bottomBtnPrimary, { backgroundColor: colors.accent }]}
                   accessibilityRole="button"
@@ -366,7 +366,7 @@ export function DatePickerModal({
                   <Text variant="mono-caps" style={[styles.bottomBtnText, { color: colors.base }]}>
                     {t('common.done')}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               </View>
             </>
           )}
@@ -375,13 +375,13 @@ export function DatePickerModal({
           {page === 'year' && (
             <>
               <View style={styles.pageHeader}>
-                <TouchableOpacity
+                <MotionPressable
                   onPress={goBack}
                   hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel={t('common.back')}>
                   <Icon name="chevron-left" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
+                </MotionPressable>
                 <Text variant="mono-caps" style={[styles.pageHeaderLabel, { color: colors.textMuted }]}>
                   {t('common.year', { defaultValue: 'Year' })}
                 </Text>
@@ -417,7 +417,7 @@ export function DatePickerModal({
                       }
                       const isSelected = y === jumperYear;
                       return (
-                        <TouchableOpacity
+                        <MotionPressable
                           key={y}
                           onPress={() => pickYear(y)}
                           style={[
@@ -435,7 +435,7 @@ export function DatePickerModal({
                             ]}>
                             {y}
                           </Text>
-                        </TouchableOpacity>
+                        </MotionPressable>
                       );
                     })}
                   </View>
@@ -448,13 +448,13 @@ export function DatePickerModal({
           {page === 'month' && (
             <>
               <View style={styles.pageHeader}>
-                <TouchableOpacity
+                <MotionPressable
                   onPress={goBack}
                   hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel={t('common.back')}>
                   <Icon name="chevron-left" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
+                </MotionPressable>
                 <Text style={[styles.monthLabel, { color: colors.textPrimary }]}>
                   {jumperYear}
                 </Text>
@@ -466,7 +466,7 @@ export function DatePickerModal({
                   const isCurrent = jumperYear === year && i === month;
                   const disabled = isMonthDisabled(jumperYear, i);
                   return (
-                    <TouchableOpacity
+                    <MotionPressable
                       key={i}
                       disabled={disabled}
                       style={[
@@ -485,7 +485,7 @@ export function DatePickerModal({
                         ]}>
                         {name}
                       </Text>
-                    </TouchableOpacity>
+                    </MotionPressable>
                   );
                 })}
               </View>

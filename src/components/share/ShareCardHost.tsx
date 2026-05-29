@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import { Ornament } from '@/components/common/Ornament';
 import { useStore } from '@/store/useStore';
 import { useShareSheet } from '@/store/useShareSheet';
@@ -159,27 +160,27 @@ export function ShareCardHost() {
               {(['story', 'square'] as const).map((s) => {
                 const active = shape === s;
                 return (
-                  <TouchableOpacity
+                  <MotionPressable
                     key={s}
                     onPress={() => onPickShape(s)}
-                    activeOpacity={0.85}
+                    pressedScale={0.97}
                     style={[styles.shapeChip, { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.surfaceRecessed : 'transparent' }]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}>
                     <Text variant="mono-caps" style={[styles.shapeChipText, { color: active ? colors.accent : colors.textSecondary }]}>
                       {t(s === 'story' ? 'share.shapeStory' : 'share.shapeSquare')}
                     </Text>
-                  </TouchableOpacity>
+                  </MotionPressable>
                 );
               })}
             </View>
 
             {/* Actions */}
             <View style={styles.actionRow}>
-              <TouchableOpacity
+              <MotionPressable
                 onPress={onShare}
                 disabled={!uri || working}
-                activeOpacity={0.85}
+                pressedScale={0.97}
                 style={[styles.actionBtn, styles.actionPrimary, { backgroundColor: colors.accent, opacity: !uri || working ? 0.5 : 1 }]}
                 accessibilityRole="button">
                 {working ? (
@@ -190,7 +191,7 @@ export function ShareCardHost() {
                     <Text variant="mono-caps" style={[styles.actionText, { color: palette.parchmentBright }]}>{t('share.shareBtn')}</Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
 
             <Text variant="body-italic" style={[styles.hint, { color: colors.textMuted }]}>

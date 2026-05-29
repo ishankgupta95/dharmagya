@@ -4,7 +4,6 @@ import {
   type AppStateStatus,
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
@@ -413,7 +412,7 @@ export default function HomeScreen() {
           <View style={styles.block}>
             <View style={styles.sectionHeader}>
               <SectionLabel settle>{t('home.yourDeities')}</SectionLabel>
-              <TouchableOpacity
+              <MotionPressable
                 onPress={() => router.push('/settings/deities')}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityRole="button"
@@ -421,16 +420,16 @@ export default function HomeScreen() {
                 <Text variant="body-italic" style={[styles.sectionAction, { color: colors.emphasis }]}>
                   {t('home.yourDeitiesManage')}  →
                 </Text>
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.deitiesScroll}>
               {selectedDeityMetas.map((deity) => (
-                <TouchableOpacity
+                <MotionPressable
                   key={deity.id}
-                  activeOpacity={0.85}
+                  pressedScale={0.97}
                   onPress={() => router.push(`/god/${deity.id}`)}
                   style={styles.deityChip}
                   accessibilityRole="button"
@@ -442,7 +441,7 @@ export default function HomeScreen() {
                     numberOfLines={1}>
                     {t(`deities.${deity.id}.displayName`)}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               ))}
             </ScrollView>
           </View>
@@ -500,8 +499,8 @@ export default function HomeScreen() {
 
         {/* ── Featured Chalisa ─────────────────────────────────────────── */}
         {featuredChalisa && (
-          <TouchableOpacity
-            activeOpacity={0.88}
+          <MotionPressable
+            pressedScale={0.97}
             onPress={() => router.push(`/chalisa/${featuredChalisa.deity}`)}
             style={[styles.featCard, styles.featCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
@@ -526,12 +525,12 @@ export default function HomeScreen() {
               </View>
               <Icon name="chevron-right" size={18} color={colors.textMuted} />
             </View>
-          </TouchableOpacity>
+          </MotionPressable>
         )}
 
         {/* ── Dasha Callout ─────────────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.88}
+        <MotionPressable
+          pressedScale={0.97}
           onPress={() => router.push('/(tabs)/astrology')}
           style={styles.calloutWrap}
           accessibilityRole="button"
@@ -560,12 +559,12 @@ export default function HomeScreen() {
             </View>
             <Icon name="chevron-right" size={18} color={colors.textTertiary} />
           </LinearGradient>
-        </TouchableOpacity>
+        </MotionPressable>
 
         {/* ── Sade Sati banner (only when active) ──────────────────────── */}
         {sadeSatiPhase !== null && (
-          <TouchableOpacity
-            activeOpacity={0.88}
+          <MotionPressable
+            pressedScale={0.97}
             onPress={() => router.push('/(tabs)/astrology')}
             style={[styles.sadeSatiBanner, { backgroundColor: 'rgba(165,48,28,0.12)', borderColor: 'rgba(165,48,28,0.40)' }]}
             accessibilityRole="button"
@@ -575,7 +574,7 @@ export default function HomeScreen() {
               {t('home.sadeSatiBanner', { phase: sadeSatiPhase })}
             </Text>
             <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-          </TouchableOpacity>
+          </MotionPressable>
         )}
 
         {/* ── Quick Row ─────────────────────────────────────────────────── */}
@@ -697,9 +696,9 @@ interface QuickCardProps {
 
 const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: QuickCardProps) {
   return (
-    <TouchableOpacity
+    <MotionPressable
       onPress={onPress}
-      activeOpacity={0.85}
+      pressedScale={0.97}
       style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
       accessibilityLabel={label}>
@@ -711,7 +710,7 @@ const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: Quic
         style={[styles.quickLabel, { color: colors.textSecondary }]}>
         {label}
       </Text>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 

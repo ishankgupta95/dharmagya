@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text as RNText, ScrollView, TouchableOpacity, Switch, Modal, StyleSheet, Alert, Linking, TextInput } from 'react-native';
+import { View, Text as RNText, ScrollView, Switch, Modal, StyleSheet, Alert, Linking, TextInput } from 'react-native';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import Constants from 'expo-constants';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -435,8 +436,7 @@ export default function SettingsScreen() {
         {/* ── Home Screen Widget ──────────────────────────────────────── */}
         <SectionHeader label={t('settings.widgetSection')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             onPress={() => router.push('/settings/widget')}
             accessibilityRole="button"
             accessibilityLabel={t('settings.widgetCustomize')}>
@@ -447,14 +447,14 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         {/* ── Location ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.location')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <TouchableOpacity
-            activeOpacity={0.85}
+          <MotionPressable
+            pressedScale={0.97}
             onPress={() => router.push('/location-permission')}
             accessibilityRole="button"
             accessibilityLabel={t('settings.myLocation')}>
@@ -470,7 +470,7 @@ export default function SettingsScreen() {
                 </View>
               }
             />
-          </TouchableOpacity>
+          </MotionPressable>
           <Divider colors={colors} />
           <RegionRow region={region} onChange={setRegion} colors={colors} />
         </View>
@@ -478,8 +478,7 @@ export default function SettingsScreen() {
         {/* ── Deities ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.deities')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             onPress={() => router.push('/settings/deities')}
             accessibilityRole="button"
             accessibilityLabel={t('settings.manageDeities')}>
@@ -494,10 +493,9 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
           <Divider colors={colors} />
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             onPress={() => router.push('/jaap')}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.openJaap')}>
@@ -508,7 +506,7 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         {/* ── Horoscope ─────────────────────────────────────────────── */}
@@ -534,8 +532,7 @@ export default function SettingsScreen() {
 
           <Divider colors={colors} />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             onPress={() => setDobPickerOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={t('settings.birthDate')}>
@@ -546,7 +543,7 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
@@ -657,8 +654,7 @@ export default function SettingsScreen() {
 
           <Divider colors={colors} />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             onPress={() => router.push('/settings/reminders')}
             accessibilityRole="button"
             accessibilityLabel={t('settings.festivalTithiReminders')}>
@@ -669,7 +665,7 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
@@ -722,8 +718,7 @@ export default function SettingsScreen() {
         <SectionHeader label={t('settings.about')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.replayWalkthrough')}
             onPress={() => {
@@ -737,12 +732,11 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.rateApp')}
             onPress={() => { void requestRating(); }}>
@@ -753,12 +747,11 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.shareApp')}
             onPress={() => { void shareApp(t('settings.shareAppMessage')); }}>
@@ -769,12 +762,11 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.sendFeedback')}
             onPress={() => Linking.openURL('mailto:ishank1995dev@gmail.com?subject=Dharmagya%20Feedback')}>
@@ -785,12 +777,11 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.privacyPolicy')}
             onPress={() => Linking.openURL('https://dharmagya.app/privacy')}>
@@ -801,7 +792,7 @@ export default function SettingsScreen() {
               colors={colors}
               right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
-          </TouchableOpacity>
+          </MotionPressable>
 
           <Divider colors={colors} />
 
@@ -1048,7 +1039,7 @@ function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) 
             style={[styles.nameInput, { color: colors.textPrimary, backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}
             accessibilityLabel={t('settings.name')}
           />
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => onSave(draft)}
             style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
             accessibilityRole="button"
@@ -1056,8 +1047,8 @@ function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) 
             <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
               {t('common.save')}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </MotionPressable>
+          <MotionPressable
             onPress={onClose}
             style={styles.nameCancel}
             accessibilityRole="button"
@@ -1065,7 +1056,7 @@ function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) 
             <Text variant="mono-caps" style={[styles.nameCancelText, { color: colors.textMuted }]}>
               {t('common.close')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </View>
     </Modal>
@@ -1105,10 +1096,9 @@ function OptionSheet<T extends string>({
             {options.map((opt, i) => {
               const active = opt.key === value;
               return (
-                <TouchableOpacity
+                <MotionPressable
                   key={opt.key}
-                  activeOpacity={0.7}
-                  onPress={() => onChange(opt.key)}
+                        onPress={() => onChange(opt.key)}
                   style={[
                     styles.sheetItem,
                     i < options.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
@@ -1128,11 +1118,11 @@ function OptionSheet<T extends string>({
                     )}
                   </View>
                   {active && <Icon name="check" size={18} color={colors.accent} />}
-                </TouchableOpacity>
+                </MotionPressable>
               );
             })}
           </View>
-          <TouchableOpacity
+          <MotionPressable
             onPress={onClose}
             style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
             accessibilityRole="button"
@@ -1140,7 +1130,7 @@ function OptionSheet<T extends string>({
             <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
               {t('common.done')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </View>
     </Modal>
@@ -1160,8 +1150,7 @@ interface PickerRowProps {
 
 function PickerRow({ icon, label, value, onPress, colors, a11yLabel }: PickerRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel ?? label}>
@@ -1181,7 +1170,7 @@ function PickerRow({ icon, label, value, onPress, colors, a11yLabel }: PickerRow
           </View>
         }
       />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -1225,7 +1214,7 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
             {FONT_SIZE_STEPS.map((step, i) => {
               const active = step.key === value;
               return (
-                <TouchableOpacity
+                <MotionPressable
                   key={step.key}
                   onPress={() => onChange(step.key)}
                   style={[
@@ -1246,7 +1235,7 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
                   }]}>
                     A
                   </RNText>
-                </TouchableOpacity>
+                </MotionPressable>
               );
             })}
           </View>
@@ -1256,7 +1245,7 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
             {activeStep ? t(activeStep.tKey) : ''}
           </Text>
 
-          <TouchableOpacity
+          <MotionPressable
             onPress={onClose}
             style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 18 }]}
             accessibilityRole="button"
@@ -1264,7 +1253,7 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
             <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
               {t('common.done')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </View>
     </Modal>
@@ -1301,10 +1290,9 @@ function RegionRow({
   function renderRegionItem(r: Region) {
     const active = r === region;
     return (
-      <TouchableOpacity
+      <MotionPressable
         key={r}
-        activeOpacity={0.7}
-        onPress={() => { onChange(r); setOpen(false); }}
+          onPress={() => { onChange(r); setOpen(false); }}
         style={[
           styles.regionItem,
           { borderBottomColor: colors.divider },
@@ -1317,15 +1305,14 @@ function RegionRow({
           {tr(r)}
         </Text>
         {active && <Icon name="check" size={18} color={colors.accent} />}
-      </TouchableOpacity>
+      </MotionPressable>
     );
   }
 
   return (
     <>
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setOpen(true)}
+      <MotionPressable
+          onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={t('settings.region')}>
         <SettingRow
@@ -1339,7 +1326,7 @@ function RegionRow({
             </View>
           }
         />
-      </TouchableOpacity>
+      </MotionPressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={styles.regionOverlay}>
@@ -1363,7 +1350,7 @@ function RegionRow({
                 </View>
               ))}
             </ScrollView>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setOpen(false)}
               style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 12 }]}
               accessibilityRole="button"
@@ -1371,7 +1358,7 @@ function RegionRow({
               <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
                 {t('common.done')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         </View>
       </Modal>

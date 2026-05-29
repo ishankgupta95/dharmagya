@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { TouchableOpacity, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +7,7 @@ import { AppText as Text } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { borderRadius, type ColorPalette } from '@/config/theme';
 import type { DayKey } from '@/config/vaarDevata';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 interface RemedyNudgeProps {
   /** Banner copy — already localised by the caller. */
@@ -38,8 +39,8 @@ export const RemedyNudge = memo(function RemedyNudge({
   const { t } = useTranslation();
   const tint = accent ?? colors.accent;
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={() => router.push(`/vaar/${dayKey}`)}
       style={[styles.banner, { backgroundColor: tint + '1E', borderColor: tint + '66' }, style]}
       accessibilityRole="button"
@@ -49,7 +50,7 @@ export const RemedyNudge = memo(function RemedyNudge({
         {text}
       </Text>
       <Icon name="chevron-right" size={14} color={tint} />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 

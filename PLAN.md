@@ -8,7 +8,7 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 
 ## 2. Current State & Tech Stack
 
-- Current State: You are working inside an ALREADY INITIALIZED Expo project (SDK 54, RN 0.81.5). Do NOT run `npx create-expo-app` or wipe the root directory.
+- Current State: You are working inside an ALREADY INITIALIZED Expo project (SDK 56, RN 0.85.3, React 19.2.3, TypeScript 6.0 — upgraded 2026-05-22, see `memory/project_sdk_56_upgrade_landed.md`). Do NOT run `npx create-expo-app` or wipe the root directory.
 - Framework: Expo (with New Architecture and React Compiler enabled).
 - Navigation: `expo-router` (File-based routing). Use expo-router `<Tabs>` for all tab navigation — do NOT use react-native-paper's BottomNavigation.
 - State Management: Zustand (for preferences, favorites, and theme toggling).
@@ -16,7 +16,7 @@ You are an expert React Native developer building a daily Hindu devotional app. 
 - Location Services: `expo-location` (To feed coordinates into the Panchang engine).
 - Local Database: `expo-sqlite` — currently used for the muhurat scan cache (`muhurat_cache` table) and (future) the Jaap session table. Aartis/chalisas come from the `hindu-devotional-texts` package at runtime. Favorites + preferences live in Zustand (persisted via `expo-sqlite/kv-store`).
 - UI Library: `react-native-paper` (Material Design 3 — for UI components like Cards, Buttons, Surfaces only).
-- Animations: `react-native-reanimated` v4.1.1 + `react-native-gesture-handler` v2.28 (already installed; do NOT reinstall).
+- Animations: `react-native-reanimated` v4.3.1 + `react-native-worklets` v0.8.3 + `react-native-gesture-handler` v2.31 (already installed; do NOT reinstall).
 - Typography (post-P6.9.1): `@expo-google-fonts/fraunces` (display serif), `@expo-google-fonts/noto-serif-devanagari` (Devanāgarī body). **Mukta and JetBrainsMono are removed**; do not reinstall.
 - Icons (post-P6.9.2): custom `<Icon>` component in `src/components/common/Icon.tsx` (react-native-svg). `@expo/vector-icons` is no longer a direct dep.
 - Backend: **none** — the app is fully offline; all user data is local (SQLite + Zustand-on-kv-store). Phase 15 (§9) would add the first backend.
@@ -121,15 +121,17 @@ Source of truth: [`src/config/theme.ts`](src/config/theme.ts) + [`src/config/typ
 | 17 | Onboarding             | `app/onboarding/*` (3 steps + walkthrough) |
 | 18 | Location Permission    | `app/location-permission.tsx`  |
 
-**Removed:** `app/katha/`, `app/rashifal/`, standalone `app/dasha.tsx` (now folded into Astrology tab).
+**Removed:** `app/rashifal/`, standalone `app/dasha.tsx` (folded into Astrology tab). (`app/katha/` was originally removed; **restored 2026-05-19** when the vrat-katha feature was surfaced from `hindu-devotional-texts` 0.3.0 — see `memory/project_katha_feature_landed.md`.)
 
-**Added (Phase 14):** `app/vaar/[day].tsx` — Vaar Devata detail screen (P14.1, shipped). `src/components/share/*` + `src/store/useShareSheet.ts` — shareable-card host (P14.5, shipped; off-screen renderer, no route). `app/navratri/{index,vrat}.tsx` + `app/scripture/[id].tsx` — Navratri 9-day guide + vrat-rules screen + Saptashati outline (P14.3, shipped). **`app/puja/{index,[slug]}.tsx`** — Puja Vidhi listing + detail (P14.2, shipped).
+**Added (Phase 14):** `app/vaar/[day].tsx` — Vaar Devata detail screen (P14.1, shipped). `src/components/share/*` + `src/store/useShareSheet.ts` — shareable-card host (P14.5, shipped; off-screen renderer, no route). `app/navratri/{index,vrat,kanya-pujan}.tsx` + `app/scripture/[id].tsx` — Navratri 9-day guide + vrat-rules + Kanya Pujan + Saptashati outline (P14.3, shipped). **`app/puja/{index,[slug]}.tsx`** — Puja Vidhi listing + detail (P14.2, shipped). **`app/(tabs)/practice.tsx`** + **`app/(tabs)/settings.tsx`** — dedicated 5th Practice tab + Settings as a top-level tab (P14.3 / bottom-nav restructure).
+
+**Added (post-Phase 14, 2026-05-19):** `app/katha/{index,[slug]}.tsx` — Vrat Katha reader (Satyanarayan + 5 vrat kathas from `hindu-devotional-texts` 0.3.0). Bhagavad Gita + Sundarkand readers added 2026-05-22 via `hindu-devotional-texts` 0.4.0.
 
 ---
 
 ## 6. Shipped phases — summary
 
-All phase decisions and per-sub-phase notes live in `memory/project_*.md`. **Everything below is in production as of 2026-05-12** (`app.json` shipped, SQLite at `user_version` 5).
+All phase decisions and per-sub-phase notes live in `memory/project_*.md`. **Everything below is in production as of 2026-05-28** (`app.json` at version 1.9.1 / versionCode 13, SQLite at `user_version` 6, Expo SDK 56, RN 0.85.3).
 
 - **Phase 1 — MVP** ✅. All 17 steps shipped (initial release).
 - **Phase 1.5 — Follow-ups** ✅ except: Read-Along Mode (deferred — tied to P5.1 audio), Expo Go reminder verification (needs dev build, not Expo Go).
@@ -147,11 +149,30 @@ All phase decisions and per-sub-phase notes live in `memory/project_*.md`. **Eve
 - **Phase 11 — Lean Pass (cleanup + low-end perf)** ✅ (2026-05-08 → 2026-05-10). Panchang cold-start fixed (resolved organically by the cuts below — user-verified on device). Compute-behind-animation rule adopted (§4): `STAGGER_CAP_MS` 400→120, `ScreenMount` rebuilt on native-side `FadeIn` layout animation. State-surface trim: `useShallow` collapsing 16 selectors in `KundliSection`, `React.memo` on Dasha rows, dead `usePanchang.ts` deleted. Dependency/asset trim: JetBrainsMono dropped, logo PNGs → webp, 46 i18n keys + 5 Icon glyphs + 4 deps removed. Custom screen transitions (P11.6, lifts P7.4): panchang date crossfade + horizontal swipe gesture, modal-up settings sub-screens, fade for search, god hero photo fade. P11.5 perf gate closed informally (no `perf-baseline.md` artifact; thresholds ≤350ms first paint / ≥58 FPS / ≤5MB delta become the diagnostic target if a regression surfaces). Notes: `memory/project_p11_{2,3,4,6}_landed.md`, `project_phase11_closed.md`.
 - **Phase 12 — panchang-ts 4.0.0 surface** ✅ (2026-05-10). 14 new compute APIs surfaced. In Kundli view: Yogas accordion (named classical yogas + reasons), Jaimini Karakas card, Ashtakavarga heat-grid (Sarva/Bhinna toggle), Bhava Bala 12-bar chart, Advanced Points accordion (Arudhas + Argala + Upagrahas + special lagnas, lazy-computed on open), KP cuspal sub-lords + significators card, Narayan dasha (5th system chip). In match: Pathu Porutham 36-point / 10-fold toggle alongside Ashtakoot. New routes: `/kundli/varshaphala` (Varshaphala annual chart + Tithi Pravesha, system + 1-indexed age toggle, 27-Saham accordion, N/S chart toggle via `cellsFromLagnaPlanets`) and `/kundli/prashna` (query date/time/location form, casts a Prashna chart). Cached entries (LRU) for all time-shifted recomputes; pure-D1 helpers ride along `KundliBundle`. Notes: `memory/project_p12_{1,2,3,4,5}_landed.md`.
 - **Phase 13 — panchang-ts 4.1.0 / 4.1.1 surface** ✅ (2026-05-11). Four opt-ins surfaced: `yoga.bhanga` cancellation tags (strikethrough + "Cancelled by" sub-block); Ashtakoot Bhakoot enrichment via enriched `NatalMoon` (`lagnaRashi` + `navamsaRashi` → 3 extra cancellations), `BirthChartEntry.derived.navamsaRashi` added with forced recompute on old cache rows; 8-Jaimini Karaka variant toggle (default stays 7-Parashara); Sripati cusps + Trikonargala in Advanced Points. Mangal Dosha severity (`none`/`anshik`/`purna`) + cancellation prominence replaces the old binary "afflicted" UI. Muhurat score pills (0..100, banded goldLeaf/gold/amber/sindoor) + "Why this day" reasons on every DayRow + expanded detail; `muhurat_cache` wiped, `user_version` 4→5. Shadbala value-range change (sthana 0–420 V, total +30..+150 V) is invisible to the per-chart-normalised `ShadbalaChart`. Patch-bumped 4.1.0 → 4.1.1 (type-check clean, no surface change). Notes: `memory/project_p13_landed.md`, `project_panchang_ts_4_1_1_landed.md`.
-- **Bundled production release — Phases 10–13 + Jaap polish** ✅ (2026-05-12). Everything in the codebase through panchang-ts 4.1.1 shipped to production. The next ship boundary is clean. Note: `memory/project_phase10_13_in_production.md`.
+- **Bundled production release — Phases 10–13 + Jaap polish** ✅ (2026-05-12). Everything in the codebase through panchang-ts 4.1.1 shipped to production. Note: `memory/project_phase10_13_in_production.md`.
+- **Phase 14 — Devotional Practice & Engagement (P14.1–P14.6)** ✅. All six sub-phases shipped to production in the post-2026-05-12 bundle. P14.1 Vaar Devata + P14.2 Puja Vidhi + P14.3 Navratri guide (with the 5th "Practice" bottom tab + Settings tab) + P14.4 Sadhana streaks + milestone celebrations (SQLite `user_version` 5→6) + P14.5 shareable cards + P14.6 audit-driven content fixes (4 critical + 8 significant + 6 minor — see `memory/project_p14_6_landed.md`). Mantras still carry `reviewPending: true` pending the Sanskrit-reviewer pass (see §7 below).
+- **Katha feature** ✅ (2026-05-19). `/katha/index` + `/katha/[slug]` reader surfaces Satyanarayan + 5 vrat kathas (`karva-chauth`, `vaibhav-lakshmi`, `santoshi-mata`, `solah-somvar`, `ahoi-ashtami`) from `hindu-devotional-texts` 0.3.0; Kanya Pujan re-export + `/navratri/kanya-pujan` screen linked from Navratri Day 8/9. Library content gaps (empty `about` strings, English-only katha prose) flagged upstream. Note: `memory/project_katha_feature_landed.md`.
+- **Scripture readers** ✅ (2026-05-22). Bhagavad Gita + Sundarkand readers added via `hindu-devotional-texts` 0.4.0 → 0.4.1.
+- **SDK 56 upgrade** ✅ (2026-05-22). Expo 54→56 (two-major hop), RN 0.81.5→0.85.3, React 19.1→19.2.3, TypeScript 5.9→6.0.3. Reanimated 4.3.1 + worklets 0.8.3. Dropped `newArchEnabled` + `android.edgeToEdgeEnabled` (now mandatory). Codemod gotcha documented (`expo-codemod` sends `BottomTabBar` imports to the wrong path — see `memory/project_sdk_56_upgrade_landed.md`). 39 lint errors are pre-existing React-19-stricter-rules surfaces, deferred.
+- **Phase 14 + Katha + scripture readers + SDK 56 bundled release** ✅ (shipped via `phase_14` → `master` merge, commits through `5a9e8db`). App.json bumped to 1.9.1 / versionCode 13. Next ship boundary is clean.
 
 ---
 
-## 7. Pending — Sentry post-launch ⏳
+## 7. Pending — Sanskrit-reviewer pass on mantra strings ⏳ — only Phase 14 debt remaining
+
+A qualified-Sanskrit-reviewer pass on every mantra string Phase 14 surfaces. Single engagement, three configs:
+
+- `src/config/vaarDevata.ts` — the 7 weekday mantras (4 of 7 already match the `hindu-devotional-texts` package verbatim; flag stays set across the board for consistency until one pass clears them all).
+- `src/config/pujas.ts` — every puja's Dhyana mantra, closing kshama-prarthana, Ghatasthapana sub-step mantras, the Rudrabhishek Mahamrityunjaya, plus the two new P14.6-flagged additions (Ganesh Prāṇa-pratiṣṭhā household form + Navagraha-Stotra Sūrya opening).
+- `src/config/navratri.ts` — the 9 Navadurga bīja-mantras + the 9 dhyāna shlokas.
+
+Until the pass lands, all mantras carry `reviewPending: true` and surface a "transliteration under scholarly review — treat as provisional" caption everywhere they render. Do not flip the flag in any config without confirmation that the relevant scholar has signed off.
+
+**Separately deferred** (not part of this debt): the full verse-by-verse Sanskrit text of the Durga Saptashati — its own ~700-verse content-review project, tracked under P14.3.
+
+---
+
+## 7a. Pending — Sentry post-launch ⏳
 
 Add `@sentry/react-native` + `sentry-expo` config plugin (decision 2026-05-02). Free Developer plan (5K errors/mo, 50 replays, 30-day retention) is sufficient at current scale; revisit only if usage actually overflows.
 
@@ -161,7 +182,7 @@ Half-day of work. **Gated on the staged rollout reaching 100%** — Play Vitals 
 
 ---
 
-## 8. Pending — Phase 14 — Devotional Practice & Engagement ⏳ — next active feature work
+## 8. Shipped — Phase 14 — Devotional Practice & Engagement ✅ — retained for reference
 
 **Why (2026-05-12, researched against Sri Mandir / Drik Panchang / AstroSage·AstroTalk + content & technical sources):** Five user-requested features that deepen daily engagement and close competitive gaps — three new devotional-content surfaces (weekday deity worship, puja procedures, a Navratri guide) and two retention/virality mechanics (practice streaks, shareable cards). All are app-internal — no backend, no native modules beyond `react-native-view-shot` / `expo-sharing` / `expo-media-library` for P14.5. Sri Mandir is the only competitor with developed gamification + share-everywhere in this space; nobody offers an interactive guided puja or a panchang-computed Navratri guide — those are genuine gaps. Suggested order within the phase: P14.1 → P14.5 → P14.4 → P14.3 (before its seasonal deadline) → P14.2 (highest effort/risk).
 
@@ -235,7 +256,7 @@ Render styled cards off-screen → hand them to the system share sheet: deity bl
 
 **v1 card types:** (1) **festival greeting** — one template per major festival (deity image + festival name in Devanagari + English + app watermark; "Share greeting" on the Festivals screen; ties to P14.3 for Navratri); (2) **deity blessing** — 1:1, deity image + name + one signature mantra/verse; "Share" on the deity detail screen; (3) **verse/mantra card** — from the aarti/chalisa reader, "Share this verse" on any verse with "From <text name>" attribution; from the Jaap counter, a post-session "I completed 108 repetitions of <mantra> today" card. Reuse the app's fonts (NotoSerifDevanagari / Fraunces). **Content/rights:** deity images are existing licensed assets; watermark cards with the app name (small, lower corner) — identifies the source, makes no authenticity claim. Chalisa/aarti/mantra text is classical/public-domain; share one or two lines (not a whole chalisa) with a source label. **Not in v1:** name-personalized greetings (needs a name-input form), video status cards (Skia/ffmpeg — much bigger), WhatsApp-direct sharing.
 
-### P14.6 — Audit-driven content + accuracy fixes ⏳ — bundled-release blocker
+### P14.6 — Audit-driven content + accuracy fixes ✅ (2026-05-16, shipped to production in the Phase-14 bundle)
 
 **Why (2026-05-14, audit on `phase_14`):** A full audit of the bundled-pending Phase 14 surfaced **four critical content errors**, **eight significant concerns**, and **one implementation gap** that go beyond the existing mantra-reviewer debt. Unlike the mantras (which carry `reviewPending: true` and surface a "provisional" caption everywhere they render), these items are **not flagged in the UI**, so a user reading them takes them as authoritative — every wrong fact is a trust hit. P14.6 is the cleanup pass that closes the audit before the bundle ships. Independent of, and in parallel with, the still-pending Sanskrit-reviewer mantra pass (the existing combined open item).
 
@@ -288,20 +309,12 @@ Render styled cards off-screen → hand them to the system share sheet: deity bl
 - P14.3: ✅ Sharad-Navratri 9-day guide — Day-1 read from `festivals.json` (`Sharad Navaratri` entry); Days 2–9 = Day 1 + N days; Day 10 from the `Dussehra` entry. **Chaitra Day 1 derived from `Rama Navami` − 8 days.** No `convertHinduToGregorian` at app-time — the dates are already baked into the pre-generated `festivals.json` from the build script, and we re-used that. Ghatasthapana muhurat (first-third-of-day-while-Pratipada window + Abhijit fallback + Chitra/Vaidhriti caption flags) is the only panchang-ts call left in the screen, `getDailyPanchang` on Day 1 only, memoised per-render. Per-day form/iconography/mantra (`reviewPending: true`)/dhyana/bhog/chakra in `src/config/navratri.ts`. **Panchang-computed colors via the Drik 9-day weekday cycle** (primary + secondary on weekday recurrence, never hardcoded per goddess) in `src/services/astrology/navratri.ts`. Daily notifications (Days 1–9 + Day 10 Vijayadashami) gated by `prefs.festival.major`. Vrat-guide screen with 4 tiers + allowed/forbidden food lists. Durga Saptashati outline + 9-day chapter map at `/scripture/durga-saptashati` (chapter titles + theme paragraphs `reviewPending`; full verses deferred to a separate content-review pass). Four Navratris handled — Sharad/Chaitra share the full guide, Magha + Ashadha Gupt surface a "Ten Mahavidyas, kept private" info card. **Surface:** dedicated 5th bottom tab **Practice** (`app/(tabs)/practice.tsx`) — replaces the earlier "Navratri header card on Festivals" decision (reverted; was a 2–3 s open-time regression on the calendar tab). Practice tab lists Navratri / Vrats / Saptashati / Vaar Devata / (Puja Vidhi coming soon) with subtitle text only — no panchang compute on tab mount. **Remaining:** a qualified-reviewer pass on the 9 bīja mantras + the dhyāna shlokas (until then they ship `reviewPending: true` with a "provisional" caption — same pattern as P14.1); the full verse-by-verse Saptashati Sanskrit text (its own ~700-verse content-review project).
 - P14.4: ✅ Sadhana streak (`useStore.sadhana` slice with 26-hr grace + clock-rollback freeze in [`src/services/sadhana.ts`](src/services/sadhana.ts)) + cumulative counter derived from `getJaapStats` + sacred-number milestones (sessions 7/21/30/108/365; reps 108/1008/10800/108000; streak 7/21/30/108/365). Celebration overlay ([`src/components/common/MilestoneCelebrationHost.tsx`](src/components/common/MilestoneCelebrationHost.tsx)) mounted in `app/_layout.tsx`; Share button opens the new 5th `ShareCardSpec` kind `milestone`. Zero leaderboards/comparisons; opt-in evening reminder ([`src/services/sadhanaReminders.ts`](src/services/sadhanaReminders.ts), default off, 20:30, 14-day rolling horizon, skips today if already practised). SQLite `user_version` 5→6 for `milestones_achieved(kind, threshold, achieved_at)` with `UNIQUE(kind, threshold)` so re-crossings are idempotent. Zustand persist v14→v15. Streak badge on Home (under QuickRow) + Jaap picker stats card. **Aarti reader is NOT a streak signal in v1** — jaap-only, per PLAN; deferred until a clear "completed" event is added to the reader.
 - P14.5: ✅ festival + deity + verse + jaap-completion cards via `captureRef` → `expo-sharing` (+ `expo-media-library` save-to-gallery), 1080-px renders (Story 9:16 / Square 1:1 toggle), app-watermarked, source-labelled text. Off-screen `<ShareCardHost>` in `app/_layout.tsx`; entry points on Festivals (major rows), deity detail hero, aarti verses, chalisa dohas, and the Jaap counter. **Plus** a separate "Share full text" affordance in the aarti + chalisa headers using RN `Share.share({ message })` — paste-into-WhatsApp ready, source + "shared via dharmagya" tail (image cards stay scoped to one-or-two lines per the source-text rule). **Not in v1 (unchanged):** name-personalized greetings, video status cards, WhatsApp-direct sharing.
-- **P14.6:** ⏳ All 4 critical items resolved (Hanuman Chalisa meter, besan re-categorisation, turmeric/hing softening, Navratri 11th notification decision). All 8 significant items either resolved or explicitly deferred with a JSDoc note explaining why. Minor items folded in opportunistically. New memory entry `project_p14_6_landed.md` capturing what shipped and what was deferred. Phase 14 closure note updated to reflect P14.6 status.
+- **P14.6:** ✅ All 4 critical items resolved (Hanuman Chalisa meter, besan re-categorisation, turmeric/hing softening, Navratri 11th notification — Day-1 Ghatasthapana muhurat T-30min reminder). All 8 significant items resolved (chakra ascent monotonised, Ardhanarishvara claim reframed, Brahmavaivarta attribution, Navagraha botanicals re-labelled, vandana-vs-avahana distinction, mantra-lineage disclosure, puja-kicker JSDoc, weekday-mantra `variantNote`). All 6 minor items resolved (Aditya Hridaya note, Prāṇa-pratiṣṭhā placeholder + Navagraha-Stotra opening both with `reviewPending: true`, Skandamata iconography, Tripurasundari spelling, Saptashati caption surfaced). Memory: `project_p14_6_landed.md`.
 - `tsc --noEmit` clean; `npx expo lint` ≤ 8 warnings throughout. New content carries source attribution; the no-new-deities roster constraint holds.
 
-### Phase 14 — closure note (2026-05-14, updated for P14.6)
+### Phase 14 — closure note (updated 2026-05-28)
 
-Phase 14 is **feature-complete on the branch but not bundle-ready** — five sub-phases (P14.1–P14.5) shipped to the working tree on branch `phase_14`, plus a sixth (P14.6, audit-driven content fixes) is now scoped and pending. The next ship is a single bundled release that includes P14.1 + P14.2 + P14.3 + P14.4 + P14.5 + P14.6 together (per `feedback_release_cadence`).
-
-**Two open items now block the bundle:**
-
-1. **P14.6 — Audit-driven content fixes.** Surface-level inaccuracies found in the bundled-pending audit (Hanuman Chalisa meter error, besan miscategorisation, over-strict turmeric/hing rule, missing 11th Navratri notification, chakra-ascent discontinuity, fringe Ardhanarishvara claim, mislabeled Navagraha vandana, +12 more). **Not** the mantra-reviewer pass — these are non-mantra content errors that surface to the user without the "provisional" caption and so need a hard fix, not a flag. Scope + punch list in P14.6 above. ~1–2 hours.
-
-2. **Sanskrit-reviewer pass on every mantra string.** P14.1 (the seven weekday mantras in `src/config/vaarDevata.ts`) + P14.2 (the puja-step mantras + closing kshama-prarthana + all preset-linked mantras in `src/config/pujas.ts`) + P14.3 (the nine Navadurga bīja-mantras + dhyāna shlokas in `src/config/navratri.ts`). All three carry `reviewPending: true` today and surface a "transliteration under scholarly review — treat as provisional" caption everywhere they render. **Until the reviewer pass lands, do not flip the flag.** P14.6 may *add* `reviewPending: true` flags to newly-introduced mantra text (Prana-Pratishtha placeholder, Navagraha Stotra opening) but cannot clear existing ones. (A separate, larger content-review project — the full verse-by-verse Durga Saptashati Sanskrit text, ~700 verses — remains deferred and is tracked under P14.3.)
-
-**Live-device smoke is still pending** on the bundled branch: the 6-tab edge-to-edge bar (P14.3); the streak + milestone celebration flow and the share-card kinds (P14.4 / P14.5); the new Puja Vidhi detail screen with its samagri checklist + step-mantra plinths + post-puja chips (P14.2). All of these compile clean and pass type-check + lint, but have not been run on a physical device yet.
+Phase 14 is **fully shipped to production.** All six sub-phases (P14.1–P14.6) merged from `phase_14` into `master` and released in the Phase-14 bundle (app version 1.9.1 / versionCode 13). The only outstanding Phase 14 debt is the **Sanskrit-reviewer pass on mantra strings** — tracked under §7 above, not as a Phase 14 sub-phase. Until that pass lands, mantras keep `reviewPending: true` and surface the "provisional — under scholarly review" caption in-screen; no functional UI work depends on it.
 
 ---
 
@@ -309,9 +322,11 @@ Phase 14 is **feature-complete on the branch but not bundle-ready** — five sub
 
 **Why (2026-05-12, researched against Expo/Firebase/Google/Apple official docs):** requested feature. The app is currently 100% offline with no accounts and no backend; sign-in is the first backend the app has had, so it's deliberately phased — and gated on a clear answer to "what is login *for*." The answer: **so a user's mantra/sadhana streak (P14.4), birth charts, favorites, and settings survive a reinstall or a new phone** — the highest-value, lowest-controversy use. (Indian devotional apps mostly use phone-OTP; Google sign-in skews to the kundli-literate user this app already serves, so it's a fine first provider — phone-OTP can be added later.) **Genuinely free at this app's scale:** Google OAuth for `email`+`profile`+`openid` is free and exempt from sensitive-scope verification — the only setup cost is a privacy-policy URL on the consent screen.
 
-### P15.A — Google Sign-In, local-only ⏳ (smallest viable step, ~1–2 days)
+### P15.A — Google Sign-In, local-only ⏳ (built 2026-05-16, **removed 2026-05-19** per user — "remove the google login for now"; ~1–2 days to rebuild)
 
 `@react-native-google-signin/google-signin` (the library Expo's docs now point to; needs a dev build — already how this app ships; not Expo Go). Google Cloud project + OAuth client IDs (Android + Web now; iOS later), **all three SHA-1s registered** (local-debug, EAS, Play-Store signing key — the #1 setup gotcha; use the config-doctor), `google-services.json` checked in. Sign-in/out UI in Settings; store the ID token + profile in the existing Zustand KV. **No backend yet** — ship this, see if users actually sign in. (If uptake is low, P15.B can be deferred — A alone cost ~2 days.)
+
+A working implementation was built 2026-05-16 then stripped per user request — see `memory/project_p15_a_landed.md` for the full rebuild checklist (TurboModule lazy-load gotcha; user-side Google Cloud setup; SHA-1 registration; `google-services.json` integration order). Re-attempt blocked until the user reopens the feature.
 
 ### P15.B — Sync backend ⏳ (~3–5 days)
 
@@ -392,26 +407,27 @@ Android widget scaffold shipped 2026-05-06 (see §6). iOS WidgetKit extension de
 **Sequencing principle:** ship optimizations + features first, language support last.
 
 ```
-Shipped to production (2026-05-12):
+Shipped to production (through 2026-05-28, app 1.9.1 / versionCode 13):
   Phase 1 → 1.5 → 2 → 3.3 → 6 → 7.1–7.3 → 8.1 → 8.2 → 8.3 (+ panchang-ts 3.1.0)
-  → 1.7.0 launch → 9 → P4.2 (Android) → Phase 10 → Phase 11 (incl. P7.4→P11.6, P7.6→P11.5)
-  → Phase 12 (panchang-ts 4.0.0) → Phase 13 (panchang-ts 4.1.1)
+  → 1.7.0 launch → 9 → P4.2 (Android widget) → Phase 10 → Phase 11
+  (incl. P7.4→P11.6, P7.6→P11.5) → Phase 12 (panchang-ts 4.0.0)
+  → Phase 13 (panchang-ts 4.1.1) → Bundle 2026-05-12
         ↓
-  Phase 14 — Devotional Practice & Engagement (P14.1–P14.5 ✅ shipped to branch
-                                                 2026-05-14, bundle blocked on
-                                                 P14.6 + Sanskrit-reviewer pass)
-      P14.1 Vaar Devata ✅ → P14.5 Shareable cards ✅ → P14.4 Sadhana streaks ✅
-      → P14.3 Navratri guide ✅ → P14.2 Puja Vidhi ✅
-      → P14.6 Audit-driven content fixes ⏳ (~1–2 h, blocks the bundled release)
+  Phase 14 (P14.1–P14.6 all ✅) + Katha feature + Bhagavad Gita / Sundarkand readers
+  + SDK 56 upgrade (Expo 54→56, RN 0.81.5→0.85.3, React 19.2.3, TS 6.0) → bundled
+  release on master
         ↓
-  Phase 15 — Accounts & Sync (Google Sign-In, phased A→D; A is the small first step;
-      makes the P14.4 streak / birth charts survive reinstall; D = Sign in with Apple, at iOS launch)
-        ↓
-  Phase 3 (P3.1 languages — Marathi first, separate PR)
-        ↓
-  Sentry (whenever staged rollout hits 100% — small, can slot in anytime) + iOS widget (after iOS launch)
-        ↓
-  Phase 5 (on hold — audio / booking / social)
+PENDING — in priority order:
+  1. Sanskrit-reviewer pass on Phase 14 mantra strings (vaarDevata / pujas / navratri)
+        — currently flagged `reviewPending: true`; one human engagement
+  2. Sentry (`@sentry/react-native`, ~half day; can slot in any time)
+  3. Phase 15 — Accounts & Sync (Google Sign-In)
+        P15.A (REBUILD — removed 2026-05-19) → P15.B Cloudflare Workers + D1 backend
+        → P15.C compliance (privacy policy, in-app + web account-deletion)
+        → P15.D Sign in with Apple (at iOS launch only)
+  4. Phase 3 (P3.1 languages — Marathi → Gujarati → Tamil → Telugu, one per release)
+  5. iOS WidgetKit (gated on iOS launch)
+  6. Phase 5 (on hold — P5.1 audio / P5.2 booking / P5.3 social)
 ```
 
 **Release cadence:** the user decides when to ship. Bundle multiple phases into one larger release rather than shipping each phase independently — the user prefers one substantive update over many small ones.

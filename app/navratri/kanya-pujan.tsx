@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,6 +15,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import i18n, { resolveLanguage } from '@/i18n';
 
 import { KANYA_PUJAN, NAVRATRI_SOURCES } from '@/config/navratri';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 type Lang = ContentLang;
 
@@ -45,14 +46,14 @@ export default function KanyaPujanScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {tForLang('navratri.kanyaTitle')}
           </Text>

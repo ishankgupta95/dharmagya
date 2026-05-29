@@ -1,8 +1,8 @@
 import { useCallback, useMemo, memo } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   ListRenderItemInfo,
 } from 'react-native';
@@ -87,14 +87,14 @@ export default function FavoritesScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('favorites.title')}
         </Text>
@@ -137,8 +137,8 @@ const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemov
   const { t } = useTranslation();
   const typeLabel = item.type === 'aarti' ? t('favorites.aartiBadge') : t('favorites.chalisaBadge');
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={onPress}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
@@ -169,7 +169,7 @@ const FavoriteCard = memo(function FavoriteCard({ item, colors, onPress, onRemov
         activeColor={colors.accent}
         accessibilityLabel={t('a11y.removeFavorite')}
       />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 });
 
@@ -184,7 +184,7 @@ function EmptyState({ colors }: { colors: ColorPalette }) {
       <Text variant="body-italic" style={[styles.emptySub, { color: colors.textTertiary }]}>
         {t('favorites.emptyDesc')}
       </Text>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.push('/(tabs)/library')}
         style={[styles.browseBtn, { borderColor: colors.accent }]}
         accessibilityRole="button"
@@ -192,7 +192,7 @@ function EmptyState({ colors }: { colors: ColorPalette }) {
         <Text variant="mono-caps" style={[styles.browseBtnText, { color: colors.accent }]}>
           {t('favorites.browseLibrary')}
         </Text>
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }

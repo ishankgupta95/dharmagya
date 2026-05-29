@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, TouchableWithoutFeedback, StyleSheet, useWindowDimensions } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -254,7 +255,7 @@ export function WalkthroughSpotlight({
 
         {/* Action row */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={onSkip}
             hitSlop={10}
             accessibilityRole="button"
@@ -262,13 +263,13 @@ export function WalkthroughSpotlight({
             <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
               {t('walkthrough.skip')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
 
           {onNext ? (
-            <TouchableOpacity
+            <MotionPressable
               onPress={onNext}
               style={[styles.nextBtn, { backgroundColor: palette.sindoor }]}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               accessibilityRole="button"
               accessibilityLabel={nextLabel ?? t('walkthrough.next')}
             >
@@ -276,7 +277,7 @@ export function WalkthroughSpotlight({
                 {nextLabel ?? t('walkthrough.next')}
               </Text>
               <Icon name="arrow-right" size={14} color={palette.parchmentBright} />
-            </TouchableOpacity>
+            </MotionPressable>
           ) : (
             <View style={[styles.tapHint, { borderColor: palette.sindoor }]}>
               <Icon name="hand" size={12} color={palette.sindoor} />

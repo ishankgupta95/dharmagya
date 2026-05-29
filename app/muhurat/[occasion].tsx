@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
@@ -331,26 +331,26 @@ export default function OccasionDetailScreen() {
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           hitSlop={12}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
           {t(`muhurat.occasion.${occasion}.name`)}
         </Text>
         {status === 'complete' ? (
-          <TouchableOpacity
+          <MotionPressable
             onPress={handleRefresh}
             hitSlop={12}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.retry')}>
             <Icon name="refresh" size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
         ) : (
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         )}
@@ -380,7 +380,7 @@ export default function OccasionDetailScreen() {
             <View style={[styles.progressBar, { backgroundColor: colors.surfaceRecessed }]}>
               <View style={[styles.progressFill, { backgroundColor: colors.accent, width: `${progressPct}%` }]} />
             </View>
-            <TouchableOpacity
+            <MotionPressable
               onPress={handleCancel}
               style={styles.progressAction}
               accessibilityRole="button"
@@ -389,7 +389,7 @@ export default function OccasionDetailScreen() {
               <Text variant="mono-caps" style={[styles.progressActionText, { color: semanticColors.error }]}>
                 {t('muhurat.cancelScan')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         )}
 
@@ -398,7 +398,7 @@ export default function OccasionDetailScreen() {
             <Text variant="body" style={[styles.progressText, { color: colors.textPrimary }]}>
               {t('muhurat.scanPaused', { current: scannedCount, total: totalDays })}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={handleResume}
               style={styles.progressAction}
               accessibilityRole="button"
@@ -407,7 +407,7 @@ export default function OccasionDetailScreen() {
               <Text variant="mono-caps" style={[styles.progressActionText, { color: colors.accent }]}>
                 {t('muhurat.resumeScan')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         )}
 
@@ -416,7 +416,7 @@ export default function OccasionDetailScreen() {
             <Text variant="body" style={[styles.errorText, { color: colors.textPrimary }]}>
               {t('muhurat.scanFailed')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={handleResume}
               style={styles.progressAction}
               accessibilityRole="button"
@@ -425,7 +425,7 @@ export default function OccasionDetailScreen() {
               <Text variant="mono-caps" style={[styles.progressActionText, { color: colors.accent }]}>
                 {t('muhurat.retryScan')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         )}
 
@@ -553,8 +553,7 @@ function DayRow({
   const scoreLabel = formatNumber(Math.round(match.score));
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <MotionPressable
       onPress={onToggle}
       style={[
         styles.dayRow,
@@ -686,7 +685,7 @@ function DayRow({
           </View>
         </View>
       )}
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 

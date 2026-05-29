@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -68,14 +68,14 @@ export default function JaapHistoryScreen() {
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="body-italic" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('jaap.historyTitle')}
           </Text>
@@ -94,7 +94,7 @@ export default function JaapHistoryScreen() {
             <Text variant="body-italic" style={[styles.emptyDesc, { color: colors.textTertiary }]}>
               {t('jaap.historyEmptyDesc')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => router.replace('/jaap')}
               style={[styles.emptyCta, { borderColor: colors.accent }]}
               accessibilityRole="button"
@@ -102,7 +102,7 @@ export default function JaapHistoryScreen() {
               <Text variant="mono-caps" style={[styles.emptyCtaText, { color: colors.accent }]}>
                 {t('jaap.historyBeginCta')}  →
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         ) : (
           <ScrollView
@@ -175,14 +175,14 @@ function SessionRow({ session, colors, onDelete, formatTime, formatNumber, t }: 
           </Text>
         </View>
       </View>
-      <TouchableOpacity
+      <MotionPressable
         onPress={onDelete}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={styles.rowDeleteBtn}
         accessibilityRole="button"
         accessibilityLabel={t('jaap.historyDeleteConfirm')}>
         <Icon name="close" size={14} color={colors.textMuted} />
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }

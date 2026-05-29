@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -9,6 +9,7 @@ import { Icon, type IconName } from '@/components/common/Icon';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 type LocationChoice = 'gps' | 'default';
 
@@ -43,14 +44,14 @@ export default function OnboardingStep3() {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="mono-caps" style={[styles.headerStep, { color: colors.textMuted }]}>
           {t('onboarding.step3of3')}
         </Text>
@@ -116,16 +117,16 @@ export default function OnboardingStep3() {
 
       {/* ── Bottom ────────────────────────────────────────────────────── */}
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH, borderTopColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={handleFinish}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           style={[styles.cta, { backgroundColor: palette.sindoor }]}
           accessibilityRole="button"
           accessibilityLabel={t('onboarding.startExploring')}>
           <Text variant="mono-caps" style={styles.ctaText}>
             {t('onboarding.startExploring')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
     </SafeAreaView>
@@ -152,8 +153,8 @@ function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
   const borderColor = isSelected ? palette.sindoor : dark ? 'rgba(243,229,200,0.12)' : palette.paperEdge;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={onPress}
       style={[
         styles.themeCard,
@@ -179,7 +180,7 @@ function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
           <Icon name="check" size={12} color={palette.parchmentBright} />
         </View>
       )}
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -196,8 +197,7 @@ interface RadioRowProps {
 
 function RadioRow({ label, sublabel, icon, selected, onPress, colors }: RadioRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <MotionPressable
       onPress={onPress}
       style={styles.radioRow}
       accessibilityRole="radio"
@@ -213,7 +213,7 @@ function RadioRow({ label, sublabel, icon, selected, onPress, colors }: RadioRow
       <View style={[styles.radioCircle, { borderColor: selected ? palette.sindoor : colors.border }]}>
         {selected && <View style={[styles.radioFill, { backgroundColor: palette.sindoor }]} />}
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
