@@ -56,6 +56,12 @@ export interface ShareStrings {
   milestoneSubline: (kind: 'sessions' | 'repetitions' | 'streak') => string;
   /** Headline numeral itself — already formatted with locale digits / grouping. */
   milestoneFigure: (threshold: number) => string;
+  /**
+   * Honorific Hindi display name for a deity (e.g. "श्री गणेश जी"), resolved
+   * from i18n by the host. The deity card's Devanagari focal line — kept out
+   * of the deity config so i18n stays the single source for display strings.
+   */
+  deityDisplayHi: (deityId: string) => string;
 }
 
 export function resolveShareContent(spec: ShareCardSpec, s: ShareStrings): ShareCardContent {
@@ -67,7 +73,7 @@ export function resolveShareContent(spec: ShareCardSpec, s: ShareStrings): Share
         accent: meta?.color ?? palette.sindoor,
         initial: meta?.initial ?? 'ॐ',
         kicker: s.kickerDeityBlessing,
-        focalHi: meta?.displayName ?? spec.deityId,
+        focalHi: s.deityDisplayHi(spec.deityId),
         focalEn: meta?.name,
         subHi: spec.mantraHi,
         verseLayout: false,

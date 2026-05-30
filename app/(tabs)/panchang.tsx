@@ -32,6 +32,7 @@ import {
   semanticColors,
   borderRadius,
   spacing,
+  typeScale,
   type ColorPalette,
 } from '@/config/theme';
 import { useLazyDailyPanchang } from '@/hooks/useLazyDailyPanchang';
@@ -1745,7 +1746,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   sunMoonLabel: { fontSize: 7.5, letterSpacing: 0.8 },
-  sunMoonTime: { fontSize: 11.5, fontFamily: MONO_FONT, fontWeight: '500' },
+  sunMoonTime: { fontSize: 12.5, ...typeScale.figuresMedium },
 
   flagStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   flag: {
@@ -1780,9 +1781,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   muhuratTime: {
-    fontSize: 11.5,
-    fontFamily: MONO_FONT,
-    fontWeight: '500',
+    fontSize: 12.5,
+    ...typeScale.figuresMedium,
     letterSpacing: 0.2,
   },
   muhuratDivider: { height: StyleSheet.hairlineWidth, opacity: 0.5 },

@@ -7,7 +7,7 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { MotionPressable } from '@/components/common/MotionPressable';
-import Animated from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +29,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
 import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
-import { getDeityImage } from '@/config/deityImages';
+import { getDeityImageSmall } from '@/config/deityImages';
 import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
 
 // ─── Content counts (computed once at module load) ──────────────────────────
@@ -205,7 +205,7 @@ interface DeityCardProps {
 const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
   const { t, i18n } = useTranslation();
   const counts = COUNTS[deity.id] ?? { aartis: 0, chalisas: 0 };
-  const image = getDeityImage(deity.id);
+  const image = getDeityImageSmall(deity.id);
 
   // Solid-fill gradient is the fallback when no image is available; with an
   // image we layer a soft top-down deity-coloured tint to bind the photo to
@@ -242,11 +242,12 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
 
       <View style={[styles.portrait, !image && { backgroundColor: deity.color + '22' }]}>
         {image && (
-          <Animated.Image
+          <Image
             source={image}
             style={styles.portraitImage}
-            resizeMode="cover"
-            sharedTransitionTag={`deity-portrait-${deity.id}`}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
           />
         )}
         <LinearGradient

@@ -34,6 +34,7 @@ import { pmark } from '@/utils/perfProfile';
 import { ShareCardHost } from '@/components/share/ShareCardHost';
 import { MilestoneCelebrationHost } from '@/components/common/MilestoneCelebrationHost';
 import { SadhanaOpenRecorder } from '@/components/common/SadhanaOpenRecorder';
+import { GrainOverlay } from '@/components/common/GrainOverlay';
 
 pmark('app:_layout:moduleEval');
 
@@ -261,6 +262,9 @@ export default function RootLayout() {
                   so a fade reads more "search dialog" than "drilldown". */}
               <Stack.Screen name="search" options={{ animation: 'fade' }} />
             </Stack>
+            {/* Paper-grain film over all screen content (below the modal
+                hosts, which present in their own layers). pointerEvents none. */}
+            <GrainOverlay />
             <ShareCardHost />
             <MilestoneCelebrationHost />
             <SadhanaOpenRecorder />

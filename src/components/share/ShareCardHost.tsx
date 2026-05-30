@@ -46,6 +46,9 @@ export function ShareCardHost() {
     kickerMilestone: t('share.kickerMilestone'),
     milestoneSubline: (kind) => t(`share.milestoneSubline.${kind}`),
     milestoneFigure: (threshold: number) => threshold.toLocaleString('en-IN'),
+    // Force the Hindi honorific regardless of UI language — the card's focal
+    // Devanagari line. Both bundles are eager-loaded, so this resolves sync.
+    deityDisplayHi: (deityId: string) => t(`deities.${deityId}.displayName`, { lng: 'hi' }),
   }), [t]);
 
   const content = useMemo(() => (spec ? resolveShareContent(spec, strings) : null), [spec, strings]);

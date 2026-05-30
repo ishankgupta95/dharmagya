@@ -2,27 +2,19 @@ import { useCallback, useMemo, memo } from 'react';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  Image,
   Dimensions,
   SectionList,
   StyleSheet,
   SectionListRenderItemInfo,
   SectionListData,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
-
-import { durations, easings } from '@/config/motion';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
@@ -45,8 +37,6 @@ import {
   type Recitation,
   type Chalisa,
 } from '@/services/content';
-
-const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 type ListItem =
   | { type: 'aarti'; data: Recitation }
@@ -254,13 +244,6 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
     [deityId],
   );
   const featuredPuja = useMemo(() => getPujasForDeity(deityId)[0], [deityId]);
-  // Hero photo fades 0→1 over 320ms once decoded (P11.6). Deity-color gradient
-  // sits at full opacity underneath as the always-visible scrim, so the user
-  // never sees a blank container — only the gradient, then the photo settling
-  // in on top of it.
-  const { dur } = useReducedMotion();
-  const heroOpacity = useSharedValue(0);
-  const heroAnimStyle = useAnimatedStyle(() => ({ opacity: heroOpacity.value }));
 
   return (
     <View style={styles.heroWrap}>
@@ -273,17 +256,16 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         />
         {image ? (
           <>
-            <AnimatedImage
+            {/* Deity-color gradient sits at full opacity underneath as the
+                always-visible scrim; the photo cross-fades in over it once
+                decoded (expo-image transition), so the container is never
+                blank — only the gradient, then the photo settling in. */}
+            <Image
               source={image}
-              style={[styles.heroImage, heroAnimStyle]}
-              resizeMode="cover"
-              sharedTransitionTag={`deity-portrait-${deityId}`}
-              onLoad={() => {
-                heroOpacity.value = withTiming(1, {
-                  duration: dur(durations.slow),
-                  easing: easings.standard,
-                });
-              }}
+              style={styles.heroImage}
+              contentFit="cover"
+              transition={320}
+              cachePolicy="memory-disk"
             />
             <LinearGradient
               colors={['transparent', 'rgba(20,10,4,0.55)']}

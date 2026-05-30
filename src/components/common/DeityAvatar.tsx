@@ -1,8 +1,9 @@
 import { memo, useMemo } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DEITY_BY_ID } from '@/config/deities';
-import { getDeityImage } from '@/config/deityImages';
+import { getDeityImageSmall } from '@/config/deityImages';
 import { deityColors, palette } from '@/config/theme';
 
 import { AppText } from './AppText';
@@ -31,7 +32,7 @@ export const DeityAvatar = memo(function DeityAvatar({
 }: DeityAvatarProps) {
   const meta = DEITY_BY_ID[deity];
   const color = meta?.color ?? FALLBACK.color;
-  const image = getDeityImage(deity);
+  const image = getDeityImageSmall(deity);
   const showRing = ring === 'editorial';
 
   const ringPad = showRing ? RING_GOLD + RING_PARCHMENT : 0;
@@ -48,7 +49,9 @@ export const DeityAvatar = memo(function DeityAvatar({
     <Image
       source={image}
       style={{ width: innerSize, height: innerSize, borderRadius: innerRadius }}
-      resizeMode="cover"
+      contentFit="cover"
+      transition={180}
+      cachePolicy="memory-disk"
     />
   ) : (
     <LinearGradient

@@ -199,4 +199,18 @@ export const typeScale = {
     letterSpacing: 2.4,
     textTransform: 'uppercase',
   },
+  // On-brand figures — Fraunces with lining + tabular numerals so columns of
+  // times/counts stay aligned (fixed-width digits) while reading as the
+  // editorial serif rather than stock system mono. Use for NUMBER displays
+  // (times, counts, degrees); mono-caps labels keep their mono face.
+  figures: {
+    fontFamily: 'Fraunces_400Regular',
+    fontVariant: ['lining-nums', 'tabular-nums'],
+    letterSpacing: 0,
+  },
+  figuresMedium: {
+    fontFamily: 'Fraunces_500Medium',
+    fontVariant: ['lining-nums', 'tabular-nums'],
+    letterSpacing: 0,
+  },
 } as const satisfies Record<string, TypeToken>;
