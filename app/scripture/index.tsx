@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { AdBanner } from '@/components/common/AdBanner';
 import { Icon } from '@/components/common/Icon';
@@ -12,14 +12,15 @@ import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
-import { ALL_SCRIPTURES, SCRIPTURE_DISCLAIMER } from '@/config/scriptures';
+import { getScriptureGroups, SCRIPTURE_DISCLAIMER } from '@/config/scriptures';
 import { MotionPressable } from '@/components/common/MotionPressable';
 
 /**
- * Scripture index — three entries: Bhagavad Geeta + Durga Saptashati (outline)
- * + Sundarkand, in alphabetical order. Tapping a row pushes `/scripture/[id]`.
- * Each row shows a single title in the app language (Devanagari for Hindi,
- * English otherwise) — no stacked-bilingual treatment.
+ * Scripture index — grouped into "Core texts" (Gita, Ramcharitmanas,
+ * Sundarkand + the Durga Saptashati outline) and "Upanishads", so the eight
+ * Upanishads don't interleave alphabetically with the epics. Tapping a row
+ * pushes `/scripture/[id]`. Each row shows a single title in the app language
+ * (Devanagari for Hindi, English otherwise).
  */
 export default function ScriptureIndexScreen() {
   const { t, i18n } = useTranslation();
@@ -29,13 +30,20 @@ export default function ScriptureIndexScreen() {
   const lang = i18n.language === 'hi' ? 'hi' : 'en';
 
   // Saptashati lives outside the library (no verses; it's an outline + 9-day
-  // map sourced from `@/config/navratri`). Merge it into the index so users
-  // see one consolidated list of scriptures.
+  // map sourced from `@/config/navratri`). Append it to the "Core" group so
+  // users see one consolidated list.
   type Row = { id: string; titleEn: string; titleHi: string };
-  const rows: Row[] = [
-    ...ALL_SCRIPTURES.map((s) => ({ id: s.slug, titleEn: s.titleEnglish, titleHi: s.titleHindi })),
-    { id: 'durga-saptashati', titleEn: 'Durga Saptashati', titleHi: 'दुर्गा सप्तशती' },
-  ].sort((a, b) => a.titleEn.localeCompare(b.titleEn));
+  type Group = { key: string; i18nKey: string; rows: Row[] };
+  const groups: Group[] = getScriptureGroups().map((g) => ({
+    key: g.key,
+    i18nKey: g.i18nKey,
+    rows: [
+      ...g.scriptures.map((s) => ({ id: s.slug, titleEn: s.titleEnglish, titleHi: s.titleHindi })),
+      ...(g.key === 'core'
+        ? [{ id: 'durga-saptashati', titleEn: 'Durga Saptashati', titleHi: 'दुर्गा सप्तशती' }]
+        : []),
+    ],
+  }));
 
   return (
     <ScreenMount>
@@ -72,28 +80,41 @@ export default function ScriptureIndexScreen() {
             <Ornament variant="lotus" tone={ornamentTone} style={styles.introOrnament} />
           </View>
 
-          {/* ── Scripture rows ──────────────────────────────────────────── */}
-          {rows.map((r) => (
-            <MotionPressable
-              key={r.id}
-              onPress={() => router.push({ pathname: '/scripture/[id]', params: { id: r.id } })}
-              pressedScale={0.97}
-              style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('scripture.a11yOpenScripture', { name: r.titleEn })}>
-              <View style={[styles.rowIcon, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
-                <Icon name="school" size={18} color={colors.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  variant={lang === 'hi' ? 'deva-bold' : 'body'}
-                  style={[styles.rowTitle, { color: colors.textPrimary }]}
-                  numberOfLines={2}>
-                  {lang === 'hi' ? r.titleHi : r.titleEn}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={14} color={colors.textMuted} />
-            </MotionPressable>
+          {/* ── Scripture rows (grouped) ────────────────────────────────── */}
+          {groups.map((g) => (
+            <View key={g.key}>
+              <Kicker
+                color={palette.gold}
+                size={9}
+                withTrailingRule
+                ruleColor={colors.divider}
+                wrapperStyle={styles.groupKicker}
+                style={styles.groupKickerText}>
+                {t(g.i18nKey)}
+              </Kicker>
+              {g.rows.map((r) => (
+                <MotionPressable
+                  key={r.id}
+                  onPress={() => router.push({ pathname: '/scripture/[id]', params: { id: r.id } })}
+                  pressedScale={0.97}
+                  style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('scripture.a11yOpenScripture', { name: r.titleEn })}>
+                  <View style={[styles.rowIcon, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
+                    <Icon name="school" size={18} color={colors.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      variant={lang === 'hi' ? 'deva-bold' : 'body'}
+                      style={[styles.rowTitle, { color: colors.textPrimary }]}
+                      numberOfLines={2}>
+                      {lang === 'hi' ? r.titleHi : r.titleEn}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
+                </MotionPressable>
+              ))}
+            </View>
           ))}
 
           {/* ── Disclaimer footer ───────────────────────────────────────── */}
@@ -144,6 +165,10 @@ const styles = StyleSheet.create({
   introEyebrow: { letterSpacing: 3.5, marginBottom: 10 },
   introText: { fontSize: 14, lineHeight: 22, textAlign: 'center' },
   introOrnament: { marginTop: 14, width: '50%' },
+
+  // Group headers
+  groupKicker: { marginTop: 10, marginBottom: 12 },
+  groupKickerText: { letterSpacing: 2.4 },
 
   // Scripture rows
   rowCard: {

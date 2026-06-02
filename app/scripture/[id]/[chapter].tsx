@@ -26,11 +26,11 @@ type Lang = ContentLang;
 
 /**
  * Scripture verse reader — one chapter at a time. Reads `id` + `chapter` from
- * the route, resolves the scripture and chapter, and renders the source text
- * verse-by-verse with a VERSE N kicker above each shloka. Geeta verses carry
- * Devanagari + IAST; Sundarkand verses are Devanagari only. No English
- * translation is shipped — the disclaimer points the reader at a trusted
- * translation when meaning matters.
+ * the route, resolves the scripture and chapter, and renders each verse with a
+ * single script per toggle mode (so nothing is shown twice): Hindi mode = the
+ * Devanagari shloka + Hindi bhāvārtha; English mode = the IAST transliteration
+ * + English translation. The meaning sits in its own MEANING block below the
+ * shloka. Geeta + Sundarkand both carry all four fields for every verse.
  */
 export default function ScriptureChapterScreen() {
   const { t } = useTranslation();
@@ -39,9 +39,9 @@ export default function ScriptureChapterScreen() {
   const ornamentTone = isDarkMode ? 'dark' : 'light';
   const appLanguage = useStore((s) => s.language);
 
-  // In-screen LangToggle mirrors aarti / chalisa: Hindi mode shows Devanagari
-  // verses, English mode shows IAST (Latin-script transliteration). Sundarkand
-  // has no IAST, so its English mode falls back to Devanagari silently.
+  // The in-screen toggle selects the MEANING language (English translation vs
+  // Hindi bhāvārtha). Devanagari + IAST are always shown regardless. Defaults
+  // to the app language.
   const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
   const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
@@ -232,24 +232,41 @@ function VerseBlock({
   colors: ColorPalette;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
-  // Hindi mode: Devanagari source. English mode: IAST (Latin transliteration);
-  // fall back to Devanagari when the lib has no IAST for this scripture (e.g.
-  // Sundarkand). Either way one form is shown — never both.
-  const showIast = lang === 'en' && !!verse.iast;
+  // One script per mode — the toggle picks the whole verse's script, so no line
+  // is ever shown twice. Hindi: Devanagari shloka + Hindi bhāvārtha. English:
+  // IAST transliteration + English translation. IAST falls back to Devanagari
+  // if a scripture lacks it; meaning falls back to the other language.
+  const isHi = lang === 'hi';
+  const meaning = isHi ? (verse.hindi ?? verse.english) : (verse.english ?? verse.hindi);
+  const showDevaShloka = isHi || !verse.iast;
   return (
     <View style={styles.verseBlock}>
       <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider}
         wrapperStyle={styles.verseKickerWrap}>
         {t('scripture.verseKicker', { num: index })}
       </Kicker>
-      {showIast ? (
-        <Text variant="body" style={[styles.verseIast, { color: colors.textPrimary }]}>
-          {verse.iast}
-        </Text>
-      ) : (
+      {showDevaShloka ? (
         <Text variant="deva-bold" style={[styles.verseSanskrit, { color: colors.textPrimary }]}>
           {verse.devanagari}
         </Text>
+      ) : (
+        <Text variant="body-italic" style={[styles.verseIast, { color: colors.textPrimary }]}>
+          {verse.iast}
+        </Text>
+      )}
+      {!!meaning && (
+        <View style={[styles.meaningBlock, { borderLeftColor: colors.borderAccent }]}>
+          <Kicker color={colors.accent} size={8} style={styles.meaningLabel}>
+            {t('scripture.meaningLabel')}
+          </Kicker>
+          {/* Hindi bhāvārtha is Devanagari prose → `deva`; English is Latin →
+              `body`. (Matches the katha reader's prose-by-script convention.) */}
+          <Text
+            variant={isHi ? 'deva' : 'body'}
+            style={[styles.meaningText, { color: colors.textSecondary }]}>
+            {meaning}
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -301,9 +318,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   verseIast: {
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 26,
     textAlign: 'center',
+  },
+  // Meaning sits in a left-ruled block so it reads as commentary, distinct
+  // from the centered recitation lines above it.
+  meaningBlock: {
+    marginTop: 16,
+    paddingLeft: 14,
+    borderLeftWidth: 2,
+  },
+  meaningLabel: { letterSpacing: 2.0, marginBottom: 6 },
+  meaningText: {
+    fontSize: 14.5,
+    lineHeight: 23,
+    textAlign: 'left',
   },
 
   // Sources

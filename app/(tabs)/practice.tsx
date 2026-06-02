@@ -32,8 +32,8 @@ type Lang = 'en' | 'hi';
  * surfaces.
  *
  * Cost discipline: the only computed bit on this screen is the Sharad
- * Navratri Day-1 date, which is read from `festivals.json` (≤1 ms). No
- * panchang-ts calls at tab open.
+ * Navratri Day-1 date, which is read from the bundled festival table
+ * (`src/data/festivals.ts`, ≤1 ms). No panchang-ts computation at tab open.
  */
 export default function PracticeTab() {
   const { t, i18n } = useTranslation();
@@ -44,7 +44,7 @@ export default function PracticeTab() {
 
   const today = useMemo(() => new Date(), []);
 
-  // Lightweight Navratri lookup — pure festivals.json read, no panchang-ts.
+  // Lightweight Navratri lookup — pure festival-table read, no panchang-ts.
   const sharad = useMemo<NavratriWindow | null>(() => {
     try {
       return nextNavratri('sharad', today);
@@ -101,7 +101,10 @@ export default function PracticeTab() {
             <Ornament variant="lotus" tone={ornamentTone} style={styles.introOrnament} />
           </View>
 
-          {/* ── Navratri 9-day guide (contains its own vrat rules + Saptashati cross-link) ── */}
+          {/* ── Daily practice ──────────────────────────────────────────── */}
+          <SectionHeader label={t('practice.section.daily')} colors={colors} />
+
+          {/* Navratri 9-day guide (contains its own vrat rules + Saptashati cross-link) */}
           <PracticeRow
             icon="flame"
             title={t('practice.navratri.title')}
@@ -111,7 +114,7 @@ export default function PracticeTab() {
             t={t}
           />
 
-          {/* ── Vaar Devata (today's weekday — genuinely week-wide, not festival-scoped) ── */}
+          {/* Vaar Devata (today's weekday — genuinely week-wide, not festival-scoped) */}
           <PracticeRow
             icon="sun"
             title={t('practice.vaar.title')}
@@ -121,7 +124,7 @@ export default function PracticeTab() {
             t={t}
           />
 
-          {/* ── Puja Vidhi (P14.2 — Featured Pujas) ─────────────────────── */}
+          {/* Puja Vidhi (P14.2 — Featured Pujas) */}
           <PracticeRow
             icon="gift"
             title={t('practice.pujaVidhi.title')}
@@ -131,22 +134,51 @@ export default function PracticeTab() {
             t={t}
           />
 
-          {/* ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────── */}
+          {/* Daily Prayers (hindu-devotional-texts prayers/ module) */}
           <PracticeRow
-            icon="text"
-            title={t('practice.kathas.title')}
-            subtitle={t('practice.kathas.subtitle')}
-            onPress={() => router.push('/katha')}
+            icon="hand"
+            title={t('practice.prayers.title')}
+            subtitle={t('practice.prayers.subtitle')}
+            onPress={() => router.push('/prayers')}
             colors={colors}
             t={t}
           />
 
-          {/* ── Scriptures (hindu-devotional-texts scriptures/ + Saptashati outline) ── */}
+          {/* ── Sacred texts ────────────────────────────────────────────── */}
+          <SectionHeader label={t('practice.section.texts')} colors={colors} />
+
+          {/* Sacred Texts hub — scriptures, stotras, sahasranama, suktas, kathas */}
           <PracticeRow
             icon="school"
-            title={t('practice.scriptures.title')}
-            subtitle={t('practice.scriptures.subtitle')}
-            onPress={() => router.push('/scripture')}
+            title={t('practice.texts.title')}
+            subtitle={t('practice.texts.subtitle')}
+            onPress={() => router.push('/texts')}
+            colors={colors}
+            t={t}
+          />
+
+          {/* ── Sacred places ───────────────────────────────────────────── */}
+          <SectionHeader label={t('practice.section.places')} colors={colors} />
+
+          {/* Tirtha — the 112-site pilgrimage atlas */}
+          <PracticeRow
+            icon="map"
+            title={t('practice.tirtha.title')}
+            subtitle={t('practice.tirtha.subtitle')}
+            onPress={() => router.push('/tirtha')}
+            colors={colors}
+            t={t}
+          />
+
+          {/* ── Festivals ───────────────────────────────────────────────── */}
+          <SectionHeader label={t('practice.section.festivals')} colors={colors} />
+
+          {/* Festivals calendar (dates from panchang-ts; significance from the lib) */}
+          <PracticeRow
+            icon="calendar"
+            title={t('practice.festivals.title')}
+            subtitle={t('practice.festivals.subtitle')}
+            onPress={() => router.push('/festivals')}
             colors={colors}
             t={t}
           />
@@ -168,6 +200,20 @@ interface PracticeRowProps {
   onPress: (() => void) | null;
   colors: ColorPalette;
   t: (key: string) => string;
+}
+
+function SectionHeader({ label, colors }: { label: string; colors: ColorPalette }) {
+  return (
+    <Kicker
+      color={colors.accent}
+      size={10}
+      withTrailingRule
+      ruleColor={colors.divider}
+      wrapperStyle={styles.sectionHeader}
+      style={styles.sectionHeaderText}>
+      {label}
+    </Kicker>
+  );
 }
 
 function PracticeRow({ icon, title, subtitle, onPress, colors, t }: PracticeRowProps) {
@@ -241,6 +287,10 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 32,
   },
+
+  // Section headers
+  sectionHeader: { marginTop: 14, marginBottom: 12 },
+  sectionHeaderText: { letterSpacing: 2.4 },
 
   // Intro block
   intro: { alignItems: 'center', marginBottom: 20, paddingHorizontal: 4 },

@@ -38,7 +38,6 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { resolveLanguage } from '@/i18n';
-import { useShareSheet } from '@/store/useShareSheet';
 import { useMilestoneCelebration } from '@/store/useMilestoneCelebration';
 import {
   CUSTOM_MANTRA_SLUG,
@@ -144,7 +143,6 @@ export default function JaapCounterScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
   const lang: ContentLang = resolveLanguage(appLanguage);
   const db = useSQLiteContext();
-  const openShare = useShareSheet(s => s.open);
   const unlockMilestone = useMilestoneCelebration(s => s.unlock);
   const sadhana = useStore(s => s.sadhana);
   const setSadhanaState = useStore(s => s.setSadhanaState);
@@ -683,25 +681,6 @@ export default function JaapCounterScreen() {
                 <Text variant="mono-caps" style={[styles.actionBtnText, { color: colors.textSecondary }]}>
                   {t('jaap.reset')}
                 </Text>
-              </MotionPressable>
-              <MotionPressable
-                onPress={() => openShare({
-                  kind: 'jaap-completion',
-                  count: totalCount,
-                  mantraHi: resolved.bodyDevanagari,
-                  mantraTranslit: resolved.bodyIast,
-                  mantraTitleEn: resolved.titleEn,
-                  deityId: mantraDeity,
-                })}
-                disabled={!hasCounted}
-                style={[
-                  styles.actionBtn,
-                  { borderColor: hasCounted ? colors.borderAccent : colors.border, opacity: hasCounted ? 1 : 0.4 },
-                ]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('share.a11yShare')}>
-                <Icon name="share" size={13} color={hasCounted ? colors.accent : colors.textSecondary} />
               </MotionPressable>
             </View>
           </View>

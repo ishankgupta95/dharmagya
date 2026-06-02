@@ -22,8 +22,6 @@ import { LangToggle } from '@/components/common/LangToggle';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { useEntranceStagger } from '@/hooks/useEntranceStagger';
 import { useRefrainHighlight } from '@/hooks/useRefrainHighlight';
-import { useShareSheet } from '@/store/useShareSheet';
-import { shareAartiText } from '@/services/shareText';
 import i18n, { resolveLanguage } from '@/i18n';
 import { getAartiForDeity, aartiVerses, titleFor, type ContentLang } from '@/services/content';
 
@@ -70,8 +68,6 @@ export default function AartiDetailScreen() {
   const isFavorite = favoriteIds.includes(favoriteKey);
 
   const verses = useMemo(() => (aarti ? aartiVerses(aarti, lang) : []), [aarti, lang]);
-  const versesHi = useMemo(() => (aarti ? aartiVerses(aarti, 'hi') : []), [aarti]);
-  const versesEn = useMemo(() => (aarti ? aartiVerses(aarti, 'en') : []), [aarti]);
   const refrainLines = useMemo(() => buildRefrainSet(verses[0] ?? ''), [verses]);
 
   // Masthead labels follow the in-screen lang toggle, not the global app
@@ -126,14 +122,6 @@ export default function AartiDetailScreen() {
         </Animated.View>
 
         <View style={styles.navRightGroup}>
-          <MotionPressable
-            onPress={() => { void shareAartiText(aarti, lang); }}
-            style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={t('share.a11yShareFullText')}>
-            <Icon name="share" size={16} color={colors.textSecondary} />
-          </MotionPressable>
           <FavoriteHeart
             active={isFavorite}
             onPress={() => toggleFavorite(favoriteKey)}
@@ -178,10 +166,6 @@ export default function AartiDetailScreen() {
             lang={lang}
             colors={colors}
             t={t}
-            deityId={aarti.deity}
-            verseHi={versesHi[index] ?? verse}
-            verseEn={versesEn[index]}
-            sourceName={aarti.titleEnglish}
             entranceIndex={index}
             animateEntrance={index < VERSE_STAGGER_MAX}
           />
@@ -207,22 +191,16 @@ interface VerseBlockProps {
   lang: ContentLang;
   colors: ColorPalette;
   t: (key: string, opts?: Record<string, unknown>) => string;
-  deityId: string;
-  verseHi: string;
-  verseEn?: string;
-  sourceName: string;
   entranceIndex: number;
   animateEntrance: boolean;
 }
 
 function VerseBlock({
   verse, verseNumber, isFirstVerse, refrainLines, lang, colors, t,
-  deityId, verseHi, verseEn, sourceName,
   entranceIndex, animateEntrance,
 }: VerseBlockProps) {
   const staggerStyle = useEntranceStagger(entranceIndex, animateEntrance);
   const refrainStyle = useRefrainHighlight();
-  const openShare = useShareSheet(s => s.open);
   const lines = verse.split('\n').filter(l => l.trim().length > 0);
   return (
     <Animated.View style={[styles.verseBlock, staggerStyle]}>
@@ -237,13 +215,6 @@ function VerseBlock({
           {t('reader.verseLabel', { num: verseNumber })}
           {isFirstVerse && ` · ${t('reader.refrainTag')}`}
         </Kicker>
-        <MotionPressable
-          onPress={() => openShare({ kind: 'verse', deityId, verseHi, verseEn, sourceLabel: t('share.from', { name: sourceName }) })}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('share.ctaVerse')}>
-          <Icon name="share" size={14} color={colors.textMuted} />
-        </MotionPressable>
       </View>
       {lines.map((line, idx) => {
         const isRefrain = refrainLines.has(normalize(line));

@@ -1,8 +1,8 @@
 import type { VratType } from '@/types';
-import festivalsData from '@/data/static/festivals.json';
+import festivalsData from '@/data/festivals';
 
 // ─── Festival → VratType mapping ────────────────────────────────────────────
-// Maps festival names from festivals.json to a VratType. Currently used by the
+// Maps festival names from the panchang-ts festival table to a VratType. Used by the
 // notification scheduler to label vrat-day reminders with the matching tithi
 // observance (e.g. "Ekadashi" instead of just the festival name).
 const FESTIVAL_NAME_TO_VRAT: Record<string, VratType> = {

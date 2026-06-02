@@ -217,6 +217,10 @@ export default {
     chalisaBadge: 'Chalisa',
     kathaBadge: 'Vrat Katha',
     scriptureBadge: 'Scripture',
+    ashtottaraBadge: '108 Names',
+    sahasranamaBadge: '1000 Names',
+    stotraBadge: 'Stotra',
+    suktaBadge: 'Vedic Sukta',
     chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
@@ -232,12 +236,38 @@ export default {
   reader: {
     aartiLabel: 'Aarti',
     chalisaLabel: 'Chalisa',
+    ashtottaraLabel: '108 Names',
+    prayerLabel: 'Daily Prayer',
     verseLabel: 'Verse {{num}}',
     refrainTag: 'refrain',
     dohaLabel: 'Doha',
     sorathaLabel: 'Soratha',
     chaupaiLabel: 'Chaupai',
     verifyNote: 'Text and pronunciation vary by tradition — verify with a pandit before any ritual use.',
+    reviewNote: 'Transliteration is under scholarly review — treat as provisional.',
+  },
+  ashtottara: {
+    badge: 'Ashtottara · 108 Names',
+    intro: 'The Ashtottara Shatanamavali — 108 names of the deity, each recited with an offering of a flower or akshat during worship.',
+    nameCount: '{{count}} names',
+    openingShloka: 'Opening shloka',
+    closingShloka: 'Closing shloka',
+    notFound: 'This litany is not available.',
+  },
+  prayers: {
+    title: 'Daily Prayers',
+    eyebrow: 'NITYA KARMA',
+    intro: 'The everyday shlokas of a home altar — recited on waking, before a bath, before a meal, and at dusk.',
+    notFound: 'No prayers available.',
+    occasion: {
+      morning: 'On Waking',
+      bath: 'Before Bathing',
+      meal: 'Before a Meal',
+      evening: 'Evening',
+      night: 'At Night',
+      invocation: 'Invocation',
+      closing: 'Closing',
+    },
   },
   langToggle: {
     english: 'English',
@@ -1203,14 +1233,124 @@ export default {
   },
 
   // ── Scripture reader (P14.3 outline + library scriptures) ──────────────
+  // ── Sacred Texts hub ────────────────────────────────────────────────────
+  texts: {
+    title: 'Sacred Texts',
+    eyebrow: 'PAATH · SWADHYAYA',
+    intro: 'The reading corpus in one place — full scriptures, hymns and litanies, the Vedic suktas, and the vrat kathas.',
+    scriptures: { title: 'Scriptures', subtitle: 'Gita, Ramcharitmanas, Sundarkand, and the Upanishads.' },
+    stotras: { title: 'Stotras & Ashtakams', subtitle: 'Shiva Tandava, Mahishasura Mardini, Bajrang Baan, and more.' },
+    sahasranama: { title: 'Sahasranama', subtitle: 'The 1000 names — Vishnu and Lalita.' },
+    suktas: { title: 'Vedic Suktas', subtitle: 'Sri Suktam, Purusha Suktam, Sri Rudram, and others.' },
+    kathas: { title: 'Vrat Kathas', subtitle: 'The stories recited when keeping a vrat.' },
+  },
+
+  // ── Stotras / Ashtakams ─────────────────────────────────────────────────
+  stotra: {
+    indexTitle: 'Stotras & Ashtakams',
+    indexEyebrow: 'HYMNS OF PRAISE',
+    indexIntro: 'Classical hymns and ashtakams to the deities — grouped by the form they extol. Tap one to read it verse by verse.',
+    notFound: 'This stotra is not available.',
+    a11yOpen: 'Open {{name}}',
+    form: {
+      stotra: 'Stotra',
+      ashtakam: 'Ashtakam',
+      stuti: 'Stuti',
+    },
+    language: {
+      sanskrit: 'Sanskrit',
+      awadhi: 'Awadhi',
+    },
+  },
+
+  // ── Vedic Suktas ────────────────────────────────────────────────────────
+  sukta: {
+    indexTitle: 'Vedic Suktas',
+    indexEyebrow: 'FROM THE VEDAS',
+    indexIntro: 'Hymns drawn from the Vedic samhitas — recited in puja, havan, and abhishekam. Tap one to read it in full.',
+    notFound: 'This sukta is not available.',
+    a11yOpen: 'Open {{name}}',
+  },
+
+  // ── Sahasranama (1000 names) ────────────────────────────────────────────
+  sahasranama: {
+    indexTitle: 'Sahasranama',
+    indexEyebrow: 'THE THOUSAND NAMES',
+    indexIntro: 'The thousand-name litanies — recited in full as a stotram, or name by name as an archana. Tap one to begin.',
+    notFound: 'This sahasranama is not available.',
+    a11yOpen: 'Open {{name}}',
+    nameCount: '{{count}} names',
+    tabStotram: 'Stotram',
+    tabNamavali: '1000 Names',
+  },
+
+  // ── Tirtha (sacred geography) ───────────────────────────────────────────
+  tirtha: {
+    title: 'Tirtha',
+    eyebrow: 'SACRED GEOGRAPHY',
+    intro: 'The holy places of the tradition — the Jyotirlingas of Shiva, the Shakti Peethas, the Char Dhams, the Sapta Puri, and the sacred rivers.',
+    notFound: 'This place is not available.',
+    sourcesLabel: 'A note on sources',
+    siteCount: '{{count}} sites',
+    a11yOpenSite: 'Open {{name}}',
+    jyotirlingaNumber: 'Jyotirlinga {{num}} of 12',
+    presidingDeity: 'Presiding deity',
+    openDeity: 'Open {{name}}',
+    openPuja: 'Open the puja vidhi',
+    startJaap: 'Start the mantra jaap',
+    category: {
+      jyotirlinga: 'Dvadasha Jyotirlinga',
+      'char-dham': 'Char Dham',
+      'chota-char-dham': 'Chota Char Dham',
+      'shakti-peetha': 'Shakti Peethas',
+      'sapta-puri': 'Sapta Puri',
+      'sacred-river': 'Sacred Rivers',
+    },
+    field: {
+      location: 'Location',
+      shakti: 'Shakti',
+      bodyPart: 'Anga (where it fell)',
+      bhairava: 'Bhairava',
+      direction: 'Direction',
+      jyotirlinga: 'In the stotra',
+    },
+  },
+
+  // ── Festival detail ─────────────────────────────────────────────────────
+  festival: {
+    notFound: 'This observance is not available.',
+    story: 'The story',
+    presidingDeity: 'Presiding deity',
+    openDeity: 'Open {{name}}',
+    observeLabel: 'How it is observed',
+    sourcesLabel: 'A note on sources',
+    category: {
+      ekadashi: 'Ekadashi',
+      'tithi-vrat': 'Monthly Vrat',
+      festival: 'Festival',
+    },
+    link: {
+      katha: 'VRAT KATHA',
+      puja: 'PUJA VIDHI',
+      scripture: 'SCRIPTURE',
+      mantra: 'MANTRA · JAAP',
+      sukta: 'VEDIC SUKTA',
+      stotra: 'STOTRA',
+    },
+  },
+
   scripture: {
     notFound: 'Scripture not available.',
     // Index screen
     indexTitle: 'Scriptures',
     indexEyebrow: 'SACRED TEXTS',
-    indexIntro: 'The Bhagavad Geeta and the Tulsi Sundarkand in their full source text, plus the Durga Saptashati outline used during Navratri recitation. Tap a scripture to read.',
+    indexIntro: 'The Bhagavad Geeta, Ramcharitmanas, Sundarkand and the principal Upanishads in their full source text, plus the Durga Saptashati outline used during Navratri recitation. Tap a scripture to read.',
     sourcesLabel: 'About this',
     a11yOpenScripture: 'Open {{name}}',
+    group: {
+      core: 'Epics & Gita',
+      upanishad: 'Upanishads',
+    },
     // Saptashati branch (kept verbatim from P14.3)
     kickerSaptashati: 'DURGA MAHATMYA',
     aboutLabel: 'About this text',
@@ -1233,6 +1373,7 @@ export default {
     a11yOpenChapter: 'Open chapter {{num}}',
     // Verse reader
     verseKicker: 'VERSE {{num}}',
+    meaningLabel: 'MEANING',
     // Chapter footer navigation
     prevChapter: 'PREVIOUS',
     nextChapter: 'NEXT',
@@ -1259,8 +1400,26 @@ export default {
   practice: {
     title: 'Pujas',
     eyebrow: 'PUJA · SADHANA',
-    intro: 'Devotional procedures and weekday worship — the Navratri 9-day guide, the Vaar Devata, seven Featured Pujas with samagri checklists and step-by-step upacharas, and six vrat kathas. Festival dates (Ekadashi, Maha Shivaratri, …) are tracked on the Festivals tab.',
+    intro: 'Devotional practice in one place — the Navratri guide and weekday Vaar Devata, the Featured Pujas, the sacred-text library, the pilgrimage atlas, and the festival calendar.',
     comingSoon: 'COMING SOON',
+    section: {
+      daily: 'Daily Practice',
+      texts: 'Sacred Texts',
+      places: 'Sacred Places',
+      festivals: 'Festivals',
+    },
+    texts: {
+      title: 'Sacred Texts',
+      subtitle: 'Scriptures, stotras & ashtakams, sahasranama, Vedic suktas, and vrat kathas.',
+    },
+    tirtha: {
+      title: 'Tirtha · Sacred Places',
+      subtitle: 'Jyotirlingas, Shakti Peethas, the Char Dhams, Sapta Puri, and the sacred rivers.',
+    },
+    festivals: {
+      title: 'Festival Calendar',
+      subtitle: 'Dates, significance, and the story behind each vrat and parva.',
+    },
     navratri: {
       title: 'Navratri 9-day guide',
       defaultSubtitle: 'Sharad Navratri · per-day form, mantra, bhog, vrat rules, and the Durga Saptashati',
@@ -1281,6 +1440,10 @@ export default {
     scriptures: {
       title: 'Scriptures',
       subtitle: 'Bhagavad Geeta, Sundarkand, and the Durga Saptashati outline.',
+    },
+    prayers: {
+      title: 'Daily Prayers',
+      subtitle: 'Nitya-karma shlokas for the day — on waking, before a bath, before a meal, and at dusk.',
     },
   },
 
@@ -1316,38 +1479,6 @@ export default {
     // Accessibility
     a11yStartJaap: 'Start a jaap of this mantra',
   },
-  share: {
-    // Sheet chrome
-    title: 'Share a card',
-    shareBtn: 'Share',
-    shapeStory: 'Story · 9:16',
-    shapeSquare: 'Square · 1:1',
-    statusHint: 'For WhatsApp Status, open the share sheet, pick WhatsApp, then tap "My status".',
-    error: "Couldn't create the card. Please try again.",
-    // Card kickers (the small label on the card)
-    kickerDeityBlessing: 'Deity Blessing',
-    kickerFestival: 'Festival Greeting',
-    kickerVerse: 'Sacred Verse',
-    kickerJaap: 'Jaap Complete',
-    jaapCountLine: '{{count}} repetitions today',
-    kickerMilestone: 'Sadhana Milestone',
-    milestoneSubline: {
-      sessions: 'completed sessions',
-      repetitions: 'sacred repetitions',
-      streak: 'day sadhana',
-    },
-    from: 'From {{name}}',
-    // Entry-point buttons
-    ctaGreeting: 'Share greeting',
-    ctaDeity: 'Share',
-    ctaVerse: 'Share verse',
-    ctaJaap: 'Share',
-    shareFullText: 'Share full text',
-    viaDharmagya: 'shared via dharmagya',
-    a11yShare: 'Create a shareable image',
-    a11yShareFullText: 'Share the full text via WhatsApp or another app',
-  },
-
   // ── Sadhana streak + milestones (P14.4) ─────────────────────────────────
   sadhana: {
     // Streak badge on Home / Jaap picker
@@ -1377,7 +1508,6 @@ export default {
     },
     milestoneBlessing: 'May your practice deepen.',
     continueBtn: 'Continue',
-    shareBtn: 'Share',
 
     // Opt-in evening reminder (off by default; gentle wording)
     reminderTitle: '🪔 A quiet moment',

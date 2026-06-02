@@ -6,12 +6,18 @@
 //
 // Run: node scripts/test-reminder-scheduler.js [YYYY-MM-DD]
 
-const fs = require('fs');
-const path = require('path');
+// Festival data comes from the panchang-ts bundled table (same source the app
+// uses via src/data/festivals.ts), built into the legacy year-keyed shape.
+const { getFestivalsForYear, FESTIVALS_YEAR_RANGE } = require('panchang-ts/festivals');
 
-const festivalsData = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '..', 'src', 'data', 'static', 'festivals.json'), 'utf8')
-);
+const festivalsData = (() => {
+  const out = {};
+  for (let y = FESTIVALS_YEAR_RANGE.start; y <= FESTIVALS_YEAR_RANGE.end; y++) {
+    const rows = getFestivalsForYear(y, 'en');
+    if (rows) out[String(y)] = rows;
+  }
+  return out;
+})();
 
 const TITHI_PREFIX = 'dharmagya-tithi-';
 const FESTIVAL_PREFIX = 'dharmagya-festival-';

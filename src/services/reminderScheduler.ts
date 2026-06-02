@@ -6,7 +6,7 @@ import type {
   TithiReminderKey,
   FestivalReminderKey,
 } from '@/store/useStore';
-import festivalsData from '@/data/static/festivals.json';
+import festivalsData from '@/data/festivals';
 import { applyQuietHoursShift } from '@/utils/format';
 import type { QuietHours } from './notifications';
 import {

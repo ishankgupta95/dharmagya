@@ -15,6 +15,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import i18n, { resolveLanguage } from '@/i18n';
 
 import { MotionPressable } from '@/components/common/MotionPressable';
+import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import {
   NAVRATRI_SOURCES,
   SAPTASHATI_ABOUT,
@@ -218,6 +219,11 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
   const [lang, setLang] = useState<Lang>(() => resolveLanguage(appLanguage));
   const tForLang = useMemo(() => i18n.getFixedT(lang, 'translation'), [lang]);
 
+  const favoriteIds = useStore(s => s.favoriteIds);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
+  const favKey = `scripture-${scripture.slug}`;
+  const isFavorite = favoriteIds.includes(favKey);
+
   const isSingleChapter = scripture.chapters.length === 1;
   const totalVerses = useMemo(
     () => scripture.chapters.reduce((n, ch) => n + ch.verses.length, 0),
@@ -239,7 +245,14 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
           </MotionPressable>
-          <View style={[styles.navPill, { borderWidth: 0 }]} />
+          <FavoriteHeart
+            active={isFavorite}
+            onPress={() => toggleFavorite(favKey)}
+            size={20}
+            inactiveColor={colors.textMuted}
+            activeColor={colors.accent}
+            accessibilityLabel={t(isFavorite ? 'a11y.removeFavorite' : 'a11y.addFavorite')}
+          />
         </View>
 
         <ScrollView

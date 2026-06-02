@@ -211,6 +211,10 @@ export default {
     chalisaBadge: 'चालीसा',
     kathaBadge: 'व्रत कथा',
     scriptureBadge: 'ग्रंथ',
+    ashtottaraBadge: '१०८ नाम',
+    sahasranamaBadge: '१००० नाम',
+    stotraBadge: 'स्तोत्र',
+    suktaBadge: 'वैदिक सूक्त',
     chaupaiCount: '{{count}} चौपाई',
     noContent: 'अभी कोई सामग्री उपलब्ध नहीं',
     deityNotFound: 'देवता नहीं मिले',
@@ -226,12 +230,38 @@ export default {
   reader: {
     aartiLabel: 'आरती',
     chalisaLabel: 'चालीसा',
+    ashtottaraLabel: '१०८ नाम',
+    prayerLabel: 'नित्य प्रार्थना',
     verseLabel: 'पद {{num}}',
     refrainTag: 'टेक',
     dohaLabel: 'दोहा',
     sorathaLabel: 'सोरठा',
     chaupaiLabel: 'चौपाई',
     verifyNote: 'पाठ एवं उच्चारण परंपरा अनुसार भिन्न होते हैं — किसी भी अनुष्ठान से पूर्व पंडित जी से पुष्टि करें।',
+    reviewNote: 'लिप्यंतरण विद्वत्-समीक्षाधीन है — इसे अनंतिम मानें।',
+  },
+  ashtottara: {
+    badge: 'अष्टोत्तर · १०८ नाम',
+    intro: 'अष्टोत्तरशतनामावली — देवता के १०८ नाम, पूजा में प्रत्येक नाम पर पुष्प अथवा अक्षत अर्पित करते हुए जप किए जाते हैं।',
+    nameCount: '{{count}} नाम',
+    openingShloka: 'आरंभिक श्लोक',
+    closingShloka: 'समापन श्लोक',
+    notFound: 'यह नामावली उपलब्ध नहीं है।',
+  },
+  prayers: {
+    title: 'नित्य प्रार्थनाएँ',
+    eyebrow: 'नित्य कर्म',
+    intro: 'गृह-पूजा की दैनिक प्रार्थनाएँ — प्रातः जागरण, स्नान से पूर्व, भोजन से पूर्व एवं संध्या के समय।',
+    notFound: 'कोई प्रार्थना उपलब्ध नहीं।',
+    occasion: {
+      morning: 'प्रातः जागरण',
+      bath: 'स्नान से पूर्व',
+      meal: 'भोजन से पूर्व',
+      evening: 'संध्या',
+      night: 'रात्रि',
+      invocation: 'आवाहन',
+      closing: 'समापन',
+    },
   },
   langToggle: {
     english: 'English',
@@ -1187,15 +1217,125 @@ export default {
     a11yOpenKanyaPujan: 'कन्या पूजन मार्गदर्शिका खोलें',
   },
 
+  // ── Sacred Texts hub ────────────────────────────────────────────────────
+  texts: {
+    title: 'पवित्र ग्रंथ',
+    eyebrow: 'पाठ · स्वाध्याय',
+    intro: 'समस्त पठन-सामग्री एक स्थान पर — पूर्ण ग्रंथ, स्तोत्र एवं नामावलियाँ, वैदिक सूक्त, तथा व्रत कथाएँ।',
+    scriptures: { title: 'ग्रंथ', subtitle: 'गीता, रामचरितमानस, सुन्दरकाण्ड एवं उपनिषद्।' },
+    stotras: { title: 'स्तोत्र एवं अष्टक', subtitle: 'शिव ताण्डव, महिषासुरमर्दिनी, बजरंग बाण आदि।' },
+    sahasranama: { title: 'सहस्रनाम', subtitle: 'सहस्र नाम — विष्णु एवं ललिता।' },
+    suktas: { title: 'वैदिक सूक्त', subtitle: 'श्री सूक्त, पुरुष सूक्त, श्री रुद्रम् आदि।' },
+    kathas: { title: 'व्रत कथाएँ', subtitle: 'व्रत रखते समय पठित कथाएँ।' },
+  },
+
+  // ── Stotras / Ashtakams ─────────────────────────────────────────────────
+  stotra: {
+    indexTitle: 'स्तोत्र एवं अष्टक',
+    indexEyebrow: 'स्तुति-गान',
+    indexIntro: 'देवताओं के शास्त्रीय स्तोत्र एवं अष्टक — स्तुत देवता अनुसार वर्गीकृत। श्लोक-दर-श्लोक पढ़ने हेतु किसी पर स्पर्श करें।',
+    notFound: 'यह स्तोत्र उपलब्ध नहीं है।',
+    a11yOpen: '{{name}} खोलें',
+    form: {
+      stotra: 'स्तोत्र',
+      ashtakam: 'अष्टक',
+      stuti: 'स्तुति',
+    },
+    language: {
+      sanskrit: 'संस्कृत',
+      awadhi: 'अवधी',
+    },
+  },
+
+  // ── Vedic Suktas ────────────────────────────────────────────────────────
+  sukta: {
+    indexTitle: 'वैदिक सूक्त',
+    indexEyebrow: 'वेदों से',
+    indexIntro: 'वेद-संहिताओं से चयनित सूक्त — पूजा, हवन एवं अभिषेक में पठित। पूर्ण पाठ हेतु किसी पर स्पर्श करें।',
+    notFound: 'यह सूक्त उपलब्ध नहीं है।',
+    a11yOpen: '{{name}} खोलें',
+  },
+
+  // ── Sahasranama (1000 names) ────────────────────────────────────────────
+  sahasranama: {
+    indexTitle: 'सहस्रनाम',
+    indexEyebrow: 'सहस्र नाम',
+    indexIntro: 'सहस्र-नाम नामावलियाँ — स्तोत्र रूप में सम्पूर्ण पाठ, अथवा अर्चना रूप में नाम-दर-नाम। आरंभ हेतु किसी पर स्पर्श करें।',
+    notFound: 'यह सहस्रनाम उपलब्ध नहीं है।',
+    a11yOpen: '{{name}} खोलें',
+    nameCount: '{{count}} नाम',
+    tabStotram: 'स्तोत्रम्',
+    tabNamavali: '१००० नाम',
+  },
+
+  // ── Tirtha (sacred geography) ───────────────────────────────────────────
+  tirtha: {
+    title: 'तीर्थ',
+    eyebrow: 'पवित्र भूगोल',
+    intro: 'परंपरा के पवित्र स्थल — शिव के ज्योतिर्लिंग, शक्तिपीठ, चार धाम, सप्त पुरी एवं पवित्र नदियाँ।',
+    notFound: 'यह स्थल उपलब्ध नहीं है।',
+    sourcesLabel: 'स्रोत-टिप्पणी',
+    siteCount: '{{count}} स्थल',
+    a11yOpenSite: '{{name}} खोलें',
+    jyotirlingaNumber: '१२ में से {{num}}वाँ ज्योतिर्लिंग',
+    presidingDeity: 'अधिष्ठाता देवता',
+    openDeity: '{{name}} खोलें',
+    openPuja: 'पूजा-विधि खोलें',
+    startJaap: 'मंत्र जप आरंभ करें',
+    category: {
+      jyotirlinga: 'द्वादश ज्योतिर्लिंग',
+      'char-dham': 'चार धाम',
+      'chota-char-dham': 'छोटा चार धाम',
+      'shakti-peetha': 'शक्तिपीठ',
+      'sapta-puri': 'सप्त पुरी',
+      'sacred-river': 'पवित्र नदियाँ',
+    },
+    field: {
+      location: 'स्थान',
+      shakti: 'शक्ति',
+      bodyPart: 'अंग (जो गिरा)',
+      bhairava: 'भैरव',
+      direction: 'दिशा',
+      jyotirlinga: 'स्तोत्र में',
+    },
+  },
+
+  // ── Festival detail ─────────────────────────────────────────────────────
+  festival: {
+    notFound: 'यह व्रत-पर्व उपलब्ध नहीं है।',
+    story: 'कथा',
+    presidingDeity: 'अधिष्ठाता देवता',
+    openDeity: '{{name}} खोलें',
+    observeLabel: 'इसका पालन कैसे करें',
+    sourcesLabel: 'स्रोत-टिप्पणी',
+    category: {
+      ekadashi: 'एकादशी',
+      'tithi-vrat': 'मासिक व्रत',
+      festival: 'पर्व',
+    },
+    link: {
+      katha: 'व्रत कथा',
+      puja: 'पूजा-विधि',
+      scripture: 'ग्रंथ',
+      mantra: 'मंत्र · जप',
+      sukta: 'वैदिक सूक्त',
+      stotra: 'स्तोत्र',
+    },
+  },
+
   // ── Scripture reader (P14.3 outline + library scriptures) ──────────────
   scripture: {
     notFound: 'यह ग्रंथ उपलब्ध नहीं है।',
     // Index screen
     indexTitle: 'ग्रंथ',
     indexEyebrow: 'पवित्र ग्रंथ',
-    indexIntro: 'भगवद्गीता एवं तुलसी-सुन्दरकाण्ड के पूर्ण मूल पाठ, तथा नवरात्रि पाठ हेतु प्रयुक्त दुर्गा सप्तशती की रूपरेखा। पढ़ने हेतु किसी ग्रंथ पर स्पर्श करें।',
+    indexIntro: 'भगवद्गीता, रामचरितमानस, सुन्दरकाण्ड एवं प्रमुख उपनिषदों के पूर्ण मूल पाठ, तथा नवरात्रि पाठ हेतु प्रयुक्त दुर्गा सप्तशती की रूपरेखा। पढ़ने हेतु किसी ग्रंथ पर स्पर्श करें।',
     sourcesLabel: 'इसके विषय में',
     a11yOpenScripture: '{{name}} खोलें',
+    group: {
+      core: 'महाकाव्य एवं गीता',
+      upanishad: 'उपनिषद्',
+    },
     // Saptashati branch
     kickerSaptashati: 'दुर्गा माहात्म्य',
     aboutLabel: 'इस ग्रंथ के विषय में',
@@ -1218,6 +1358,7 @@ export default {
     a11yOpenChapter: 'अध्याय {{num}} खोलें',
     // Verse reader
     verseKicker: 'श्लोक {{num}}',
+    meaningLabel: 'अर्थ',
     // Chapter footer navigation
     prevChapter: 'पिछला',
     nextChapter: 'अगला',
@@ -1244,8 +1385,26 @@ export default {
   practice: {
     title: 'पूजा',
     eyebrow: 'पूजा · साधना',
-    intro: 'पूजा-विधि एवं वार-उपासना — नवरात्रि नौ-दिवसीय मार्गदर्शिका, वार देवता, सामग्री-सूची एवं क्रमिक उपचार सहित सात विशेष पूजाएँ, तथा छह व्रत कथाएँ। पर्व-तिथियाँ (एकादशी, महाशिवरात्रि आदि) पर्व-तालिका (Festivals) टैब में सूचीबद्ध हैं।',
+    intro: 'समस्त साधना एक स्थान पर — नवरात्रि मार्गदर्शिका एवं वार देवता, विशेष पूजाएँ, पवित्र-ग्रंथ संग्रह, तीर्थ-संग्रह, तथा पर्व-तालिका।',
     comingSoon: 'शीघ्र आ रही',
+    section: {
+      daily: 'नित्य साधना',
+      texts: 'पवित्र ग्रंथ',
+      places: 'तीर्थ-स्थल',
+      festivals: 'पर्व',
+    },
+    texts: {
+      title: 'पवित्र ग्रंथ',
+      subtitle: 'ग्रंथ, स्तोत्र एवं अष्टक, सहस्रनाम, वैदिक सूक्त एवं व्रत कथाएँ।',
+    },
+    tirtha: {
+      title: 'तीर्थ · पवित्र स्थल',
+      subtitle: 'ज्योतिर्लिंग, शक्तिपीठ, चार धाम, सप्त पुरी एवं पवित्र नदियाँ।',
+    },
+    festivals: {
+      title: 'पर्व-तालिका',
+      subtitle: 'प्रत्येक व्रत एवं पर्व की तिथि, महत्त्व एवं कथा।',
+    },
     navratri: {
       title: 'नवरात्रि नौ-दिवसीय मार्गदर्शिका',
       defaultSubtitle: 'शारदीय नवरात्रि · दिन-वार रूप, मंत्र, भोग, व्रत-नियम एवं दुर्गा सप्तशती',
@@ -1266,6 +1425,10 @@ export default {
     scriptures: {
       title: 'ग्रंथ',
       subtitle: 'भगवद्गीता, सुन्दरकाण्ड एवं दुर्गा सप्तशती की रूपरेखा।',
+    },
+    prayers: {
+      title: 'नित्य प्रार्थनाएँ',
+      subtitle: 'दिन भर की नित्य-कर्म प्रार्थनाएँ — प्रातः जागरण, स्नान से पूर्व, भोजन से पूर्व एवं संध्या।',
     },
   },
 
@@ -1300,38 +1463,6 @@ export default {
     // Accessibility
     a11yStartJaap: 'इस मंत्र का जप आरंभ करें',
   },
-  share: {
-    // Sheet chrome
-    title: 'कार्ड साझा करें',
-    shareBtn: 'साझा करें',
-    shapeStory: 'स्टोरी · 9:16',
-    shapeSquare: 'वर्ग · 1:1',
-    statusHint: 'व्हाट्सऐप स्टेटस के लिए — शेयर शीट खोलें, व्हाट्सऐप चुनें, फिर "My status" पर टैप करें।',
-    error: 'कार्ड नहीं बन सका। कृपया फिर से प्रयास करें।',
-    // Card kickers
-    kickerDeityBlessing: 'देव आशीर्वाद',
-    kickerFestival: 'पर्व की शुभकामनाएँ',
-    kickerVerse: 'पावन पंक्ति',
-    kickerJaap: 'जाप पूर्ण',
-    jaapCountLine: 'आज {{count}} बार जप',
-    kickerMilestone: 'साधना मील-पत्थर',
-    milestoneSubline: {
-      sessions: 'पूर्ण किए गए सत्र',
-      repetitions: 'पावन जप',
-      streak: 'दिनों की साधना',
-    },
-    from: 'स्रोत — {{name}}',
-    // Entry-point buttons
-    ctaGreeting: 'शुभकामना साझा करें',
-    ctaDeity: 'साझा करें',
-    ctaVerse: 'पंक्ति साझा करें',
-    ctaJaap: 'साझा करें',
-    shareFullText: 'पूरा पाठ साझा करें',
-    viaDharmagya: 'dharmagya ऐप से साझा',
-    a11yShare: 'साझा करने योग्य चित्र बनाएँ',
-    a11yShareFullText: 'पूरा पाठ व्हाट्सऐप या किसी अन्य ऐप पर साझा करें',
-  },
-
   // ── साधना श्रृंखला + मील-पत्थर (P14.4) ─────────────────────────────────
   sadhana: {
     streakLabel: 'साधना',
@@ -1358,7 +1489,6 @@ export default {
     },
     milestoneBlessing: 'आपकी साधना गहरी हो।',
     continueBtn: 'आगे बढ़ें',
-    shareBtn: 'साझा करें',
 
     reminderTitle: '🪔 एक शांत क्षण',
     reminderBody: 'जब समय मिले, आज की साधना आरंभ करें।',

@@ -1,12 +1,14 @@
 import {
   getInstantPanchang,
+  getUpcomingSolarEclipse,
+  getUpcomingLunarEclipse,
   PanchangError,
   type AyanamsaType,
   type FestivalInfo,
   type FestivalRegion,
 } from 'panchang-ts';
 
-import festivalsData from '@/data/static/festivals.json';
+import festivalsData from '@/data/festivals';
 import { pmark, ptime } from '@/utils/perfProfile';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -97,11 +99,12 @@ export interface CalendarMonthOptions {
   masaSystem: 'purnimanta' | 'amanta';
 }
 
-// ─── Static festivals.json index (built once at module load) ─────────────────
-// `festivals.json` is ~3300 entries across 2016..2036. Flatten into a single
-// `Map<YYYY-MM-DD, row>` so per-cell lookup is O(1). The whole bundle is
-// already eagerly imported by `vrat.ts`, so this only pays an indexing cost
-// (≈1ms), not a JSON-parse cost.
+// ─── Festival index (built once at module load) ──────────────────────────────
+// `festivalsData` is the panchang-ts bundled festival table, year-keyed (see
+// `src/data/festivals.ts`). Flatten into a single `Map<YYYY-MM-DD, row>` so
+// per-cell lookup is O(1). Eclipses are not in this table (the lib excludes
+// them — visibility is location-dependent); they're sourced live per-month via
+// `eclipsesForCells` below.
 
 interface FestivalJsonRow {
   date: string;
@@ -186,6 +189,44 @@ function ymdKey(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * Eclipses for a calendar grid window, sourced live from panchang-ts (the
+ * bundled festival table excludes eclipses by design — visibility is
+ * location-dependent). Computed once per month build (cache miss only), not
+ * per cell. A 42-day window can hold at most one solar and one lunar eclipse
+ * (consecutive same-kind eclipses are ≥148 days apart), so a single lookahead
+ * per kind suffices. Peak instants are mapped to their device-local calendar
+ * day to match the grid's device-local cells (mirrors `eclipseDateOf` in
+ * panchangService).
+ */
+function eclipsesForCells(
+  cellDates: Date[],
+  coords: { lat: number; lon: number },
+): Map<string, 'solar' | 'lunar'> {
+  const map = new Map<string, 'solar' | 'lunar'>();
+  if (cellDates.length === 0) return map;
+  const first = cellDates[0];
+  const last = cellDates[cellDates.length - 1];
+  const spanDays = Math.ceil((last.getTime() - first.getTime()) / 86_400_000) + 2;
+  const loc = { latitude: coords.lat, longitude: coords.lon };
+  try {
+    const solar = getUpcomingSolarEclipse(first, loc, spanDays);
+    if (solar) map.set(ymdKey(new Date(solar.peak)), 'solar');
+  } catch (e) {
+    if (e instanceof PanchangError) console.warn('[calendar]', e.code, e.message);
+  }
+  try {
+    const lunar = getUpcomingLunarEclipse(first, loc, spanDays);
+    if (lunar) {
+      const k = ymdKey(new Date(lunar.peak));
+      if (!map.has(k)) map.set(k, 'lunar');
+    }
+  } catch (e) {
+    if (e instanceof PanchangError) console.warn('[calendar]', e.code, e.message);
+  }
+  return map;
 }
 
 /**
@@ -388,6 +429,7 @@ function buildDay(
   coords: { lat: number; lon: number },
   ayanamsa: AyanamsaType,
   selectedDeities: string[],
+  eclipseMap: Map<string, 'solar' | 'lunar'>,
 ): CalendarDay {
   // Tithi/paksha — light snapshot at sunrise approx (≈60µs per call).
   let tithiIdx = 0;
@@ -434,12 +476,8 @@ function buildDay(
   );
   const sankranti = festivals.some(f => f.type === 'sankranti');
   const pradosh = festivals.some(f => f.type === 'pradosha');
-  const eclipseEntry = festivals.find(f => f.type === 'eclipse');
-  // festivals.json names eclipses as "Surya Grahan (Solar Eclipse)" /
-  // "Chandra Grahan (Lunar Eclipse)" — match on the parenthesised form.
-  const eclipse: 'solar' | 'lunar' | null = eclipseEntry
-    ? (/lunar|chandra/i.test(eclipseEntry.name) ? 'lunar' : 'solar')
-    : null;
+  // Eclipses are sourced live (not in the festival table) — see eclipsesForCells.
+  const eclipse: 'solar' | 'lunar' | null = eclipseMap.get(ymdKey(date)) ?? null;
   const isUserDeityFestival =
     selectedDeities.length > 0 &&
     festivals.some(f => festivalMatchesDeity(f, selectedDeities));
@@ -510,8 +548,10 @@ export function getCalendarMonth(
   }
   pmark('calendar:getCalendarMonth:miss', `${year}-${month + 1}`);
   const endBuild = ptime('calendar:getCalendarMonth:build');
-  const cells = buildCells(year, month).map(d =>
-    buildDay(d, coords, opts.ayanamsa, opts.selectedDeities),
+  const cellDates = buildCells(year, month);
+  const eclipseMap = eclipsesForCells(cellDates, coords);
+  const cells = cellDates.map(d =>
+    buildDay(d, coords, opts.ayanamsa, opts.selectedDeities, eclipseMap),
   );
   endBuild();
 
@@ -568,10 +608,12 @@ export function peekCalendarMonth(
 }
 
 // ─── Yearly drilldowns (P9.3) ────────────────────────────────────────────────
-// Drilldown lists ("Ekadashi this year", "Sankrantis this year", "Upcoming
-// eclipses") read the pre-computed festivals.json bundled in `src/data/static`.
-// The file covers 2016..2036 — see scripts/generate-festivals.js. Years outside
-// that window return an empty list.
+// Drilldown lists ("Ekadashi this year", "Sankrantis this year") read the
+// panchang-ts bundled festival table (see `src/data/festivals.ts`). It covers
+// FESTIVALS_MIN_YEAR..FESTIVALS_MAX_YEAR; years outside that window return an
+// empty list. Eclipses are NOT in the table — `getUpcomingEclipsesLocal` is kept
+// as a stub returning `[]`; live eclipses come from `fetchUpcomingEclipses`
+// (panchangService) and the month grid's `eclipsesForCells`.
 
 function parseYmd(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);

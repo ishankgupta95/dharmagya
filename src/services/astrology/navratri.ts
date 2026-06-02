@@ -33,7 +33,7 @@ import {
   type NavadurgaForm,
 } from '@/config/navratri';
 import { FALLBACK_COORDS } from './panchangService';
-import festivalsData from '@/data/static/festivals.json';
+import festivalsData from '@/data/festivals';
 
 // ─── Result types ────────────────────────────────────────────────────────────
 

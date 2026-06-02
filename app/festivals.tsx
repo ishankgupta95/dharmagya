@@ -18,12 +18,12 @@ import { Kicker } from '@/components/common/Kicker';
 import { AdBanner } from '@/components/common/AdBanner';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
-import festivalsData from '@/data/static/festivals.json';
+import festivalsData, { FESTIVALS_MIN_YEAR, FESTIVALS_MAX_YEAR } from '@/data/festivals';
 import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
 import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
-import { useShareSheet } from '@/store/useShareSheet';
 import { getPujaForFestivalName } from '@/config/pujas';
 import { getKathaForFestivalName } from '@/config/kathas';
+import { getFestivalContentForName } from '@/config/festivalContent';
 import type { IEclipseSummary } from '@/types';
 
 interface FestivalEntry {
@@ -152,8 +152,8 @@ function collapseEkadashiPair(list: FestivalEntry[]): FestivalEntry[] {
   return list;
 }
 
-const MIN_YEAR = 2016;
-const MAX_YEAR = 2036;
+const MIN_YEAR = FESTIVALS_MIN_YEAR;
+const MAX_YEAR = FESTIVALS_MAX_YEAR;
 
 function isSameDay(a: Date, b: Date) {
   return a.getDate() === b.getDate() &&
@@ -427,7 +427,6 @@ function FestivalRowImpl({
   const dayName = item.date.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNum = item.date.getDate();
   const highlighted = isToday || isSoon;
-  const openShare = useShareSheet(s => s.open);
 
   return (
     <View
@@ -500,19 +499,45 @@ function FestivalRowImpl({
           }
           const matchedPuja = getPujaForFestivalName(f.name, f.description);
           const matchedKatha = getKathaForFestivalName(f.name, f.description);
+          const matchedFestival = getFestivalContentForName(f.name, f.description);
           const pujaLang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
+          // When the lib carries content for this observance, the name becomes a
+          // link into the festival detail (significance + story + cross-links),
+          // and a one-line significance shows when no other subtitle is present.
+          const significance = matchedFestival && !secondary
+            ? matchedFestival.significance[pujaLang]
+            : undefined;
           return (
             <View key={i} style={styles.festivalItem}>
               <View style={{ marginTop: 3 }}>
                 <Icon name={typeInfo.icon} size={14} color={typeInfo.color ?? colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text variant="body" style={[styles.festivalName, { color: colors.textPrimary }]}>
-                  {primary}
-                </Text>
+                {matchedFestival ? (
+                  <MotionPressable
+                    onPress={() => router.push({ pathname: '/festival/[id]', params: { id: matchedFestival.id } })}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    style={styles.festivalNameRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={localizeFestivalName(f.name, i18n.language)}>
+                    <Text variant="body" style={[styles.festivalName, styles.festivalNameLink, { color: colors.textPrimary }]}>
+                      {primary}
+                    </Text>
+                    <Icon name="chevron-right" size={13} color={colors.textMuted} />
+                  </MotionPressable>
+                ) : (
+                  <Text variant="body" style={[styles.festivalName, { color: colors.textPrimary }]}>
+                    {primary}
+                  </Text>
+                )}
                 {secondary && (
                   <Text variant="body-italic" style={[styles.festivalSecondary, { color: colors.textMuted }]}>
                     {secondary}
+                  </Text>
+                )}
+                {significance && (
+                  <Text variant="body-italic" style={[styles.festivalSecondary, { color: colors.textMuted }]} numberOfLines={2}>
+                    {significance}
                   </Text>
                 )}
                 {matchedPuja && (
@@ -542,21 +567,6 @@ function FestivalRowImpl({
                   </MotionPressable>
                 )}
               </View>
-              {f.type === 'major' && (
-                <MotionPressable
-                  onPress={() => openShare({
-                    kind: 'festival-greeting',
-                    festivalNameEn: localizeFestivalName(f.name, 'en'),
-                    festivalNameHi: localizeFestivalName(f.name, 'hi'),
-                    dateLabel: item.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-                  })}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{ marginTop: 1 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('share.ctaGreeting')}>
-                  <Icon name="share" size={15} color={colors.textMuted} />
-                </MotionPressable>
-              )}
             </View>
           );
         })}
@@ -637,7 +647,9 @@ const styles = StyleSheet.create({
 
   festivalCol: { flex: 1, paddingVertical: 10, paddingRight: 12, gap: 6 },
   festivalItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  festivalNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   festivalName: { fontSize: 14, lineHeight: 19 },
+  festivalNameLink: { flexShrink: 1 },
   festivalSecondary: { fontSize: 11, lineHeight: 15, marginTop: 1 },
   pujaCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
   pujaCtaText: { fontSize: 8.5, letterSpacing: 1.4, flexShrink: 1 },
