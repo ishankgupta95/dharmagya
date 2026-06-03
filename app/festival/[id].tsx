@@ -17,7 +17,7 @@ import { MotionPressable } from '@/components/common/MotionPressable';
 import { DEITY_BY_ID } from '@/config/deities';
 import { getFestivalContentById, FESTIVAL_SOURCES } from '@/config/festivalContent';
 import { getKathaBySlug } from '@/config/kathas';
-import { getPujaBySlug } from '@/config/pujas';
+import { getPujaBySlug } from '@/config/poojas';
 import { getScriptureBySlug } from '@/config/scriptures';
 import { getMantraBySlug, getStotraBySlug, getSuktaBySlug, titleFor, type ContentLang } from '@/services/content';
 
@@ -56,7 +56,7 @@ export default function FestivalDetailScreen() {
     }
     const puja = festival.pujaSlug ? getPujaBySlug(festival.pujaSlug) : undefined;
     if (puja) {
-      out.push({ key: 'puja', icon: 'gift', kicker: t('festival.link.puja'), title: puja.name[lang], href: { pathname: '/puja/[slug]', params: { slug: puja.slug } } });
+      out.push({ key: 'puja', icon: 'gift', kicker: t('festival.link.puja'), title: puja.name[lang], href: { pathname: '/pooja/[slug]', params: { slug: puja.slug } } });
     }
     const scripture = festival.scriptureSlug ? getScriptureBySlug(festival.scriptureSlug) : undefined;
     if (scripture) {

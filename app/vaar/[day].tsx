@@ -23,7 +23,7 @@ import {
   type VaarDeity,
   type VaarDevata,
 } from '@/config/vaarDevata';
-import { getPujasForDeity, type PujaContent } from '@/config/pujas';
+import { getPujasForDeity, type PujaContent } from '@/config/poojas';
 
 type Lang = ContentLang;
 
@@ -200,7 +200,7 @@ export default function VaarDevataScreen() {
               {linkedPujas.map((p) => (
                 <MotionPressable
                   key={p.slug}
-                  onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: p.slug } })}
+                  onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: p.slug } })}
                   pressedScale={0.97}
                   style={[styles.linkedPujaRow, { borderColor: colors.borderAccent, backgroundColor: colors.surfaceRecessed }]}
                   accessibilityRole="button"

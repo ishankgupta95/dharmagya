@@ -153,7 +153,7 @@ export default function TirthaDetailScreen() {
           <View style={styles.ctaRow}>
             {site.pujaSlug && (
               <MotionPressable
-                onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: site.pujaSlug! } })}
+                onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: site.pujaSlug! } })}
                 pressedScale={0.97}
                 style={[styles.ctaChip, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
                 accessibilityRole="button"

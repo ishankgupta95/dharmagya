@@ -26,7 +26,7 @@ import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { DEITY_BY_ID } from '@/config/deities';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { getDeityImage } from '@/config/deityImages';
-import { getPujasForDeity } from '@/config/pujas';
+import { getPujasForDeity } from '@/config/poojas';
 import { getKathasForDeity, type Katha } from '@/config/kathas';
 import { getScripturesForDeity, type Scripture } from '@/config/scriptures';
 import {
@@ -379,7 +379,7 @@ function HeroBlock({ deityId, deityColor, displayName, description, image, color
         <View style={styles.heroCtaRow}>
           {featuredPuja && (
             <MotionPressable
-              onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: featuredPuja.slug } })}
+              onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: featuredPuja.slug } })}
               pressedScale={0.97}
               style={[styles.heroShareBtn, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
               accessibilityRole="button"

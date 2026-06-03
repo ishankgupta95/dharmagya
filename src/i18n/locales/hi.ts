@@ -51,7 +51,7 @@ export default {
     panchang: 'पंचांग',
     gods: 'भगवान',
     astrology: 'ज्योतिष',
-    pujas: 'पूजा',
+    devotion: 'भक्ति',
     settings: 'सेटिंग्स',
   },
 
@@ -1383,8 +1383,8 @@ export default {
 
   // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
   practice: {
-    title: 'पूजा',
-    eyebrow: 'पूजा · साधना',
+    title: 'भक्ति',
+    eyebrow: 'साधना',
     intro: 'समस्त साधना एक स्थान पर — नवरात्रि मार्गदर्शिका एवं वार देवता, विशेष पूजाएँ, पवित्र-ग्रंथ संग्रह, तीर्थ-संग्रह, तथा पर्व-तालिका।',
     comingSoon: 'शीघ्र आ रही',
     section: {

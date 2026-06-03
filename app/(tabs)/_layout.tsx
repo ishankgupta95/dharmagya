@@ -105,11 +105,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="practice"
         options={{
-          // Label resolves from `tabs.pujas` (was `tabs.practice` pre-rename).
-          // File still named `practice.tsx` since the URL `/practice` is
-          // already referenced from other screens / notifications; renaming
-          // the file would invalidate those without payoff.
-          title: t('tabs.pujas'),
+          // Label resolves from `tabs.devotion` (was `tabs.pujas`, and
+          // `tabs.practice` before that). File stays `practice.tsx` since the
+          // URL `/practice` is already referenced from other screens /
+          // notifications; renaming the file would invalidate those without
+          // payoff. The tab is a broad devotional hub (texts, tirtha,
+          // festivals, pujas), so the label is "Devotion", not "Pujas".
+          title: t('tabs.devotion'),
           tabBarIcon: (props) => <TabIcon focused={props.focused} color={props.color} emberColor={activeColor} name="flame" />,
         }}
       />

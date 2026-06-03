@@ -129,7 +129,7 @@ export default function PracticeTab() {
             icon="gift"
             title={t('practice.pujaVidhi.title')}
             subtitle={t('practice.pujaVidhi.subtitle')}
-            onPress={() => router.push('/puja')}
+            onPress={() => router.push('/pooja')}
             colors={colors}
             t={t}
           />

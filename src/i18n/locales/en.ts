@@ -55,7 +55,7 @@ export default {
     // 6-tab edge-to-edge layouts. The in-screen title (`astrology.title`)
     // still reads "Astrology" so the meaning is unambiguous on entry.
     astrology: 'Jyotish',
-    pujas: 'Pujas',
+    devotion: 'Devotion',
     settings: 'Settings',
   },
 
@@ -1138,7 +1138,7 @@ export default {
     mantraLabel: 'Mantra for the day',
     mantraReviewNote: 'Transliteration is under scholarly review — treat as provisional.',
     variantNotesLabel: 'Regional & traditional variants',
-    linkedPujaLabel: 'Linked puja vidhi',
+    linkedPujaLabel: 'Linked pooja vidhi',
     sourcesLabel: 'About this',
     // Kundli remedy nudges (Dignity / Dosha / Sade Sati / Dasha cards)
     nudgeWeakChandra: 'Born with a weak (debilitated) Moon? Monday is traditionally for Shiva worship — see the Monday Vaar Devata.',
@@ -1216,8 +1216,8 @@ export default {
     a11yStartJaap: 'Start a jaap of this mantra',
     a11yOpenVrat: 'Open the Navratri vrat guide',
     a11yOpenSaptashati: 'Open the Durga Saptashati outline',
-    // P14.2 cross-link: Ghatasthapana puja vidhi
-    openGhatasthapanaPuja: 'Open the Ghatasthapana puja vidhi',
+    // P14.2 cross-link: Ghatasthapana pooja vidhi
+    openGhatasthapanaPuja: 'Open the Ghatasthapana pooja vidhi',
     // Kanya Pujan (dedicated guide — /navratri/kanya-pujan)
     kanyaPujanCardCta: 'Read the Kanya Pujan guide',
     kanyaTitle: 'Kanya Pujan',
@@ -1267,7 +1267,7 @@ export default {
   sukta: {
     indexTitle: 'Vedic Suktas',
     indexEyebrow: 'FROM THE VEDAS',
-    indexIntro: 'Hymns drawn from the Vedic samhitas — recited in puja, havan, and abhishekam. Tap one to read it in full.',
+    indexIntro: 'Hymns drawn from the Vedic samhitas — recited in pooja, havan, and abhishekam. Tap one to read it in full.',
     notFound: 'This sukta is not available.',
     a11yOpen: 'Open {{name}}',
   },
@@ -1296,7 +1296,7 @@ export default {
     jyotirlingaNumber: 'Jyotirlinga {{num}} of 12',
     presidingDeity: 'Presiding deity',
     openDeity: 'Open {{name}}',
-    openPuja: 'Open the puja vidhi',
+    openPuja: 'Open the pooja vidhi',
     startJaap: 'Start the mantra jaap',
     category: {
       jyotirlinga: 'Dvadasha Jyotirlinga',
@@ -1331,7 +1331,7 @@ export default {
     },
     link: {
       katha: 'VRAT KATHA',
-      puja: 'PUJA VIDHI',
+      puja: 'POOJA VIDHI',
       scripture: 'SCRIPTURE',
       mantra: 'MANTRA · JAAP',
       sukta: 'VEDIC SUKTA',
@@ -1385,11 +1385,11 @@ export default {
   katha: {
     indexTitle: 'Vrat Kathas',
     indexEyebrow: 'RECITED WHEN A VRAT IS KEPT',
-    indexIntro: 'The traditional narratives recited when a vrat is observed — each paired with its puja samagri and vidhi. Tap a katha to read it in full.',
+    indexIntro: 'The traditional narratives recited when a vrat is observed — each paired with its pooja samagri and vidhi. Tap a katha to read it in full.',
     notFound: 'This katha is not available.',
     aboutLabel: 'About this katha',
-    samagriLabel: 'Puja Samagri',
-    vidhiLabel: 'Puja Vidhi',
+    samagriLabel: 'Pooja Samagri',
+    vidhiLabel: 'Pooja Vidhi',
     adhyayKicker: 'ADHYAY {{num}}',
     sourcesLabel: 'About this',
     a11yOpenKatha: 'Open {{name}}',
@@ -1398,9 +1398,9 @@ export default {
 
   // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
   practice: {
-    title: 'Pujas',
-    eyebrow: 'PUJA · SADHANA',
-    intro: 'Devotional practice in one place — the Navratri guide and weekday Vaar Devata, the Featured Pujas, the sacred-text library, the pilgrimage atlas, and the festival calendar.',
+    title: 'Devotion',
+    eyebrow: 'SADHANA',
+    intro: 'Devotional practice in one place — the Navratri guide and weekday Vaar Devata, the Featured Poojas, the sacred-text library, the pilgrimage atlas, and the festival calendar.',
     comingSoon: 'COMING SOON',
     section: {
       daily: 'Daily Practice',
@@ -1430,8 +1430,8 @@ export default {
       subtitle: '{{day}} — {{deities}}',
     },
     pujaVidhi: {
-      title: 'Puja Vidhi',
-      subtitle: 'Step-by-step household pujas — Satyanarayan, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha, Ghatasthapana.',
+      title: 'Pooja Vidhi',
+      subtitle: 'Step-by-step household poojas — Satyanarayan, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha, Ghatasthapana.',
     },
     kathas: {
       title: 'Vrat Kathas',
@@ -1447,13 +1447,13 @@ export default {
     },
   },
 
-  // ── Puja Vidhi (P14.2) ──────────────────────────────────────────────────
+  // ── Pooja Vidhi (P14.2) ──────────────────────────────────────────────────
   puja: {
     // Index screen
-    indexTitle: 'Puja Vidhi',
-    indexEyebrow: 'FEATURED PUJAS',
-    indexIntro: 'Seven of the most-performed household pujas, each on the classical Shodashopachara template — when and why, an interactive samagri checklist, numbered steps, and deep links to the aarti, chalisa, jaap, and the matching festival or muhurat.',
-    notFound: 'This puja is not available.',
+    indexTitle: 'Pooja Vidhi',
+    indexEyebrow: 'FEATURED POOJAS',
+    indexIntro: 'Seven of the most-performed household poojas, each on the classical Shodashopachara template — when and why, an interactive samagri checklist, numbered steps, and deep links to the aarti, chalisa, jaap, and the matching festival or muhurat.',
+    notFound: 'This pooja is not available.',
     // Detail-screen section labels
     whenWhyLabel: 'When & why',
     samagriLabel: 'Samagri · supplies',
@@ -1462,9 +1462,9 @@ export default {
     sankalpaHint: "Recite mentally; substitute your gotra, name, place, and intention where shown in brackets.",
     preArcLabel: 'Opening steps',
     shodashopacharaLabel: 'The sixteen upacharas',
-    shodashopacharaHint: 'The classical Shodashopachara sequence, parameterised for this puja.',
+    shodashopacharaHint: 'The classical Shodashopachara sequence, parameterised for this pooja.',
     postArcLabel: 'Closing steps',
-    afterTheLabel: 'After the puja',
+    afterTheLabel: 'After the pooja',
     variantsLabel: 'Regional & traditional variants',
     sourcesLabel: 'About this',
     // Banners + buttons
@@ -1473,7 +1473,7 @@ export default {
     openAarti: 'Open the aarti',
     openChalisa: 'Open the chalisa',
     // Cross-link CTAs (used by Library / Festivals / Vaar / Navratri)
-    openPujaCta: 'Open the Puja',
+    openPujaCta: 'Open the Pooja',
     openNamedPuja: 'OPEN {{name}}',
     openDeityPuja: 'Open the {{name}}',
     // Accessibility

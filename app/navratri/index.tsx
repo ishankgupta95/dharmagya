@@ -403,7 +403,7 @@ function DayCard({
           )}
           {/* Link into the Ghatasthapana puja vidhi (P14.2). */}
           <MotionPressable
-            onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: 'navratri-ghatasthapana' } })}
+            onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: 'navratri-ghatasthapana' } })}
             pressedScale={0.97}
             style={[styles.ghatasthapanaPujaCta, { borderColor: colors.borderAccent }]}
             accessibilityRole="button"

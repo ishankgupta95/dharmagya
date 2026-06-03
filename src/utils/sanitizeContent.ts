@@ -22,3 +22,26 @@ export function stripSourceRefs(text: string): string {
 export function sanitizeBilingual<T extends { en: string; hi: string }>(b: T): T {
   return { ...b, en: stripSourceRefs(b.en), hi: stripSourceRefs(b.hi) };
 }
+
+/**
+ * Display-time spelling shim: the `hindu-devotional-texts` library spells
+ * "Puja"; the app's chosen romanisation is "Pooja". Rewrite whole-word
+ * "Puja"/"Pujas" (any case) to "Pooja"/"Poojas" so library-sourced puja names
+ * read consistently with the app's own strings.
+ *
+ * Whole-word only — "Pujan" (Kanya Pujan / Shami Pujan, the distinct word
+ * पूजन) and IAST transliterations ("pūjā", carrying diacritics) are left
+ * untouched; it is also a no-op on Devanagari. Idempotent. Scope it to short
+ * NAME / kicker fields, not arbitrary library prose (which can carry IAST).
+ * The clean permanent fix is an upstream package release spelling them
+ * "Pooja" — drop this shim then.
+ */
+export function poojafy(text: string): string {
+  return text
+    .replace(/\bPUJAS\b/g, 'POOJAS')
+    .replace(/\bPUJA\b/g, 'POOJA')
+    .replace(/\bPujas\b/g, 'Poojas')
+    .replace(/\bPuja\b/g, 'Pooja')
+    .replace(/\bpujas\b/g, 'poojas')
+    .replace(/\bpuja\b/g, 'pooja');
+}

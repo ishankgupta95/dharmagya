@@ -4,7 +4,7 @@
  * The seven featured pujas, the 16-step Shodashopachara template, and every
  * puja type now live in the shared `hindu-devotional-texts` library, in its
  * `puja/` module. This file is kept as the app's import boundary — screens
- * still import from `@/config/pujas` — but all content and types are sourced
+ * still import from `@/config/poojas` — but all content and types are sourced
  * from the library. The previous inline dataset has been removed.
  *
  * Type names are bridged to the names the app's screens already use:
@@ -20,6 +20,7 @@ import {
   type Puja,
   type PujaSamagriItem,
 } from 'hindu-devotional-texts';
+import { poojafy } from '@/utils/sanitizeContent';
 
 // ─── Types (sourced from the library) ────────────────────────────────────────
 
@@ -48,8 +49,23 @@ export { PUJA_DISCLAIMER } from 'hindu-devotional-texts';
 
 // ─── The seven featured pujas + lookups ──────────────────────────────────────
 
+/**
+ * Rewrite a puja's display name + kicker from the library's "Puja" spelling to
+ * the app's "Pooja" (see `poojafy`). English face only — the Devanagari `hi`
+ * face is unaffected, and step text / mantras (which carry IAST) are left to
+ * the upstream package. `name` is display-only here: lookups key on `slug`,
+ * `rosterDeity`, and `festivalMatchers`, never on `name`, so this is safe.
+ */
+function poojafyPuja(p: Puja): Puja {
+  return {
+    ...p,
+    name: { ...p.name, en: poojafy(p.name.en) },
+    kicker: p.kicker ? { ...p.kicker, en: poojafy(p.kicker.en) } : p.kicker,
+  };
+}
+
 /** All seven featured pujas, in display order. */
-export const FEATURED_PUJAS: readonly PujaContent[] = getAllPujas();
+export const FEATURED_PUJAS: readonly PujaContent[] = getAllPujas().map(poojafyPuja);
 
 /** Look up a featured puja by slug; `undefined` for an unknown key. */
 export function getPujaBySlug(slug: string | undefined): PujaContent | undefined {

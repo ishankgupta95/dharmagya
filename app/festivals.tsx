@@ -21,7 +21,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import festivalsData, { FESTIVALS_MIN_YEAR, FESTIVALS_MAX_YEAR } from '@/data/festivals';
 import { fetchUpcomingEclipses, FALLBACK_COORDS } from '@/services/astrology/panchangService';
 import { localizeFestivalName, localizeFestivalDescription } from '@/i18n/festivalNames';
-import { getPujaForFestivalName } from '@/config/pujas';
+import { getPujaForFestivalName } from '@/config/poojas';
 import { getKathaForFestivalName } from '@/config/kathas';
 import { getFestivalContentForName } from '@/config/festivalContent';
 import type { IEclipseSummary } from '@/types';
@@ -542,7 +542,7 @@ function FestivalRowImpl({
                 )}
                 {matchedPuja && (
                   <MotionPressable
-                    onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: matchedPuja.slug } })}
+                    onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: matchedPuja.slug } })}
                     hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     style={styles.pujaCtaRow}
                     accessibilityRole="button"
