@@ -107,6 +107,14 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   // re-fills with the score data the DayRow now renders.
   // 6: milestones_achieved table introduced (P14.4 sadhana milestones). No
   // old data to migrate; the bump just records that the schema reached v6.
+  // 7: panchang-ts 5.x. Two independent reasons to wipe muhurat_cache: the
+  // embedded `IPanchangDay` gained collection-shaped `varjyam` / `amritKala`
+  // (old rows carry the removed `varjyamStart` scalars and would render blank
+  // rows), and the stock muhurta rules were themselves rebuilt against
+  // DrikPanchang's published calendars — 26 defects across all 13 rules, plus
+  // Vara×Tithi yoga scoring and Bhadra demoted from whole-day veto to a
+  // penalty — so cached scans list days the new rules reject and omit days
+  // they now accept.
   const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version < 2) {
@@ -125,6 +133,10 @@ export async function initDatabase(db: SQLiteDatabase): Promise<void> {
   }
   if (version < 6) {
     db.execSync('PRAGMA user_version = 6');
+  }
+  if (version < 7) {
+    db.execSync('DELETE FROM muhurat_cache');
+    db.execSync('PRAGMA user_version = 7');
   }
   end();
 }

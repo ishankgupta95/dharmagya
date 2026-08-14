@@ -16,7 +16,16 @@
       }
     },
     "production": {
-      "android": {}
+      "android": {},
+      "ios": {}
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "ishank1995@gmail.com",
+        "appleTeamId": "UXDRZS84TX"
+      }
     }
   }
 }

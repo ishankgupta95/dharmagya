@@ -6,14 +6,20 @@
 //
 // Run: node scripts/test-reminder-scheduler.js [YYYY-MM-DD]
 
-// Festival data comes from the panchang-ts bundled table (same source the app
-// uses via src/data/festivals.ts), built into the legacy year-keyed shape.
-const { getFestivalsForYear, FESTIVALS_YEAR_RANGE } = require('panchang-ts/festivals');
+// Festival data comes from the table scripts/generate-festivals-table.js builds
+// (the same source the app uses via src/data/festivals.ts), flattened into the
+// legacy year-keyed shape.
+const {
+  readFestivalsForYear,
+  readFestivalsYearRange,
+} = require('panchang-ts/festivals');
+const festivalsTable = require('../src/data/static/festivals-table.json');
 
 const festivalsData = (() => {
+  const range = readFestivalsYearRange(festivalsTable);
   const out = {};
-  for (let y = FESTIVALS_YEAR_RANGE.start; y <= FESTIVALS_YEAR_RANGE.end; y++) {
-    const rows = getFestivalsForYear(y, 'en');
+  for (let y = range.start; y <= range.end; y++) {
+    const rows = readFestivalsForYear(festivalsTable, y, 'en');
     if (rows) out[String(y)] = rows;
   }
   return out;

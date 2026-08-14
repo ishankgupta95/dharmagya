@@ -20,11 +20,12 @@ import type {
   PoruthamName,
 } from 'panchang-ts';
 
+import Svg, { Circle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
-import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
@@ -65,7 +66,6 @@ export default function KundliMatchScreen() {
   const ayanamsa = useStore((s) => s.ayanamsa);
   const houseSystem = useStore((s) => s.houseSystem);
   const colors = isDarkMode ? darkColors : lightColors;
-  const plinth = usePlinthColors();
 
   const charts = useBirthStore((s) => s.charts);
   const upsertChart = useBirthStore((s) => s.upsertChart);
@@ -289,10 +289,10 @@ export default function KundliMatchScreen() {
                 <MotionPressable
                   pressedScale={0.97}
                   onPress={() => router.push('/settings')}
-                  style={[styles.sexMissingCard, { backgroundColor: 'rgba(165,48,28,0.12)', borderColor: 'rgba(165,48,28,0.40)' }]}
+                  style={[styles.sexMissingCard, { backgroundColor: colors.dangerSurface, borderColor: colors.danger + '66' }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('match.userSexMissing')}>
-                  <Icon name="alert-circle" size={18} color={palette.sindoor} />
+                  <Icon name="alert-circle" size={18} color={colors.danger} />
                   <Text variant="body" style={[styles.sexMissingText, { color: colors.textPrimary }]}>
                     {t('match.userSexMissing')}
                   </Text>
@@ -388,7 +388,7 @@ export default function KundliMatchScreen() {
                   active={matchSystem === 'ashtakoot'}
                   onPress={() => setMatchSystem('ashtakoot')}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.systemChip}
@@ -400,7 +400,7 @@ export default function KundliMatchScreen() {
                       {
                         color:
                           matchSystem === 'ashtakoot'
-                            ? palette.parchmentBright
+                            ? palette.night
                             : colors.textSecondary,
                       },
                     ]}>
@@ -411,7 +411,7 @@ export default function KundliMatchScreen() {
                   active={matchSystem === 'porutham'}
                   onPress={() => setMatchSystem('porutham')}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.systemChip}
@@ -423,7 +423,7 @@ export default function KundliMatchScreen() {
                       {
                         color:
                           matchSystem === 'porutham'
-                            ? palette.parchmentBright
+                            ? palette.night
                             : colors.textSecondary,
                       },
                     ]}>
@@ -434,29 +434,25 @@ export default function KundliMatchScreen() {
 
               {matchSystem === 'ashtakoot' ? (
                 <>
-                  <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
-                    <Kicker color={plinth.accent} size={10}>
-                      {t('match.totalScoreLabel')}
-                    </Kicker>
-                    <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
-                      {result.totalScore} <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 36</Text>
-                    </Text>
-                    <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
-                      {verdictKey(result.totalScore, t)}
-                    </Text>
-                  </NightCard>
+                  <TotalHero
+                    score={result.totalScore}
+                    max={36}
+                    verdict={verdictKey(result.totalScore, t)}
+                    colors={colors}
+                    isDark={isDarkMode}
+                  />
 
-                  <View style={styles.kootList}>
-                    {result.koots.map((k) => (
-                      <KootRow key={k.name} koot={k} colors={colors} t={t} />
+                  <View style={[styles.kootList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {result.koots.map((k, i) => (
+                      <KootRow key={k.name} koot={k} first={i === 0} colors={colors} isDark={isDarkMode} t={t} />
                     ))}
                   </View>
 
                   {result.cancellations.length > 0 && (
                     <View style={[styles.cancelCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Kicker color={colors.accent} size={9}>
+                      <Text variant="kicker-small" style={{ color: colors.accentText, fontSize: 9 }}>
                         {t('match.cancellationsLabel')}
-                      </Kicker>
+                      </Text>
                       {result.cancellations.map((c, i) => (
                         <Text key={i} variant="body" style={[styles.cancelLine, { color: colors.textSecondary }]}>
                           • {c}
@@ -467,26 +463,21 @@ export default function KundliMatchScreen() {
                 </>
               ) : (
                 <>
-                  <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
-                    <Kicker color={plinth.accent} size={10}>
-                      {t('match.pathuPorutham.totalScoreLabel')}
-                    </Kicker>
-                    <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
-                      {poruthamResult.totalPasses}{' '}
-                      <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 10</Text>
-                    </Text>
-                    <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
-                      {t(
-                        poruthamResult.recommended
-                          ? 'match.pathuPorutham.recommended'
-                          : 'match.pathuPorutham.notRecommended',
-                      )}
-                    </Text>
-                  </NightCard>
+                  <TotalHero
+                    score={poruthamResult.totalPasses}
+                    max={10}
+                    verdict={t(
+                      poruthamResult.recommended
+                        ? 'match.pathuPorutham.recommended'
+                        : 'match.pathuPorutham.notRecommended',
+                    )}
+                    colors={colors}
+                    isDark={isDarkMode}
+                  />
 
-                  <View style={styles.kootList}>
-                    {poruthamResult.poruthams.map((p) => (
-                      <PoruthamRow key={p.name} porutham={p} colors={colors} t={t} />
+                  <View style={[styles.kootList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {poruthamResult.poruthams.map((p, i) => (
+                      <PoruthamRow key={p.name} porutham={p} first={i === 0} colors={colors} isDark={isDarkMode} t={t} />
                     ))}
                   </View>
                 </>
@@ -701,29 +692,96 @@ function PartnerRow({ entry, selected, onSelect, onEdit, onDelete, colors, t }: 
   );
 }
 
+// ── Total hero (frame 27) — the score is the headline. The ring is a static
+// SVG arc: guna scores never animate (MOTION.md).
+function TotalHero({
+  score,
+  max,
+  verdict,
+  colors,
+  isDark,
+}: {
+  score: number;
+  max: number;
+  verdict: string;
+  colors: ColorPalette;
+  isDark: boolean;
+}) {
+  const R = 49;
+  const C = 2 * Math.PI * R;
+  const frac = Math.max(0, Math.min(1, score / max));
+  const track = isDark ? 'rgba(237,232,240,0.10)' : 'rgba(34,27,36,0.10)';
+  return (
+    <View style={[styles.totalHero, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+      <LinearGradient
+        colors={
+          isDark
+            ? (['rgba(216,163,26,0.13)', 'rgba(255,255,255,0.03)'] as const)
+            : ([colors.surfaceAccent, '#FFFFFF'] as const)
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.totalRing}>
+        <Svg width={110} height={110} style={StyleSheet.absoluteFill}>
+          <Circle cx={55} cy={55} r={R} stroke={track} strokeWidth={5} fill="none" />
+          <Circle
+            cx={55}
+            cy={55}
+            r={R}
+            stroke={colors.accent}
+            strokeWidth={5}
+            fill="none"
+            strokeDasharray={`${C}`}
+            strokeDashoffset={C * (1 - frac)}
+            strokeLinecap="round"
+            transform="rotate(-90 55 55)"
+          />
+        </Svg>
+        <Text variant="display" style={[styles.totalScore, { color: colors.textPrimary }]}>
+          {score}
+        </Text>
+        <Text variant="body-small" style={[styles.totalOf, { color: colors.textTertiary }]}>
+          / {max}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text variant="title" style={[styles.verdict, { color: colors.textPrimary }]}>
+          {verdict}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 interface KootRowProps {
   koot: AshtakootResult['koots'][number];
+  first: boolean;
   colors: ColorPalette;
+  isDark: boolean;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function KootRow({ koot, colors, t }: KootRowProps) {
+function KootRow({ koot, first, colors, isDark, t }: KootRowProps) {
   const ratio = koot.score / koot.maxScore;
-  const tone = ratio >= 0.66 ? '#3FA37D' : ratio >= 0.33 ? '#BA7E2A' : palette.sindoor;
+  // Red is reserved for a koota scoring under half (frame 27).
+  const tone = ratio < 0.5 ? colors.danger : colors.accent;
+  const track = isDark ? 'rgba(237,232,240,0.12)' : 'rgba(34,27,36,0.10)';
   return (
-    <View style={[styles.kootRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.kootRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
       <View style={styles.kootHead}>
-        <Text variant="body" style={[styles.kootName, { color: colors.textPrimary }]}>
+        <Text variant="title" style={[styles.kootName, { color: colors.textPrimary }]}>
           {t(`match.koots.${kootKey(koot.name)}`)}
         </Text>
-        <Text variant="mono-caps" style={[styles.kootScore, { color: tone }]}>
-          {koot.score} / {koot.maxScore}
+        <Text variant="mono" style={[styles.kootScore, { color: colors.textSecondary }]}>
+          {koot.score}/{koot.maxScore}
         </Text>
       </View>
-      <View style={[styles.kootBarTrack, { backgroundColor: colors.border }]}>
+      <View style={[styles.kootBarTrack, { backgroundColor: track }]}>
         <View style={[styles.kootBarFill, { width: `${Math.max(0, ratio * 100)}%`, backgroundColor: tone }]} />
       </View>
-      <Text variant="mono" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
+      <Text variant="body-small" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
         {koot.description}
       </Text>
     </View>
@@ -745,44 +803,38 @@ function kootKey(name: KootName): string {
 
 interface PoruthamRowProps {
   porutham: PathuPoruthamResult['poruthams'][number];
+  first: boolean;
   colors: ColorPalette;
+  isDark: boolean;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function PoruthamRow({ porutham, colors, t }: PoruthamRowProps) {
-  // Pathu Porutham is binary per koot; pass = green tone, fail = sindoor.
-  // Veto-failed koots get a stronger sindoor outline so the user reads
-  // "this is the one that flipped the recommendation" at a glance.
+function PoruthamRow({ porutham, first, colors, isDark, t }: PoruthamRowProps) {
+  // Pathu Porutham is binary per koot: pass fills the bar in the accent, fail
+  // leaves it empty with the label in the danger tone. Veto-failed koots carry
+  // a tag so the user reads "this one flipped the recommendation" at a glance.
   const passes = porutham.passes;
   const veto = porutham.veto === true;
-  const tone = passes ? '#3FA37D' : palette.sindoor;
+  const track = isDark ? 'rgba(237,232,240,0.12)' : 'rgba(34,27,36,0.10)';
   return (
-    <View
-      style={[
-        styles.kootRow,
-        {
-          backgroundColor: colors.surface,
-          borderColor: veto ? palette.sindoor : colors.border,
-          borderWidth: veto ? 1.5 : 1,
-        },
-      ]}>
+    <View style={[styles.kootRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
       <View style={styles.kootHead}>
-        <Text variant="body" style={[styles.kootName, { color: colors.textPrimary }]}>
+        <Text variant="title" style={[styles.kootName, { color: colors.textPrimary }]}>
           {t(`match.pathuPorutham.poruthams.${poruthamKey(porutham.name)}`)}
           {veto && (
-            <Text variant="mono-caps" style={[styles.poruthamVetoTag, { color: palette.sindoor }]}>
+            <Text variant="kicker-small" style={[styles.poruthamVetoTag, { color: colors.danger }]}>
               {'  '}· {t('match.pathuPorutham.vetoTag')}
             </Text>
           )}
         </Text>
-        <Text variant="mono-caps" style={[styles.kootScore, { color: tone }]}>
+        <Text variant="mono" style={[styles.kootScore, { color: passes ? colors.textSecondary : colors.danger }]}>
           {t(passes ? 'match.pathuPorutham.pass' : 'match.pathuPorutham.fail')}
         </Text>
       </View>
-      <View style={[styles.kootBarTrack, { backgroundColor: colors.border }]}>
-        <View style={[styles.kootBarFill, { width: passes ? '100%' : '0%', backgroundColor: tone }]} />
+      <View style={[styles.kootBarTrack, { backgroundColor: track }]}>
+        <View style={[styles.kootBarFill, { width: passes ? '100%' : '0%', backgroundColor: passes ? colors.accent : colors.danger }]} />
       </View>
-      <Text variant="mono" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
+      <Text variant="body-small" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
         {porutham.description}
       </Text>
     </View>
@@ -915,7 +967,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 active={sex === 'male'}
                 onPress={() => setSex('male')}
                 inactiveBg="transparent"
-                activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                activeBg={colors.accent}
                 inactiveBorder={colors.border}
                 activeBorder="transparent"
                 style={styles.sexChip}
@@ -924,7 +976,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                   variant="mono-caps"
                   style={[
                     styles.sexChipText,
-                    { color: sex === 'male' ? palette.parchmentBright : colors.textSecondary },
+                    { color: sex === 'male' ? palette.night : colors.textSecondary },
                   ]}>
                   {t('settings.sex.male')}
                 </Text>
@@ -933,7 +985,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 active={sex === 'female'}
                 onPress={() => setSex('female')}
                 inactiveBg="transparent"
-                activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                activeBg={colors.accent}
                 inactiveBorder={colors.border}
                 activeBorder="transparent"
                 style={styles.sexChip}
@@ -942,7 +994,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                   variant="mono-caps"
                   style={[
                     styles.sexChipText,
-                    { color: sex === 'female' ? palette.parchmentBright : colors.textSecondary },
+                    { color: sex === 'female' ? palette.night : colors.textSecondary },
                   ]}>
                   {t('settings.sex.female')}
                 </Text>
@@ -1001,7 +1053,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
               onPress={handleSave}
               pressedScale={0.97}
               disabled={!canSave}
-              style={[styles.saveBtn, { backgroundColor: canSave ? palette.sindoor : colors.border, opacity: canSave ? 1 : 0.6 }]}
+              style={[styles.saveBtn, { backgroundColor: canSave ? palette.turmeric : colors.border, opacity: canSave ? 1 : 0.6 }]}
               accessibilityRole="button">
               <Text variant="mono-caps" style={styles.saveBtnText}>
                 {existing ? t('common.save') : t('match.addPartner')}
@@ -1217,25 +1269,40 @@ const styles = StyleSheet.create({
   },
   systemChipText: { fontSize: 9 },
 
-  totalScore: { fontSize: 56, lineHeight: 60, marginTop: 6 },
-  totalOf: { fontSize: 24, lineHeight: 28 },
-  verdict: { fontSize: 14, lineHeight: 20, marginTop: 6 },
-
-  poruthamVetoTag: { fontSize: 9, letterSpacing: 1.4 },
-
-  kootList: { marginTop: 16, gap: 10 },
-  kootRow: {
-    padding: 14,
+  totalHero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
     borderRadius: borderRadius.card,
     borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    overflow: 'hidden',
+  },
+  totalRing: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
+  totalScore: { fontSize: 40, lineHeight: 44 },
+  totalOf: { fontSize: 12, marginTop: 1 },
+  verdict: { fontSize: 20, lineHeight: 27 },
+
+  poruthamVetoTag: { fontSize: 9 },
+
+  kootList: {
+    marginTop: 12,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  kootRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     gap: 8,
   },
   kootHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  kootName: { fontSize: 14, lineHeight: 20 },
-  kootScore: { fontSize: 11, letterSpacing: 1.4 },
-  kootBarTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  kootBarFill: { height: '100%', borderRadius: 2 },
-  kootDesc: { fontSize: 11, lineHeight: 16, letterSpacing: 0.2 },
+  kootName: { fontSize: 14.5, lineHeight: 20 },
+  kootScore: { fontSize: 12.5 },
+  kootBarTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  kootBarFill: { height: '100%', borderRadius: 3 },
+  kootDesc: { fontSize: 11.5, lineHeight: 16 },
 
   cancelCard: {
     marginTop: 16,
@@ -1296,7 +1363,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
-  saveBtnText: { color: palette.parchmentBright, fontSize: 11 },
+  saveBtnText: { color: palette.night, fontSize: 11 },
 
   cityRow: {
     paddingVertical: 14,

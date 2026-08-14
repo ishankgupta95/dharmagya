@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  name: { fontSize: 15, fontFamily: 'Fraunces_400Regular', flex: 1 },
+  name: { fontSize: 15, fontFamily: 'Geist_400Regular', flex: 1 },
   time: { fontSize: 12, fontFamily: MONO_FONT },
 });

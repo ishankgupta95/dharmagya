@@ -16,13 +16,10 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, MONO_FONT, spacing, borderRadius, type ColorPalette } from '@/config/theme';
 import { AdBanner } from '@/components/common/AdBanner';
 import { Icon } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { MotionPressable } from '@/components/common/MotionPressable';
-import { SadhanaStreakBadge } from '@/components/common/SadhanaStreakBadge';
 import { resolveLanguage } from '@/i18n';
 import { useLocaleFormatters } from '@/utils/format';
 import {
@@ -123,7 +120,7 @@ export default function JaapPickerScreen() {
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
           </MotionPressable>
-          <Text variant="body-italic" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text variant="display" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('jaap.title')}
           </Text>
           <MotionPressable
@@ -140,24 +137,6 @@ export default function JaapPickerScreen() {
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-
-          {/* ── Editorial masthead ─────────────────────────────────────────── */}
-          <View style={styles.heroBlock}>
-            <Kicker color={colors.accent} size={11} style={styles.heroEyebrow}>
-              {t('jaap.titleEyebrow')}
-            </Kicker>
-            <Kicker color={colors.accent} size={22} style={styles.heroTitle}>
-              {t('jaap.title')}
-            </Kicker>
-            <Ornament
-              variant="lotus"
-              tone={isDarkMode ? 'dark' : 'light'}
-              style={styles.heroRule}
-            />
-            <Text variant="body-italic" style={[styles.heroIntro, { color: colors.textTertiary }]}>
-              {t('jaap.pickerIntro')}
-            </Text>
-          </View>
 
           {/* ── Stats card (only when there's history) ─────────────────────── */}
           {stats.sessionCount > 0 && (
@@ -189,10 +168,6 @@ export default function JaapPickerScreen() {
               <Text variant="body-italic" style={[styles.statsHint, { color: colors.textTertiary }]}>
                 {t('jaap.statsSessionCount', { count: stats.sessionCount })}  →
               </Text>
-              {/* Sadhana streak (P14.4) — sits inside the stats card so the
-                  three private metrics (total reps / malas / streak) read
-                  together as "your practice today." */}
-              <SadhanaStreakBadge colors={colors} large style={styles.statsStreakBadge} />
             </MotionPressable>
           )}
 
@@ -456,7 +431,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  navTitle: { flex: 1, textAlign: 'center', fontSize: 15 },
+  navTitle: { flex: 1, fontSize: 24, lineHeight: 30, marginLeft: 2 },
 
   scroll: { paddingTop: 16, paddingBottom: 24 },
 
@@ -485,7 +460,6 @@ const styles = StyleSheet.create({
   },
   statsDivider: { width: StyleSheet.hairlineWidth, height: 38 },
   statsHint: { fontSize: 12.5, marginTop: 12 },
-  statsStreakBadge: { marginTop: 12, alignSelf: 'flex-start' },
 
   customCard: {
     borderRadius: borderRadius.card,

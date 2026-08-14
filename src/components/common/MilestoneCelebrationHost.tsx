@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   headlineWrap: { alignItems: 'center' },
   kindLine: { fontSize: 14, lineHeight: 18, textAlign: 'center' },
   bigNumber: {
-    fontFamily: 'Fraunces_400Regular_Italic',
+    fontFamily: 'Geist_400Regular',
     fontStyle: 'italic',
     fontSize: 72,
     lineHeight: 82,

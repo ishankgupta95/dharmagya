@@ -133,10 +133,10 @@ export default function BirthPlacePickerScreen() {
           <MotionPressable
             onPress={handleUseCurrentLocation}
             pressedScale={0.97}
-            style={[styles.primaryBtn, { backgroundColor: palette.sindoor }]}
+            style={[styles.primaryBtn, { backgroundColor: palette.turmeric }]}
             accessibilityRole="button"
             accessibilityLabel={t('settings.birthPlaceUseCurrent')}>
-            <Icon name="navigate" size={16} color={palette.parchmentBright} />
+            <Icon name="navigate" size={16} color={palette.night} />
             <Text variant="mono-caps" style={styles.primaryBtnText}>
               {t('settings.birthPlaceUseCurrent')}
             </Text>
@@ -169,7 +169,7 @@ export default function BirthPlacePickerScreen() {
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Geist_400Regular' }]}
             placeholder={t('locationPermission.searchPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             value={query}
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: borderRadius.button,
   },
-  primaryBtnText: { fontSize: 11, color: palette.parchmentBright },
+  primaryBtnText: { fontSize: 11, color: palette.night },
 
   secondaryBtn: {
     paddingVertical: 12,

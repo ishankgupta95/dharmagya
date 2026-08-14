@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   InteractionManager,
+  PixelRatio,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,15 +28,17 @@ import { useLocaleFormatters } from '@/utils/format';
 import {
   darkColors,
   lightColors,
-  MONO_FONT,
   palette,
   semanticColors,
   borderRadius,
   spacing,
   typeScale,
+  ledgerLabelMinWidth,
+  LEDGER_STACK_SCALE,
   type ColorPalette,
 } from '@/config/theme';
 import { useLazyDailyPanchang } from '@/hooks/useLazyDailyPanchang';
+import { buildDayVerdict } from '@/utils/dayVerdict';
 import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang } from '@/services/astrology/panchangService';
 import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 import { resolveLanguage } from '@/i18n';
@@ -50,7 +53,6 @@ import { localizeFestivalName, localizeFestivalDescription, localizePrimaryEvent
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
-import { Ornament } from '@/components/common/Ornament';
 import { CalendarGridSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
@@ -86,6 +88,7 @@ function ymdKey(d: Date) {
 
 // ─── Accordion category keys (also used as i18n a11y labels) ───────────────
 const CATEGORY_KEYS = {
+  fullAlmanac: 'panchang.fullAlmanac',
   panchaAnga: 'panchang.panchaAnga',
   sunMoon: 'panchang.sunMoon',
   auspicious: 'panchang.auspicious',
@@ -95,6 +98,13 @@ const CATEGORY_KEYS = {
   forYou: 'panchang.forYou',
   planetary: 'panchang.planetary',
 } as const;
+
+// P16.3 content gate: the "today's verdict" copy is conservative + descriptive
+// (it only restates windows panchang-ts already flags, plus an eclipse caution
+// — no predictive "good day for X" claims). It carries a provisional posture
+// until the en+hi wording passes a qualified-reviewer pass before the bundle
+// ships. Flip to false only after that review.
+const VERDICT_REVIEW_PENDING = true;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -149,6 +159,13 @@ function getActiveIndex(elements: IPanchangElement[]): number {
  *
  *  Auto-detection keeps the call site identical to the old API.
  */
+// Diya frame 02: the five limbs as one ledger. The label is an inline uppercase
+// kicker column; the active element gets an accent dot; continuation rows are
+// indented past the label column rather than boxed. Past a 1.3× font scale the
+// row stops being a row: the label moves onto its own line above the value
+// (frame 40) so nothing clips.
+const LEDGER_STACKED = PixelRatio.getFontScale() >= LEDGER_STACK_SCALE;
+
 const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday }: LimbRowProps) {
   const isStatic = elements.length === 1 && !elements[0].endTime;
 
@@ -156,7 +173,7 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
     return (
       <>
         <View style={styles.staticRow}>
-          <Text variant="display-italic" style={[styles.kicker, { color: colors.accent }]} numberOfLines={1}>
+          <Text variant="kicker" style={[styles.kicker, { color: colors.textMuted }]} numberOfLines={1}>
             {label}
           </Text>
           <Text style={[styles.staticValue, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -172,33 +189,28 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
   return (
     <>
       <View style={styles.dynamicLimb}>
-        <Text variant="display-italic" style={[styles.kicker, { color: colors.accent }]} numberOfLines={1}>
-          {label}
-        </Text>
+        {LEDGER_STACKED && (
+          <Text variant="kicker" style={[styles.kicker, styles.kickerStacked, { color: colors.textMuted }]}>
+            {label}
+          </Text>
+        )}
         {elements.map((el, i) => {
           const isPrimary = i === 0;
           const isActive = i === activeIdx;
           const padaSuffix = el.pada !== undefined ? ` · ${el.pada}` : '';
           const showSunriseTail = elements.length > 1 && el.isActiveAtSunrise && !isPrimary;
-          const nameColor = isActive
-            ? colors.accent
-            : isPrimary
-              ? colors.textPrimary
-              : colors.textSecondary;
-          // End-time stays muted across active/inactive — the accent dot +
-          // accent name already signal "this one's active". An accent time
-          // would double-shout and pull the eye away from the name.
-          const timeColor = colors.textMuted;
+          const nameColor = isPrimary ? colors.textPrimary : colors.textSecondary;
           return (
-            <View key={i} style={[
-              isPrimary ? styles.primaryRow : styles.secondaryRow,
-              i > 0 && { marginTop: 4 },
-            ]}>
-              {!isPrimary && (
-                <View style={[styles.continuationMark, { backgroundColor: colors.textMuted }]} />
+            <View key={i} style={[styles.limbLine, i > 0 && styles.limbLineNext]}>
+              {LEDGER_STACKED ? null : isPrimary ? (
+                <Text variant="kicker" style={[styles.kicker, { color: colors.textMuted }]} numberOfLines={1}>
+                  {label}
+                </Text>
+              ) : (
+                <View style={styles.limbIndent} />
               )}
-              {isPrimary && isActive && (
-                <View style={[styles.activeDot, { backgroundColor: colors.accent }]} />
+              {isPrimary && (
+                <View style={[styles.activeDot, { backgroundColor: isActive ? colors.accent : 'transparent' }]} />
               )}
               <Text
                 style={[
@@ -217,7 +229,7 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
                 <Text
                   style={[
                     isPrimary ? styles.primaryEndTime : styles.secondaryEndTime,
-                    { color: timeColor },
+                    { color: colors.textMuted },
                   ]}
                   numberOfLines={1}>
                   {el.endTime}
@@ -468,6 +480,9 @@ export default function PanchangScreen() {
     new Date(today.getFullYear(), today.getMonth(), 1),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+  // P16.3 — "Good & avoid times" shows Choghadiya by default; the other three
+  // systems (Gowri / Do Ghati / Hora) sit behind this inline reveal.
+  const [showAllSystems, setShowAllSystems] = useState(false);
 
   const panchangLang = resolveLanguage(language);
   const birthMoment = useMemo<Date | null>(() => {
@@ -508,6 +523,15 @@ export default function PanchangScreen() {
       pmark('panchangScreen:firstPaint:realData');
     }
   }, [panchang]);
+
+  // P16.3: the day's plain verdict needs the daily compute (Rahu Kalam /
+  // Abhijit windows), so request it once on mount instead of waiting for an
+  // accordion open. Runs after first paint (effect), so cold-start paint isn't
+  // blocked; the compute is cached for the rest of the session and auto-syncs
+  // on date change.
+  useEffect(() => {
+    request();
+  }, [request]);
 
   // ── Instant snapshot — only relevant when viewing today ─────────────────
   const [instant, setInstant] = useState<IInstantPanchang | null>(null);
@@ -777,6 +801,25 @@ export default function PanchangScreen() {
     return parts.join(' · ');
   }, [selectedCell, panchangLang]);
 
+  // P16.3 — supporting tithi/nakshatra line, MERGED: on "today" it shows the
+  // current (instant) values, on other days the day's values. Replaces the
+  // duplicate "AT A GLANCE" + "AT THIS MOMENT" rows.
+  const momentLine = useMemo(() => {
+    if (isViewingToday && instant) {
+      return `${localizeTithi(instant.tithi, panchangLang)} · ${localizeNakshatra(instant.nakshatra, panchangLang)} · ${localizeYoga(instant.yoga, panchangLang)}`;
+    }
+    return glanceLine;
+  }, [isViewingToday, instant, glanceLine, panchangLang]);
+
+  // P16.3 — plain "today's verdict". Shared with the Home Panchang hero via
+  // buildDayVerdict (see that helper for the content-gate posture). Eclipse is
+  // read from the synchronous cell snapshot so the caution shows before the
+  // daily compute resolves.
+  const verdict = useMemo(
+    () => buildDayVerdict(panchang, !!selectedCell?.eclipse, t),
+    [selectedCell, panchang, t],
+  );
+
   // Pancha Anga is the canonical "what is this day?" view, so it defaults
   // to open when the user hasn't yet interacted with it. An explicit collapse
   // by the user is still honoured (the persisted `false` overrides this
@@ -785,7 +828,10 @@ export default function PanchangScreen() {
     (key: string) => {
       const stored = panchangCategoriesOpen[key];
       if (stored !== undefined) return stored;
-      return key === CATEGORY_KEYS.panchaAnga;
+      // P16.3: default everything closed — the plain verdict up top is the
+      // primary read; the detailed ledger lives behind the "Full almanac"
+      // reveal, which itself defaults closed.
+      return false;
     },
     [panchangCategoriesOpen],
   );
@@ -821,19 +867,14 @@ export default function PanchangScreen() {
           balances the right-side location pill so the centred title stays
           centred. */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenH }]}>
-        <View style={styles.headerSide} />
-        <View style={styles.headerCenter}>
-          <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            {t('panchang.headerTitle')}
+        <Text variant="display" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {t('panchang.headerTitle')}
+        </Text>
+        <View style={[styles.locPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="location" size={10} color={colors.accent} />
+          <Text variant="kicker" style={[styles.locText, { color: colors.textTertiary }]} numberOfLines={1}>
+            {locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'))}
           </Text>
-        </View>
-        <View style={[styles.headerSide, styles.headerSideRight]}>
-          <View style={[styles.locPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Icon name="location" size={10} color={colors.accent} />
-            <Text variant="mono-caps" style={[styles.locText, { color: colors.textTertiary }]} numberOfLines={1}>
-              {locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'))}
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -865,7 +906,7 @@ export default function PanchangScreen() {
             ]}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.openDatePicker')}>
-            <Text variant="display-italic" style={[styles.monthName, { color: colors.textPrimary }]}>
+            <Text variant="display" style={[styles.monthName, { color: colors.textPrimary }]}>
               {monthNames[calMonthIdx]}
             </Text>
             <Text variant="mono" style={[styles.monthYear, { color: colors.textTertiary }]}>
@@ -1004,7 +1045,7 @@ export default function PanchangScreen() {
           )}
         </SkeletonCrossfade>
 
-        <Ornament variant="double-rule" style={styles.postCalRule} />
+        <View style={[styles.postCalRule, { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider }]} />
 
         {/* ── Date-dependent content (fades on date change, swipe-able) ──── */}
         <GestureDetector gesture={swipeGesture}>
@@ -1033,26 +1074,40 @@ export default function PanchangScreen() {
 
         <FlagStrip colors={colors} items={glanceFestivals} />
 
-        {glanceLine.length > 0 && (
-          <View style={[styles.glanceTithiRow, { borderColor: colors.divider }]}>
+        {/* ── Today's verdict + glance (merges AT A GLANCE / AT THIS MOMENT) ──
+            Plain-language read of the day up top; the detailed ledger lives
+            behind the "Full almanac" reveal below. Verdict copy is conservative
+            and provisional — see VERDICT_REVIEW_PENDING. */}
+        {(verdict || momentLine.length > 0) && (
+          <View style={[styles.verdictCard, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
             <Text variant="mono-caps" style={[styles.glanceKicker, { color: colors.accent }]}>
               {t('panchang.glanceTitle')}
             </Text>
-            <Text variant="body-italic" style={[styles.glanceTithiText, { color: colors.textSecondary }]} numberOfLines={2}>
-              {glanceLine}
-            </Text>
-          </View>
-        )}
-
-        {/* AT THIS MOMENT — only on today */}
-        {isViewingToday && instant && (
-          <View style={[styles.instantRow, { borderColor: colors.divider }]}>
-            <Text variant="mono-caps" style={[styles.instantKicker, { color: colors.accent }]}>
-              {t('panchang.atThisMoment')}
-            </Text>
-            <Text variant="body-italic" style={[styles.instantBody, { color: colors.textSecondary }]} numberOfLines={1}>
-              {`${localizeTithi(instant.tithi, panchangLang)} · ${localizeNakshatra(instant.nakshatra, panchangLang)} · ${localizeYoga(instant.yoga, panchangLang)}`}
-            </Text>
+            {verdict && (
+              <Text
+                variant="body"
+                style={[
+                  styles.verdictText,
+                  { color: verdict.caution ? semanticColors.error : colors.textPrimary },
+                ]}>
+                {verdict.text}
+              </Text>
+            )}
+            {verdict && VERDICT_REVIEW_PENDING && (
+              <Text
+                variant="body-italic"
+                style={[styles.verdictProvisional, { color: colors.textMuted }]}>
+                {t('panchang.verdictProvisional')}
+              </Text>
+            )}
+            {momentLine.length > 0 && (
+              <Text
+                variant="body-italic"
+                style={[styles.verdictGlance, { color: colors.textSecondary }]}
+                numberOfLines={2}>
+                {momentLine}
+              </Text>
+            )}
           </View>
         )}
 
@@ -1078,8 +1133,21 @@ export default function PanchangScreen() {
             Open state persists in Zustand so users who always look at the same
             categories don't have to re-expand them daily. */}
 
+        {/* ── Full almanac — the detailed 8-section ledger behind one reveal
+            (P16.3). Default closed; the verdict above is the primary read. The
+            walkthrough spotlight rides on this wrapper so it points at the
+            reveal rather than a now-hidden inner accordion. ── */}
+        <View ref={panchaAngaRef} style={styles.fullAlmanacWrap}>
+        <AccordionSection
+          storageKey={CATEGORY_KEYS.fullAlmanac}
+          title={t('panchang.fullAlmanac')}
+          open={isCategoryOpen(CATEGORY_KEYS.fullAlmanac)}
+          onToggle={() => togglePanchangCategory(CATEGORY_KEYS.fullAlmanac)}
+          onFirstOpen={onAnyAccordionFirstOpen}
+          colors={colors}>
+
         {/* Pancha Anga — five limbs + masa + extensions + day flags */}
-        <View ref={panchaAngaRef}>
+        <View>
           <AccordionSection
             storageKey={CATEGORY_KEYS.panchaAnga}
             title={t('panchang.panchaAngaSection')}
@@ -1112,7 +1180,7 @@ export default function PanchangScreen() {
                     <>
                       <View style={[styles.limbDivider, { backgroundColor: colors.divider }]} />
                       <View style={styles.staticRow}>
-                        <Text variant="display-italic" style={[styles.kicker, { color: colors.accent }]} numberOfLines={1}>
+                        <Text variant="kicker" style={[styles.kicker, { color: colors.textMuted }]} numberOfLines={1}>
                           {t('panchang.chandraMasa')}
                         </Text>
                         <Text style={[styles.staticValue, { color: colors.textPrimary, marginRight: 8 }]} numberOfLines={1}>
@@ -1231,7 +1299,9 @@ export default function PanchangScreen() {
                 { key: 'vijaya',   label: t('panchang.vijayaMuhurta'),   start: panchang.vijayaMuhurtaStart,   end: panchang.vijayaMuhurtaEnd },
                 { key: 'godhuli',  label: t('panchang.godhuliMuhurta'),  start: panchang.godhuliMuhurtaStart,  end: panchang.godhuliMuhurtaEnd },
                 { key: 'sayahna',  label: t('panchang.sayahnaSandhya'),  start: panchang.sayahnaSandhyaStart,  end: panchang.sayahnaSandhyaEnd },
-                { key: 'amrit',    label: t('panchang.amritKala'),       start: panchang.amritKalaStart,       end: panchang.amritKalaEnd },
+                ...panchang.amritKala.map((ak, i) => ({
+                  key: `amrit-${i}`, label: t('panchang.amritKala'), start: ak.start, end: ak.end,
+                })),
                 { key: 'nishita',  label: t('panchang.nishitaMuhurta'),  start: panchang.nishitaMuhurtaStart,  end: panchang.nishitaMuhurtaEnd },
               ]}
             />
@@ -1260,7 +1330,9 @@ export default function PanchangScreen() {
                 ...panchang.durMuhurta.map((dm, i) => ({
                   key: `dur-${i}`, label: t('panchang.durMuhurta'), start: dm.start, end: dm.end,
                 })),
-                { key: 'varjyam', label: t('panchang.varjyam'),     start: panchang.varjyamStart,      end: panchang.varjyamEnd },
+                ...panchang.varjyam.map((vj, i) => ({
+                  key: `varjyam-${i}`, label: t('panchang.varjyam'), start: vj.start, end: vj.end,
+                })),
                 ...(panchang.bhadra
                   ? [{ key: 'bhadra', label: t('panchang.bhadra'), start: panchang.bhadra.start, end: panchang.bhadra.end }]
                   : []),
@@ -1301,7 +1373,7 @@ export default function PanchangScreen() {
                 <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                   {t('panchang.eclipsePeak', { time: panchang.eclipse.peak })}
                   {'  ·  '}
-                  {t('panchang.eclipseMagnitude', { value: panchang.eclipse.magnitude.toFixed(2) })}
+                  {t('panchang.eclipseObscuration', { value: Math.round(panchang.eclipse.obscuration * 100) })}
                 </Text>
                 <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
                   {t('panchang.eclipseSutak', { start: panchang.eclipse.sutakStart, end: panchang.eclipse.sutakEnd })}
@@ -1319,17 +1391,34 @@ export default function PanchangScreen() {
         {/* Time quality — Choghadiya / Gowri / Do Ghati / Hora */}
         <AccordionSection
           storageKey={CATEGORY_KEYS.timeQuality}
-          title={t('panchang.timeQuality')}
+          title={t('panchang.goodAvoidTimes')}
           open={isCategoryOpen(CATEGORY_KEYS.timeQuality)}
           onToggle={() => togglePanchangCategory(CATEGORY_KEYS.timeQuality)}
           onFirstOpen={onAnyAccordionFirstOpen}
           colors={colors}>
           {panchang ? (
             <>
+              {/* Choghadiya is the most widely-read good/avoid system; the other
+                  three are equivalent traditions, folded behind one tap (P16.3). */}
               <QualitySlotsCard label={t('panchang.choghadiya')} slots={panchang.choghadiya} colors={colors} />
-              <QualitySlotsCard label={t('panchang.gowriPanchangam')} slots={panchang.gowriPanchangam} colors={colors} />
-              <QualitySlotsCard label={t('panchang.doGhatiMuhurta')} slots={panchang.doGhatiMuhurta} colors={colors} />
-              <HoraCard slots={panchang.hora} colors={colors} />
+              {showAllSystems && (
+                <>
+                  <QualitySlotsCard label={t('panchang.gowriPanchangam')} slots={panchang.gowriPanchangam} colors={colors} />
+                  <QualitySlotsCard label={t('panchang.doGhatiMuhurta')} slots={panchang.doGhatiMuhurta} colors={colors} />
+                  <HoraCard slots={panchang.hora} colors={colors} />
+                </>
+              )}
+              <MotionPressable
+                onPress={() => setShowAllSystems((o) => !o)}
+                hitSlop={8}
+                style={styles.showSystemsBtn}
+                accessibilityRole="button"
+                accessibilityLabel={showAllSystems ? t('panchang.hideOtherSystems') : t('panchang.showAllSystems')}>
+                <Text variant="mono-caps" style={[styles.showSystemsText, { color: colors.accent }]}>
+                  {showAllSystems ? t('panchang.hideOtherSystems') : t('panchang.showAllSystems')}
+                </Text>
+                <Icon name={showAllSystems ? 'chevron-up' : 'chevron-down'} size={12} color={colors.accent} />
+              </MotionPressable>
             </>
           ) : (
             renderPlaceholder(CATEGORY_KEYS.timeQuality)
@@ -1393,6 +1482,9 @@ export default function PanchangScreen() {
           )}
         </AccordionSection>
 
+        </AccordionSection>
+        </View>
+
         </Animated.View>
         </GestureDetector>
 
@@ -1406,7 +1498,7 @@ export default function PanchangScreen() {
           description={t('walkthrough.step2Desc')}
           tooltipPosition="above"
           stepIndex={1}
-          totalSteps={4}
+          totalSteps={3}
           onNext={() => {
             setWalkthroughStep(3);
             router.push('/(tabs)/library');
@@ -1440,15 +1532,16 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { paddingBottom: 32, paddingTop: 2 },
 
+  // Diya frame 02 — left-aligned light display title, location pill right.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 12,
   },
-  headerSide: { width: 90 },
-  headerSideRight: { alignItems: 'flex-end' },
-  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
-  headerTitle: { fontSize: 18, lineHeight: 24 },
+  headerTitle: { fontSize: 30, lineHeight: 36, flexShrink: 1 },
   locPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1557,7 +1650,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  calDayNum: { fontFamily: 'Fraunces_400Regular', fontSize: 13.5, lineHeight: 15 },
+  calDayNum: { fontFamily: 'Geist_400Regular', fontSize: 13.5, lineHeight: 15 },
   festivalDot: {
     position: 'absolute',
     bottom: 3,
@@ -1595,6 +1688,29 @@ const styles = StyleSheet.create({
   glanceKicker: { fontSize: 8.5, letterSpacing: 1.1 },
   glanceTithiText: { fontSize: 13, flex: 1, lineHeight: 18 },
 
+  // ─── Today's verdict card + Full almanac reveal (P16.3) ──────────────────
+  verdictCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    gap: 6,
+  },
+  verdictText: { fontSize: 15, lineHeight: 21 },
+  verdictProvisional: { fontSize: 11, lineHeight: 15 },
+  verdictGlance: { fontSize: 12.5, lineHeight: 18 },
+  fullAlmanacWrap: { marginTop: 4 },
+  showSystemsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  showSystemsText: { fontSize: 9, letterSpacing: 1 },
+
   // ─── Pancha Anga card (Sacred Almanac entry layout) ──────────────────────
   // Outer card hosts a vertical sequence of limb entries. Padding is generous
   // horizontally so the long-form serif names breathe; vertical padding stays
@@ -1608,92 +1724,73 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Shared italic Fraunces kicker — the section-label treatment in the new
-  // layout. Lowercase ("tithi", "nakshatra"); editorial italics carry the
-  // weight that mono-caps used to. Sized as a real section heading so the
-  // eye lands on the label first, then the value below.
+  // Ledger label — inline uppercase kicker column (frame 02: 9.5px, wide
+  // tracking, muted). minWidth so long localised labels push the row wider
+  // instead of clipping.
   kicker: {
-    fontSize: 13.5,
-    lineHeight: 17,
-    letterSpacing: 0.15,
+    fontSize: 9.5,
+    lineHeight: 14,
+    minWidth: ledgerLabelMinWidth,
   },
+  // Frame 40 — past 1.3× the label sits on its own line above the value.
+  kickerStacked: { minWidth: 0, paddingTop: 10 },
 
-  // Dynamic limb (tithi / nakshatra / yoga / karana) — kicker + stack of
-  // element rows. The top-of-block kicker is followed by a 4pt gap before
-  // the primary element so the eye reads "kicker introduces the headline".
+  // Dynamic limb (tithi / nakshatra / yoga / karana) — one line per element.
   dynamicLimb: {
-    paddingVertical: 12,
-    gap: 4,
+    paddingVertical: 3,
   },
-
-  // Primary (top-of-block) element — serif headline with optional accent dot
-  // and a mono right-rail end-time. Sized to read as canonical body content,
-  // not a hero — the kicker is the accent, not the primary name.
-  primaryRow: {
+  limbLine: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
+    alignItems: 'center',
+    gap: 11,
+    paddingVertical: 10,
   },
+  limbLineNext: {
+    paddingTop: 0,
+  },
+  // Continuation rows are indented past the label column, not boxed.
+  limbIndent: { width: ledgerLabelMinWidth + 17 },
   primaryName: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 24,
     fontFamily: 'NotoSerifDevanagari_500Medium',
     letterSpacing: 0.1,
   },
   primaryEndTime: {
-    fontSize: 12.5,
-    lineHeight: 15,
-    fontFamily: MONO_FONT,
-    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 16,
+    fontFamily: 'Geist_400Regular',
+    fontVariant: ['tabular-nums'],
     letterSpacing: 0.2,
   },
 
-  // Secondary (mid-day-transition) element — only ~10% smaller than primary
-  // so the eye reads it as "continuation, not demotion". Indented + leading
-  // continuation mark to signal sequence.
-  secondaryRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    paddingLeft: 12,
-  },
   secondaryName: {
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 21,
     fontFamily: 'NotoSerifDevanagari_400Regular',
     letterSpacing: 0.05,
   },
   secondaryEndTime: {
-    fontSize: 11.5,
-    lineHeight: 14,
-    fontFamily: MONO_FONT,
+    fontSize: 12.5,
+    lineHeight: 15,
+    fontFamily: 'Geist_400Regular',
+    fontVariant: ['tabular-nums'],
     letterSpacing: 0.2,
   },
 
-  // 4×4 dot before active primary name. Same visual weight as the muhurat-
-  // row dots so the language is consistent across the screen.
+  // 6×6 accent dot marking the active element (frame 02). Transparent when
+  // inactive so names stay column-aligned.
   activeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    alignSelf: 'center',
-  },
-  // Hairline tick before each secondary element — smaller than activeDot so
-  // it reads as "continuation", not "highlight".
-  continuationMark: {
     width: 6,
-    height: StyleSheet.hairlineWidth,
-    alignSelf: 'center',
-    opacity: 0.7,
+    height: 6,
+    borderRadius: 3,
   },
 
-  // " · sunrise" tail on the at-sunrise element when not the primary. Italic
-  // Fraunces, tiny, muted — never the visual focus, just an asterisk-style
-  // canonicalisation marker for almanac purists.
+  // " · sunrise" tail on the at-sunrise element when not the primary — a
+  // quiet canonicalisation marker, never the visual focus.
   sunriseTail: {
     fontSize: 10.5,
-    fontFamily: 'Fraunces_300Light',
-    fontStyle: 'italic',
+    fontFamily: 'Geist_400Regular',
     letterSpacing: 0.2,
   },
 
@@ -1822,7 +1919,7 @@ const styles = StyleSheet.create({
   durationCell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   durationDivider: { width: 0.5, height: 16 },
   durationText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
-  durationValue: { fontSize: 13, fontFamily: MONO_FONT, fontWeight: '500' },
+  durationValue: { fontSize: 13, fontFamily: 'Geist_500Medium', fontVariant: ['tabular-nums'] },
 
   // Accordion body placeholder when daily compute hasn't completed yet.
   placeholder: {

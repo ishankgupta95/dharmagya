@@ -1,25 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, deityColors, palette, spacing } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { AdBanner } from '@/components/common/AdBanner';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Icon, type IconName } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import { DEITY_BY_ID } from '@/config/deities';
-import { getFestivalContentById, FESTIVAL_SOURCES } from '@/config/festivalContent';
+import { getFestivalContentById, getFestivalContentForName, FESTIVAL_SOURCES } from '@/config/festivalContent';
 import { getKathaBySlug } from '@/config/kathas';
 import { getPujaBySlug } from '@/config/poojas';
 import { getScriptureBySlug } from '@/config/scriptures';
 import { getMantraBySlug, getStotraBySlug, getSuktaBySlug, titleFor, type ContentLang } from '@/services/content';
+import { fetchPanchang } from '@/services/astrology/panchangService';
+import festivalsByYear from '@/data/festivals';
+import { localizeTithi } from '@/i18n/panchangNames';
+import type { IPanchangDay } from '@/types';
 
 interface CrossLink {
   key: string;
@@ -29,23 +32,76 @@ interface CrossLink {
   href: Href;
 }
 
+function parseYmd(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// i18n panchang labels are stored uppercase for the ledger kickers; the times
+// card uses sentence case.
+function titleCase(s: string): string {
+  return s.replace(/\b[A-Z]+\b/g, (w) => w[0] + w.slice(1).toLowerCase());
+}
+
 /**
- * Festival detail — significance + origin story + scriptural source + presiding
- * deity + cross-links to the katha / puja / mantras / suktas / stotras /
- * scripture the lib associates with the observance. Dates are NOT shown here
- * (they live on the Festivals calendar this screen is reached from). Reached via
- * `/festival/[id]` where `id` is the lib festival slug.
+ * Festival detail (frame 09) — the one screen where colour floods: a
+ * per-festival gradient wash from the presiding deity's hue. Next-occurrence
+ * date + computed times sit above the prose; then significance + origin story +
+ * presiding deity + cross-links. Reached via `/festival/[id]` (lib slug).
  */
 export default function FestivalDetailScreen() {
   const { t, i18n } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
+  const userLocation = useStore((s) => s.userLocation);
   const colors = isDarkMode ? darkColors : lightColors;
-  const ornamentTone = isDarkMode ? 'dark' : 'light';
   const lang: ContentLang = i18n.language === 'hi' ? 'hi' : 'en';
 
   const { id } = useLocalSearchParams<{ id?: string }>();
   const festival = useMemo(() => getFestivalContentById(id), [id]);
   const [storyOpen, setStoryOpen] = useState(false);
+
+  // Next dated occurrence — reverse match against the bundled panchang-ts
+  // festival table (engine-free rows; the calendar remains the source of
+  // truth). Scans from today across this year and the next.
+  const occurrence = useMemo(() => {
+    if (!festival) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
+      for (const row of festivalsByYear[String(year)] ?? []) {
+        const d = parseYmd(row.date);
+        if (!d || d.getTime() < today.getTime()) continue;
+        for (const f of row.festivals) {
+          const matched = getFestivalContentForName(f.name, f.description);
+          if (matched?.id === festival.id) {
+            return {
+              date: d,
+              daysAway: Math.round((d.getTime() - today.getTime()) / 86_400_000),
+            };
+          }
+        }
+      }
+    }
+    return null;
+  }, [festival]);
+
+  // Times on the day — computed for the user's location. They appear; no
+  // transition (MOTION.md: reported times never animate).
+  const [dayTimes, setDayTimes] = useState<IPanchangDay | null>(null);
+  useEffect(() => {
+    if (!occurrence) return;
+    let alive = true;
+    fetchPanchang(occurrence.date, userLocation, false).then((p) => {
+      if (alive) setDayTimes(p);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [occurrence?.date.getTime(), userLocation?.lat, userLocation?.lon]);
 
   const links = useMemo<CrossLink[]>(() => {
     if (!festival) return [];
@@ -80,19 +136,17 @@ export default function FestivalDetailScreen() {
   if (!festival) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-        <View style={[styles.headerRow, { borderBottomColor: colors.divider }]}>
+        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
           <MotionPressable
             onPress={() => router.back()}
-            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
-            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-left" size={22} color={colors.textSecondary} />
           </MotionPressable>
-          <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
         <View style={styles.emptyWrap}>
-          <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
+          <Text variant="body" style={[styles.emptyText, { color: colors.textMuted }]}>
             {t('festival.notFound')}
           </Text>
         </View>
@@ -101,40 +155,118 @@ export default function FestivalDetailScreen() {
   }
 
   const rosterDeity = festival.deity ? DEITY_BY_ID[festival.deity] : undefined;
+  const washHue = (festival.deity && deityColors[festival.deity]) || palette.turmeric;
+  const washColors = isDarkMode
+    ? ([`${washHue}4D`, `${palette.turmeric}1F`, `${palette.night}00`] as const)
+    : ([`${washHue}33`, `${palette.turmeric}14`, `${palette.rice}00`] as const);
+
+  const dateLocale = lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const dateLabel = occurrence
+    ? occurrence.date.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+  const tithiName = dayTimes?.tithis?.[0]?.name;
+  const countdownLabel = occurrence
+    ? occurrence.daysAway === 0
+      ? t('festival.today')
+      : occurrence.daysAway === 1
+        ? t('festival.tomorrow')
+        : t('festival.inDays', { count: occurrence.daysAway })
+    : null;
+
+  const timeRows: { label: string; value: string }[] = [];
+  if (dayTimes) {
+    timeRows.push({ label: titleCase(t('panchang.sunrise')), value: dayTimes.sunrise });
+    timeRows.push({ label: titleCase(t('panchang.sunset')), value: dayTimes.sunset });
+    if (dayTimes.brahmaMuhurtaStart && dayTimes.brahmaMuhurtaEnd) {
+      timeRows.push({ label: titleCase(t('panchang.brahmaMuhurta')), value: `${dayTimes.brahmaMuhurtaStart} – ${dayTimes.brahmaMuhurtaEnd}` });
+    }
+    if (dayTimes.abhijitMuhurtaStart && dayTimes.abhijitMuhurtaEnd) {
+      timeRows.push({ label: titleCase(t('panchang.abhijitMuhurta')), value: `${dayTimes.abhijitMuhurtaStart} – ${dayTimes.abhijitMuhurtaEnd}` });
+    }
+    if (dayTimes.nishitaMuhurtaStart && dayTimes.nishitaMuhurtaEnd) {
+      timeRows.push({ label: titleCase(t('panchang.nishitaMuhurta')), value: `${dayTimes.nishitaMuhurtaStart} – ${dayTimes.nishitaMuhurtaEnd}` });
+    }
+  }
 
   return (
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+        {/* The one screen where colour floods — per-festival wash. */}
+        <LinearGradient
+          colors={washColors}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0.3, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.wash}
+          pointerEvents="none"
+        />
 
-        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
           <MotionPressable
             onPress={() => router.back()}
-            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
-            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-left" size={22} color={colors.textPrimary} />
           </MotionPressable>
-          <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
+          contentContainerStyle={[styles.scroll, { paddingHorizontal: 26 }]}
           showsVerticalScrollIndicator={false}>
 
-          <View style={styles.heroBlock}>
-            <Kicker color={colors.accent} size={10} style={styles.heroEyebrow}>
-              {t(`festival.category.${festival.category}`)}
-            </Kicker>
-            <Text variant="deva-bold" style={[styles.heroTitle, { color: colors.textPrimary }]}>
-              {festival.name[lang]}
+          {/* ── Hero ─────────────────────────────────────────────────────── */}
+          {countdownLabel && (
+            <View style={[styles.countChip, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+              <Text variant="kicker-small" style={[styles.countChipText, { color: colors.textPrimary }]}>
+                {countdownLabel}
+              </Text>
+            </View>
+          )}
+          <Text variant="deva-bold" style={[styles.heroTitle, { color: colors.textPrimary }]}>
+            {festival.name[lang]}
+          </Text>
+          <Text variant="display" style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+            {lang === 'hi' ? festival.name.en : (festival.nameSanskrit ?? festival.name.hi)}
+          </Text>
+          {dateLabel && (
+            <Text variant="mono" style={[styles.heroDate, { color: colors.textTertiary }]}>
+              {dateLabel}
+              {tithiName ? ` · ${localizeTithi(tithiName, i18n.language)}` : ''}
             </Text>
-            <Text variant="body-italic" style={[styles.heroSubtitle, { color: colors.textTertiary }]}>
-              {lang === 'hi' ? festival.name.en : (festival.nameSanskrit ?? festival.name.hi)}
-            </Text>
-            <Ornament variant="lotus" tone={ornamentTone} style={styles.heroOrnament} />
-          </View>
+          )}
 
+          {/* ── Times above the prose ────────────────────────────────────── */}
+          {timeRows.length > 0 && (
+            <View style={[styles.timesCard, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+              <Text variant="kicker-small" style={[styles.timesKicker, { color: colors.accentText }]}>
+                {t('festival.onTheDay')}
+              </Text>
+              {timeRows.map((row, i) => (
+                <View key={row.label}>
+                  {i > 0 && <View style={[styles.timesDivider, { backgroundColor: colors.divider }]} />}
+                  <View style={styles.timesRow}>
+                    <Text variant="body" style={[styles.timesLabel, { color: colors.textSecondary }]}>
+                      {row.label}
+                    </Text>
+                    <Text variant="mono" style={[styles.timesValue, { color: colors.textPrimary }]}>
+                      {row.value}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {dayTimes?.rahuKalamStart && dayTimes.rahuKalamEnd && (
+                <View style={styles.rahuRow}>
+                  <Icon name="warning" size={11} color={colors.danger} />
+                  <Text variant="mono" style={[styles.rahuText, { color: colors.textMuted }]}>
+                    {t('muhurat.avoidRahu', { start: dayTimes.rahuKalamStart, end: dayTimes.rahuKalamEnd })}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── Prose ────────────────────────────────────────────────────── */}
           <Text variant={lang === 'hi' ? 'deva' : 'body'} style={[styles.significance, { color: colors.textSecondary }]}>
             {festival.significance[lang]}
           </Text>
@@ -146,8 +278,11 @@ export default function FestivalDetailScreen() {
                 onPress={() => setStoryOpen((v) => !v)}
                 style={styles.storyHead}
                 accessibilityRole="button"
+                accessibilityState={{ expanded: storyOpen }}
                 accessibilityLabel={t('festival.story')}>
-                <Kicker color={colors.accent} size={10}>{t('festival.story')}</Kicker>
+                <Text variant="kicker-small" style={[styles.cardKicker, { color: colors.accentText }]}>
+                  {t('festival.story')}
+                </Text>
                 <Icon name={storyOpen ? 'caret-down' : 'chevron-right'} size={14} color={colors.textMuted} />
               </MotionPressable>
               {storyOpen && (
@@ -156,7 +291,7 @@ export default function FestivalDetailScreen() {
                     {festival.story[lang]}
                   </Text>
                   {festival.storySource && (
-                    <Text variant="body-italic" style={[styles.storySource, { color: colors.textMuted }]}>
+                    <Text variant="body-small" style={[styles.storySource, { color: colors.textMuted }]}>
                       {festival.storySource[lang]}
                     </Text>
                   )}
@@ -169,60 +304,65 @@ export default function FestivalDetailScreen() {
             <MotionPressable
               onPress={() => router.push({ pathname: '/god/[id]', params: { id: rosterDeity.id } })}
               pressedScale={0.97}
-              style={[styles.deityCard, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
+              style={[styles.deityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('festival.openDeity', { name: t(`deities.${rosterDeity.id}.displayName`) })}>
               <DeityAvatar deity={rosterDeity.id} size={42} />
               <View style={{ flex: 1 }}>
-                <Text variant="mono-caps" style={[styles.cardKicker, { color: colors.accent }]}>
+                <Text variant="kicker-small" style={[styles.cardKicker, { color: colors.textMuted }]}>
                   {t('festival.presidingDeity')}
                 </Text>
                 <Text variant="deva-bold" style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                   {t(`deities.${rosterDeity.id}.displayName`)}
                 </Text>
               </View>
-              <Icon name="chevron-right" size={16} color={colors.accent} />
+              <Icon name="chevron-right" size={16} color={colors.textDisabled} />
             </MotionPressable>
           )}
 
+          {/* Cross-links — one grouped card, inset separators (frame 09). */}
           {links.length > 0 && (
             <View style={styles.linksBlock}>
-              <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider} wrapperStyle={styles.linksKicker}>
+              <Text variant="kicker-small" style={[styles.linksKicker, { color: colors.textMuted }]}>
                 {t('festival.observeLabel')}
-              </Kicker>
-              {links.map((l) => (
-                <MotionPressable
-                  key={l.key}
-                  onPress={() => router.push(l.href)}
-                  pressedScale={0.97}
-                  style={[styles.linkCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={l.title}>
-                  <View style={[styles.linkIcon, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
-                    <Icon name={l.icon} size={16} color={colors.accent} />
+              </Text>
+              <View style={[styles.linksCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {links.map((l, i) => (
+                  <View key={l.key}>
+                    {i > 0 && <View style={[styles.linkDivider, { backgroundColor: colors.divider }]} />}
+                    <MotionPressable
+                      onPress={() => router.push(l.href)}
+                      pressedScale={0.98}
+                      style={styles.linkRow}
+                      accessibilityRole="button"
+                      accessibilityLabel={l.title}>
+                      <Icon name={l.icon} size={18} color={colors.accent} />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="kicker-small" style={[styles.cardKicker, { color: colors.textMuted }]}>
+                          {l.kicker}
+                        </Text>
+                        <Text variant="body" style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                          {l.title}
+                        </Text>
+                      </View>
+                      <Icon name="chevron-right" size={14} color={colors.textDisabled} />
+                    </MotionPressable>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="mono-caps" style={[styles.cardKicker, { color: colors.textMuted }]}>
-                      {l.kicker}
-                    </Text>
-                    <Text variant="body" style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                      {l.title}
-                    </Text>
-                  </View>
-                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
-                </MotionPressable>
-              ))}
+                ))}
+              </View>
             </View>
           )}
 
           <View style={styles.disclaimerBlock}>
             {festival.reviewPending && (
-              <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
+              <Text variant="body-small" style={[styles.reviewNote, { color: colors.textMuted }]}>
                 {t('reader.reviewNote')}
               </Text>
             )}
-            <Kicker color={colors.textMuted} size={9}>{t('festival.sourcesLabel')}</Kicker>
-            <Text variant="body-italic" style={[styles.disclaimerText, { color: colors.textMuted }]}>
+            <Text variant="kicker-small" style={{ color: colors.textMuted, fontSize: 9 }}>
+              {t('festival.sourcesLabel')}
+            </Text>
+            <Text variant="body-small" style={[styles.disclaimerText, { color: colors.textMuted }]}>
               {FESTIVAL_SOURCES[lang]}
             </Text>
           </View>
@@ -239,36 +379,85 @@ export default function FestivalDetailScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  headerRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: 12, paddingTop: 6, paddingBottom: 12, paddingHorizontal: spacing.screenH,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  wash: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 320,
   },
-  backPill: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingTop: 16, paddingBottom: 24 },
-  heroBlock: { alignItems: 'center', marginBottom: 18, paddingHorizontal: 4 },
-  heroEyebrow: { letterSpacing: 3.0, marginBottom: 12 },
-  heroTitle: { fontSize: 28, lineHeight: 38, textAlign: 'center' },
-  heroSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: 'center' },
-  heroOrnament: { marginTop: 14, width: '50%' },
-  significance: { fontSize: 14.5, lineHeight: 23, marginBottom: 16 },
-  storyCard: { borderRadius: 14, borderWidth: 1, padding: spacing.cardPadLg, marginBottom: 16 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+  scroll: { paddingTop: 30, paddingBottom: 24 },
+
+  countChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  countChipText: { fontSize: 10 },
+  heroTitle: { fontSize: 38, lineHeight: 50, marginTop: 16 },
+  heroSubtitle: { fontSize: 24, lineHeight: 30, marginTop: 2 },
+  heroDate: { fontSize: 14, lineHeight: 20, marginTop: 12 },
+
+  timesCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    paddingHorizontal: 19,
+    paddingVertical: 16,
+    marginTop: 26,
+  },
+  timesKicker: { fontSize: 9.5, marginBottom: 11 },
+  timesRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 6 },
+  timesDivider: { height: StyleSheet.hairlineWidth },
+  timesLabel: { flex: 1, fontSize: 14 },
+  timesValue: { fontSize: 14 },
+  rahuRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  rahuText: { fontSize: 10.5, lineHeight: 14 },
+
+  significance: { fontSize: 15, lineHeight: 25, marginTop: 22, marginBottom: 16 },
+
+  storyCard: { borderRadius: borderRadius.list, borderWidth: 1, padding: spacing.cardPadLg, marginBottom: 14 },
   storyHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   storyText: { fontSize: 14, lineHeight: 23, marginTop: 12 },
   storySource: { fontSize: 12, lineHeight: 18, marginTop: 10 },
+
   deityCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: borderRadius.card, borderWidth: 1, padding: spacing.cardPad, marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: borderRadius.list,
+    borderWidth: 1,
+    padding: spacing.cardPad,
+    marginBottom: 14,
   },
-  cardKicker: { fontSize: 8.5, letterSpacing: 1.6, marginBottom: 3 },
+  cardKicker: { fontSize: 8.5, marginBottom: 3 },
   cardTitle: { fontSize: 15.5, lineHeight: 21 },
+
   linksBlock: { marginBottom: 8 },
-  linksKicker: { marginBottom: 12 },
-  linkCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: borderRadius.card, borderWidth: 1, padding: spacing.cardPad, marginBottom: 10,
+  linksKicker: { fontSize: 9.5, marginBottom: 10, paddingHorizontal: 2 },
+  linksCard: {
+    borderRadius: borderRadius.list,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  linkIcon: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  linkDivider: { height: StyleSheet.hairlineWidth, marginLeft: 49 },
+
   disclaimerBlock: { marginTop: 8, gap: 8 },
   reviewNote: { fontSize: 12, lineHeight: 18 },
   disclaimerText: { fontSize: 12, lineHeight: 19 },

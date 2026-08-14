@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   dayNum: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
     lineHeight: 16,
   },

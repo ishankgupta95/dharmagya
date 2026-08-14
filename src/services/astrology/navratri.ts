@@ -391,16 +391,16 @@ export function computeGhatasthapanaMuhurat(
 
 function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): GhatasthapanaMuhurat {
 
-  const sunrise = raw.sunrise;
-  const sunset = raw.sunset;
-  const nextSunrise = raw.nextSunrise;
+  const sunrise = raw.sun.rise;
+  const sunset = raw.sun.set;
+  const nextSunrise = raw.sun.nextRise;
   const dayDurMs = sunset.getTime() - sunrise.getTime();
   const firstThirdEnd = new Date(sunrise.getTime() + dayDurMs / 3);
 
   // Pratipada is tithi number 1 (Shukla Pratipada).
-  const pratipada = raw.tithis.find(t => t.number === 1);
+  const pratipada = raw.angas.tithis.find(t => t.number === 1);
   const pratipadaEnd = pratipada?.endTime ?? null;
-  const isPratipadaActiveAtSunrise = raw.tithis[0]?.number === 1;
+  const isPratipadaActiveAtSunrise = raw.angas.tithis[0]?.number === 1;
 
   // Window candidate: [sunrise, min(firstThirdEnd, pratipadaEnd)]
   let start = sunrise;
@@ -412,9 +412,9 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
 
   // Fallback to Abhijit when Pratipada isn't active at sunrise.
   if (!isPratipadaActiveAtSunrise) {
-    if (raw.abhijitMuhurta) {
-      start = raw.abhijitMuhurta.start;
-      end = raw.abhijitMuhurta.end;
+    if (raw.muhurtas.abhijit) {
+      start = raw.muhurtas.abhijit.start;
+      end = raw.muhurtas.abhijit.end;
       isAbhijitFallback = true;
     }
   }
@@ -422,7 +422,7 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
   // Warnings — Chitra nakshatra (index 13) / Vaidhriti yoga (index 26) over
   // the muhurat window.
   let chitra = false;
-  for (const n of raw.nakshatras) {
+  for (const n of raw.angas.nakshatras) {
     if (n.index !== 13) continue;
     const r = elementRange(n, sunrise, nextSunrise);
     if (r && overlaps(r[0], r[1], start, end)) {
@@ -431,7 +431,7 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
     }
   }
   let vaidhriti = false;
-  for (const y of raw.yogas) {
+  for (const y of raw.angas.yogas) {
     if (y.index !== 26) continue;
     const r = elementRange(y, sunrise, nextSunrise);
     if (r && overlaps(r[0], r[1], start, end)) {
@@ -451,7 +451,14 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
 
-/** Format a time as "HH:MM AM/PM" in the local timezone. */
+/**
+ * Format a time as "HH:MM AM/PM" in the local timezone.
+ *
+ * Reads device-local getters, which is correct because panchang-ts v5 publishes
+ * true instants. (Through 4.x the same Dates were pre-shifted by the UTC offset,
+ * so these getters rendered a wall clock that was off by the device offset —
+ * the v5 upgrade fixes the Ghatasthapana window's displayed times.)
+ */
 export function formatMuhuratTime(d: Date): string {
   const hours24 = d.getHours();
   const minutes = d.getMinutes();

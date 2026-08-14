@@ -91,6 +91,8 @@ export interface JaapStats {
   sessionCount: number;
   totalCount: number;
   totalMalas: number;
+  /** Total time in sessions, ms. */
+  totalDurationMs: number;
 }
 
 export function getJaapStats(db: SQLiteDatabase): JaapStats {
@@ -98,17 +100,36 @@ export function getJaapStats(db: SQLiteDatabase): JaapStats {
     session_count: number;
     total_count: number | null;
     total_malas: number | null;
+    total_duration: number | null;
   }>(
     `SELECT COUNT(*) AS session_count,
             SUM(total_count) AS total_count,
-            SUM(mala_count) AS total_malas
+            SUM(mala_count) AS total_malas,
+            SUM(MAX(ended_at - started_at, 0)) AS total_duration
        FROM jaap_sessions`,
   );
   return {
     sessionCount: row?.session_count ?? 0,
     totalCount: row?.total_count ?? 0,
     totalMalas: row?.total_malas ?? 0,
+    totalDurationMs: row?.total_duration ?? 0,
   };
+}
+
+/** Per-day mala totals for the history density grid (frame 25). Keys are
+ *  local-time "YYYY-MM-DD" strings; days without practice are absent. */
+export function getJaapDailyMalas(db: SQLiteDatabase, sinceMs: number): Map<string, number> {
+  const rows = db.getAllSync<{ day: string; malas: number | null }>(
+    `SELECT date(started_at / 1000, 'unixepoch', 'localtime') AS day,
+            SUM(mala_count) AS malas
+       FROM jaap_sessions
+      WHERE started_at >= ?
+      GROUP BY day`,
+    [sinceMs],
+  );
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.day, r.malas ?? 0);
+  return map;
 }
 
 export function deleteJaapSession(db: SQLiteDatabase, id: number): void {

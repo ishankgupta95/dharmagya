@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   glyph: {
-    fontFamily: 'Fraunces_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 22,
     lineHeight: 24,
   },

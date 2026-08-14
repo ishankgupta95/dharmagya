@@ -1,65 +1,60 @@
-import { useState, useCallback, useRef, useMemo, memo } from 'react';
-import {
-  View,
-  FlatList,
-  TextInput,
-  StyleSheet,
-  type ListRenderItemInfo,
-} from 'react-native';
-import { MotionPressable } from '@/components/common/MotionPressable';
+import { useState, useCallback, useRef, useMemo } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Icon } from '@/components/common/Icon';
+import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
 import {
   darkColors,
   lightColors,
-  palette,
   spacing,
-  typeScale,
+  borderRadius,
   type ColorPalette,
 } from '@/config/theme';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
-import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
+import { getVaarDevataForDate } from '@/config/vaarDevata';
+import { ALL_DEITIES } from '@/config/deities';
 import { getDeityImageSmall } from '@/config/deityImages';
-import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
+import {
+  getAartiForDeity,
+  getChalisaForDeity,
+  getAllAppAartis,
+  getAllAppChalisas,
+  aartiVerses,
+  chalisaSections,
+  titleFor,
+} from '@/services/content';
+import { resolveLanguage } from '@/i18n';
 
-// ─── Content counts (computed once at module load) ──────────────────────────
-// Cards show "X aartis · Y chālīsā" — costs nothing to precompute since both
-// listings are already filtered to the in-app roster.
+/**
+ * Library — Diya frame 06: resume first, deities second, collections as a
+ * plain grouped list. Buckets are unchanged from P16.5 (Read / Rituals &
+ * Festivals / Your Practice); the chrome is the Diya list card.
+ */
 
-const COUNTS: Record<string, { aartis: number; chalisas: number }> = (() => {
-  const acc: Record<string, { aartis: number; chalisas: number }> = {};
-  for (const a of getAllAppAartis()) {
-    const c = (acc[a.deity] ??= { aartis: 0, chalisas: 0 });
-    c.aartis += 1;
-  }
-  for (const c of getAllAppChalisas()) {
-    const e = (acc[c.deity] ??= { aartis: 0, chalisas: 0 });
-    e.chalisas += 1;
-  }
-  return acc;
-})();
-
-const COLUMN_GAP = 10;
+const GRID_DEITIES = ALL_DEITIES.slice(0, 4);
 
 export default function LibraryScreen() {
   const isDarkMode = useStore(s => s.isDarkMode);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
+  const selectedDeities = useStore(s => s.selectedDeities);
+  const lastReadKey = useStore(s => s.lastReadKey);
+  const readingPositions = useStore(s => s.readingPositions);
+  const appLanguage = useStore(s => s.language);
   const colors = isDarkMode ? darkColors : lightColors;
   const { t } = useTranslation();
+  const contentLang = resolveLanguage(appLanguage);
 
-  const [query, setQuery] = useState('');
-
+  // Walkthrough step 3 spotlights the Deities section.
   const deityGridRef = useRef<View>(null);
   const [deityGridRect, setDeityGridRect] = useState<SpotlightRect | null>(null);
 
@@ -80,98 +75,194 @@ export default function LibraryScreen() {
     }, [walkthroughStep, measureDeityGrid])
   );
 
-  const filteredDeities = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return ALL_DEITIES;
-    return ALL_DEITIES.filter(d => {
-      const tagline = (t(`deities.${d.id}.description`) as string).toLowerCase();
-      const display = (t(`deities.${d.id}.displayName`) as string).toLowerCase();
-      return (
-        d.name.toLowerCase().includes(q) ||
-        d.nameHindi.includes(q) ||
-        display.includes(q) ||
-        tagline.includes(q)
-      );
-    });
-  }, [query, t]);
+  const vaar = useMemo(() => getVaarDevataForDate(new Date()), []);
 
-  const renderDeity = useCallback(
-    ({ item }: ListRenderItemInfo<DeityMeta>) => (
-      <View style={styles.cardCell}>
-        <DeityCard deity={item} colors={colors} />
-      </View>
-    ),
-    [colors]
-  );
+  // ── Continue card — resolves the most recent reader position ─────────────
+  const resume = useMemo(() => {
+    if (!lastReadKey) return null;
+    const [kind, ...rest] = lastReadKey.split('-');
+    const slug = rest.join('-');
+    const index = readingPositions[lastReadKey] ?? 0;
+    if (kind === 'aarti') {
+      const a = getAartiForDeity(slug);
+      if (!a) return null;
+      return {
+        title: titleFor(a, contentLang),
+        num: index + 1,
+        total: aartiVerses(a, contentLang).length,
+        go: () => router.push({ pathname: '/aarti/[id]', params: { id: slug } }),
+      };
+    }
+    if (kind === 'chalisa') {
+      const c = getChalisaForDeity(slug);
+      if (!c) return null;
+      const total = chalisaSections(c, contentLang).reduce((n, s) => n + s.verses.length, 0);
+      return {
+        title: titleFor(c, contentLang),
+        num: index + 1,
+        total,
+        go: () => router.push({ pathname: '/chalisa/[id]', params: { id: slug } }),
+      };
+    }
+    return null;
+  }, [lastReadKey, readingPositions, contentLang]);
+
+  const aartiCount = useMemo(() => getAllAppAartis().length, []);
+  const chalisaCount = useMemo(() => getAllAppChalisas().length, []);
+
+  const manageDeitiesSub =
+    selectedDeities.length > 0
+      ? t('settings.manageDeitiesCount', { count: selectedDeities.length })
+      : t('settings.manageDeitiesNone');
 
   return (
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
+        showsVerticalScrollIndicator={false}>
 
-      <FlatList
-        data={filteredDeities}
-        keyExtractor={(item) => item.id}
-        renderItem={renderDeity}
-        numColumns={2}
-        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
-        columnWrapperStyle={styles.columnWrapper}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <View ref={deityGridRef} collapsable={false}>
-            {/* Hero */}
-            <View style={styles.hero}>
-              <Text
-                variant="display-italic"
-                style={[styles.heroTitle, { color: colors.textPrimary }]}>
-                {t('library.godsTitle')}
-              </Text>
-            </View>
+        {/* ── Title ─────────────────────────────────────────────────────── */}
+        <Text variant="display" style={[styles.heroTitle, { color: colors.textPrimary }]}>
+          {t('library.title')}
+        </Text>
 
-            {/* Search */}
-            <View
-              style={[
-                styles.searchBar,
-                { backgroundColor: colors.surface, borderColor: colors.borderAccent },
-              ]}>
-              <Icon name="search" size={16} color={colors.textTertiary} />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                placeholder={t('library.searchPlaceholder') as string}
-                placeholderTextColor={colors.textMuted}
-                style={[
-                  styles.searchInput,
-                  { color: colors.textPrimary, ...typeScale.bodyItalic },
-                ]}
-                returnKeyType="search"
-                autoCorrect={false}
-              />
-              {query.length > 0 && (
-                <MotionPressable
-                  onPress={() => setQuery('')}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('a11y.clearSearch')}>
-                  <Icon name="close-circle" size={16} color={colors.textMuted} />
-                </MotionPressable>
-              )}
-            </View>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyOrnament}>
-              <Ornament variant="lotus" color={colors.emphasis} size={14} />
-            </View>
-            <Text
-              variant="body-italic"
-              style={[styles.emptyText, { color: colors.textTertiary }]}>
-              {t('library.emptyForQuery', { query: query.trim() })}
+        {/* ── Search field → /search ────────────────────────────────────── */}
+        <MotionPressable
+          onPress={() => router.push('/search')}
+          pressedScale={0.98}
+          style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('search.placeholder')}>
+          <Icon name="search" size={17} color={colors.textMuted} />
+          <Text
+            variant="body"
+            style={[styles.searchPlaceholder, { color: colors.textMuted }]}
+            numberOfLines={1}>
+            {t('search.placeholder')}
+          </Text>
+        </MotionPressable>
+
+        {/* ── Continue reading ──────────────────────────────────────────── */}
+        {resume && (
+          <MotionPressable
+            onPress={resume.go}
+            pressedScale={0.98}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('library.continueKicker')} · ${resume.title}`}>
+            <LinearGradient
+              colors={
+                isDarkMode
+                  ? ['rgba(216,163,26,0.13)', 'rgba(255,255,255,0.03)']
+                  : [colors.accentSurface, colors.surface]
+              }
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={[styles.resumeCard, { borderColor: colors.borderAccent }]}>
+              <View style={[styles.resumeIcon, { backgroundColor: colors.accentSurface, borderColor: colors.borderAccent }]}>
+                <Icon name="text" size={20} color={colors.accent} />
+              </View>
+              <View style={styles.resumeBody}>
+                <Text variant="kicker" style={[styles.resumeKicker, { color: colors.textMuted }]}>
+                  {t('library.continueKicker')}
+                </Text>
+                <Text variant="deva-bold" style={[styles.resumeTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {resume.title}
+                </Text>
+                <Text variant="body-small" style={[styles.resumeMeta, { color: colors.textMuted }]}>
+                  {t('library.continueVerse', { num: resume.num, total: resume.total })}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textMuted} />
+            </LinearGradient>
+          </MotionPressable>
+        )}
+
+        {/* ── Deities — portrait tiles + "All N" ────────────────────────── */}
+        <View ref={deityGridRef} collapsable={false}>
+          <View style={styles.sectionHead}>
+            <Text variant="kicker" style={[styles.sectionKicker, { color: colors.textMuted }]}>
+              {t('library.bucketDeities')}
             </Text>
+            <MotionPressable
+              onPress={() => router.push('/gods')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('library.allGodsTitle')}>
+              <Text variant="body" style={[styles.sectionLink, { color: colors.accentText }]}>
+                {t('library.allCount', { count: ALL_DEITIES.length })}
+              </Text>
+            </MotionPressable>
           </View>
-        }
-      />
+          <View style={styles.deityGrid}>
+            {GRID_DEITIES.map((d) => {
+              const src = getDeityImageSmall(d.id);
+              return (
+                <MotionPressable
+                  key={d.id}
+                  onPress={() => router.push({ pathname: '/god/[id]', params: { id: d.id } })}
+                  pressedScale={0.96}
+                  style={styles.deityCell}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(`deities.${d.id}.displayName`)}>
+                  <View style={[styles.deityTile, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+                    {src && (
+                      <Image source={src} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+                    )}
+                    <LinearGradient
+                      colors={['rgba(11,8,16,0)', 'rgba(11,8,16,0.55)']}
+                      start={{ x: 0.5, y: 0.45 }}
+                      end={{ x: 0.5, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  </View>
+                  <Text variant="body-small" style={[styles.deityName, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {t(`deities.${d.id}.displayName`)}
+                  </Text>
+                </MotionPressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ── Read ──────────────────────────────────────────────────────── */}
+        <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
+          {t('library.bucketRead')}
+        </Text>
+        <ListCard colors={colors} rows={[
+          { icon: 'flame',  title: t('library.allAartis.title'),   count: aartiCount,   go: () => router.push('/aarti') },
+          { icon: 'text',   title: t('library.allChalisas.title'), count: chalisaCount, go: () => router.push('/chalisa') },
+          { icon: 'school', title: t('texts.scriptures.title'),    go: () => router.push('/scripture') },
+          { icon: 'star',   title: t('texts.stotras.title'),       go: () => router.push('/stotra') },
+          { icon: 'lotus',  title: t('texts.sahasranama.title'),   go: () => router.push('/sahasranama') },
+          { icon: 'flower', title: t('texts.suktas.title'),        go: () => router.push('/sukta') },
+          { icon: 'text',   title: t('texts.kathas.title'),        go: () => router.push('/katha') },
+          { icon: 'hand',   title: t('practice.prayers.title'),    go: () => router.push('/prayers') },
+        ]} />
+
+        {/* ── Rituals & Festivals ───────────────────────────────────────── */}
+        <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
+          {t('library.bucketRituals')}
+        </Text>
+        <ListCard colors={colors} rows={[
+          { icon: 'gift',     title: t('practice.pujaVidhi.title'), go: () => router.push('/pooja') },
+          { icon: 'calendar', title: t('practice.festivals.title'), go: () => router.push('/festivals') },
+          { icon: 'flame',    title: t('practice.navratri.title'),  go: () => router.push('/navratri') },
+          { icon: 'sun',      title: t('practice.vaar.title'),      go: () => router.push({ pathname: '/vaar/[day]', params: { day: vaar.dayKey } }) },
+          { icon: 'map',      title: t('practice.tirtha.title'),    go: () => router.push('/tirtha') },
+        ]} />
+
+        {/* ── Your Practice ─────────────────────────────────────────────── */}
+        <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
+          {t('library.bucketPractice')}
+        </Text>
+        <ListCard colors={colors} rows={[
+          { icon: 'circle-outline', title: t('jaap.title'),             go: () => router.push('/jaap') },
+          { icon: 'flower',         title: t('settings.manageDeities'), caption: manageDeitiesSub, go: () => router.push('/settings/deities') },
+          { icon: 'heart',          title: t('favorites.title'),        go: () => router.push('/favorites') },
+        ]} />
+
+      </ScrollView>
 
       <AdBanner colors={colors} placement="libraryGodsInline" />
 
@@ -182,9 +273,9 @@ export default function LibraryScreen() {
           description={t('walkthrough.step3Desc')}
           tooltipPosition="below"
           stepIndex={2}
-          totalSteps={4}
+          totalSteps={3}
           onNext={() => {
-            setWalkthroughStep(4);
+            setWalkthroughStep(0);
             router.push('/(tabs)');
           }}
           onSkip={() => setWalkthroughStep(0)}
@@ -195,216 +286,133 @@ export default function LibraryScreen() {
   );
 }
 
-// ─── Deity card ─────────────────────────────────────────────────────────────
+// ─── Grouped list card ───────────────────────────────────────────────────────
 
-interface DeityCardProps {
-  deity: DeityMeta;
-  colors: ColorPalette;
+interface ListRow {
+  icon: IconName;
+  title: string;
+  caption?: string;
+  count?: number;
+  go: () => void;
 }
 
-const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
-  const { t, i18n } = useTranslation();
-  const counts = COUNTS[deity.id] ?? { aartis: 0, chalisas: 0 };
-  const image = getDeityImageSmall(deity.id);
-
-  // Solid-fill gradient is the fallback when no image is available; with an
-  // image we layer a soft top-down deity-coloured tint to bind the photo to
-  // the deity's brand colour and keep the halo legible against busy crops.
-  const gradientColors = useMemo(
-    () =>
-      image
-        ? [`${deity.color}00`, `${deity.color}66`] as const
-        : [`${deity.color}E6`, `${deity.color}55`] as const,
-    [deity.color, image]
-  );
-
-  const pillText = useMemo(() => {
-    const parts: string[] = [];
-    if (counts.aartis > 0) parts.push(t('library.countAartis', { count: counts.aartis }));
-    if (counts.chalisas > 0) parts.push(t('library.countChalisas', { count: counts.chalisas }));
-    if (parts.length === 0) parts.push(t('library.countNone') as string);
-    return parts.join(' · ');
-  }, [counts.aartis, counts.chalisas, t]);
-
-  const tagline = t(`deities.${deity.id}.description`) as string;
-  const isHindi = i18n.language?.startsWith('hi');
-
+function ListCard({ rows, colors }: { rows: ListRow[]; colors: ColorPalette }) {
   return (
-    <MotionPressable
-      pressedScale={0.97}
-      onPress={() => router.push(`/god/${deity.id}`)}
-      style={[
-        styles.card,
-        { backgroundColor: colors.surface, borderColor: colors.borderAccent },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={t('a11y.openDeity', { name: t(`deities.${deity.id}.displayName`) })}>
-
-      <View style={[styles.portrait, !image && { backgroundColor: deity.color + '22' }]}>
-        {image && (
-          <Image
-            source={image}
-            style={styles.portraitImage}
-            contentFit="cover"
-            transition={200}
-            cachePolicy="memory-disk"
-          />
-        )}
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
-        <View style={styles.haloOuter} pointerEvents="none" />
-        <View style={styles.haloInner} pointerEvents="none" />
-        {!image && (
-          <Text variant="deva-bold" style={styles.portraitInitial}>
-            {deity.initial}
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.info}>
-        <Text style={[styles.name, { color: colors.textPrimary }]} numberOfLines={1}>
-          {t(`deities.${deity.id}.displayName`)}
-        </Text>
-        <Text
-          variant={isHindi ? 'deva' : 'body-italic'}
-          style={[styles.tagline, { color: colors.textTertiary }]}
-          numberOfLines={2}>
-          {tagline}
-        </Text>
-        <Text
-          variant="mono-caps"
-          style={[styles.pill, { color: palette.gold }]}
-          numberOfLines={1}>
-          {pillText}
-        </Text>
-      </View>
-    </MotionPressable>
+    <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {rows.map((row, i) => (
+        <View key={row.title}>
+          {i > 0 && <View style={[styles.rowDivider, { backgroundColor: colors.divider }]} />}
+          <MotionPressable
+            onPress={row.go}
+            pressedScale={0.98}
+            style={styles.row}
+            accessibilityRole="button"
+            accessibilityLabel={row.title}>
+            <Icon name={row.icon} size={19} color={colors.accent} />
+            <View style={styles.rowText}>
+              <Text variant="body" style={[styles.rowTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                {row.title}
+              </Text>
+              {!!row.caption && (
+                <Text variant="body-small" style={[styles.rowCaption, { color: colors.textMuted }]} numberOfLines={1}>
+                  {row.caption}
+                </Text>
+              )}
+            </View>
+            {row.count !== undefined && (
+              <Text variant="mono" style={[styles.rowCount, { color: colors.textMuted }]}>{row.count}</Text>
+            )}
+            <Icon name="chevron-right" size={15} color={colors.textDisabled} />
+          </MotionPressable>
+        </View>
+      ))}
+    </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  listContent: { paddingTop: 4, paddingBottom: 32 },
-  columnWrapper: { gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
+  scroll: { paddingTop: 10, paddingBottom: 32 },
 
-  // Hero
-  hero: {
-    paddingTop: 6,
-    paddingBottom: 16,
-  },
-  heroTitle: {
-    fontSize: 34,
-    lineHeight: 40,
-  },
+  heroTitle: { fontSize: 30, lineHeight: 36, marginBottom: 14 },
 
-  // Search
+  // Search field
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 9,
+    height: 42,
     paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 14,
+    borderRadius: 13,
     borderWidth: 1,
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13.5,
-    padding: 0,
-  },
+  searchPlaceholder: { flex: 1, fontSize: 15 },
 
-  // Cards
-  cardCell: { flex: 1, maxWidth: '50%' },
-  card: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  portrait: {
-    height: 132,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 10,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  portraitImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-  haloInner: {
-    position: 'absolute',
-    top: 8,
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 1,
-    borderColor: 'rgba(251,243,222,0.40)',
-  },
-  haloOuter: {
-    position: 'absolute',
-    top: 4,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(251,243,222,0.28)',
-  },
-  portraitInitial: {
-    fontSize: 38,
-    lineHeight: 44,
-    color: palette.parchmentBright,
-    textShadowColor: 'rgba(20,10,4,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-  },
-
-  info: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
-    gap: 4,
-  },
-  name: {
-    ...typeScale.bodySerif,
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  tagline: {
-    fontSize: 11.5,
-    lineHeight: 15,
-  },
-  pill: {
-    fontSize: 8.5,
-    marginTop: 4,
-  },
-
-  emptyState: {
-    paddingTop: 36,
-    paddingHorizontal: 24,
+  // Continue card
+  resumeCard: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    marginBottom: 16,
   },
-  emptyOrnament: {
-    width: 120,
+  resumeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: 13.5,
-    lineHeight: 20,
-    textAlign: 'center',
+  resumeBody: { flex: 1 },
+  resumeKicker: { fontSize: 10 },
+  resumeTitle: { fontSize: 17, lineHeight: 24, marginTop: 2 },
+  resumeMeta: { fontSize: 12, marginTop: 2 },
+
+  // Sections
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
+  sectionKicker: { fontSize: 9.5 },
+  sectionLink: { fontSize: 12.5 },
+  bucketLabel: { marginTop: 22, marginBottom: 12 },
+
+  // Deity tiles
+  deityGrid: { flexDirection: 'row', gap: 10 },
+  deityCell: { flex: 1, alignItems: 'center', gap: 7 },
+  deityTile: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: borderRadius.tile,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  deityName: { fontSize: 11.5 },
+
+  // Grouped list card
+  listCard: {
+    borderRadius: borderRadius.list,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+  },
+  rowText: { flex: 1 },
+  rowTitle: { fontSize: 15, lineHeight: 21 },
+  rowCaption: { fontSize: 12, marginTop: 1 },
+  rowCount: { fontSize: 13 },
+  rowDivider: { height: StyleSheet.hairlineWidth, marginLeft: 50 },
 });

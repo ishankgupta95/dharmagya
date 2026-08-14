@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ishank1995.dharmagya"
+      "bundleIdentifier": "com.ishank1995.dharmagya",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -39,9 +43,9 @@
           "image": "./assets/images/dharmagya_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#F8F4F2",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#171220"
           }
         }
       ],

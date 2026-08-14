@@ -55,7 +55,7 @@ export function NotificationPermissionPrompt({
         <Animated.View
           entering={FadeIn.duration(durations.base)}
           exiting={FadeOut.duration(durations.fast)}
-          style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+          style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.borderAccent }]}>
           <TouchableOpacity
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}

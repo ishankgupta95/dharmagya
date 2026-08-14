@@ -186,7 +186,8 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {title}
           </Text>
@@ -220,10 +221,10 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
           </ScrollView>
           <MotionPressable
             onPress={onClose}
-            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 16 }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.done')}>
-            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
               {t('common.done')}
             </Text>
           </MotionPressable>
@@ -298,11 +299,14 @@ const styles = StyleSheet.create({
   },
   sheet: {
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 12,
     paddingBottom: 28,
-    borderTopLeftRadius: borderRadius.card,
-    borderTopRightRadius: borderRadius.card,
+    borderTopLeftRadius: borderRadius.sheet,
+    borderTopRightRadius: borderRadius.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
   },
+  sheetGrabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, marginBottom: 14 },
   sheetTitle: { fontSize: 20, marginBottom: 8 },
   sheetList: { maxHeight: 360, marginTop: 4 },
   sheetItem: {

@@ -15,16 +15,34 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, spacing, borderRadius, type ColorPalette } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
 import {
   listJaapSessions,
   deleteJaapSession,
+  getJaapStats,
+  getJaapDailyMalas,
   type JaapSession,
+  type JaapStats,
 } from '@/services/jaapSessions';
 import { useLocaleFormatters } from '@/utils/format';
+
+const GRID_WEEKS = 12;
+const GRID_DAYS = GRID_WEEKS * 7;
+
+/** "21h" past an hour, "48m" under it — the Time-sat tile grain. */
+function formatSatTime(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
+  return `${minutes}m`;
+}
+
+function ymdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${da}`;
+}
 
 export default function JaapHistoryScreen() {
   const { t, i18n } = useTranslation();
@@ -34,9 +52,13 @@ export default function JaapHistoryScreen() {
   const { formatDateTime, formatNumber } = useLocaleFormatters();
 
   const [sessions, setSessions] = useState<JaapSession[]>([]);
+  const [stats, setStats] = useState<JaapStats | null>(null);
+  const [dailyMalas, setDailyMalas] = useState<Map<string, number>>(new Map());
 
   const refreshSessions = useCallback(() => {
     setSessions(listJaapSessions(db, 30));
+    setStats(getJaapStats(db));
+    setDailyMalas(getJaapDailyMalas(db, Date.now() - GRID_DAYS * 86_400_000));
   }, [db]);
 
   useFocusEffect(
@@ -44,6 +66,21 @@ export default function JaapHistoryScreen() {
       refreshSessions();
     }, [refreshSessions]),
   );
+
+  // 12 columns of 7 days, oldest week first, today in the last column.
+  const gridCells = (() => {
+    const cells: number[] = [];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (GRID_DAYS - 1));
+    for (let i = 0; i < GRID_DAYS; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      cells.push(dailyMalas.get(ymdLocal(d)) ?? 0);
+    }
+    return cells;
+  })();
+  const gridMax = Math.max(1, ...gridCells);
 
   const handleDelete = useCallback(
     (id: number) => {
@@ -76,7 +113,7 @@ export default function JaapHistoryScreen() {
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
           </MotionPressable>
-          <Text variant="body-italic" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text variant="display" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('jaap.historyTitle')}
           </Text>
           <View style={{ width: 36, height: 36 }} />
@@ -84,14 +121,10 @@ export default function JaapHistoryScreen() {
 
         {sessions.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Kicker color={colors.accent} size={11} style={styles.emptyEyebrow}>
-              {t('jaap.titleEyebrow')}
-            </Kicker>
-            <Text variant="display-italic" style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+            <Text variant="display" style={[styles.emptyTitle, { color: colors.textPrimary }]}>
               {t('jaap.historyEmptyTitle')}
             </Text>
-            <Ornament variant="diamond" tone={isDarkMode ? 'dark' : 'light'} style={styles.emptyRule} />
-            <Text variant="body-italic" style={[styles.emptyDesc, { color: colors.textTertiary }]}>
+            <Text variant="body" style={[styles.emptyDesc, { color: colors.textTertiary }]}>
               {t('jaap.historyEmptyDesc')}
             </Text>
             <MotionPressable
@@ -99,7 +132,7 @@ export default function JaapHistoryScreen() {
               style={[styles.emptyCta, { borderColor: colors.accent }]}
               accessibilityRole="button"
               accessibilityLabel={t('jaap.historyBeginCta')}>
-              <Text variant="mono-caps" style={[styles.emptyCtaText, { color: colors.accent }]}>
+              <Text variant="kicker" style={[styles.emptyCtaText, { color: colors.accentText }]}>
                 {t('jaap.historyBeginCta')}  →
               </Text>
             </MotionPressable>
@@ -108,6 +141,63 @@ export default function JaapHistoryScreen() {
           <ScrollView
             contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
             showsVerticalScrollIndicator={false}>
+
+            {/* ── Stat tiles — a record of practice, not a fitness app ───── */}
+            {stats && (
+              <View style={styles.statTiles}>
+                <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>
+                    {formatNumber(stats.totalMalas)}
+                  </Text>
+                  <Text variant="kicker" style={[styles.statLabel, { color: colors.textTertiary }]}>
+                    {t('jaap.statMalas')}
+                  </Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>
+                    {formatSatTime(stats.totalDurationMs)}
+                  </Text>
+                  <Text variant="kicker" style={[styles.statLabel, { color: colors.textTertiary }]}>
+                    {t('jaap.statTime')}
+                  </Text>
+                </View>
+                <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>
+                    {formatNumber(stats.sessionCount)}
+                  </Text>
+                  <Text variant="kicker" style={[styles.statLabel, { color: colors.textTertiary }]}>
+                    {t('jaap.statSessions')}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* ── Density grid — consistency without axes, goals or badges ── */}
+            <View style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text variant="kicker" style={[styles.gridKicker, { color: colors.textMuted }]}>
+                {t('jaap.last12Weeks')}
+              </Text>
+              <View style={styles.grid}>
+                {gridCells.map((malas, i) => {
+                  const intensity = malas === 0 ? 0 : 0.3 + 0.7 * (malas / gridMax);
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        styles.gridCell,
+                        {
+                          backgroundColor:
+                            malas === 0
+                              ? (isDarkMode ? 'rgba(237,232,240,0.07)' : 'rgba(34,27,36,0.06)')
+                              : `rgba(216,163,26,${intensity.toFixed(2)})`,
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+
             {grouped.map((group) => (
               <View key={group.dateKey} style={styles.dateGroup}>
                 <Text variant="mono-caps" style={[styles.dateHeader, { color: colors.textTertiary }]}>
@@ -257,9 +347,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  navTitle: { flex: 1, textAlign: 'center', marginHorizontal: 12, fontSize: 15 },
+  navTitle: { flex: 1, marginHorizontal: 12, fontSize: 24, lineHeight: 30 },
 
   scroll: { paddingTop: 16, paddingBottom: 12 },
+
+  // Stat tiles (frame 25 — no streaks, deliberately)
+  statTiles: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  statTile: {
+    flex: 1,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    paddingVertical: 17,
+    paddingHorizontal: 16,
+  },
+  statValue: {
+    fontFamily: 'Geist_200ExtraLight',
+    fontVariant: ['tabular-nums'],
+    fontSize: 34,
+    lineHeight: 38,
+  },
+  statLabel: { fontSize: 9.5, marginTop: 8 },
+
+  // Density grid
+  gridCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 22,
+  },
+  gridKicker: { fontSize: 9.5, marginBottom: 14 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  gridCell: {
+    // 12 columns; sized against the card's inner width via flexBasis so the
+    // grid stays square-ish across device widths.
+    flexBasis: `${100 / 12 - 1.5}%`,
+    flexGrow: 1,
+    aspectRatio: 1,
+    borderRadius: 4,
+  },
 
   dateGroup: { marginBottom: 22 },
   dateHeader: { fontSize: 9.5, marginBottom: 10, letterSpacing: 2.4 },

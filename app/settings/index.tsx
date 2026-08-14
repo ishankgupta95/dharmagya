@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
-import { useStore, type Ayanamsa, type ChartStyle, type FontSize, type HouseSystem, type MasaSystem, type Region, type Sex, type ThemeMode, type TimeFormat } from '@/store/useStore';
+import { useStore, type Ayanamsa, type ChartStyle, type FontSize, type HouseSystem, type IntentKey, type MasaSystem, type Region, type Sex, type ThemeMode, type TimeFormat } from '@/store/useStore';
 import { requestRating, shareApp } from '@/utils/share';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
@@ -36,6 +36,15 @@ const SUNRISE_OFFSET_OPTIONS: { key: string; min: number }[] = [
   { key: '15', min: 15 },
   { key: '30', min: 30 },
 ];
+
+// Onboarding intent — re-editable here so it's never a one-way persona trap
+// (P16.6). Order matters: [0] is the primary intent driving the Home heroes.
+const INTENT_OPTIONS: IntentKey[] = ['worship', 'panchang', 'kundli'];
+const INTENT_ICON: Record<IntentKey, IconName> = {
+  worship: 'flame',
+  panchang: 'calendar',
+  kundli: 'compass',
+};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -92,7 +101,8 @@ export default function SettingsScreen() {
     userName,
     setUserName,
     setWalkthroughStep,
-    selectedDeities,
+    primaryIntent,
+    setPrimaryIntent,
   } = useStore();
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
@@ -301,14 +311,21 @@ export default function SettingsScreen() {
 
   return (
     <ScreenMount>
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      {/* Settings is now a bottom tab — back-button dropped; users switch
-          tabs via the bar instead of popping a stack. Title left-aligned to
-          match the other hub tabs (Astrology, Library). */}
+      {/* Settings is a pushed stack screen reached from the Home gear — a
+          hidden NativeTabs trigger can't be focused, so it must NOT live in
+          the (tabs) group. Back pops to wherever the user came from. */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
-        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary, textAlign: 'left' }]}>
+        <MotionPressable
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Icon name="chevron-left" size={22} color={colors.textSecondary} />
+        </MotionPressable>
+        <Text variant="display" style={[styles.headerTitle, { color: colors.textPrimary, textAlign: 'left' }]}>
           {t('settings.title')}
         </Text>
       </View>
@@ -316,6 +333,60 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
+
+        {/* ── Location ──────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.location')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <MotionPressable
+            pressedScale={0.97}
+            onPress={() => router.push('/location-permission')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.myLocation')}>
+            <SettingRow
+              icon="location"
+              label={t('settings.gpsLocation')}
+              sublabel={locationText}
+              colors={colors}
+              right={
+                <View style={styles.locationRight}>
+                  <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
+                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
+                </View>
+              }
+            />
+          </MotionPressable>
+          <Divider colors={colors} />
+          <RegionRow region={region} onChange={setRegion} colors={colors} />
+        </View>
+
+
+        {/* ── Calendar ─────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.calendar')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <PickerRow
+            icon="apps"
+            label={t('panchang.layoutSettingLabel')}
+            value={layoutLabel}
+            onPress={() => setLayoutSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <PickerRow
+            icon="calendar"
+            label={t('settings.masaSystem')}
+            value={masaLabel}
+            onPress={() => setMasaSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <PickerRow
+            icon="compass"
+            label={t('settings.ayanamsa.label')}
+            value={ayanamsaLabel}
+            onPress={() => setAyanamsaSheetOpen(true)}
+            colors={colors}
+          />
+        </View>
 
         {/* ── Language ──────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.language')} colors={colors} />
@@ -351,6 +422,47 @@ export default function SettingsScreen() {
             colors={colors}
           />
 
+        </View>
+
+        {/* ── What brings you here? (intent — re-editable, P16.6) ──────── */}
+        <SectionHeader label={t('settings.intentSection')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {INTENT_OPTIONS.map((key, i) => {
+            const checked = primaryIntent.includes(key);
+            return (
+              <View key={key}>
+                {i > 0 && <Divider colors={colors} />}
+                <MotionPressable
+                  onPress={() => {
+                    const next = checked
+                      ? primaryIntent.filter((k) => k !== key)
+                      : [...primaryIntent, key];
+                    setPrimaryIntent(next);
+                  }}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                  accessibilityLabel={t(`onboarding.intent_${key}`)}>
+                  <SettingRow
+                    icon={INTENT_ICON[key]}
+                    label={t(`onboarding.intent_${key}`)}
+                    colors={colors}
+                    right={
+                      <View
+                        style={[
+                          styles.intentCheck,
+                          {
+                            borderColor: checked ? colors.accent : colors.border,
+                            backgroundColor: checked ? colors.accent : 'transparent',
+                          },
+                        ]}>
+                        {checked && <Icon name="check" size={12} color={palette.night} />}
+                      </View>
+                    }
+                  />
+                </MotionPressable>
+              </View>
+            );
+          })}
         </View>
 
         {/* ── Display ───────────────────────────────────────────────── */}
@@ -405,34 +517,6 @@ export default function SettingsScreen() {
 
         </View>
 
-        {/* ── Calendar ─────────────────────────────────────────────── */}
-        <SectionHeader label={t('settings.calendar')} colors={colors} />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <PickerRow
-            icon="apps"
-            label={t('panchang.layoutSettingLabel')}
-            value={layoutLabel}
-            onPress={() => setLayoutSheetOpen(true)}
-            colors={colors}
-          />
-          <Divider colors={colors} />
-          <PickerRow
-            icon="calendar"
-            label={t('settings.masaSystem')}
-            value={masaLabel}
-            onPress={() => setMasaSheetOpen(true)}
-            colors={colors}
-          />
-          <Divider colors={colors} />
-          <PickerRow
-            icon="compass"
-            label={t('settings.ayanamsa.label')}
-            value={ayanamsaLabel}
-            onPress={() => setAyanamsaSheetOpen(true)}
-            colors={colors}
-          />
-        </View>
-
         {/* ── Home Screen Widget ──────────────────────────────────────── */}
         <SectionHeader label={t('settings.widgetSection')} colors={colors} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -450,64 +534,8 @@ export default function SettingsScreen() {
           </MotionPressable>
         </View>
 
-        {/* ── Location ──────────────────────────────────────────────── */}
-        <SectionHeader label={t('settings.location')} colors={colors} />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <MotionPressable
-            pressedScale={0.97}
-            onPress={() => router.push('/location-permission')}
-            accessibilityRole="button"
-            accessibilityLabel={t('settings.myLocation')}>
-            <SettingRow
-              icon="location"
-              label={t('settings.gpsLocation')}
-              sublabel={locationText}
-              colors={colors}
-              right={
-                <View style={styles.locationRight}>
-                  <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
-                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
-                </View>
-              }
-            />
-          </MotionPressable>
-          <Divider colors={colors} />
-          <RegionRow region={region} onChange={setRegion} colors={colors} />
-        </View>
-
-        {/* ── Deities ──────────────────────────────────────────────── */}
-        <SectionHeader label={t('settings.deities')} colors={colors} />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <MotionPressable
-            onPress={() => router.push('/settings/deities')}
-            accessibilityRole="button"
-            accessibilityLabel={t('settings.manageDeities')}>
-            <SettingRow
-              icon="flower"
-              label={t('settings.manageDeities')}
-              sublabel={
-                selectedDeities.length > 0
-                  ? t('settings.manageDeitiesCount', { count: selectedDeities.length })
-                  : t('settings.manageDeitiesNone')
-              }
-              colors={colors}
-              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
-            />
-          </MotionPressable>
-          <Divider colors={colors} />
-          <MotionPressable
-            onPress={() => router.push('/jaap')}
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.openJaap')}>
-            <SettingRow
-              icon="circle-outline"
-              label={t('jaap.title')}
-              sublabel={t('jaap.homeBody')}
-              colors={colors}
-              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
-            />
-          </MotionPressable>
-        </View>
+        {/* Deities + Mantra Jaap moved to the Library tab's "Your Practice"
+            bucket in P16.5 (/settings/deities + /jaap stay routable). */}
 
         {/* ── Horoscope ─────────────────────────────────────────────── */}
         <SectionHeader label={t('settings.horoscope')} colors={colors} />
@@ -1023,7 +1051,8 @@ function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {t('settings.namePickerTitle')}
           </Text>
@@ -1041,10 +1070,10 @@ function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) 
           />
           <MotionPressable
             onPress={() => onSave(draft)}
-            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 16 }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.save')}>
-            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
               {t('common.save')}
             </Text>
           </MotionPressable>
@@ -1088,7 +1117,8 @@ function OptionSheet<T extends string>({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {title}
           </Text>
@@ -1124,10 +1154,10 @@ function OptionSheet<T extends string>({
           </View>
           <MotionPressable
             onPress={onClose}
-            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 16 }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.done')}>
-            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
               {t('common.done')}
             </Text>
           </MotionPressable>
@@ -1197,7 +1227,8 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {t('settings.fontSizePickerTitle')}
           </Text>
@@ -1247,10 +1278,10 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
 
           <MotionPressable
             onPress={onClose}
-            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 18 }]}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 18 }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.done')}>
-            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
               {t('common.done')}
             </Text>
           </MotionPressable>
@@ -1330,7 +1361,8 @@ function RegionRow({
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={styles.regionOverlay}>
-          <View style={[styles.regionSheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.regionSheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+            <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
             <Text variant="display-italic" style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
               {t('settings.regionPickerTitle')}
             </Text>
@@ -1352,10 +1384,10 @@ function RegionRow({
             </ScrollView>
             <MotionPressable
               onPress={() => setOpen(false)}
-              style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 12 }]}
+              style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 12 }]}
               accessibilityRole="button"
               accessibilityLabel={t('common.done')}>
-              <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+              <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
                 {t('common.done')}
               </Text>
             </MotionPressable>
@@ -1431,11 +1463,10 @@ const styles = StyleSheet.create({
   // Header
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingTop: 6,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backPill: {
     width: 36,
@@ -1455,6 +1486,15 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 10,
     marginLeft: 4,
+  },
+
+  intentCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Card
@@ -1499,7 +1539,16 @@ const styles = StyleSheet.create({
   regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
   regionValue: { fontSize: 13, flexShrink: 1 },
   regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  regionSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, maxHeight: '75%' },
+  regionSheet: {
+    borderTopLeftRadius: borderRadius.sheet,
+    borderTopRightRadius: borderRadius.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
+    paddingTop: 12,
+    paddingBottom: 36,
+    maxHeight: '75%',
+  },
   regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
   regionScroll: { flexShrink: 1 },
   regionGroupHeader: {
@@ -1526,7 +1575,18 @@ const styles = StyleSheet.create({
 
   // Generic picker sheet (reused by language + masa system)
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 },
+  // Sheets sit ON TOP of the screen, so they need the OPAQUE raised surface —
+  // `colors.surface` is a translucent card tint and lets the page bleed through.
+  sheet: {
+    borderTopLeftRadius: borderRadius.sheet,
+    borderTopRightRadius: borderRadius.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
+    paddingTop: 12,
+    paddingBottom: 36,
+  },
+  sheetGrabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, marginBottom: 14 },
   sheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
   sheetItem: {
     flexDirection: 'row',
@@ -1549,7 +1609,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     borderWidth: 1,
     fontSize: 15,
-    fontFamily: 'Fraunces_400Regular',
+    fontFamily: 'Geist_400Regular',
   },
   nameCancel: { alignItems: 'center', marginTop: 10, paddingVertical: 6 },
   nameCancelText: { fontSize: 10 },
@@ -1579,7 +1639,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   segmentGlyph: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: 'Geist_500Medium',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },

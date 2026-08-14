@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { View, ScrollView, StyleSheet, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -65,6 +65,30 @@ export default function ScriptureChapterScreen() {
     };
   }, [scripture, chapterData]);
 
+  // Per-chapter reading progress (frame 21). The furthest-scrolled verse is
+  // approximated from the scroll fraction and stored under
+  // `scripture-<slug>-<chapter>`; it only ever advances, so re-reading the top
+  // of a chapter never loses progress. The detail screen renders it as the
+  // per-chapter bar + the Continue card.
+  const setReadingPosition = useStore((s) => s.setReadingPosition);
+  const positionKey = scripture && chapterData ? `scripture-${scripture.slug}-${chapterData.number}` : null;
+  const verseCount = chapterData?.verses.length ?? 0;
+  const furthestRef = useRef(-1);
+  const handleScrollProgress = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!positionKey || verseCount === 0) return;
+    if (furthestRef.current < 0) {
+      furthestRef.current = useStore.getState().readingPositions[positionKey] ?? 0;
+    }
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const scrollable = contentSize.height - layoutMeasurement.height;
+    const fraction = scrollable > 0 ? Math.min(1, Math.max(0, contentOffset.y / scrollable)) : 1;
+    const index = Math.round(fraction * (verseCount - 1));
+    if (index > furthestRef.current) {
+      furthestRef.current = index;
+      setReadingPosition(positionKey, index);
+    }
+  };
+
   if (!scripture || !chapterData) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
@@ -117,6 +141,8 @@ export default function ScriptureChapterScreen() {
 
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
+          onScroll={handleScrollProgress}
+          scrollEventThrottle={250}
           showsVerticalScrollIndicator={false}>
 
           {/* ── Chapter heading ─────────────────────────────────────────── */}

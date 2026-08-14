@@ -204,7 +204,7 @@ export default function LocationPickerScreen() {
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Geist_400Regular' }]}
             placeholder={t('locationPermission.searchPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             value={query}

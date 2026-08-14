@@ -32,11 +32,18 @@ function sanitizeTirtha(t: TirthaEntry): TirthaEntry {
 /** All sites, sanitized, in registry order. */
 const ALL_TIRTHAS: readonly TirthaEntry[] = pkgGetAllTirthas().map(sanitizeTirtha);
 
+/** Every site across the six lists (search corpus, distance sorts). */
+export function getAllTirthas(): readonly TirthaEntry[] {
+  return ALL_TIRTHAS;
+}
+
 export interface TirthaCategoryMeta {
   key: TirthaCategory;
   icon: IconName;
   /** i18n key for the category display name (`tirtha.category.*`). */
   i18nKey: string;
+  /** Category hue for the hub tile gradient / detail wash (frames 22–23). */
+  tint: string;
   /** A reference śloka shown atop the category list, where the tradition has
    *  a canonical one (the Dvādaśa-Jyotirliṅga stotra, Sapta-Purī / Sapta-Nadī
    *  ślokas). */
@@ -45,12 +52,12 @@ export interface TirthaCategoryMeta {
 
 /** The six lists, in display order (best-known first). */
 export const TIRTHA_CATEGORIES: readonly TirthaCategoryMeta[] = [
-  { key: 'jyotirlinga', icon: 'flame', i18nKey: 'tirtha.category.jyotirlinga', sloka: DVADASHA_JYOTIRLINGA_STOTRA },
-  { key: 'char-dham', icon: 'compass', i18nKey: 'tirtha.category.char-dham' },
-  { key: 'chota-char-dham', icon: 'navigate', i18nKey: 'tirtha.category.chota-char-dham' },
-  { key: 'shakti-peetha', icon: 'flower', i18nKey: 'tirtha.category.shakti-peetha' },
-  { key: 'sapta-puri', icon: 'home', i18nKey: 'tirtha.category.sapta-puri', sloka: SAPTA_PURI_SLOKA },
-  { key: 'sacred-river', icon: 'globe', i18nKey: 'tirtha.category.sacred-river', sloka: SAPTA_NADI_SLOKA },
+  { key: 'jyotirlinga', icon: 'flame', i18nKey: 'tirtha.category.jyotirlinga', tint: '#7AA8C8', sloka: DVADASHA_JYOTIRLINGA_STOTRA },
+  { key: 'char-dham', icon: 'compass', i18nKey: 'tirtha.category.char-dham', tint: '#D8A31A' },
+  { key: 'chota-char-dham', icon: 'navigate', i18nKey: 'tirtha.category.chota-char-dham', tint: '#E8893C' },
+  { key: 'shakti-peetha', icon: 'flower', i18nKey: 'tirtha.category.shakti-peetha', tint: '#D45454' },
+  { key: 'sapta-puri', icon: 'home', i18nKey: 'tirtha.category.sapta-puri', tint: '#5DCAA5', sloka: SAPTA_PURI_SLOKA },
+  { key: 'sacred-river', icon: 'globe', i18nKey: 'tirtha.category.sacred-river', tint: '#4A9EF5', sloka: SAPTA_NADI_SLOKA },
 ];
 
 export function getTirthaCategoryMeta(key: string | undefined): TirthaCategoryMeta | undefined {

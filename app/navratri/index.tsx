@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +11,6 @@ import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPale
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import i18n, { resolveLanguage } from '@/i18n';
@@ -53,7 +53,6 @@ export default function NavratriGuideScreen() {
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
-  const ornamentTone = isDarkMode ? 'dark' : 'light';
 
   const userLocation = useStore(s => s.userLocation);
   const masaSystem = useStore(s => s.masaSystem);
@@ -89,21 +88,39 @@ export default function NavratriGuideScreen() {
   return (
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+        {/* The Devi's colour washes the top (frame 30). */}
+        <LinearGradient
+          colors={
+            isDarkMode
+              ? (['rgba(212,84,84,0.30)', 'rgba(216,163,26,0.10)', `${palette.night}00`] as const)
+              : (['rgba(212,84,84,0.20)', 'rgba(216,163,26,0.08)', `${palette.rice}00`] as const)
+          }
+          locations={[0, 0.5, 1]}
+          start={{ x: 0.4, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.wash}
+          pointerEvents="none"
+        />
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
           <MotionPressable
             onPress={() => router.back()}
-            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
-            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-left" size={22} color={colors.textPrimary} />
           </MotionPressable>
-          <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text variant="deva-bold" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {tForLang('navratri.title')}
           </Text>
-          <View style={[styles.backPill, { borderWidth: 0 }]} />
+          {window?.currentDay != null && (
+            <View style={[styles.dayBadge, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+              <Text variant="kicker-small" style={[styles.dayBadgeText, { color: colors.textPrimary }]}>
+                {tForLang('navratri.dayOfBadge', { day: window.currentDay })}
+              </Text>
+            </View>
+          )}
         </View>
 
         <ScrollView
@@ -123,7 +140,7 @@ export default function NavratriGuideScreen() {
                   active={active}
                   onPress={() => setKind(m.kind)}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.kindChip}
@@ -131,7 +148,7 @@ export default function NavratriGuideScreen() {
                   <Text
                     variant="mono-caps"
                     numberOfLines={1}
-                    style={[styles.kindChipText, { color: active ? palette.parchmentBright : colors.textSecondary }]}>
+                    style={[styles.kindChipText, { color: active ? palette.night : colors.textSecondary }]}>
                     {m.name[lang]}
                   </Text>
                 </SegmentedChip>
@@ -141,7 +158,7 @@ export default function NavratriGuideScreen() {
 
           {/* ── Kind summary line (always shown) ──────────────────────────── */}
           <View style={styles.summary}>
-            <Text variant="mono-caps" style={[styles.summaryWindow, { color: colors.accent }]}>
+            <Text variant="mono-caps" style={[styles.summaryWindow, { color: colors.accentText }]}>
               {masaInfo.windowLabel[lang]}
             </Text>
             {window && (
@@ -153,7 +170,6 @@ export default function NavratriGuideScreen() {
                 {window.days[0].date.getFullYear()}
               </Text>
             )}
-            <Ornament variant="lotus" tone={ornamentTone} style={styles.summaryOrnament} />
           </View>
 
           {/* ── Gupt: info card only (no 9-day guide) ─────────────────────── */}
@@ -231,14 +247,14 @@ function DayPicker({ window: navWindow, selectedDay, onSelect, colors, isDarkMod
             active={active}
             onPress={() => onSelect(d.day)}
             inactiveBg="transparent"
-            activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+            activeBg={colors.accent}
             inactiveBorder={isCurrent ? colors.accent : colors.border}
             activeBorder="transparent"
             style={styles.dayChip}
             accessibilityLabel={t('navratri.a11yPickDay', { day: d.day })}>
             <Text
               variant="mono-caps"
-              style={[styles.dayChipText, { color: active ? palette.parchmentBright : colors.textSecondary }]}>
+              style={[styles.dayChipText, { color: active ? palette.night : colors.textSecondary }]}>
               {String(d.day)}
             </Text>
           </SegmentedChip>
@@ -267,7 +283,6 @@ function DayCard({
   vijayadashami, lang, colors, isDarkMode, t,
 }: DayCardProps) {
   const form = day.form;
-  const ornamentTone = isDarkMode ? 'dark' : 'light';
 
   const ghatasthapana = useMemo<GhatasthapanaMuhurat | null>(() => {
     if (!isFirstDay) return null;
@@ -293,12 +308,11 @@ function DayCard({
         <Text variant="body-italic" style={[styles.dayHeroDate, { color: colors.accent }]}>
           {formatNavratriDayLabel(day.date, lang)}
         </Text>
-        <Ornament variant="lotus" tone={ornamentTone} style={styles.dayHeroOrnament} />
       </View>
 
       {/* ── Day colour (computed, not hardcoded) ──────────────────────── */}
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Kicker color={colors.accent} size={10}>{t('navratri.colorLabel')}</Kicker>
+        <Kicker color={colors.accentText} size={10}>{t('navratri.colorLabel')}</Kicker>
         <View style={styles.colorRow}>
           <View style={[styles.colorSwatch, { backgroundColor: day.color.hex, borderColor: colors.textTertiary }]} />
           <View style={{ flex: 1 }}>
@@ -327,7 +341,7 @@ function DayCard({
 
       {/* ── Mantra for the day ────────────────────────────────────────── */}
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Kicker color={colors.accent} size={10}>{t('navratri.mantraLabel')}</Kicker>
+        <Kicker color={colors.accentText} size={10}>{t('navratri.mantraLabel')}</Kicker>
         <Text variant="deva-bold" style={[styles.mantraDeva, { color: colors.textPrimary }]}>
           {form.mantra.devanagari}
         </Text>
@@ -340,10 +354,10 @@ function DayCard({
         <MotionPressable
           onPress={() => startJaap(form)}
           pressedScale={0.97}
-          style={[styles.jaapBtn, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
+          style={[styles.jaapBtn, { backgroundColor: palette.turmeric }]}
           accessibilityRole="button"
           accessibilityLabel={t('navratri.a11yStartJaap')}>
-          <Icon name="flower" size={14} color={palette.parchmentBright} />
+          <Icon name="flower" size={14} color={palette.night} />
           <Text variant="mono-caps" style={styles.jaapBtnText}>{t('navratri.startJaap')}</Text>
         </MotionPressable>
         <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
@@ -377,7 +391,7 @@ function DayCard({
       {/* ── Day 1: Ghatasthapana muhurat ──────────────────────────────── */}
       {isFirstDay && ghatasthapana && (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Kicker color={colors.accent} size={10}>{t('navratri.ghatasthapanaLabel')}</Kicker>
+          <Kicker color={colors.accentText} size={10}>{t('navratri.ghatasthapanaLabel')}</Kicker>
           <Text variant="display-italic" style={[styles.muhuratWindow, { color: colors.textPrimary }]}>
             {formatMuhuratRange(ghatasthapana.start, ghatasthapana.end)}
           </Text>
@@ -422,18 +436,18 @@ function DayCard({
         <MotionPressable
           onPress={() => router.push('/navratri/kanya-pujan')}
           pressedScale={0.97}
-          style={[styles.calloutCard, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}
+          style={[styles.calloutCard, { backgroundColor: colors.accentSurface, borderColor: colors.borderAccent }]}
           accessibilityRole="button"
           accessibilityLabel={t('navratri.a11yOpenKanyaPujan')}>
-          <Kicker color={palette.goldLeaf} size={10}>{t('navratri.kanyaPujanKicker')}</Kicker>
+          <Kicker color={colors.accentText} size={10}>{t('navratri.kanyaPujanKicker')}</Kicker>
           <Text variant="body" style={[styles.paragraph, { color: colors.textPrimary, marginTop: 10 }]}>
             {t(day.day === 9 ? 'navratri.day9HavanText' : 'navratri.kanyaPujanText', { lang })}
           </Text>
           <View style={styles.kanyaCtaRow}>
-            <Text variant="mono-caps" style={[styles.kanyaCtaText, { color: palette.goldLeaf }]}>
+            <Text variant="mono-caps" style={[styles.kanyaCtaText, { color: colors.accentText }]}>
               {t('navratri.kanyaPujanCardCta')}
             </Text>
-            <Icon name="chevron-right" size={13} color={palette.goldLeaf} />
+            <Icon name="chevron-right" size={13} color={colors.accent} />
           </View>
         </MotionPressable>
       )}
@@ -441,7 +455,7 @@ function DayCard({
       {/* ── Day 9: Vijayadashami / Dussehra preview ───────────────────── */}
       {day.day === 9 && (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Kicker color={colors.accent} size={10}>{t('navratri.vijayadashamiLabel')}</Kicker>
+          <Kicker color={colors.accentText} size={10}>{t('navratri.vijayadashamiLabel')}</Kicker>
           <Text variant="body" style={[styles.paragraph, { color: colors.textSecondary, marginTop: 10 }]}>
             {t('navratri.vijayadashamiText', { date: formatNavratriDayLabel(vijayadashami, lang) })}
           </Text>
@@ -456,7 +470,7 @@ function DayCard({
           style={[styles.saptashatiCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('navratri.a11yOpenSaptashati')}>
-          <Kicker color={colors.accent} size={10}>{t('navratri.saptashatiTodayLabel')}</Kicker>
+          <Kicker color={colors.accentText} size={10}>{t('navratri.saptashatiTodayLabel')}</Kicker>
           <Text variant="body" style={[styles.paragraph, { color: colors.textPrimary, marginTop: 8 }]}>
             {t('navratri.saptashatiChapters', {
               count: saptashati.chapters.length,
@@ -486,8 +500,8 @@ interface GuptInfoProps {
 
 function GuptInfoCard({ lang, colors, t }: GuptInfoProps) {
   return (
-    <View style={[styles.calloutCard, { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' }]}>
-      <Kicker color={palette.goldLeaf} size={10}>{t('navratri.guptKicker')}</Kicker>
+    <View style={[styles.calloutCard, { backgroundColor: colors.accentSurface, borderColor: colors.borderAccent }]}>
+      <Kicker color={colors.accentText} size={10}>{t('navratri.guptKicker')}</Kicker>
       <Text variant="body" style={[styles.paragraph, { color: colors.textPrimary, marginTop: 10 }]}>
         {GUPT_NAVRATRI_INFO[lang]}
       </Text>
@@ -534,7 +548,7 @@ function CrossLinksCard({ colors, t }: CrossLinksProps) {
 function SectionCard({ title, colors, children }: { title: string; colors: ColorPalette; children: ReactNode }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Kicker color={colors.accent} size={10}>{title}</Kicker>
+      <Kicker color={colors.accentText} size={10}>{title}</Kicker>
       <View style={styles.cardBody}>{children}</View>
     </View>
   );
@@ -545,24 +559,28 @@ function SectionCard({ title, colors, children }: { title: string; colors: Color
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
+  wash: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 300,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
     paddingTop: 6,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  headerTitle: { flex: 1, fontSize: 26, lineHeight: 38 },
+  dayBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  headerTitle: { flex: 1, fontSize: 22, lineHeight: 28, textAlign: 'center' },
+  dayBadgeText: { fontSize: 10 },
 
   scroll: { paddingTop: 16, paddingBottom: 24 },
 
@@ -641,7 +659,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     marginTop: 16,
   },
-  jaapBtnText: { fontSize: 11, color: palette.parchmentBright },
+  jaapBtnText: { fontSize: 11, color: palette.night },
   reviewNote: { fontSize: 11.5, lineHeight: 17, marginTop: 12 },
 
   // Dhyana

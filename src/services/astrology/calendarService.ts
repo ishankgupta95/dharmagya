@@ -446,14 +446,14 @@ function buildDay(
       { ayanamsa, computeEndTimes: false },
     );
     if (inst) {
-      tithiIdx = inst.tithi.index;
-      paksha = normalizePaksha(inst.tithi.paksha);
+      tithiIdx = inst.angas.tithi.index;
+      paksha = normalizePaksha(inst.angas.tithi.paksha);
       // Pournami = last tithi of shukla paksha (number 15).
       // Amavasya = last tithi of krishna paksha (number 15).
-      pournami = paksha === 'shukla' && inst.tithi.number === 15;
-      amavasya = paksha === 'krishna' && inst.tithi.number === 15;
-      nakshatra = inst.nakshatra.name ?? '';
-      yoga = inst.yoga.name ?? '';
+      pournami = paksha === 'shukla' && inst.angas.tithi.number === 15;
+      amavasya = paksha === 'krishna' && inst.angas.tithi.number === 15;
+      nakshatra = inst.angas.nakshatra.name ?? '';
+      yoga = inst.angas.yoga.name ?? '';
     }
   } catch (e) {
     if (e instanceof PanchangError) {
@@ -568,9 +568,9 @@ export function getCalendarMonth(
     );
     if (inst) {
       hinduMasa = opts.masaSystem === 'amanta'
-        ? inst.chandramasa.name
-        : inst.chandramasa.purnimantaName;
-      vikramSamvat = inst.samvat.vikramSamvat;
+        ? inst.calendar.chandramasa.name
+        : inst.calendar.chandramasa.purnimantaName;
+      vikramSamvat = inst.calendar.samvat.vikramSamvat;
     }
   } catch (e) {
     if (e instanceof PanchangError) {

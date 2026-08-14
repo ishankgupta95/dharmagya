@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, deityColors, palette, spacing } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
@@ -210,7 +211,6 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
   const { t } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
-  const ornamentTone = isDarkMode ? 'dark' : 'light';
   const appLanguage = useStore(s => s.language);
 
   // In-screen LangToggle mirrors the aarti / chalisa / Saptashati pattern —
@@ -221,6 +221,7 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
 
   const favoriteIds = useStore(s => s.favoriteIds);
   const toggleFavorite = useStore(s => s.toggleFavorite);
+  const readingPositions = useStore(s => s.readingPositions);
   const favKey = `scripture-${scripture.slug}`;
   const isFavorite = favoriteIds.includes(favKey);
 
@@ -231,19 +232,81 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
   );
   const heroTitle = lang === 'hi' ? scripture.titleHindi : scripture.titleEnglish;
 
+  // Per-chapter progress from the reader's `scripture-<slug>-<n>` keys
+  // (frame 21): each chapter is its own achievable thing, so there is no
+  // overall bar. `furthest` is the furthest-read verse index; a chapter is
+  // complete once the reader reached its last verse.
+  const progressFor = (chapterNumber: number, verseCount: number) => {
+    const furthest = readingPositions[`scripture-${scripture.slug}-${chapterNumber}`];
+    if (furthest == null || verseCount === 0) return { started: false, complete: false, fraction: 0, furthest: 0 };
+    const complete = furthest >= verseCount - 1;
+    return {
+      started: furthest > 0,
+      complete,
+      fraction: verseCount > 1 ? Math.min(1, furthest / (verseCount - 1)) : 1,
+      furthest,
+    };
+  };
+
+  // Continue card — the chapter the reader last left, rolled to the next
+  // chapter once one completes.
+  const continueTarget = useMemo(() => {
+    let best: { chapterNumber: number; furthest: number; verseCount: number } | null = null;
+    for (const ch of scripture.chapters) {
+      const furthest = readingPositions[`scripture-${scripture.slug}-${ch.number}`];
+      if (furthest == null) continue;
+      const complete = furthest >= ch.verses.length - 1;
+      if (!complete) {
+        if (!best || ch.number > best.chapterNumber) {
+          best = { chapterNumber: ch.number, furthest, verseCount: ch.verses.length };
+        }
+      }
+    }
+    if (best) return best;
+    // Everything read so far is complete — offer the first unread chapter.
+    for (const ch of scripture.chapters) {
+      if (readingPositions[`scripture-${scripture.slug}-${ch.number}`] == null) {
+        return { chapterNumber: ch.number, furthest: 0, verseCount: ch.verses.length };
+      }
+    }
+    return null;
+  }, [scripture, readingPositions]);
+  const hasAnyProgress = scripture.chapters.some(
+    ch => readingPositions[`scripture-${scripture.slug}-${ch.number}`] != null,
+  );
+
+  const openChapter = (chapterNumber: number) =>
+    router.push({
+      pathname: '/scripture/[id]/[chapter]',
+      params: { id: scripture.slug, chapter: String(chapterNumber) },
+    });
+
+  const washHue = (scripture.deity && deityColors[scripture.deity]) || palette.turmeric;
+
   return (
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+        <LinearGradient
+          colors={
+            isDarkMode
+              ? ([`${washHue}42`, `${palette.night}00`] as const)
+              : ([`${washHue}2E`, `${palette.rice}00`] as const)
+          }
+          locations={[0, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.wash}
+          pointerEvents="none"
+        />
 
         {/* ── Header ────────────────────────────────────────────────────── */}
-        <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
+        <View style={styles.navRowPlain}>
           <MotionPressable
             onPress={() => router.back()}
-            style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
-            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-left" size={22} color={colors.textPrimary} />
           </MotionPressable>
           <FavoriteHeart
             active={isFavorite}
@@ -259,31 +322,56 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
           contentContainerStyle={[styles.bodyScroll, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}>
 
-          {/* ── Hero ─────────────────────────────────────────────────────── */}
-          <View style={styles.heroBlock}>
-            <Text
-              variant={lang === 'hi' ? 'deva-bold' : 'display-italic'}
-              style={[styles.libHeroTitle, { color: colors.textPrimary }]}>
-              {heroTitle}
-            </Text>
-            <Text variant="body-italic" style={[styles.heroSubtitle, { color: colors.textTertiary }]}>
-              {isSingleChapter
-                ? tForLang('scripture.subtitleVersesOnly', { count: totalVerses })
-                : tForLang('scripture.subtitleChaptersVerses', {
-                    chapters: scripture.chapters.length,
-                    verses: totalVerses,
-                  })}
-            </Text>
-            <Ornament variant="lotus" tone={ornamentTone} style={styles.heroRule} />
+          {/* ── Title block ──────────────────────────────────────────────── */}
+          <Text variant="deva-bold" style={[styles.libHeroDeva, { color: colors.textPrimary }]}>
+            {scripture.titleHindi}
+          </Text>
+          <Text variant="display" style={[styles.libHeroLatin, { color: colors.textSecondary }]}>
+            {scripture.titleEnglish}
+          </Text>
+          <Text variant="mono" style={[styles.libHeroMeta, { color: colors.textTertiary }]}>
+            {isSingleChapter
+              ? tForLang('scripture.subtitleVersesOnly', { count: totalVerses })
+              : tForLang('scripture.subtitleChaptersVerses', {
+                  chapters: scripture.chapters.length,
+                  verses: totalVerses,
+                })}
+          </Text>
+
+          <View style={styles.langToggleWrap}>
+            <LangToggle lang={lang} onChange={setLang} colors={colors} />
           </View>
 
-          {/* ── Lang toggle (shared component) ──────────────────────────── */}
-          <LangToggle lang={lang} onChange={setLang} colors={colors} />
+          {/* ── Continue card ────────────────────────────────────────────── */}
+          {hasAnyProgress && continueTarget && (
+            <MotionPressable
+              onPress={() => openChapter(continueTarget.chapterNumber)}
+              pressedScale={0.97}
+              style={[styles.continueCard, { backgroundColor: colors.surfaceAccent, borderColor: colors.borderAccent }]}
+              accessibilityRole="button"
+              accessibilityLabel={tForLang('scripture.continueChapter', { num: continueTarget.chapterNumber })}>
+              <Icon name="text" size={19} color={colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text variant="title" style={[styles.continueTitle, { color: colors.textPrimary }]}>
+                  {tForLang('scripture.continueChapter', { num: continueTarget.chapterNumber })}
+                </Text>
+                <Text variant="mono" style={[styles.continueMeta, { color: colors.textTertiary }]}>
+                  {tForLang('scripture.verseOf', {
+                    x: continueTarget.furthest + 1,
+                    y: continueTarget.verseCount,
+                  })}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.accent} />
+            </MotionPressable>
+          )}
 
           {/* ── About ───────────────────────────────────────────────────── */}
           {scripture.about[lang].trim().length > 0 && (
             <View style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Kicker color={colors.accent} size={10}>{tForLang('scripture.aboutLabel')}</Kicker>
+              <Text variant="kicker-small" style={[styles.cardKicker, { color: colors.accentText }]}>
+                {tForLang('scripture.aboutLabel')}
+              </Text>
               <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
                 {scripture.about[lang]}
               </Text>
@@ -293,18 +381,13 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
           {/* ── Read CTA (single-chapter scriptures) OR chapter list ────── */}
           {isSingleChapter ? (
             <MotionPressable
-              onPress={() =>
-                router.push({
-                  pathname: '/scripture/[id]/[chapter]',
-                  params: { id: scripture.slug, chapter: String(scripture.chapters[0].number) },
-                })
-              }
+              onPress={() => openChapter(scripture.chapters[0].number)}
               pressedScale={0.97}
               style={[styles.readCta, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
               accessibilityRole="button"
               accessibilityLabel={tForLang('scripture.readAllVerses', { count: totalVerses })}>
               <View style={{ flex: 1 }}>
-                <Text variant="mono-caps" style={[styles.readCtaKicker, { color: colors.accent }]}>
+                <Text variant="kicker-small" style={[styles.readCtaKicker, { color: colors.accentText }]}>
                   {tForLang('scripture.readCtaKicker')}
                 </Text>
                 <Text variant="body" style={[styles.readCtaText, { color: colors.textPrimary }]}>
@@ -315,45 +398,68 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
             </MotionPressable>
           ) : (
             <View style={styles.section}>
-              <Kicker color={colors.accent} size={10} style={styles.sectionKicker}>
+              <Text variant="kicker-small" style={[styles.sectionKickerText, { color: colors.textMuted }]}>
                 {tForLang('scripture.chapterListLabel')}
-              </Kicker>
-              {scripture.chapters.map((ch) => (
-                <MotionPressable
-                  key={ch.number}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/scripture/[id]/[chapter]',
-                      params: { id: scripture.slug, chapter: String(ch.number) },
-                    })
-                  }
-                  pressedScale={0.97}
-                  style={[styles.chapterCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={tForLang('scripture.a11yOpenChapter', { num: ch.number })}>
-                  <View style={styles.chapterHead}>
-                    <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider}
-                      wrapperStyle={styles.chapterKickerWrap}>
-                      {tForLang('scripture.chapterKicker', { num: ch.number })}
-                    </Kicker>
-                  </View>
-                  <Text
-                    variant={lang === 'hi' ? 'deva-bold' : 'body'}
-                    style={[styles.chapterSanskrit, { color: colors.textPrimary }]}>
-                    {lang === 'hi' ? (ch.titleSanskrit ?? ch.titleEnglish ?? '') : (ch.titleEnglish ?? ch.titleSanskrit ?? '')}
-                  </Text>
-                  <Text variant="mono-caps" style={[styles.chapterVerseCount, { color: colors.textMuted }]}>
-                    {tForLang('scripture.versesNCount', { count: ch.verses.length })}
-                  </Text>
-                </MotionPressable>
-              ))}
+              </Text>
+              <View style={[styles.chapterListCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {scripture.chapters.map((ch, i) => {
+                  const progress = progressFor(ch.number, ch.verses.length);
+                  const inProgress = progress.started && !progress.complete;
+                  return (
+                    <View key={ch.number}>
+                      {i > 0 && <View style={[styles.chapterDivider, { backgroundColor: colors.divider }]} />}
+                      <MotionPressable
+                        onPress={() => openChapter(ch.number)}
+                        pressedScale={0.98}
+                        style={[styles.chapterRow, inProgress && { backgroundColor: colors.accentSurface }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={tForLang('scripture.a11yOpenChapter', { num: ch.number })}>
+                        <Text
+                          variant="display"
+                          style={[
+                            styles.chapterNum,
+                            { color: inProgress ? colors.accentText : colors.textMuted },
+                          ]}>
+                          {ch.number}
+                        </Text>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            variant={lang === 'hi' ? 'deva' : 'body'}
+                            style={[styles.chapterRowTitle, { color: colors.textPrimary }]}
+                            numberOfLines={1}>
+                            {lang === 'hi' ? (ch.titleSanskrit ?? ch.titleEnglish ?? '') : (ch.titleEnglish ?? ch.titleSanskrit ?? '')}
+                          </Text>
+                          {inProgress ? (
+                            <View style={[styles.chapterBar, { backgroundColor: isDarkMode ? 'rgba(237,232,240,0.14)' : 'rgba(34,27,36,0.10)' }]}>
+                              <View
+                                style={[
+                                  styles.chapterBarFill,
+                                  { backgroundColor: colors.accent, width: `${Math.round(progress.fraction * 100)}%` },
+                                ]}
+                              />
+                            </View>
+                          ) : (
+                            <Text variant="body-small" style={[styles.chapterRowCaption, { color: colors.textMuted }]}>
+                              {tForLang('scripture.versesNCount', { count: ch.verses.length })}
+                              {progress.complete ? ` · ${tForLang('scripture.chapterComplete')}` : ''}
+                            </Text>
+                          )}
+                        </View>
+                        {progress.complete && <Icon name="check-circle" size={17} color={colors.accent} />}
+                      </MotionPressable>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           )}
 
           {/* ── Sources / disclaimer ──────────────────────────────────── */}
           <View style={styles.sourcesBlock}>
-            <Kicker color={colors.textMuted} size={9}>{tForLang('scripture.sourcesLabel')}</Kicker>
-            <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
+            <Text variant="kicker-small" style={{ color: colors.textMuted, fontSize: 9 }}>
+              {tForLang('scripture.sourcesLabel')}
+            </Text>
+            <Text variant="body-small" style={[styles.sourcesText, { color: colors.textMuted }]}>
               {SCRIPTURE_DISCLAIMER[lang]}
             </Text>
           </View>
@@ -414,6 +520,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  navRowPlain: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenH,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  wash: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 280,
+  },
+
+  // Diya title block (library scriptures)
+  libHeroDeva: { fontSize: 32, lineHeight: 44, marginTop: 14 },
+  libHeroLatin: { fontSize: 22, lineHeight: 28, marginTop: 2 },
+  libHeroMeta: { fontSize: 13.5, lineHeight: 19, marginTop: 10 },
+  langToggleWrap: { marginTop: 16 },
+
+  continueCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    borderRadius: borderRadius.list,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    marginBottom: spacing.cardGap,
+  },
+  continueTitle: { fontSize: 15, lineHeight: 20 },
+  continueMeta: { fontSize: 12.5, marginTop: 2 },
+
+  cardKicker: { fontSize: 9.5 },
+  sectionKickerText: { fontSize: 9.5, marginBottom: 10, paddingHorizontal: 4 },
+
+  chapterListCard: {
+    borderRadius: borderRadius.list,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  chapterDivider: { height: StyleSheet.hairlineWidth, marginLeft: 57 },
+  chapterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 17,
+  },
+  chapterNum: { fontSize: 21, lineHeight: 26, minWidth: 26, textAlign: 'left' },
+  chapterRowTitle: { fontSize: 16, lineHeight: 22 },
+  chapterRowCaption: { fontSize: 12, marginTop: 1 },
+  chapterBar: { height: 3, borderRadius: 2, marginTop: 7, overflow: 'hidden' },
+  chapterBarFill: { height: '100%', borderRadius: 2 },
 
   bodyScroll: { paddingTop: 20, paddingBottom: 32 },
 

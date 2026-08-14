@@ -4,9 +4,9 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from './AppText';
-import { Ornament } from './Ornament';
-import { borderRadius, palette, spacing } from '@/config/theme';
+import { borderRadius, darkColors, lightColors, palette, spacing } from '@/config/theme';
 import { MotionPressable } from '@/components/common/MotionPressable';
+import { useStore } from '@/store/useStore';
 
 /**
  * Editorial time picker. iOS shows an inline `@react-native-community/datetimepicker`
@@ -47,6 +47,8 @@ export function TimePickerModal(props: TimePickerModalProps) {
 
 function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: TimePickerModalProps) {
   const { t } = useTranslation();
+  const isDark = useStore((s) => s.isDarkMode);
+  const colors = isDark ? darkColors : lightColors;
   const [draft, setDraft] = useState<Date>(() => hhmmToDate(value));
 
   useEffect(() => {
@@ -73,14 +75,12 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
         <TouchableOpacity
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
-          style={[styles.sheet, { backgroundColor: palette.parchmentBright, borderColor: palette.paperEdge }]}
+          style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
           accessible={false}>
 
-          <Text variant="display-italic" style={[styles.title, { color: palette.ink }]}>
+          <Text variant="title" style={[styles.title, { color: colors.textPrimary }]}>
             {title ?? t('common.pickTime')}
           </Text>
-
-          <Ornament variant="lotus" style={styles.rule} />
 
           <View style={styles.pickerWrap}>
             <DateTimePicker
@@ -88,9 +88,9 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
               mode="time"
               display="spinner"
               onChange={handleChange}
-              accentColor={palette.sindoor}
-              textColor={palette.ink}
-              themeVariant="light"
+              accentColor={palette.turmeric}
+              textColor={colors.textPrimary}
+              themeVariant={isDark ? 'dark' : 'light'}
               is24Hour={is24Hour}
               style={styles.picker}
             />
@@ -99,10 +99,10 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
           <MotionPressable
             pressedScale={0.97}
             onPress={handleDone}
-            style={[styles.doneBtn, { backgroundColor: palette.sindoor }]}
+            style={[styles.doneBtn, { backgroundColor: palette.turmeric }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.done')}>
-            <Text variant="mono-caps" style={styles.doneText}>
+            <Text variant="button" style={styles.doneText}>
               {t('common.done')}
             </Text>
           </MotionPressable>
@@ -154,8 +154,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 14,
   },
-  title: { fontSize: 24, lineHeight: 30, textAlign: 'center' },
-  rule: { marginTop: 10, marginBottom: 8, alignSelf: 'center', width: '50%' },
+  title: { fontSize: 18, lineHeight: 25, textAlign: 'center', marginBottom: 8 },
   pickerWrap: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -169,5 +168,5 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
-  doneText: { fontSize: 11, color: palette.parchmentBright },
+  doneText: { fontSize: 15, color: palette.night },
 });

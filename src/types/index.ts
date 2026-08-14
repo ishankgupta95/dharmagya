@@ -54,8 +54,6 @@ export interface IFestival {
   type: FestivalType;
   /** Classical/specific name, e.g. "Saphala Ekadashi" for a generic Ekadashi. */
   description?: string;
-  /** Smarta-only: when Ekadashi is Dashami-viddha, the Dwadashi fast day (ISO yyyy-mm-dd). */
-  deferralDate?: string;
 }
 
 /** Lightweight summary of an upcoming eclipse — used for forecasting cards. */
@@ -89,7 +87,13 @@ export interface IEclipse {
   sutakStart: string;
   sutakEnd: string;
   visibleFromLocation: boolean;
-  magnitude: number;
+  /**
+   * Fraction of the disc's *area* covered at peak, [0, 1] — render as a
+   * percentage. Published by panchang-ts as `magnitude` through 4.x and
+   * renamed in v5, where `magnitude` became the disc-*diameter* fraction that
+   * eclipse catalogues publish (>1 when total, negative when penumbral).
+   */
+  obscuration: number;
   description: string;
 }
 
@@ -192,7 +196,7 @@ export interface IPanchangDay {
   gulikaKalamEnd?: string;
   abhijitMuhurtaStart?: string;
   abhijitMuhurtaEnd?: string;
-  durMuhurta: Array<{ start: string; end: string }>;
+  durMuhurta: { start: string; end: string }[];
   vara?: string;
   hinduMonth?: string;
   hinduMonthAmanta?: string;
@@ -212,16 +216,16 @@ export interface IPanchangDay {
   godhuliMuhurtaEnd?: string;
   nishitaMuhurtaStart?: string;
   nishitaMuhurtaEnd?: string;
-  amritKalaStart?: string;
-  amritKalaEnd?: string;
+  /** 0–2 nakshatra-anchored windows; transition days carry two. */
+  amritKala: { start: string; end: string }[];
   madhyahnaStart?: string;
   madhyahnaEnd?: string;
   pratahSandhyaStart?: string;
   pratahSandhyaEnd?: string;
   sayahnaSandhyaStart?: string;
   sayahnaSandhyaEnd?: string;
-  varjyamStart?: string;
-  varjyamEnd?: string;
+  /** 0–2 nakshatra-anchored windows; transition days carry two. */
+  varjyam: { start: string; end: string }[];
   gandaMula?: IGandaMula | null;
   anandadiYoga?: IAnandadiYoga;
   tarabala?: ITarabala | null;

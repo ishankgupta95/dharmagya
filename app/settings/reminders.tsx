@@ -16,7 +16,6 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
-import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
 import {
   NotificationPermissionPrompt,
@@ -57,20 +56,8 @@ export default function RemindersScreen() {
   const setFestivalReminderTime = useStore(s => s.setFestivalReminderTime);
   const { formatTime: formatDisplayTime } = useLocaleFormatters();
 
-  // Sadhana practice reminder (P14.4) — opt-in evening nudge if the user
-  // hasn't begun their sadhana yet today.
-  const sadhana = useStore(s => s.sadhana);
-  const sadhanaReminderEnabled = useStore(s => s.sadhanaReminderEnabled);
-  const setSadhanaReminderEnabled = useStore(s => s.setSadhanaReminderEnabled);
-  const sadhanaReminderTime = useStore(s => s.sadhanaReminderTime);
-  const setSadhanaReminderTime = useStore(s => s.setSadhanaReminderTime);
-  const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
-  const quietHoursStart = useStore(s => s.quietHoursStart);
-  const quietHoursEnd = useStore(s => s.quietHoursEnd);
-
   const [tithiTimePickerOpen, setTithiTimePickerOpen] = useState(false);
   const [festivalTimePickerOpen, setFestivalTimePickerOpen] = useState(false);
-  const [sadhanaTimePickerOpen, setSadhanaTimePickerOpen] = useState(false);
 
   // Permission pre-prompt: when the user flips a reminder ON for the first
   // time we show an editorial card explaining what they'll receive before the
@@ -106,35 +93,6 @@ export default function RemindersScreen() {
     setPrePromptKind(null);
     resolve?.(proceed);
   }, []);
-
-  // Re-schedule the sadhana horizon when the toggle / time changes. Same
-  // debounce semantics as the tithi/festival reminders above, but a separate
-  // effect so the two namespaces don't interfere.
-  const sadhanaDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (sadhanaDebounceRef.current) clearTimeout(sadhanaDebounceRef.current);
-    sadhanaDebounceRef.current = setTimeout(() => {
-      void rescheduleSadhanaReminder({
-        enabled: sadhanaReminderEnabled,
-        timeHHmm: sadhanaReminderTime,
-        sadhana,
-        quietHours: quietHoursEnabled
-          ? { enabled: true, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }
-          : undefined,
-      });
-    }, 300);
-    return () => {
-      if (sadhanaDebounceRef.current) clearTimeout(sadhanaDebounceRef.current);
-    };
-  }, [sadhanaReminderEnabled, sadhanaReminderTime, sadhana, quietHoursEnabled, quietHoursStart, quietHoursEnd]);
-
-  async function handleSadhanaToggle(val: boolean) {
-    if (val && !sadhanaReminderEnabled) {
-      const ok = await ensurePermissionWithPreprompt('sadhana');
-      if (!ok) return;
-    }
-    setSadhanaReminderEnabled(val);
-  }
 
   // Navratri context — `prefs.festival.major` triggers the 9-day Navratri
   // sequence, which needs panchang-compute inputs.
@@ -184,19 +142,17 @@ export default function RemindersScreen() {
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
         <MotionPressable
           onPress={() => router.back()}
           hitSlop={12}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
-          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+          <Icon name="chevron-left" size={22} color={colors.textSecondary} />
         </MotionPressable>
-        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+        <Text variant="display" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('reminders.title')}
         </Text>
-        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       <ScrollView
@@ -206,29 +162,6 @@ export default function RemindersScreen() {
         <Text variant="body-italic" style={[styles.intro, { color: colors.textTertiary }]}>
           {t('reminders.intro')}
         </Text>
-
-        {/* ── Sadhana practice (P14.4) ────────────────────────────────── */}
-        <SectionLabel style={styles.sectionLabelSpacing}>{t('reminders.sadhanaSection')}</SectionLabel>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ToggleRow
-            icon="flame"
-            label={t('reminders.sadhanaLabel')}
-            sublabel={t('reminders.sadhanaSublabel')}
-            value={sadhanaReminderEnabled}
-            onChange={handleSadhanaToggle}
-            colors={colors}
-            showDivider={sadhanaReminderEnabled}
-          />
-          {sadhanaReminderEnabled && (
-            <TimeRow
-              icon="clock"
-              label={t('reminders.sadhanaTimeLabel')}
-              value={formatDisplayTime(sadhanaReminderTime)}
-              onPress={() => setSadhanaTimePickerOpen(true)}
-              colors={colors}
-            />
-          )}
-        </View>
 
         {/* ── Tithi Reminders ─────────────────────────────────────────── */}
         <SectionLabel style={styles.sectionLabelSpacing}>{t('reminders.tithiSection')}</SectionLabel>
@@ -301,17 +234,9 @@ export default function RemindersScreen() {
         title={t('reminders.festivalTimePickerTitle')}
       />
 
-      <TimePickerModal
-        visible={sadhanaTimePickerOpen}
-        onClose={() => setSadhanaTimePickerOpen(false)}
-        value={sadhanaReminderTime}
-        onPick={setSadhanaReminderTime}
-        title={t('reminders.sadhanaTimePickerTitle')}
-      />
-
       <NotificationPermissionPrompt
         visible={prePromptKind !== null}
-        kind={prePromptKind ?? 'sadhana'}
+        kind={prePromptKind ?? 'tithi'}
         onCancel={() => closePrePrompt(false)}
         onContinue={() => closePrePrompt(true)}
       />
@@ -394,21 +319,12 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingTop: 6,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 22 },
+  headerTitle: { flex: 1, fontSize: 30, lineHeight: 40 },
 
   scroll: { paddingTop: 14, paddingBottom: 32 },
 

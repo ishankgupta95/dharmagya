@@ -8,15 +8,16 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   useFonts,
-  Fraunces_300Light,
-  Fraunces_400Regular,
-  Fraunces_500Medium,
-  Fraunces_300Light_Italic,
-  Fraunces_400Regular_Italic,
-} from '@expo-google-fonts/fraunces';
+  Geist_200ExtraLight,
+  Geist_300Light,
+  Geist_400Regular,
+  Geist_500Medium,
+  Geist_600SemiBold,
+} from '@expo-google-fonts/geist';
 import {
   NotoSerifDevanagari_400Regular,
   NotoSerifDevanagari_500Medium,
+  NotoSerifDevanagari_600SemiBold,
   NotoSerifDevanagari_700Bold,
 } from '@expo-google-fonts/noto-serif-devanagari';
 
@@ -27,12 +28,10 @@ import i18n, { resolveLanguage, changeLanguage } from '@/i18n';
 import { preloadInterstitial, showInterstitial } from '@/services/interstitialAds';
 import { scheduleDailyReminder } from '@/services/notifications';
 import { rescheduleReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
-import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
+import { cancelSadhanaReminders } from '@/services/sadhanaReminders';
 import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 import { APP_RESUME_MIN_BACKGROUND_MS } from '@/config/ads';
 import { pmark } from '@/utils/perfProfile';
-import { MilestoneCelebrationHost } from '@/components/common/MilestoneCelebrationHost';
-import { SadhanaOpenRecorder } from '@/components/common/SadhanaOpenRecorder';
 
 pmark('app:_layout:moduleEval');
 
@@ -55,9 +54,6 @@ export default function RootLayout() {
     quietHoursEnabled,
     quietHoursStart,
     quietHoursEnd,
-    sadhana,
-    sadhanaReminderEnabled,
-    sadhanaReminderTime,
     userLocation,
     ayanamsa,
     masaSystem,
@@ -80,15 +76,16 @@ export default function RootLayout() {
   );
 
   const [fontsLoaded, fontError] = useFonts({
-    // Sacred Editorial — Fraunces (display + body serif, italic pairs).
-    Fraunces_300Light,
-    Fraunces_400Regular,
-    Fraunces_500Medium,
-    Fraunces_300Light_Italic,
-    Fraunces_400Regular_Italic,
-    // Sacred Editorial — Noto Serif Devanagari (hi-titles, mantras).
+    // Diya — Geist carries all Latin UI and figures.
+    Geist_200ExtraLight,
+    Geist_300Light,
+    Geist_400Regular,
+    Geist_500Medium,
+    Geist_600SemiBold,
+    // Noto Serif Devanagari — names, mantras, verse (unchanged).
     NotoSerifDevanagari_400Regular,
     NotoSerifDevanagari_500Medium,
+    NotoSerifDevanagari_600SemiBold,
     NotoSerifDevanagari_700Bold,
   });
 
@@ -183,23 +180,13 @@ export default function RootLayout() {
             { coords: userLocation, ayanamsa, masaSystem },
           );
         }
-        // Roll the sadhana at-risk horizon forward (P14.4). Idempotent;
-        // also skips today's prompt internally if already practised.
-        if (sadhanaReminderEnabled) {
-          void rescheduleSadhanaReminder({
-            enabled: true,
-            timeHHmm: sadhanaReminderTime,
-            sadhana,
-            quietHours: quietHoursEnabled ? quietHours : undefined,
-          });
-        }
         // Foreground refresh of the home-screen widget. Debounced inside the
         // service so multiple resumes per minute don't recompute panchang.
         void refreshTodayWidget();
       }
     });
     return () => sub.remove();
-  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime, userLocation, ayanamsa, masaSystem]);
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, userLocation, ayanamsa, masaSystem]);
 
   // Roll reminder horizons once on each cold start too.
   useEffect(() => {
@@ -213,15 +200,10 @@ export default function RootLayout() {
         { coords: userLocation, ayanamsa, masaSystem },
       );
     }
-    if (sadhanaReminderEnabled) {
-      void rescheduleSadhanaReminder({
-        enabled: true,
-        timeHHmm: sadhanaReminderTime,
-        sadhana,
-        quietHours: quietHoursEnabled ? quietHours : undefined,
-      });
-    }
-  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, quietHoursEnabled, sadhana, sadhanaReminderEnabled, sadhanaReminderTime, userLocation, ayanamsa, masaSystem]);
+    // The P14.4 sadhana reminder was removed — cancel any nudges still
+    // scheduled on devices where it had been enabled before the feature went.
+    void cancelSadhanaReminders();
+  }, [appReady, hasOnboarded, dailyReminderEnabled, dailyReminderTime, reminderPrefs, tithiReminderTime, festivalReminderTime, quietHours, userLocation, ayanamsa, masaSystem]);
 
   if (!appReady) return null;
 
@@ -260,8 +242,6 @@ export default function RootLayout() {
                   so a fade reads more "search dialog" than "drilldown". */}
               <Stack.Screen name="search" options={{ animation: 'fade' }} />
             </Stack>
-            <MilestoneCelebrationHost />
-            <SadhanaOpenRecorder />
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
           </SQLiteProvider>
         </Suspense>

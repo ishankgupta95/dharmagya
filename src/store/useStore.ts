@@ -20,6 +20,12 @@ export type ChartStyle = 'north' | 'south';
 export type HouseSystem = 'whole-sign' | 'equal' | 'placidus-kp';
 export type Sex = 'male' | 'female';
 
+/** What the user came to the app for (P16.6 onboarding keystone). Multi-select;
+ *  the first entry is the "primary" intent that drives Home hero order, the
+ *  Home primary-action button, and the Kundli default view. Re-editable in
+ *  Settings — never a one-way persona trap. Defaults to ['worship']. */
+export type IntentKey = 'worship' | 'panchang' | 'kundli';
+
 /** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
  *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
  *  state-slug naming. Default 'all' emits every regional variant. */
@@ -92,8 +98,7 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
  *  0  = completed / skipped
  *  1  = Home → highlight panchang card (tap → go to Panchang)
  *  2  = Panchang → explain the screen (tap Next → go to Library)
- *  3  = Library → explain the screen (tap Next → go to Home)
- *  4  = Home → highlight settings gear (tap → finish)
+ *  3  = Library → explain the screen (tap Next → finish)
  */
 interface AppStore {
   // Persisted
@@ -103,7 +108,15 @@ interface AppStore {
    *  _layout.tsx; persisted so first paint matches the last known value. */
   isDarkMode: boolean;
   favoriteIds: string[]; // Stores both aarti and chalisa IDs (prefixed: "aarti-*", "chalisa-*")
+  /** Diya reader — last focused verse per text (key: "chalisa-hanuman"), so
+   *  returning to a reader lands on the saved verse. */
+  readingPositions: Record<string, number>;
+  /** Most recently read text — drives the Library "Continue" card. */
+  lastReadKey: string | null;
   hasOnboarded: boolean;
+  /** Onboarding intent (P16.6). Multi-select; [0] is primary. Defaults to
+   *  ['worship']. Drives Home hero order + primary action + Kundli default. */
+  primaryIntent: IntentKey[];
   selectedDeities: string[];
   userLocation: { lat: number; lon: number } | null;
   locationName: string | null; // e.g. "Mumbai, MH" or "GPS"
@@ -187,8 +200,10 @@ interface AppStore {
   /** Internal: called by _layout.tsx whenever themeMode or system scheme changes. */
   setResolvedDarkMode: (val: boolean) => void;
   toggleFavorite: (id: string) => void;
+  setReadingPosition: (key: string, index: number) => void;
   setUserLocation: (loc: { lat: number; lon: number }, name?: string) => void;
   setHasOnboarded: () => void;
+  setPrimaryIntent: (intents: IntentKey[]) => void;
   setSelectedDeities: (deities: string[]) => void;
   setFontSize: (size: FontSize) => void;
   setLanguage: (lang: AppLanguage) => void;
@@ -234,7 +249,10 @@ export const useStore = create<AppStore>()(
       themeMode: 'system' as ThemeMode,
       isDarkMode: true,
       favoriteIds: [],
+      readingPositions: {},
+      lastReadKey: null,
       hasOnboarded: false,
+      primaryIntent: ['worship'] as IntentKey[],
       selectedDeities: [],
       userLocation: null,
       locationName: null,
@@ -280,8 +298,15 @@ export const useStore = create<AppStore>()(
             ? s.favoriteIds.filter((fId) => fId !== id)
             : [...s.favoriteIds, id],
         })),
+      setReadingPosition: (key, index) =>
+        set((s) => (s.readingPositions[key] === index && s.lastReadKey === key ? {} : {
+          readingPositions: { ...s.readingPositions, [key]: index },
+          lastReadKey: key,
+        })),
       setUserLocation: (loc, name) => set({ userLocation: loc, locationName: name ?? null }),
       setHasOnboarded: () => set({ hasOnboarded: true }),
+      setPrimaryIntent: (intents) =>
+        set({ primaryIntent: intents.length > 0 ? intents : (['worship'] as IntentKey[]) }),
       setSelectedDeities: (deities) => set({ selectedDeities: deities }),
       setFontSize: (size) => set({ fontSize: size }),
       setLanguage: (lang) => set({ language: lang }),
@@ -348,7 +373,7 @@ export const useStore = create<AppStore>()(
     {
       name: 'dharmagya-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 15,
+      version: 16,
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -554,6 +579,16 @@ export const useStore = create<AppStore>()(
           }
           if (state.sadhanaReminderTime === undefined) {
             state.sadhanaReminderTime = '20:30';
+          }
+        }
+
+        // v15 → v16: P16.6 onboarding intent. Existing users never picked one,
+        // so seed the safe default ('worship') — the same fallback the skip
+        // path uses. It's re-editable in Settings, so this is non-binding.
+        if (version < 16) {
+          const pi = state.primaryIntent as unknown;
+          if (!Array.isArray(pi) || pi.length === 0) {
+            state.primaryIntent = ['worship'];
           }
         }
 

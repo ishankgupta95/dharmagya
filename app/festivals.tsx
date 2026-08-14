@@ -13,8 +13,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore, type Region } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, semanticColors, spacing, type ColorPalette } from '@/config/theme';
-import { Kicker } from '@/components/common/Kicker';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { AdBanner } from '@/components/common/AdBanner';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
@@ -30,7 +29,6 @@ interface FestivalEntry {
   name: string;
   type: string;
   description?: string;
-  deferralDate?: string;
   /** Other regional names observed for the same event (e.g. Sankranti variants). */
   regionalVariants?: string[];
 }
@@ -49,13 +47,13 @@ interface SectionData {
 // theme-responsive accent (sindoor in light, goldLeaf in dark) for WCAG contrast.
 const TYPE_ICON: Record<string, { icon: IconName; color: string | null }> = {
   major: { icon: 'star', color: null },
-  minor: { icon: 'star-half', color: palette.gold },
+  minor: { icon: 'star-half', color: null },
   ekadashi: { icon: 'moon', color: '#7AA8C8' },
   smarta_ekadashi: { icon: 'moon', color: '#7AA8C8' },
   vaishnava_ekadashi: { icon: 'moon', color: '#7AA8C8' },
   pradosha: { icon: 'moon', color: '#9575CD' },
   sankranti: { icon: 'sun', color: '#E8893C' },
-  eclipse: { icon: 'contrast', color: semanticColors.error },
+  eclipse: { icon: 'contrast', color: palette.rose },
 };
 
 /** Window used to flag upcoming items with a "Soon" badge + accent border. */
@@ -139,8 +137,7 @@ function collapseEkadashiPair(list: FestivalEntry[]): FestivalEntry[] {
   if (!smarta || !vaishnava) return list;
   const sameClassicalName =
     smarta.description && smarta.description === vaishnava.description;
-  const smartaDeferred = !!smarta.deferralDate;
-  if (sameClassicalName && !smartaDeferred) {
+  if (sameClassicalName) {
     const merged: FestivalEntry = {
       name: smarta.description!,
       type: 'ekadashi',
@@ -256,19 +253,19 @@ export default function FestivalsScreen() {
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
         <MotionPressable
           onPress={() => router.back()}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
-          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+          <Icon name="chevron-left" size={22} color={colors.textSecondary} />
         </MotionPressable>
-        <Text variant="display-italic" style={[styles.screenTitle, { color: colors.textPrimary }]}>
+        <Text
+          variant={i18n.language === 'hi' ? 'deva-bold' : 'display'}
+          style={[styles.screenTitle, { color: colors.textPrimary }]}>
           {t('festivals.title')}
         </Text>
-        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       {/* ── Year selector ──────────────────────────────────────────── */}
@@ -305,7 +302,7 @@ export default function FestivalsScreen() {
             onChangeText={setSearchQuery}
             placeholder={t('festivals.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Geist_400Regular' }]}
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
@@ -324,9 +321,9 @@ export default function FestivalsScreen() {
 
       {(upcomingEclipses.solar || upcomingEclipses.lunar) && (
         <View style={[styles.eclipseSection, { paddingHorizontal: spacing.screenH }]}>
-          <Kicker color={colors.accent} size={10} withTrailingRule ruleColor={colors.divider}>
+          <Text variant="kicker-small" style={{ color: colors.textMuted, fontSize: 9.5, marginBottom: 4 }}>
             {t('festivals.upcomingEclipses')}
-          </Kicker>
+          </Text>
           {(['solar', 'lunar'] as const).map(kind => {
             const e = upcomingEclipses[kind];
             if (!e) return null;
@@ -335,12 +332,12 @@ export default function FestivalsScreen() {
                 key={kind}
                 style={[
                   styles.eclipseCard,
-                  { backgroundColor: palette.goldLeaf + '1E', borderColor: palette.goldLeaf + '66' },
+                  { backgroundColor: colors.accentSurface, borderColor: colors.borderAccent },
                 ]}>
                 <Icon
                   name={e.kind === 'solar' ? 'sun' : 'moon'}
                   size={16}
-                  color={palette.goldLeaf}
+                  color={colors.accent}
                 />
                 <View style={{ flex: 1 }}>
                   <Text variant="body" style={[styles.eclipseTitle, { color: colors.textPrimary }]}>
@@ -378,13 +375,9 @@ export default function FestivalsScreen() {
           sections.map(section => (
             <Fragment key={section.title}>
               <View style={styles.sectionHeader}>
-                <Kicker
-                  color={colors.accent}
-                  size={10}
-                  withTrailingRule
-                  ruleColor={colors.divider}>
+                <Text variant="kicker-small" style={{ color: colors.accentText, fontSize: 9.5 }}>
                   {section.title}
-                </Kicker>
+                </Text>
               </View>
               {section.data.map(day => {
                 const t0 = day.date.getTime();
@@ -441,21 +434,21 @@ function FestivalRowImpl({
       <View
         style={[
           styles.dateCol,
-          { backgroundColor: isToday ? palette.sindoor : colors.surfaceRecessed },
+          { backgroundColor: isToday ? colors.accent : 'transparent' },
         ]}>
         <Text
-          variant="mono-caps"
+          variant="kicker-small"
           style={[
             styles.dateDayName,
-            { color: isToday ? palette.parchmentBright : colors.textMuted },
+            { color: isToday ? palette.night : colors.textMuted },
           ]}>
           {dayName}
         </Text>
         <Text
-          variant="display-italic"
+          variant="display"
           style={[
             styles.dateDayNum,
-            { color: isToday ? palette.parchmentBright : colors.textPrimary },
+            { color: isToday ? palette.night : colors.textPrimary },
           ]}>
           {dayNum}
         </Text>
@@ -482,9 +475,7 @@ function FestivalRowImpl({
             const sectLabel = f.type === 'smarta_ekadashi'
               ? t('festivals.smartaFast')
               : t('festivals.vaishnavaFast');
-            secondary = f.deferralDate
-              ? t('festivals.deferredTo', { label: sectLabel, date: f.deferralDate })
-              : sectLabel;
+            secondary = sectLabel;
           } else if (f.regionalVariants && f.regionalVariants.length > 0) {
             const localizedVariants = f.regionalVariants
               .map(v => localizeFestivalName(v, i18n.language))
@@ -581,11 +572,10 @@ const styles = StyleSheet.create({
   // Header
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingTop: 6,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backPill: {
     width: 36,
@@ -595,7 +585,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  screenTitle: { fontSize: 22 },
+  screenTitle: { flex: 1, fontSize: 30, lineHeight: 40 },
 
   yearRow: {
     flexDirection: 'row',

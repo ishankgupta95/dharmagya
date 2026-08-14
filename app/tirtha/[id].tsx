@@ -1,35 +1,34 @@
 import { useMemo } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { AdBanner } from '@/components/common/AdBanner';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { Icon } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import { DEITY_BY_ID } from '@/config/deities';
-import { getTirthaById, getTirthaCategoryMeta, TIRTHA_SOURCES } from '@/config/tirtha';
+import { getTirthaById, getTirthaCategoryMeta, TIRTHA_SOURCES, tirthaCount } from '@/config/tirtha';
 
 type Lang = 'en' | 'hi';
 
 /**
- * Tirtha site detail — significance + place + category-specific attributes
- * (jyotirlinga position / Shakti + aṅga + Bhairava / cardinal direction), a
- * presiding-deity link into the Library where the form is in the roster, and
- * puja / mantra cross-links where the lib provides them.
+ * Tirtha site detail (frame 23) — the category's colour washes the top, a
+ * badge places the site in its canonical list ("Jyotirlinga · 7 of 12"), and
+ * the screen hands off to Maps. Category-specific attributes (Shakti / aṅga /
+ * Bhairava / direction) stay as labelled rows. Darshan timings need per-site
+ * data the library doesn't carry — deferred upstream, never invented.
  */
 export default function TirthaDetailScreen() {
   const { t, i18n } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
-  const ornamentTone = isDarkMode ? 'dark' : 'light';
   const lang: Lang = i18n.language === 'hi' ? 'hi' : 'en';
 
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -39,19 +38,17 @@ export default function TirthaDetailScreen() {
   if (!site) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
-        <View style={[styles.headerRow, { borderBottomColor: colors.divider }]}>
+        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
           <MotionPressable
             onPress={() => router.back()}
-            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
-            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-left" size={22} color={colors.textSecondary} />
           </MotionPressable>
-          <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
         <View style={styles.emptyWrap}>
-          <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
+          <Text variant="body" style={[styles.emptyText, { color: colors.textMuted }]}>
             {t('tirtha.notFound')}
           </Text>
         </View>
@@ -60,128 +57,191 @@ export default function TirthaDetailScreen() {
   }
 
   const rosterDeity = site.deity ? DEITY_BY_ID[site.deity] : undefined;
-  const place = [site.location[lang], site.state?.[lang]].filter(Boolean).join(' · ');
+  const place = [site.location[lang], site.state?.[lang]].filter(Boolean).join(', ');
+  const tint = meta?.tint ?? palette.turmeric;
+  const washColors = isDarkMode
+    ? ([`${tint}47`, `${palette.night}00`] as const)
+    : ([`${tint}30`, `${palette.rice}00`] as const);
+
+  // Badge: "Jyotirlinga · 7 of 12" where the list has a canonical order.
+  const badgeLabel = site.jyotirlingaNumber
+    ? `${t(meta!.i18nKey)} · ${t('tirtha.numOf', { num: site.jyotirlingaNumber, total: tirthaCount('jyotirlinga') })}`
+    : meta
+      ? t(meta.i18nKey)
+      : null;
 
   // Category-specific labelled rows.
   const infoRows: { label: string; value: string }[] = [];
-  if (place) infoRows.push({ label: t('tirtha.field.location'), value: place });
   if (site.shakti) infoRows.push({ label: t('tirtha.field.shakti'), value: site.shakti[lang] });
   if (site.bodyPart) infoRows.push({ label: t('tirtha.field.bodyPart'), value: site.bodyPart[lang] });
   if (site.bhairava) infoRows.push({ label: t('tirtha.field.bhairava'), value: site.bhairava[lang] });
   if (site.direction) infoRows.push({ label: t('tirtha.field.direction'), value: site.direction[lang] });
-  if (site.jyotirlingaNumber) {
-    infoRows.push({ label: t('tirtha.field.jyotirlinga'), value: t('tirtha.jyotirlingaNumber', { num: site.jyotirlingaNumber }) });
-  }
+
+  const openInMaps = () => {
+    const query = encodeURIComponent(
+      [site.name.en, site.location.en, site.state?.en].filter(Boolean).join(', '),
+    );
+    const url = Platform.select({
+      ios: `maps:0,0?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+      default: `https://maps.google.com/?q=${query}`,
+    });
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://maps.google.com/?q=${query}`).catch(() => { /* no maps handler */ });
+    });
+  };
 
   return (
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+        <LinearGradient
+          colors={washColors}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.wash}
+          pointerEvents="none"
+        />
 
-        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
           <MotionPressable
             onPress={() => router.back()}
-            style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
-            <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+            <Icon name="chevron-left" size={22} color={colors.textPrimary} />
           </MotionPressable>
-          <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
 
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}>
 
-          <View style={styles.heroBlock}>
-            {!!meta && (
-              <Kicker color={colors.accent} size={10} style={styles.heroEyebrow}>
-                {t(meta.i18nKey)}
-              </Kicker>
-            )}
-            <Text variant="deva-bold" style={[styles.heroTitle, { color: colors.textPrimary }]}>
-              {site.name[lang]}
-            </Text>
-            <Text variant="body-italic" style={[styles.heroSubtitle, { color: colors.textTertiary }]}>
-              {lang === 'hi' ? site.name.en : (site.nameSanskrit ?? site.name.hi)}
-            </Text>
-            <Ornament variant="lotus" tone={ornamentTone} style={styles.heroOrnament} />
-          </View>
-
-          <Text variant={lang === 'hi' ? 'deva' : 'body'} style={[styles.significance, { color: colors.textSecondary }]}>
-            {site.significance[lang]}
+          {/* ── Hero ─────────────────────────────────────────────────────── */}
+          {badgeLabel && (
+            <View style={[styles.badge, { backgroundColor: `${tint}2E`, borderColor: `${tint}4D` }]}>
+              <Text variant="kicker-small" style={[styles.badgeText, { color: isDarkMode ? tint : colors.textSecondary }]}>
+                {badgeLabel}
+              </Text>
+            </View>
+          )}
+          <Text variant="deva-bold" style={[styles.heroTitle, { color: colors.textPrimary }]}>
+            {site.name[lang]}
           </Text>
+          <Text variant="display" style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+            {lang === 'hi' ? site.name.en : (site.nameSanskrit ?? site.name.hi)}
+          </Text>
+          {!!place && (
+            <View style={styles.placeRow}>
+              <Icon name="location" size={14} color={colors.textTertiary} />
+              <Text variant="body" style={[styles.placeText, { color: colors.textTertiary }]}>
+                {place}
+              </Text>
+            </View>
+          )}
 
+          {/* ── Category attributes ──────────────────────────────────────── */}
           {infoRows.length > 0 && (
             <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {infoRows.map((r, i) => (
-                <View
-                  key={r.label}
-                  style={[styles.infoRow, i > 0 && { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}>
-                  <Text variant="mono-caps" style={[styles.infoLabel, { color: colors.textMuted }]}>
-                    {r.label}
-                  </Text>
-                  <Text variant={lang === 'hi' ? 'deva' : 'body'} style={[styles.infoValue, { color: colors.textPrimary }]}>
-                    {r.value}
-                  </Text>
+                <View key={r.label}>
+                  {i > 0 && <View style={[styles.infoDivider, { backgroundColor: colors.divider }]} />}
+                  <View style={styles.infoRow}>
+                    <Text variant="body" style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                      {r.label}
+                    </Text>
+                    <Text
+                      variant={lang === 'hi' ? 'deva' : 'body'}
+                      style={[styles.infoValue, { color: colors.textPrimary }]}
+                      numberOfLines={2}>
+                      {r.value}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
           )}
+
+          {/* ── Significance prose ───────────────────────────────────────── */}
+          <Text variant={lang === 'hi' ? 'deva' : 'body'} style={[styles.significance, { color: colors.textSecondary }]}>
+            {site.significance[lang]}
+          </Text>
 
           {/* Presiding-deity link into the Library (roster forms only). */}
           {rosterDeity && (
             <MotionPressable
               onPress={() => router.push({ pathname: '/god/[id]', params: { id: rosterDeity.id } })}
               pressedScale={0.97}
-              style={[styles.deityCard, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}
+              style={[styles.deityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('tirtha.openDeity', { name: t(`deities.${rosterDeity.id}.displayName`) })}>
               <DeityAvatar deity={rosterDeity.id} size={42} />
               <View style={{ flex: 1 }}>
-                <Text variant="mono-caps" style={[styles.deityKicker, { color: colors.accent }]}>
+                <Text variant="kicker-small" style={[styles.deityKicker, { color: colors.textMuted }]}>
                   {t('tirtha.presidingDeity')}
                 </Text>
                 <Text variant="deva-bold" style={[styles.deityName, { color: colors.textPrimary }]} numberOfLines={1}>
                   {t(`deities.${rosterDeity.id}.displayName`)}
                 </Text>
               </View>
-              <Icon name="chevron-right" size={16} color={colors.accent} />
+              <Icon name="chevron-right" size={16} color={colors.textDisabled} />
             </MotionPressable>
           )}
 
-          <View style={styles.ctaRow}>
+          {/* ── Actions — Maps handoff + cross-links, one grouped card ───── */}
+          <View style={[styles.linksCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <MotionPressable
+              onPress={openInMaps}
+              pressedScale={0.98}
+              style={styles.linkRow}
+              accessibilityRole="button"
+              accessibilityLabel={t('tirtha.openMaps')}>
+              <Icon name="navigate" size={19} color={colors.accent} />
+              <Text variant="body" style={[styles.linkText, { color: colors.textPrimary }]}>
+                {t('tirtha.openMaps')}
+              </Text>
+              <Icon name="chevron-right" size={14} color={colors.textDisabled} />
+            </MotionPressable>
             {site.pujaSlug && (
-              <MotionPressable
-                onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: site.pujaSlug! } })}
-                pressedScale={0.97}
-                style={[styles.ctaChip, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
-                accessibilityRole="button"
-                accessibilityLabel={t('tirtha.openPuja')}>
-                <Icon name="gift" size={13} color={colors.accent} />
-                <Text variant="mono-caps" style={[styles.ctaText, { color: colors.accent }]}>
-                  {t('tirtha.openPuja')}
-                </Text>
-              </MotionPressable>
+              <>
+                <View style={[styles.linkDivider, { backgroundColor: colors.divider }]} />
+                <MotionPressable
+                  onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: site.pujaSlug! } })}
+                  pressedScale={0.98}
+                  style={styles.linkRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('tirtha.openPuja')}>
+                  <Icon name="gift" size={19} color={colors.accent} />
+                  <Text variant="body" style={[styles.linkText, { color: colors.textPrimary }]}>
+                    {t('tirtha.openPuja')}
+                  </Text>
+                  <Icon name="chevron-right" size={14} color={colors.textDisabled} />
+                </MotionPressable>
+              </>
             )}
             {site.mantraSlug && (
-              <MotionPressable
-                onPress={() => router.push({ pathname: '/jaap/[slug]', params: { slug: site.mantraSlug! } })}
-                pressedScale={0.97}
-                style={[styles.ctaChip, { borderColor: colors.borderAccent, backgroundColor: colors.surface }]}
-                accessibilityRole="button"
-                accessibilityLabel={t('tirtha.startJaap')}>
-                <Icon name="lotus" size={13} color={colors.accent} />
-                <Text variant="mono-caps" style={[styles.ctaText, { color: colors.accent }]}>
-                  {t('tirtha.startJaap')}
-                </Text>
-              </MotionPressable>
+              <>
+                <View style={[styles.linkDivider, { backgroundColor: colors.divider }]} />
+                <MotionPressable
+                  onPress={() => router.push({ pathname: '/jaap/[slug]', params: { slug: site.mantraSlug! } })}
+                  pressedScale={0.98}
+                  style={styles.linkRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('tirtha.startJaap')}>
+                  <Icon name="lotus" size={19} color={colors.accent} />
+                  <Text variant="body" style={[styles.linkText, { color: colors.textPrimary }]}>
+                    {t('tirtha.startJaap')}
+                  </Text>
+                  <Icon name="chevron-right" size={14} color={colors.textDisabled} />
+                </MotionPressable>
+              </>
             )}
           </View>
 
           <View style={styles.disclaimerBlock}>
-            <Kicker color={colors.textMuted} size={9}>{t('tirtha.sourcesLabel')}</Kicker>
-            <Text variant="body-italic" style={[styles.disclaimerText, { color: colors.textMuted }]}>
+            <Text variant="kicker-small" style={{ color: colors.textMuted, fontSize: 9 }}>
+              {t('tirtha.sourcesLabel')}
+            </Text>
+            <Text variant="body-small" style={[styles.disclaimerText, { color: colors.textMuted }]}>
               {TIRTHA_SOURCES[lang]}
             </Text>
           </View>
@@ -198,36 +258,74 @@ export default function TirthaDetailScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  headerRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: 12, paddingTop: 6, paddingBottom: 12, paddingHorizontal: spacing.screenH,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  wash: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 300,
   },
-  backPill: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingTop: 16, paddingBottom: 24 },
-  heroBlock: { alignItems: 'center', marginBottom: 18, paddingHorizontal: 4 },
-  heroEyebrow: { letterSpacing: 3.0, marginBottom: 12 },
-  heroTitle: { fontSize: 28, lineHeight: 38, textAlign: 'center' },
-  heroSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: 'center' },
-  heroOrnament: { marginTop: 14, width: '50%' },
-  significance: { fontSize: 14.5, lineHeight: 23, marginBottom: 18 },
-  infoCard: { borderRadius: 14, borderWidth: 1, paddingHorizontal: spacing.cardPadLg, marginBottom: 16 },
-  infoRow: { paddingVertical: 12 },
-  infoLabel: { fontSize: 8.5, letterSpacing: 1.6, marginBottom: 4 },
-  infoValue: { fontSize: 15, lineHeight: 21 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+  scroll: { paddingTop: 22, paddingBottom: 24 },
+
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  badgeText: { fontSize: 10 },
+  heroTitle: { fontSize: 34, lineHeight: 46, marginTop: 14 },
+  heroSubtitle: { fontSize: 21, lineHeight: 27, marginTop: 2 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  placeText: { fontSize: 13.5, lineHeight: 19 },
+
+  infoCard: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    paddingHorizontal: 19,
+    paddingVertical: 6,
+    marginTop: 22,
+  },
+  infoRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12, paddingVertical: 11 },
+  infoDivider: { height: StyleSheet.hairlineWidth },
+  infoLabel: { flex: 1, fontSize: 14 },
+  infoValue: { fontSize: 14.5, lineHeight: 21, textAlign: 'right', flexShrink: 1 },
+
+  significance: { fontSize: 15, lineHeight: 25, marginTop: 18, marginBottom: 18 },
+
   deityCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: borderRadius.card, borderWidth: 1,
-    padding: spacing.cardPad, marginBottom: 16,
+    borderRadius: borderRadius.list, borderWidth: 1,
+    padding: spacing.cardPad, marginBottom: 14,
   },
-  deityKicker: { fontSize: 8.5, letterSpacing: 1.6, marginBottom: 3 },
+  deityKicker: { fontSize: 8.5, marginBottom: 3 },
   deityName: { fontSize: 16, lineHeight: 22 },
-  ctaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
-  ctaChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingVertical: 8, paddingHorizontal: 14, borderRadius: borderRadius.chip, borderWidth: 1,
+
+  linksCard: {
+    borderRadius: borderRadius.list,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  ctaText: { fontSize: 9 },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+  },
+  linkText: { flex: 1, fontSize: 15 },
+  linkDivider: { height: StyleSheet.hairlineWidth, marginLeft: 50 },
+
   disclaimerBlock: { marginTop: 4, gap: 8 },
   disclaimerText: { fontSize: 12, lineHeight: 19 },
   adWrap: { marginTop: 16 },

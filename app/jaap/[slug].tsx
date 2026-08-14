@@ -34,18 +34,13 @@ import { useLocaleFormatters } from '@/utils/format';
 import { darkColors, lightColors, MONO_FONT, palette, spacing, borderRadius } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { resolveLanguage } from '@/i18n';
-import { useMilestoneCelebration } from '@/store/useMilestoneCelebration';
 import {
   CUSTOM_MANTRA_SLUG,
-  getJaapStats,
   insertJaapSession,
 } from '@/services/jaapSessions';
-import { recordSessionForSadhana } from '@/services/sadhanaRecorder';
-import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import {
   getMantraBySlug,
   type ContentLang,
@@ -61,12 +56,11 @@ const DEFAULT_MALA_SIZE: MalaSize = 108;
 const CUSTOM_MIN = 1;
 const CUSTOM_MAX = 100000;
 
-// Ring shrunk to 180dp to free up vertical space for a more readable mantra
-// block — the user is reading + tapping simultaneously, so the Devanagari
-// body is the focal element, not the ring. 180dp still comfortably holds the
-// 56pt count number with the kicker + "x of y" stacked inside.
-const RING_SIZE = 180;
-const RING_STROKE = 5;
+// Diya frame 05 — the ring is the centrepiece again (210dp, hairline 3dp
+// stroke) with the hero count inside. The mantra block above stays readable;
+// the only decoration is the warm glow behind the count.
+const RING_SIZE = 210;
+const RING_STROKE = 3;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
@@ -143,14 +137,6 @@ export default function JaapCounterScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
   const lang: ContentLang = resolveLanguage(appLanguage);
   const db = useSQLiteContext();
-  const unlockMilestone = useMilestoneCelebration(s => s.unlock);
-  const sadhana = useStore(s => s.sadhana);
-  const setSadhanaState = useStore(s => s.setSadhanaState);
-  const sadhanaReminderEnabled = useStore(s => s.sadhanaReminderEnabled);
-  const sadhanaReminderTime = useStore(s => s.sadhanaReminderTime);
-  const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
-  const quietHoursStart = useStore(s => s.quietHoursStart);
-  const quietHoursEnd = useStore(s => s.quietHoursEnd);
 
   const resolved = useMemo<ResolvedMantra | null>(() => {
     if (slug === CUSTOM_MANTRA_SLUG) {
@@ -160,10 +146,6 @@ export default function JaapCounterScreen() {
     const m = getMantraBySlug(slug);
     return m ? buildResolved(m, lang, t) : null;
   }, [slug, customText, lang, t]);
-  const mantraDeity = useMemo(
-    () => (slug === CUSTOM_MANTRA_SLUG ? undefined : getMantraBySlug(slug)?.deity),
-    [slug],
-  );
 
   // Adaptive type scale — Gayatri is 4 lines, Mahamrityunjaya is 2, most are
   // 1. The mantra is the focal element so short mantras get a generous size;
@@ -269,6 +251,12 @@ export default function JaapCounterScreen() {
       setMalaCount((mc) => mc + 1);
       setCount(0);
     } else {
+      // Quarter-mala beads (27 / 54 / 81 on a 108 mala) get a Medium pulse on
+      // top of the per-tap cue so progress registers without looking
+      // (design_handoff_diya MOTION.md).
+      if (malaSize === 108 && (next === 27 || next === 54 || next === 81)) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      }
       setCount(next);
     }
   }, [count, malaSize, scaleSV, completionSV]);
@@ -306,57 +294,20 @@ export default function JaapCounterScreen() {
   }, [hasCounted, totalCount, t]);
 
   // ── Save / exit flow ───────────────────────────────────────────────────
-  // Persist the session AND advance the sadhana streak / scan milestones in
-  // one call. We deliberately keep the SQLite write and the orchestrator
-  // synchronous so that:
-  //   - the celebration overlay opens before `router.back()` resolves,
-  //     which puts it cleanly on top of the picker
-  //   - the at-risk reminder cancellation runs from a known-true state
-  //     (today is now a qualifying day) rather than racing on next focus.
+  // Persist the jaap session synchronously so the SQLite write commits before
+  // `router.back()` resolves.
   const persistSession = useCallback(() => {
     if (!resolved || !hasCounted) return;
-    const nowMs = Date.now();
     insertJaapSession(db, {
       startedAt: startedAtRef.current,
-      endedAt: nowMs,
+      endedAt: Date.now(),
       mantraSlug: resolved.slug,
       mantraLabel: resolved.label,
       malaSize,
       malaCount,
       totalCount,
     });
-
-    // Re-read lifetime totals AFTER the insert — milestone scan needs the
-    // post-write counts to detect crossings.
-    const statsAfter = getJaapStats(db);
-    const { nextState, celebration } = recordSessionForSadhana({
-      db,
-      prevState: sadhana,
-      statsAfter,
-      nowMs,
-      deityId: mantraDeity,
-    });
-    if (nextState !== sadhana) setSadhanaState(nextState);
-    if (celebration) unlockMilestone(celebration);
-
-    // The user practised today — kill today's at-risk reminder and roll the
-    // 14-day horizon forward so tomorrow's still fires (if enabled).
-    if (sadhanaReminderEnabled) {
-      void rescheduleSadhanaReminder({
-        enabled: true,
-        timeHHmm: sadhanaReminderTime,
-        sadhana: nextState,
-        quietHours: quietHoursEnabled
-          ? { enabled: true, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }
-          : undefined,
-      });
-    }
-  }, [
-    db, resolved, hasCounted, malaSize, malaCount, totalCount,
-    sadhana, setSadhanaState, unlockMilestone, mantraDeity,
-    sadhanaReminderEnabled, sadhanaReminderTime,
-    quietHoursEnabled, quietHoursStart, quietHoursEnd,
-  ]);
+  }, [db, resolved, hasCounted, malaSize, malaCount, totalCount]);
 
   const handleSaveExit = useCallback(() => {
     persistSession();
@@ -427,7 +378,7 @@ export default function JaapCounterScreen() {
     );
   }
 
-  const ringTrackColor = isDarkMode ? 'rgba(243,229,200,0.10)' : 'rgba(27,20,10,0.12)';
+  const ringTrackColor = isDarkMode ? 'rgba(237,232,240,0.09)' : 'rgba(34,27,36,0.10)';
   const ringFillColor = colors.accent;
 
   // Preserve the user's progress across size changes — the user has been
@@ -518,7 +469,7 @@ export default function JaapCounterScreen() {
             <Text variant="deva-bold" style={[styles.mantraTitle, { color: colors.textPrimary }]} numberOfLines={1}>
               {resolved.titleHi}
             </Text>
-            <Ornament variant="double-rule" style={styles.mantraRule} />
+            <View style={styles.mantraRule} />
             <Text
               variant="deva"
               style={[
@@ -550,16 +501,16 @@ export default function JaapCounterScreen() {
                 active={size === malaSize}
                 onPress={() => handleMalaSizeChange(size)}
                 inactiveBg={colors.surface}
-                activeBg={palette.ink}
+                activeBg={colors.accent}
                 inactiveBorder={colors.border}
-                activeBorder={palette.ink}
+                activeBorder={colors.accent}
                 style={styles.malaSizeChip}
                 accessibilityLabel={t('jaap.malaSize', { count: size })}>
                 <Text
                   variant="mono"
                   style={[
                     styles.malaSizeChipText,
-                    { color: size === malaSize ? palette.parchmentBright : colors.textSecondary },
+                    { color: size === malaSize ? palette.night : colors.textSecondary },
                   ]}>
                   {size}
                 </Text>
@@ -569,16 +520,16 @@ export default function JaapCounterScreen() {
               active={isCustomSize}
               onPress={openCustomSizeModal}
               inactiveBg={colors.surface}
-              activeBg={palette.ink}
+              activeBg={colors.accent}
               inactiveBorder={colors.border}
-              activeBorder={palette.ink}
+              activeBorder={colors.accent}
               style={styles.malaSizeChip}
               accessibilityLabel={t('jaap.customMalaSize')}>
               <Text
                 variant="mono"
                 style={[
                   styles.malaSizeChipText,
-                  { color: isCustomSize ? palette.parchmentBright : colors.textSecondary },
+                  { color: isCustomSize ? palette.night : colors.textSecondary },
                 ]}>
                 {isCustomSize ? malaSize : '+'}
               </Text>
@@ -704,7 +655,9 @@ export default function JaapCounterScreen() {
               accessible={false}
               style={[
                 styles.customSizeSheet,
-                { backgroundColor: colors.surface, borderColor: colors.border },
+                // Floating card — needs the OPAQUE raised surface, not the
+                // translucent card tint (which lets the screen bleed through).
+                { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
               ]}>
               <Text variant="display-italic" style={[styles.customSizeTitle, { color: colors.textPrimary }]}>
                 {t('jaap.customMalaSizeTitle')}
@@ -894,13 +847,13 @@ const styles = StyleSheet.create({
   },
   counterKicker: { fontSize: 9.5, marginBottom: 4 },
   counterValue: {
-    fontFamily: MONO_FONT,
-    fontWeight: '500',
-    fontSize: 56,
-    lineHeight: 60,
-    letterSpacing: -1,
+    fontFamily: 'Geist_200ExtraLight',
+    fontVariant: ['tabular-nums'],
+    fontSize: 68,
+    lineHeight: 72,
+    letterSpacing: -2.5,
   },
-  counterTotal: { fontSize: 12, marginTop: 4 },
+  counterTotal: { fontSize: 10.5, letterSpacing: 1.8, textTransform: 'uppercase', marginTop: 8 },
 
   // Bottom bar — summary + decrement/reset, fixed at the bottom of the tap
   // zone. Background-less so the parchment continues; just a subtle hairline

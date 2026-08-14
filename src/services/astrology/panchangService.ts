@@ -6,6 +6,7 @@ import {
   getSiderealMoonLongitude,
   getUpcomingSolarEclipse,
   getUpcomingLunarEclipse,
+  formatInZone,
   GRAHA_ABBR,
   PanchangError,
   type AyanamsaType,
@@ -17,6 +18,7 @@ import {
   type FestivalRegion,
   type GrahaName,
   type Language,
+  type TimePeriod,
 } from 'panchang-ts';
 
 import type {
@@ -136,14 +138,41 @@ const GRAHA_NAMES: Record<Language, Record<GrahaName, string>> = {
 //   preferred over `computeVimshottariDasha` because we always have a birth
 //   moment.
 
-// Dates from panchang-ts are offset-adjusted local display dates — read via getUTC*.
-function formatTime(date: Date | null | undefined): string | undefined {
-  if (!date) return undefined;
-  const h = date.getUTCHours();
-  const m = date.getUTCMinutes();
+// Every `Date` panchang-ts publishes is a TRUE instant since v5 — `getUTC*` on
+// one reads UTC, not the wall clock. Display comes from the `*Local` companion
+// instead: offset-carrying ISO 8601 in the requested timezone, e.g.
+// "2025-01-14T07:09:44.172+05:30", so the wall clock is a fixed-width slice.
+function formatLocal(iso: string | null | undefined): string | undefined {
+  if (!iso) return undefined;
+  const h = Number(iso.slice(11, 13));
+  if (!Number.isFinite(h)) return undefined;
+  const m = iso.slice(14, 16);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  return `${h12}:${m} ${ampm}`;
+}
+
+/** Device UTC offset in minutes east — what we hand panchang-ts as `timezone`. */
+function deviceOffsetMinutes(): number {
+  return -new Date().getTimezoneOffset();
+}
+
+/**
+ * Same rendering for an instant the library did not localize for us — the
+ * upcoming-eclipse helpers take no timezone, so there is no `*Local` on their
+ * result and we render the instant in the device's offset ourselves.
+ */
+function formatInstant(date: Date | null | undefined, offsetMinutes: number): string | undefined {
+  if (!date) return undefined;
+  return formatLocal(formatInZone(date, offsetMinutes));
+}
+
+/** `{ start, end }` of any v5 window, rendered for display. */
+function toWindow(p: {
+  startLocal?: string | null;
+  endLocal?: string | null;
+}): { start: string; end: string } {
+  return { start: formatLocal(p.startLocal) ?? '', end: formatLocal(p.endLocal) ?? '' };
 }
 
 /** Coerce the lib's locale-specific paksha string into our typed union. */
@@ -158,12 +187,12 @@ function normalizePaksha(p: string | undefined | null): 'Shukla' | 'Krishna' | n
 function toTithiElements(items: DailyTithiInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     paksha: normalizePaksha(item.paksha),
     tithiNumber: item.number,
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
@@ -171,11 +200,11 @@ function toTithiElements(items: DailyTithiInfo[]): IPanchangElement[] {
 function toNakshatraElements(items: DailyNakshatraInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     pada: item.pada,
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
@@ -183,10 +212,10 @@ function toNakshatraElements(items: DailyNakshatraInfo[]): IPanchangElement[] {
 function toYogaElements(items: DailyYogaInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
@@ -194,21 +223,19 @@ function toYogaElements(items: DailyYogaInfo[]): IPanchangElement[] {
 function toKaranaElements(items: DailyKaranaInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     karanaType: item.type,
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
 
-interface RawQualitySlot {
+interface RawQualitySlot extends TimePeriod {
   name: string;
   quality: IQualitySlot['quality'];
   qualityName: string;
-  start: Date;
-  end: Date;
 }
 
 function toQualitySlots(slots: readonly RawQualitySlot[]): IQualitySlot[] {
@@ -216,26 +243,14 @@ function toQualitySlots(slots: readonly RawQualitySlot[]): IQualitySlot[] {
     name: s.name,
     quality: s.quality,
     qualityName: s.qualityName,
-    start: formatTime(s.start) ?? '',
-    end: formatTime(s.end) ?? '',
+    ...toWindow(s),
   }));
 }
 
 function toHoraSlots(
-  slots: DailyPanchangResult['hora']['day'],
+  slots: DailyPanchangResult['periods']['hora']['day'],
 ): IHoraSlot[] {
-  return slots.map(s => ({
-    planet: s.planet,
-    start: formatTime(s.start) ?? '',
-    end: formatTime(s.end) ?? '',
-  }));
-}
-
-function ymdOf(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return slots.map(s => ({ planet: s.planet, ...toWindow(s) }));
 }
 
 function mapFestivals(list: DailyPanchangResult['festivals']): IFestival[] {
@@ -250,7 +265,6 @@ function mapFestivals(list: DailyPanchangResult['festivals']): IFestival[] {
       name: f.name,
       type: f.type as FestivalType,
       description: f.description,
-      deferralDate: f.deferralDate ? ymdOf(f.deferralDate) : undefined,
     }));
 }
 
@@ -259,24 +273,24 @@ function mapEclipse(e: DailyPanchangResult['eclipse']): IEclipse | null {
   return {
     kind: e.kind,
     subtype: e.subtype,
-    peak: formatTime(e.peak) ?? '',
-    start: formatTime(e.start) ?? '',
-    end: formatTime(e.end) ?? '',
-    sutakStart: formatTime(e.sutakStart) ?? '',
-    sutakEnd: formatTime(e.sutakEnd) ?? '',
+    peak: formatLocal(e.peakLocal) ?? '',
+    start: formatLocal(e.startLocal) ?? '',
+    end: formatLocal(e.endLocal) ?? '',
+    sutakStart: formatLocal(e.sutakStartLocal) ?? '',
+    sutakEnd: formatLocal(e.sutakEndLocal) ?? '',
     visibleFromLocation: e.visibleFromLocation,
-    magnitude: e.magnitude,
+    // v5 renamed the [0,1] disc-*area* fraction we render as a percentage to
+    // `obscuration`; the new `magnitude` is the disc-*diameter* fraction that
+    // catalogues publish, which exceeds 1 when total and goes negative for a
+    // penumbral lunar eclipse. Keep publishing the area fraction.
+    obscuration: e.obscuration,
     description: e.description,
   };
 }
 
-function mapBhadra(b: DailyPanchangResult['bhadra']): IBhadra | null {
+function mapBhadra(b: DailyPanchangResult['inauspicious']['bhadra']): IBhadra | null {
   if (!b) return null;
-  return {
-    start: formatTime(b.start) ?? '',
-    end: formatTime(b.end) ?? '',
-    location: b.location,
-  };
+  return { ...toWindow(b), location: b.location };
 }
 
 function mapChandraBalam(cb: DailyPanchangResult['chandraBalam']): IChandraBalam | null {
@@ -290,90 +304,90 @@ function mapChandraBalam(cb: DailyPanchangResult['chandraBalam']): IChandraBalam
 }
 
 export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
+  const { sun, moon, angas, calendar, muhurtas, inauspicious, periods } = result;
   return {
     date: result.date,
-    tithis: toTithiElements(result.tithis),
-    nakshatras: toNakshatraElements(result.nakshatras),
-    yogas: toYogaElements(result.yogas),
-    karanas: toKaranaElements(result.karanas),
-    sunrise: formatTime(result.sunrise) ?? '—',
-    sunset: formatTime(result.sunset) ?? '—',
-    nextSunrise: formatTime(result.nextSunrise),
+    tithis: toTithiElements(angas.tithis),
+    nakshatras: toNakshatraElements(angas.nakshatras),
+    yogas: toYogaElements(angas.yogas),
+    karanas: toKaranaElements(angas.karanas),
+    sunrise: formatLocal(sun.riseLocal) ?? '—',
+    sunset: formatLocal(sun.setLocal) ?? '—',
+    nextSunrise: formatLocal(sun.nextRiseLocal),
     ayanamsa: result.ayanamsa,
-    rahuKalamStart: formatTime(result.rahuKalam.start),
-    rahuKalamEnd: formatTime(result.rahuKalam.end),
-    yamagandaStart: formatTime(result.yamaganda.start),
-    yamagandaEnd: formatTime(result.yamaganda.end),
-    gulikaKalamStart: formatTime(result.gulikaKalam.start),
-    gulikaKalamEnd: formatTime(result.gulikaKalam.end),
-    abhijitMuhurtaStart: formatTime(result.abhijitMuhurta?.start),
-    abhijitMuhurtaEnd: formatTime(result.abhijitMuhurta?.end),
-    durMuhurta: result.durMuhurta.map(dm => ({
-      start: formatTime(dm.start) ?? '',
-      end: formatTime(dm.end) ?? '',
-    })),
-    vara: result.vara.name,
-    hinduMonth: result.chandramasa.purnimantaName,
-    hinduMonthAmanta: result.chandramasa.name,
-    hinduMonthPurnimanta: result.chandramasa.purnimantaName,
-    isAdhikaMasa: result.chandramasa.isAdhika,
-    masa: result.masa.name,
-    vikramSamvat: result.samvat.vikramSamvat,
-    shakaSamvat: result.samvat.shakaSamvat,
-    chandraRashi: result.chandraRashi.name,
-    suryaNakshatra: result.suryaNakshatra.name,
-    moonrise: formatTime(result.moonrise),
-    moonset: formatTime(result.moonset),
-    brahmaMuhurtaStart: formatTime(result.brahmaMuhurta.start),
-    brahmaMuhurtaEnd: formatTime(result.brahmaMuhurta.end),
-    vijayaMuhurtaStart: formatTime(result.vijayaMuhurta.start),
-    vijayaMuhurtaEnd: formatTime(result.vijayaMuhurta.end),
-    godhuliMuhurtaStart: formatTime(result.godhuliMuhurta.start),
-    godhuliMuhurtaEnd: formatTime(result.godhuliMuhurta.end),
-    nishitaMuhurtaStart: formatTime(result.nishitaMuhurta.start),
-    nishitaMuhurtaEnd: formatTime(result.nishitaMuhurta.end),
-    amritKalaStart: result.amritKala ? formatTime(result.amritKala.start) : undefined,
-    amritKalaEnd: result.amritKala ? formatTime(result.amritKala.end) : undefined,
-    madhyahnaStart: formatTime(result.madhyahna.start),
-    madhyahnaEnd: formatTime(result.madhyahna.end),
-    pratahSandhyaStart: formatTime(result.pratahSandhya.start),
-    pratahSandhyaEnd: formatTime(result.pratahSandhya.end),
-    sayahnaSandhyaStart: formatTime(result.sayahnaSandhya.start),
-    sayahnaSandhyaEnd: formatTime(result.sayahnaSandhya.end),
-    varjyamStart: result.varjyam ? formatTime(result.varjyam.start) : undefined,
-    varjyamEnd: result.varjyam ? formatTime(result.varjyam.end) : undefined,
-    gandaMula: result.gandaMula.active
-      ? { nakshatraName: result.gandaMula.nakshatraName, severity: result.gandaMula.severity }
+    rahuKalamStart: formatLocal(inauspicious.rahuKalam.startLocal),
+    rahuKalamEnd: formatLocal(inauspicious.rahuKalam.endLocal),
+    yamagandaStart: formatLocal(inauspicious.yamaganda.startLocal),
+    yamagandaEnd: formatLocal(inauspicious.yamaganda.endLocal),
+    gulikaKalamStart: formatLocal(inauspicious.gulikaKalam.startLocal),
+    gulikaKalamEnd: formatLocal(inauspicious.gulikaKalam.endLocal),
+    abhijitMuhurtaStart: formatLocal(muhurtas.abhijit?.startLocal),
+    abhijitMuhurtaEnd: formatLocal(muhurtas.abhijit?.endLocal),
+    durMuhurta: inauspicious.durMuhurta.map(toWindow),
+    vara: angas.vara.name,
+    hinduMonth: calendar.chandramasa.purnimantaName,
+    hinduMonthAmanta: calendar.chandramasa.name,
+    hinduMonthPurnimanta: calendar.chandramasa.purnimantaName,
+    isAdhikaMasa: calendar.chandramasa.isAdhika,
+    masa: calendar.masa.name,
+    vikramSamvat: calendar.samvat.vikramSamvat,
+    shakaSamvat: calendar.samvat.shakaSamvat,
+    chandraRashi: moon.rashi.name,
+    suryaNakshatra: sun.nakshatra.name,
+    moonrise: formatLocal(moon.riseLocal),
+    moonset: formatLocal(moon.setLocal),
+    brahmaMuhurtaStart: formatLocal(muhurtas.brahma.startLocal),
+    brahmaMuhurtaEnd: formatLocal(muhurtas.brahma.endLocal),
+    vijayaMuhurtaStart: formatLocal(muhurtas.vijaya.startLocal),
+    vijayaMuhurtaEnd: formatLocal(muhurtas.vijaya.endLocal),
+    godhuliMuhurtaStart: formatLocal(muhurtas.godhuli.startLocal),
+    godhuliMuhurtaEnd: formatLocal(muhurtas.godhuli.endLocal),
+    nishitaMuhurtaStart: formatLocal(muhurtas.nishita.startLocal),
+    nishitaMuhurtaEnd: formatLocal(muhurtas.nishita.endLocal),
+    // v5: Amrit Kala and Varjyam are both nakshatra-anchored collections —
+    // 0–2 windows a day, not the single window 4.x published. A transition
+    // day genuinely carries two, and dropping the second is what 4.x got
+    // wrong, so both are surfaced.
+    amritKala: muhurtas.amritKala.map(toWindow),
+    madhyahnaStart: formatLocal(muhurtas.madhyahna.startLocal),
+    madhyahnaEnd: formatLocal(muhurtas.madhyahna.endLocal),
+    pratahSandhyaStart: formatLocal(muhurtas.pratahSandhya.startLocal),
+    pratahSandhyaEnd: formatLocal(muhurtas.pratahSandhya.endLocal),
+    sayahnaSandhyaStart: formatLocal(muhurtas.sayahnaSandhya.startLocal),
+    sayahnaSandhyaEnd: formatLocal(muhurtas.sayahnaSandhya.endLocal),
+    varjyam: inauspicious.varjyam.map(toWindow),
+    gandaMula: inauspicious.gandaMula.active
+      ? {
+          nakshatraName: inauspicious.gandaMula.nakshatraName,
+          severity: inauspicious.gandaMula.severity,
+        }
       : null,
     anandadiYoga: { name: result.anandadiYoga.name, quality: result.anandadiYoga.quality },
     tarabala: result.tarabala
       ? { name: result.tarabala.name, englishName: result.tarabala.englishName, quality: result.tarabala.quality }
       : null,
     chandraBalam: mapChandraBalam(result.chandraBalam),
-    bhadra: mapBhadra(result.bhadra),
+    bhadra: mapBhadra(inauspicious.bhadra),
     eclipse: mapEclipse(result.eclipse),
-    panchaka: result.panchaka,
-    panchakaRahita: result.panchakaRahita.map(p => ({
-      start: formatTime(p.start) ?? '',
-      end: formatTime(p.end) ?? '',
-    })),
-    dayDurationMinutes: result.dayDurationMinutes,
-    nightDurationMinutes: result.nightDurationMinutes,
+    panchaka: inauspicious.panchaka,
+    panchakaRahita: inauspicious.panchakaRahita.map(toWindow),
+    dayDurationMinutes: sun.dayDurationMinutes,
+    nightDurationMinutes: sun.nightDurationMinutes,
     choghadiya: {
-      day: toQualitySlots(result.choghadiya.day),
-      night: toQualitySlots(result.choghadiya.night),
+      day: toQualitySlots(periods.choghadiya.day),
+      night: toQualitySlots(periods.choghadiya.night),
     },
     gowriPanchangam: {
-      day: toQualitySlots(result.gowriPanchangam.day),
-      night: toQualitySlots(result.gowriPanchangam.night),
+      day: toQualitySlots(periods.gowri.day),
+      night: toQualitySlots(periods.gowri.night),
     },
     doGhatiMuhurta: {
-      day: toQualitySlots(result.doGhatiMuhurta.day),
-      night: toQualitySlots(result.doGhatiMuhurta.night),
+      day: toQualitySlots(muhurtas.doGhati.day),
+      night: toQualitySlots(muhurtas.doGhati.night),
     },
     hora: {
-      day: toHoraSlots(result.hora.day),
-      night: toHoraSlots(result.hora.night),
+      day: toHoraSlots(periods.hora.day),
+      night: toHoraSlots(periods.hora.night),
     },
     specialYogas: result.specialYogas.map(y => ({ name: y.name, type: y.type })),
     festivals: mapFestivals(result.festivals),
@@ -453,7 +467,7 @@ export function getCachedPanchangDay(
 
   pmark('panchang:cache:miss', `endTimes=${opts.computeEndTimes} ${ymdLocal(date)}`);
   const endLib = ptime(`panchang:getDailyPanchang endTimes=${opts.computeEndTimes}`);
-  const timezone = -new Date().getTimezoneOffset();
+  const timezone = deviceOffsetMinutes();
   const raw = getDailyPanchang(
     date,
     { latitude: coords.lat, longitude: coords.lon },
@@ -559,7 +573,7 @@ export async function fetchPanchang(
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
-    const timezone = -new Date().getTimezoneOffset();
+    const timezone = deviceOffsetMinutes();
     const result = getDailyPanchang(
       date,
       { latitude: coords.lat, longitude: coords.lon },
@@ -614,10 +628,10 @@ export function fetchInstantPanchang(
     );
     if (!raw) return null;
     return {
-      tithi: raw.tithi.name,
-      nakshatra: raw.nakshatra.name,
-      yoga: raw.yoga.name,
-      karana: raw.karana.name,
+      tithi: raw.angas.tithi.name,
+      nakshatra: raw.angas.nakshatra.name,
+      yoga: raw.angas.yoga.name,
+      karana: raw.angas.karana.name,
     };
   } catch (e) {
     if (e instanceof PanchangError) {
@@ -638,11 +652,11 @@ const ECLIPSE_CACHE_MAX = 8;
 const ECLIPSE_LOOK_AHEAD_DAYS = 365;
 
 function eclipseDateOf(d: Date): string {
-  // Eclipses come from panchang-ts as UTC Date objects; convert to local YMD.
-  const local = new Date(d);
-  const y = local.getFullYear();
-  const m = String(local.getMonth() + 1).padStart(2, '0');
-  const day = String(local.getDate()).padStart(2, '0');
+  // v5 publishes true instants, so the device-local calendar date of the peak
+  // is what these getters read.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
@@ -652,7 +666,9 @@ function summarizeEclipse(e: ReturnType<typeof getUpcomingSolarEclipse>): IEclip
     kind: e.kind,
     subtype: e.subtype,
     date: eclipseDateOf(e.peak),
-    peak: formatTime(e.peak) ?? '',
+    // The upcoming-eclipse helpers take no timezone, so their result carries no
+    // `*Local` strings — render the instant in the device's offset ourselves.
+    peak: formatInstant(e.peak, deviceOffsetMinutes()) ?? '',
     visibleFromLocation: e.visibleFromLocation,
     description: e.description,
   };

@@ -34,7 +34,7 @@ export default {
     openSettings: 'Open settings',
     openDasha: 'Open Vimshottari Dasha',
     openPanchang: 'Open Panchang',
-    openMuhuratFinder: 'Find an auspicious date',
+    openMuhuratFinder: 'Open Muhurat finder',
     openDeity: 'Open {{name}}',
     openAarti: 'Open Aarti',
     openChalisa: 'Open Chalisa',
@@ -47,15 +47,16 @@ export default {
 
   // ── Tabs ────────────────────────────────────────────────────────────────
   tabs: {
-    home: 'Home',
+    home: 'Today',
     panchang: 'Panchang',
     gods: 'Gods',
-    // "Jyotish" (Sanskrit jyotiṣa) is the canonical name for Vedic astrology
-    // and matches the existing Hindi label; keeps the bar from ellipsising on
-    // 6-tab edge-to-edge layouts. The in-screen title (`astrology.title`)
-    // still reads "Astrology" so the meaning is unambiguous on entry.
-    astrology: 'Jyotish',
+    // "Kundli" (birth chart) is the term users actually search for and the
+    // Phase 16 hero label for the astrology tab — short enough to avoid
+    // ellipsising on the bottom bar. (Was "Jyotish"; the in-screen title is
+    // realigned to "Kundli" in P16.2 when the tab is restructured.)
+    astrology: 'Kundli',
     devotion: 'Devotion',
+    library: 'Library',
     settings: 'Settings',
   },
 
@@ -67,7 +68,28 @@ export default {
     panchangKicker: 'The Five Limbs',
     panchangTitleDeva: 'आज का पंचांग',
     featuredKicker: 'For your deities · Today',
-    dashaCurrentBody: 'You are in {{planet}} mahādaśā',
+    dashaCurrentBody: 'You are in {{planet}} Major Period',
+    // P16.4 — light two-hero Home feed
+    panchangHeroKicker: "TODAY'S PANCHANG",
+    kundliHeroKicker: 'YOUR KUNDLI',
+    kundliSetupTitle: 'Set up your kundli',
+    kundliSetupDesc: 'Add your birth details for your chart & daily timings.',
+    kundliOpenPrompt: 'See your full chart',
+    actionJaap: 'Start a jaap',
+    actionMuhurat: 'Find an auspicious time',
+    actionKundli: 'Open your kundli',
+    // Diya — Today screen
+    fullLink: 'Full',
+    rahuBeginsIn: 'Rahu Kaal begins in {{time}}',
+    rahuEndsIn: 'Rahu Kaal ends in {{time}}',
+    quickJaap: 'Jaap',
+    quickMuhurat: 'Muhurat',
+    quickAarti: 'Aarti',
+    quickKundli: 'Kundli',
+    quickJaapCaption: 'Count your mala',
+    quickMuhuratCaption: 'Good times today',
+    quickKundliCaption: 'Chart & dasha',
+    abhijitAt: 'Abhijit {{time}}',
     setDashaPrompt: 'Set your birth date to unlock your 120-year timeline',
     sadeSatiBanner: 'Sade Sati · Phase {{phase}} active — see Astrology',
     tithi: 'TITHI',
@@ -89,7 +111,7 @@ export default {
     festivals: 'Festivals',
     jaap: 'Mantra Jaap',
     findMuhuratTitle: 'Find an auspicious date',
-    findMuhuratDesc: 'Vivah, Griha Pravesh, Namkaran — classical muhurat rules',
+    findMuhuratDesc: 'Auspicious timings for weddings, housewarming, naming & more',
     dashaLink: {
     },
   },
@@ -156,7 +178,7 @@ export default {
     eclipseSubtype: { partial: 'Partial', total: 'Total', annular: 'Annular', penumbral: 'Penumbral' },
     eclipseVisible: 'Visible from your location',
     eclipseNotVisible: 'Not visible from your location',
-    eclipseMagnitude: 'Magnitude: {{value}}',
+    eclipseObscuration: 'Coverage: {{value}}%',
     eclipsePeak: 'Peak at {{time}}',
     eclipseWindow: '{{start}} – {{end}}',
     eclipseSutak: 'Sutak: {{start}} – {{end}}',
@@ -178,7 +200,7 @@ export default {
     tapToChangeDate: 'Tap to change date',
     activeNow: 'NOW',
     hora: 'HORA',
-    findAuspiciousDate: 'Find an auspicious date for an occasion',
+    findAuspiciousDate: 'Muhurat — find an auspicious time',
     dayHeaders: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
     monthNames: [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -193,6 +215,17 @@ export default {
     layoutDense: 'Detailed',
     layoutSettingLabel: 'Calendar layout',
     glanceTitle: 'AT A GLANCE',
+    // P16.3 — plain "today's verdict" (conservative + descriptive; provisional
+    // until reviewed, see VERDICT_REVIEW_PENDING) + the Full-almanac reveal.
+    verdictBestAvoid: 'Best around {{best}} · avoid {{avoid}}',
+    verdictAvoidOnly: 'Avoid {{avoid}}',
+    verdictBestOnly: 'Best around {{best}}',
+    verdictEclipse: 'Eclipse today — traditionally a time for restraint, not new ventures.',
+    verdictProvisional: 'A general guide, not a prediction.',
+    fullAlmanac: 'FULL ALMANAC',
+    goodAvoidTimes: 'GOOD & AVOID TIMES',
+    showAllSystems: 'Show all systems',
+    hideOtherSystems: 'Hide other systems',
     panchaAngaSection: 'PANCHA ANGA',
     sunMoonSection: 'SUN & MOON',
     forYouSection: 'FOR YOU',
@@ -205,10 +238,40 @@ export default {
     searchPlaceholder: 'Search gods, aartis, chalisas…',
     countAartis_one: '{{count}} aarti',
     countAartis_other: '{{count}} aartis',
-    countChalisas_one: '{{count}} chālīsā',
-    countChalisas_other: '{{count}} chālīsās',
+    countChalisas_one: '{{count}} chalisa',
+    countChalisas_other: '{{count}} chalisas',
     countNone: 'Coming soon',
     emptyForQuery: 'Nothing found for "{{query}}".',
+    // P16.5 — merged Library tab (Deities + the devotional hub)
+    title: 'Library',
+    bucketDeities: 'Deities',
+    bucketRead: 'Read',
+    bucketRituals: 'Rituals & Festivals',
+    bucketPractice: 'Your Practice',
+    // Diya — Library tab (frame 06)
+    continueKicker: 'Continue',
+    continueVerse: 'Verse {{num}} of {{total}}',
+    allCount: 'All {{count}}',
+    favoritesSubtitle: "Aartis and chalisas you've saved",
+    allGodsTitle: 'All Gods',
+    allGodsSubtitle: 'Browse the 19 deities — aartis, chalisas, stotras & more',
+    allAartis: {
+      title: 'Aarti',
+      count: '{{count}} aartis',
+      verseCount: '{{count}} verses',
+      rowSubtitle: 'Every aarti, across all deities',
+      eyebrow: 'READ & RECITE',
+      intro: 'Every aarti in the app, gathered in one place.',
+      a11yOpen: 'Open {{name}} aarti',
+    },
+    allChalisas: {
+      title: 'Chalisa',
+      count: '{{count}} chalisas',
+      rowSubtitle: 'Every chalisa, across all deities',
+      eyebrow: 'READ & RECITE',
+      intro: 'Every chalisa in the app, gathered in one place.',
+      a11yOpen: 'Open {{name}} chalisa',
+    },
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
@@ -224,6 +287,8 @@ export default {
     chaupaiCount: '{{count}} Chaupai',
     noContent: 'No content available yet',
     deityNotFound: 'Deity not found',
+    moolMantra: 'Mool Mantra',
+    jaapRecommended: '{{count}} recommended',
   },
 
   // ── Aarti / Chalisa Detail ──────────────────────────────────────────────
@@ -245,6 +310,8 @@ export default {
     chaupaiLabel: 'Chaupai',
     verifyNote: 'Text and pronunciation vary by tradition — verify with a pandit before any ritual use.',
     reviewNote: 'Transliteration is under scholarly review — treat as provisional.',
+    prevVerse: 'Previous verse',
+    nextVerse: 'Next verse',
   },
   ashtottara: {
     badge: 'Ashtottara · 108 Names',
@@ -256,7 +323,7 @@ export default {
   },
   prayers: {
     title: 'Daily Prayers',
-    eyebrow: 'NITYA KARMA',
+    eyebrow: 'DAILY RITES',
     intro: 'The everyday shlokas of a home altar — recited on waking, before a bath, before a meal, and at dusk.',
     notFound: 'No prayers available.',
     occasion: {
@@ -276,20 +343,32 @@ export default {
 
   // ── Search Screen ───────────────────────────────────────────────────────
   search: {
-    placeholder: 'Search aartis, chalisas…',
+    placeholder: 'Search texts, deities, tirtha…',
     emptyTitle: 'Search',
-    emptyDesc: 'Search by title, transliteration, or deity name',
+    emptyDesc: 'Search by title, deity, or place — in Hindi or English',
     noResults: 'No results',
     noResultsFor: 'Nothing found for "{{query}}"',
-    aartisSection: 'AARTIS  ·  {{count}}',
-    chalisasSection: 'CHALISAS  ·  {{count}}',
+    textsSection: 'TEXTS · {{count}}',
+    deitiesSection: 'DEITIES · {{count}}',
+    tirthaSection: 'TIRTHA · {{count}}',
+    deityTexts: '{{count}} texts',
+    kind: {
+      aarti: 'Aarti',
+      chalisa: 'Chalisa',
+      stotra: 'Stotra',
+      sukta: 'Vedic Sukta',
+      sahasranama: 'Sahasranama',
+      katha: 'Vrat Katha',
+      scripture: 'Scripture',
+    },
   },
 
   // ── Favorites Screen ────────────────────────────────────────────────────
   favorites: {
-    title: 'Favourites',
-    emptyTitle: 'No favourites yet',
-    emptyDesc: 'Tap the ♡ on any aarti or chalisa to save it here',
+    title: 'Saved',
+    textsSection: 'TEXTS · {{count}}',
+    emptyTitle: 'Nothing saved yet',
+    emptyDesc: 'Tap the ♡ on any text to save it here',
     browseLibrary: 'Browse Library',
     aartiBadge: 'Aarti',
     chalisaBadge: 'Chalisa',
@@ -310,7 +389,6 @@ export default {
     eclipseNotVisible: 'Not visible from your location',
     smartaFast: 'Smarta fast',
     vaishnavaFast: 'Vaishnava fast',
-    deferredTo: '{{label}} · deferred to {{date}}',
     alsoObservedAs: 'Also: {{names}}',
   },
 
@@ -318,6 +396,7 @@ export default {
   settings: {
     title: 'Settings',
     appearance: 'APPEARANCE',
+    intentSection: 'WHAT BRINGS YOU HERE?',
     display: 'DISPLAY',
     timeFormat: 'Time Format',
     timeFormatAuto: 'Automatic',
@@ -472,8 +551,8 @@ export default {
     appVersion: 'App Version',
     replayWalkthrough: 'App Walkthrough',
     replayWalkthroughDesc: 'Learn how to use the app',
-    festivalTithiReminders: 'Sadhana, Tithi & Festival Reminders',
-    festivalTithiRemindersDesc: 'Daily sadhana nudge + Ekadashi, Pradosha, festivals',
+    festivalTithiReminders: 'Tithi & Festival Reminders',
+    festivalTithiRemindersDesc: 'Ekadashi, Pradosha, Purnima & festival nudges',
     sendFeedback: 'Send Feedback',
     sendFeedbackDesc: 'Report a bug or request a feature',
     rateApp: 'Rate Dharmagya',
@@ -507,10 +586,6 @@ export default {
 
   // ── Notification permission pre-prompt ──────────────────────────────────
   permissionPrompt: {
-    sadhana: {
-      title: 'Stay on your path',
-      body: 'A gentle nudge in the evening if you haven\'t begun your practice — sent only on days you haven\'t completed a jaap session yet.',
-    },
     tithi: {
       title: 'Honour every tithi',
       body: 'One notification the evening before each Ekadashi, Pradosh, Purnima, Amavasya and other tithis you\'ve selected — so the date never slips by.',
@@ -576,12 +651,6 @@ export default {
     festivalTimeLabel: 'Reminder Time (evening before)',
     tithiTimePickerTitle: 'Tithi Reminder Time',
     festivalTimePickerTitle: 'Festival Reminder Time',
-    // Sadhana practice (P14.4) — opt-in evening nudge, off by default.
-    sadhanaSection: 'SADHANA PRACTICE',
-    sadhanaLabel: 'Evening sadhana reminder',
-    sadhanaSublabel: 'A gentle nudge if you haven’t begun today',
-    sadhanaTimeLabel: 'Reminder time',
-    sadhanaTimePickerTitle: 'Sadhana Reminder Time',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -611,18 +680,18 @@ export default {
     setBirthDate: 'Set your birth date',
     changeBirthDate: 'Change',
     currentLabel: 'CURRENTLY IN',
-    mahadashaSuffix: 'Mahadasha',
-    antardashaSuffix: 'Antardasha',
+    mahadashaSuffix: 'Major Period',
+    antardashaSuffix: 'Sub-period',
     untilDate: 'until {{date}}',
     dateRangeLong: '{{start}} – {{end}}',
     yearsOne: '{{years}} year',
     yearsOther: '{{years}} years',
     fullCycle: 'FULL 120-YEAR CYCLE',
-    antardashasHeader: 'Antardashas',
-    pratyantarSuffix: 'Pratyantar',
+    antardashasHeader: 'Sub-periods',
+    pratyantarSuffix: 'Sub-sub-period',
     dateRangeShort: '{{start}}–{{end}}',
     notSetPrompt: 'Set your birth date to see your 120-year Vimshottari Dasha cycle.',
-    approxNote: 'Your first mahadasha is a partial balance — precise timing needs birth time, which is not recorded.',
+    approxNote: 'Your first Major Period is a partial balance — precise timing needs birth time, which is not recorded.',
     birthDatePickerTitle: 'Pick your birth date',
     planet: {
       sun: 'Sun',
@@ -635,6 +704,7 @@ export default {
       rahu: 'Rahu',
       ketu: 'Ketu',
     },
+    otherSystems: 'Other systems',
     system: {
       vimshottari: 'Vimshottari',
       ashtottari: 'Ashtottari',
@@ -677,7 +747,19 @@ export default {
   onboarding: {
     // Step 1
     tagline: 'Your daily bridge to the divine',
+    orientingLine: 'Panchang, kundli, and daily worship in one place',
     beginJourney: 'Begin Journey',
+    stepCounter: 'Step {{current}} of {{total}}',
+    // Step — Intent (keystone, P16.6)
+    intentTitle: 'What brings you here?',
+    intentSubtitle: 'Pick what matters most — you can change this anytime in Settings.',
+    intent_worship: 'Daily worship & festivals',
+    intent_panchang: 'Panchang & auspicious timing',
+    intent_kundli: 'Astrology & kundli',
+    // Step — Birth details (skippable & soft, P16.6)
+    birthTitle: 'Your birth details',
+    birthSubtitle: 'So your chart & timings are accurate. You can add these later in Kundli.',
+    birthAddLater: 'Add later in Kundli',
     // Step 2
     step2of3: 'Step 2 of 3',
     chooseDeities: 'Choose Your Deities',
@@ -694,6 +776,21 @@ export default {
     usePuneDefault: 'Use Varanasi (default)',
     puneDesc: 'No location permission needed',
     startExploring: 'Start Exploring  🙏',
+    // Diya onboarding (frames 1–5)
+    welcomeBody: 'Panchang, muhurat and pooja for every day — calculated on your phone, working offline.',
+    welcomePromise: 'No account. Nothing leaves your device.',
+    begin: 'Begin',
+    langTitle: 'Language & tradition',
+    showTextIn: 'Show text in',
+    calendarSystem: 'Calendar system',
+    purnimantaDesc: 'North India — month ends at full moon',
+    amantaDesc: 'South & West — month ends at new moon',
+    masaNote: 'This changes festival dates and month names, not the panchang itself.',
+    locTitle: 'Where are you?',
+    locBody: 'Sunrise, sunset and every muhurat shift by the minute across cities. Panchang is only correct for one place at a time.',
+    useMyLocation: 'Use my location',
+    chooseCity: 'Choose a city',
+    locationSetTo: 'Location set: {{name}}',
   },
 
   // ── Deity Names & Descriptions ──────────────────────────────────────────
@@ -721,11 +818,8 @@ export default {
 
   // ── Muhurat Screen ──────────────────────────────────────────────────────
   muhurat: {
-    title: 'Auspicious Muhurat',
-    intro: 'Find auspicious dates for life events using classical Muhurat rules — Tithi, Nakshatra, Yoga, and Vara combinations.',
+    title: 'Find a muhurat',
     footer: 'These are rule-based candidate dates. Consult a pandit for final confirmation on high-stakes events.',
-    notFound: 'Occasion not found',
-    scanRange: 'Showing auspicious days in the next {{days}} days',
     progressCalculating: 'Calculating day {{current}} of {{total}}…',
     cancelScan: 'Cancel',
     scanPaused: 'Scan paused at day {{current}} of {{total}}',
@@ -733,14 +827,18 @@ export default {
     retryScan: 'Try again',
     scanFailed: 'Unable to compute muhurats. Please try again.',
     noMatches: 'No auspicious dates found',
-    noMatchesDesc: 'The next 365 days do not satisfy all classical rules for this occasion.',
-    resultsCount: '{{count}} AUSPICIOUS DAYS',
+    noMatchesDesc: 'This window does not satisfy all classical rules for the occasion.',
+    resultsCount: '{{count}} dates found',
     upcomingBadge: 'Soon',
+    bestBadge: 'Best',
+    changeRange: 'Change',
+    window3: '3 months',
+    window6: '6 months',
+    window12: '1 year',
+    durationHM: '{{h}}h {{m}}m',
     bestSlots: 'BEST SLOTS IN THE DAY',
     noSlots: 'No specific slot data available',
     avoidRahu: 'Avoid Rahu Kalam: {{start}} – {{end}}',
-    disclaimer: 'Rule-based; not a substitute for a qualified pandit.',
-    scoreKicker: 'SCORE',
     scoreOutOf: '/ 100',
     scoreAccessibility: 'Score {{score}} out of 100',
     whyThisDay: 'WHY THIS DAY',
@@ -751,13 +849,13 @@ export default {
       marginal: 'Marginally auspicious',
     },
     occasion: {
-      vivah: { name: 'Vivah (Marriage)', desc: 'Wedding ceremony muhurat' },
-      'griha-pravesh': { name: 'Griha Pravesh', desc: 'Housewarming / moving into a new home' },
-      namkaran: { name: 'Namkaran', desc: 'Baby naming ceremony' },
-      vahan: { name: 'Vahan Kharidi', desc: 'Vehicle purchase' },
-      mundan: { name: 'Mundan', desc: 'First-haircut ceremony for a child' },
-      annaprashan: { name: 'Annaprashan', desc: 'First-solid-food ceremony (around 6 months)' },
-      vidyarambh: { name: 'Vidyarambh', desc: 'Start of formal learning' },
+      vivah: { name: 'Vivah (Marriage)', chip: 'Marriage', desc: 'Wedding ceremony muhurat' },
+      'griha-pravesh': { name: 'Griha Pravesh', chip: 'Griha Pravesh', desc: 'Housewarming / moving into a new home' },
+      namkaran: { name: 'Namkaran', chip: 'Naming', desc: 'Baby naming ceremony' },
+      vahan: { name: 'Vahan Kharidi', chip: 'Vehicle', desc: 'Vehicle purchase' },
+      mundan: { name: 'Mundan', chip: 'Mundan', desc: 'First-haircut ceremony for a child' },
+      annaprashan: { name: 'Annaprashan', chip: 'Annaprashan', desc: 'First-solid-food ceremony (around 6 months)' },
+      vidyarambh: { name: 'Vidyarambh', chip: 'Vidyarambh', desc: 'Start of formal learning' },
     },
   },
 
@@ -775,6 +873,43 @@ export default {
     padaShort: 'Pada {{pada}}',
     chartNorth: 'North',
     chartSouth: 'South',
+    // Divisional (varga) chart short meanings — plain-language labels so a
+    // beginner reads "D9 · Marriage" instead of a bare D-code (P16.1).
+    divisional: {
+      D1: 'Overall',
+      D2: 'Wealth',
+      D3: 'Siblings',
+      D7: 'Children',
+      D9: 'Marriage',
+      D10: 'Career',
+      D12: 'Parents',
+      D30: 'Hardships',
+    },
+    // P16.2 — Basics layer (identity + current period + highlights + tools) and
+    // the single "Advanced chart" switch that holds the full expert stack.
+    setupTitle: 'SET UP YOUR KUNDLI',
+    moonSignLabel: 'MOON SIGN',
+    sunSignLabel: 'SUN SIGN',
+    currentPeriodLabel: 'CURRENT PERIOD',
+    currentPeriodBody: 'You are in {{planet}} Major Period — until {{year}}',
+    reading: {
+      label: 'YOUR READING',
+      intro: 'A plain-language summary of your chart — your nature, your strengths, and what to keep an eye on.',
+      natureLabel: 'YOUR NATURE',
+      strengthsLabel: 'STRENGTHS',
+      cautionsLabel: 'THINGS TO WATCH',
+    },
+    highlightsLabel: 'HIGHLIGHTS',
+    noFlags: 'No major doshas in your chart.',
+    flagMangal: 'Mangal Dosha',
+    flagKaalSarp: 'Kaal Sarp',
+    flagPitru: 'Pitru Dosha',
+    toolsLabel: 'TOOLS',
+    toolMatch: 'Match',
+    toolVarshaphala: 'Varshaphala',
+    toolPrashna: 'Prashna',
+    advancedChart: 'ADVANCED CHART',
+    dashaTimelineLabel: 'DASHA TIMELINE',
     openSettings: 'Open Settings',
     computeFailed: 'Could not compute the chart for these inputs.',
     doshasSection: 'DOSHAS',
@@ -1107,7 +1242,11 @@ export default {
     saveBeforeExitDesc: 'You\'ve counted {{count}} repetitions. Save to your history?',
     saveYes: 'Save session',
     saveNo: 'Discard',
-    historyTitle: 'Jaap History',
+    historyTitle: 'Your practice',
+    statMalas: 'Malas total',
+    statTime: 'Time sat',
+    statSessions: 'Sessions',
+    last12Weeks: 'Last 12 weeks',
     historyEmptyTitle: 'No sessions yet',
     historyEmptyDesc: 'Complete a jaap session to see it here. We keep the last 30.',
     historyBeginCta: 'Begin a Jaap',
@@ -1144,7 +1283,7 @@ export default {
     nudgeWeakChandra: 'Born with a weak (debilitated) Moon? Monday is traditionally for Shiva worship — see the Monday Vaar Devata.',
     nudgeMangal: 'Facing Mangal Dosha? Tuesday is traditionally for Hanuman worship — see the Tuesday Vaar Devata.',
     nudgeSadeSati: 'During Sade Sati, Saturday worship of Shani Dev (with Hanuman) is the classical observance.',
-    nudgeDashaLord: 'You are in {{planet}} mahādaśā — {{day}} is its weekday. See its Vaar Devata.',
+    nudgeDashaLord: 'You are in {{planet}} Major Period — {{day}} is its weekday. See its Vaar Devata.',
     // Accessibility
     a11yTodaysDeities: "Today's deities: {{names}}, ruled by {{graha}}. Open for details.",
     a11yStartJaap: 'Start a jaap of this mantra',
@@ -1159,6 +1298,7 @@ export default {
     dayShortLabel: 'DAY',
     // Index screen
     dayKicker: 'DAY {{day}} · {{name}}',
+    dayOfBadge: 'Day {{day}} of 9',
     colorLabel: "Today's colour",
     colorComputedNote: 'Anchored to {{weekday}} — colours follow the weekday, not the goddess.',
     iconographyLabel: 'Iconography',
@@ -1236,7 +1376,7 @@ export default {
   // ── Sacred Texts hub ────────────────────────────────────────────────────
   texts: {
     title: 'Sacred Texts',
-    eyebrow: 'PAATH · SWADHYAYA',
+    eyebrow: 'READ & STUDY',
     intro: 'The reading corpus in one place — full scriptures, hymns and litanies, the Vedic suktas, and the vrat kathas.',
     scriptures: { title: 'Scriptures', subtitle: 'Gita, Ramcharitmanas, Sundarkand, and the Upanishads.' },
     stotras: { title: 'Stotras & Ashtakams', subtitle: 'Shiva Tandava, Mahishasura Mardini, Bajrang Baan, and more.' },
@@ -1294,6 +1434,8 @@ export default {
     siteCount: '{{count}} sites',
     a11yOpenSite: 'Open {{name}}',
     jyotirlingaNumber: 'Jyotirlinga {{num}} of 12',
+    numOf: '{{num}} of {{total}}',
+    openMaps: 'Open in Maps',
     presidingDeity: 'Presiding deity',
     openDeity: 'Open {{name}}',
     openPuja: 'Open the pooja vidhi',
@@ -1324,6 +1466,10 @@ export default {
     openDeity: 'Open {{name}}',
     observeLabel: 'How it is observed',
     sourcesLabel: 'A note on sources',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    inDays: 'In {{count}} days',
+    onTheDay: 'On the day',
     category: {
       ekadashi: 'Ekadashi',
       'tithi-vrat': 'Monthly Vrat',
@@ -1364,7 +1510,10 @@ export default {
     subtitleVersesOnly_one: '{{count}} verse',
     subtitleVersesOnly_other: '{{count}} verses',
     subtitleChaptersVerses: '{{chapters}} chapters · {{verses}} verses',
-    chapterListLabel: 'The chapters',
+    chapterListLabel: 'Chapters',
+    continueChapter: 'Continue — Chapter {{num}}',
+    verseOf: 'Verse {{x}} of {{y}}',
+    chapterComplete: 'complete',
     versesNCount_one: '{{count}} verse',
     versesNCount_other: '{{count}} verses',
     readCtaKicker: 'TAP TO READ',
@@ -1399,7 +1548,7 @@ export default {
   // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
   practice: {
     title: 'Devotion',
-    eyebrow: 'SADHANA',
+    eyebrow: 'DEVOTIONAL PRACTICE',
     intro: 'Devotional practice in one place — the Navratri guide and weekday Vaar Devata, the Featured Poojas, the sacred-text library, the pilgrimage atlas, and the festival calendar.',
     comingSoon: 'COMING SOON',
     section: {
@@ -1467,6 +1616,18 @@ export default {
     afterTheLabel: 'After the pooja',
     variantsLabel: 'Regional & traditional variants',
     sourcesLabel: 'About this',
+    // Step-at-a-time flow (frame 04)
+    todayBadge: 'Today',
+    stepKicker: 'Step {{n}}',
+    stepCount: '{{count}} steps',
+    samagriCount: '{{count}} samagri items',
+    beginCta: 'Begin the pooja',
+    doneNext: 'Done — next step',
+    finish: 'Finish',
+    neededNow: 'Needed now',
+    completeTitle: 'POOJA COMPLETE',
+    completeSubtitle: 'All steps are complete. Close with the aarti and offer the naivedya as prasad.',
+    a11yExitSteps: 'Exit the step-by-step view',
     // Banners + buttons
     reviewBanner: "Mantras are under scholarly review — treat as provisional. Regional and family variations exist; a pandit's guidance supersedes this app for any major ceremony.",
     startJaap: 'Start Jaap',
@@ -1478,39 +1639,5 @@ export default {
     openDeityPuja: 'Open the {{name}}',
     // Accessibility
     a11yStartJaap: 'Start a jaap of this mantra',
-  },
-  // ── Sadhana streak + milestones (P14.4) ─────────────────────────────────
-  sadhana: {
-    // Streak badge on Home / Jaap picker
-    streakLabel: 'Sadhana',
-    streakDays_one: 'day',
-    streakDays_other: 'days',
-    dayStreakLabel_one: 'DAY SADHANA',
-    dayStreakLabel_other: 'DAYS SADHANA',
-    a11yStreakBadge_one: 'Your current sadhana streak: {{count}} day',
-    a11yStreakBadge_other: 'Your current sadhana streak: {{count}} days',
-
-    // Milestone celebration overlay
-    milestoneEyebrow: 'SADHANA MILESTONE',
-    milestoneKicker: {
-      sessions: 'सत्र · sessions',
-      repetitions: 'जप · repetitions',
-      streak: 'साधना · days of practice',
-    },
-    milestoneSub: {
-      // Plural-safe — count interpolated below the big numeral.
-      sessions_one: 'session completed',
-      sessions_other: 'sessions completed',
-      repetitions_one: 'sacred repetition',
-      repetitions_other: 'sacred repetitions',
-      streak_one: 'day of unbroken sadhana',
-      streak_other: 'days of unbroken sadhana',
-    },
-    milestoneBlessing: 'May your practice deepen.',
-    continueBtn: 'Continue',
-
-    // Opt-in evening reminder (off by default; gentle wording)
-    reminderTitle: '🪔 A quiet moment',
-    reminderBody: 'Begin your sadhana when you have a moment today.',
   },
 } as const;
