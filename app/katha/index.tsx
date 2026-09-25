@@ -19,9 +19,9 @@ import { MotionPressable } from '@/components/common/MotionPressable';
  * Vrat Kathas — listing screen.
  *
  * Lists the six library kathas (Satyanarayan + five vrat kathas) as editorial
- * rows. Unlike the aarti/chalisa readers, there is no in-screen language
- * toggle — the katha narrative prose is English-primary (see `@/config/kathas`)
- * so each row shows the Devanagari title with the English title beneath it.
+ * rows. Unlike the aarti/chalisa readers there is no in-screen language toggle:
+ * both this screen and the reader it pushes to follow the app language, so each
+ * row shows a single title in that language.
  * The Practice tab routes here; tapping a row pushes `/katha/[slug]`.
  */
 export default function KathaIndexScreen() {
@@ -29,8 +29,8 @@ export default function KathaIndexScreen() {
   const isDarkMode = useStore((s) => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
   const ornamentTone = isDarkMode ? 'dark' : 'light';
-  // Katha narrative prose is English-only, but the disclaimer is bilingual —
-  // surface it in the app language so meta-text matches the chrome labels.
+  // Row titles and the bilingual disclaimer both follow the app language, the
+  // same selection the reader makes for the narrative itself.
   const lang = i18n.language === 'hi' ? 'hi' : 'en';
 
   return (

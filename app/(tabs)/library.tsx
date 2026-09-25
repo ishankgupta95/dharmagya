@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
@@ -46,15 +46,24 @@ export default function LibraryScreen() {
   const isDarkMode = useStore(s => s.isDarkMode);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
-  const selectedDeities = useStore(s => s.selectedDeities);
-  const lastReadKey = useStore(s => s.lastReadKey);
-  const readingPositions = useStore(s => s.readingPositions);
-  const appLanguage = useStore(s => s.language);
   const colors = isDarkMode ? darkColors : lightColors;
   const { t } = useTranslation();
-  const contentLang = resolveLanguage(appLanguage);
 
-  // Walkthrough step 3 spotlights the Deities section.
+  // NativeTabs has no lazy/freeze gate (see `app/(tabs)/_layout.tsx`), so this
+  // tab mounts on cold start alongside Home — and its body is the widest tree
+  // in the app: three grouped list cards (16 rows, two icons each), four
+  // deity tiles and the resume lookup, all built inside the commit that paints
+  // Home. Holding the body back until the tab is first focused moves that off
+  // the launch frame. Only the body is gated: the screen chrome and its title
+  // stay outside, so the tab is never blank if it is tapped on the first
+  // frame. One-way latch, so switching away and back tears nothing down.
+  const isFocused = useIsFocused();
+  const [hasBeenFocused, setHasBeenFocused] = useState(isFocused);
+  if (isFocused && !hasBeenFocused) setHasBeenFocused(true);
+
+  // Walkthrough step 3 spotlights the Deities section. The ref is handed down
+  // to the body; the measure fires 300ms after focus, by which point the latch
+  // above has already mounted the grid it measures.
   const deityGridRef = useRef<View>(null);
   const [deityGridRect, setDeityGridRect] = useState<SpotlightRect | null>(null);
 
@@ -74,6 +83,67 @@ export default function LibraryScreen() {
       }
     }, [walkthroughStep, measureDeityGrid])
   );
+
+  return (
+    <ScreenMount>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+      <ScrollView
+        // iOS: explicit rather than relying on react-native-screens finding this
+        // as the first ScrollView in the tab screen's first-descendant chain
+        // (it does today) — keeps the content clear of the floating tab bar
+        // even if something is ever rendered before it. Android ignores it.
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
+        showsVerticalScrollIndicator={false}>
+
+        {/* ── Title ─────────────────────────────────────────────────────── */}
+        <Text variant="display" style={[styles.heroTitle, { color: colors.textPrimary }]}>
+          {t('library.title')}
+        </Text>
+
+        {hasBeenFocused && (
+          <LibraryBody colors={colors} isDarkMode={isDarkMode} deityGridRef={deityGridRef} />
+        )}
+
+      </ScrollView>
+
+      <AdBanner colors={colors} placement="libraryGodsInline" aboveTabBar />
+
+      {walkthroughStep === 3 && deityGridRect && (
+        <WalkthroughSpotlight
+          spotlight={deityGridRect}
+          title={t('walkthrough.step3Title')}
+          description={t('walkthrough.step3Desc')}
+          tooltipPosition="below"
+          stepIndex={2}
+          totalSteps={3}
+          onNext={() => {
+            setWalkthroughStep(0);
+            router.push('/(tabs)');
+          }}
+          onSkip={() => setWalkthroughStep(0)}
+        />
+      )}
+    </SafeAreaView>
+    </ScreenMount>
+  );
+}
+
+// ─── Body — everything below the title, mounted on first focus ───────────────
+
+interface LibraryBodyProps {
+  colors: ColorPalette;
+  isDarkMode: boolean;
+  deityGridRef: React.RefObject<View | null>;
+}
+
+function LibraryBody({ colors, isDarkMode, deityGridRef }: LibraryBodyProps) {
+  const selectedDeities = useStore(s => s.selectedDeities);
+  const lastReadKey = useStore(s => s.lastReadKey);
+  const readingPositions = useStore(s => s.readingPositions);
+  const appLanguage = useStore(s => s.language);
+  const { t } = useTranslation();
+  const contentLang = resolveLanguage(appLanguage);
 
   const vaar = useMemo(() => getVaarDevataForDate(new Date()), []);
 
@@ -116,173 +186,148 @@ export default function LibraryScreen() {
       : t('settings.manageDeitiesNone');
 
   return (
-    <ScreenMount>
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-        showsVerticalScrollIndicator={false}>
+    <>
+    {/* ── Search field → /search ────────────────────────────────────── */}
+    <MotionPressable
+      onPress={() => router.push('/search')}
+      pressedScale={0.98}
+      style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={t('search.placeholder')}>
+      <Icon name="search" size={17} color={colors.textMuted} />
+      <Text
+        variant="body"
+        style={[styles.searchPlaceholder, { color: colors.textMuted }]}
+        numberOfLines={1}>
+        {t('search.placeholder')}
+      </Text>
+    </MotionPressable>
 
-        {/* ── Title ─────────────────────────────────────────────────────── */}
-        <Text variant="display" style={[styles.heroTitle, { color: colors.textPrimary }]}>
-          {t('library.title')}
+    {/* ── Continue reading ──────────────────────────────────────────── */}
+    {resume && (
+      <MotionPressable
+        onPress={resume.go}
+        pressedScale={0.98}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('library.continueKicker')} · ${resume.title}`}>
+        <LinearGradient
+          colors={
+            isDarkMode
+              ? ['rgba(216,163,26,0.13)', 'rgba(255,255,255,0.03)']
+              : [colors.accentSurface, colors.surface]
+          }
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={[styles.resumeCard, { borderColor: colors.borderAccent }]}>
+          <View style={[styles.resumeIcon, { backgroundColor: colors.accentSurface, borderColor: colors.borderAccent }]}>
+            <Icon name="text" size={20} color={colors.accent} />
+          </View>
+          <View style={styles.resumeBody}>
+            <Text variant="kicker" style={[styles.resumeKicker, { color: colors.textMuted }]}>
+              {t('library.continueKicker')}
+            </Text>
+            <Text variant="deva-bold" style={[styles.resumeTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              {resume.title}
+            </Text>
+            <Text variant="body-small" style={[styles.resumeMeta, { color: colors.textMuted }]}>
+              {t('library.continueVerse', { num: resume.num, total: resume.total })}
+            </Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textMuted} />
+        </LinearGradient>
+      </MotionPressable>
+    )}
+
+    {/* ── Deities — portrait tiles + "All N" ────────────────────────── */}
+    <View ref={deityGridRef} collapsable={false}>
+      <View style={styles.sectionHead}>
+        <Text variant="kicker" style={[styles.sectionKicker, { color: colors.textMuted }]}>
+          {t('library.bucketDeities')}
         </Text>
-
-        {/* ── Search field → /search ────────────────────────────────────── */}
         <MotionPressable
-          onPress={() => router.push('/search')}
-          pressedScale={0.98}
-          style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => router.push('/gods')}
+          hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={t('search.placeholder')}>
-          <Icon name="search" size={17} color={colors.textMuted} />
-          <Text
-            variant="body"
-            style={[styles.searchPlaceholder, { color: colors.textMuted }]}
-            numberOfLines={1}>
-            {t('search.placeholder')}
+          accessibilityLabel={t('library.allGodsTitle')}>
+          <Text variant="body" style={[styles.sectionLink, { color: colors.accentText }]}>
+            {t('library.allCount', { count: ALL_DEITIES.length })}
           </Text>
         </MotionPressable>
-
-        {/* ── Continue reading ──────────────────────────────────────────── */}
-        {resume && (
-          <MotionPressable
-            onPress={resume.go}
-            pressedScale={0.98}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('library.continueKicker')} · ${resume.title}`}>
-            <LinearGradient
-              colors={
-                isDarkMode
-                  ? ['rgba(216,163,26,0.13)', 'rgba(255,255,255,0.03)']
-                  : [colors.accentSurface, colors.surface]
-              }
-              start={{ x: 0.1, y: 0 }}
-              end={{ x: 0.9, y: 1 }}
-              style={[styles.resumeCard, { borderColor: colors.borderAccent }]}>
-              <View style={[styles.resumeIcon, { backgroundColor: colors.accentSurface, borderColor: colors.borderAccent }]}>
-                <Icon name="text" size={20} color={colors.accent} />
-              </View>
-              <View style={styles.resumeBody}>
-                <Text variant="kicker" style={[styles.resumeKicker, { color: colors.textMuted }]}>
-                  {t('library.continueKicker')}
-                </Text>
-                <Text variant="deva-bold" style={[styles.resumeTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {resume.title}
-                </Text>
-                <Text variant="body-small" style={[styles.resumeMeta, { color: colors.textMuted }]}>
-                  {t('library.continueVerse', { num: resume.num, total: resume.total })}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.textMuted} />
-            </LinearGradient>
-          </MotionPressable>
-        )}
-
-        {/* ── Deities — portrait tiles + "All N" ────────────────────────── */}
-        <View ref={deityGridRef} collapsable={false}>
-          <View style={styles.sectionHead}>
-            <Text variant="kicker" style={[styles.sectionKicker, { color: colors.textMuted }]}>
-              {t('library.bucketDeities')}
-            </Text>
+      </View>
+      <View style={styles.deityGrid}>
+        {GRID_DEITIES.map((d) => {
+          const src = getDeityImageSmall(d.id);
+          return (
             <MotionPressable
-              onPress={() => router.push('/gods')}
-              hitSlop={8}
+              key={d.id}
+              onPress={() => router.push({ pathname: '/god/[id]', params: { id: d.id } })}
+              pressedScale={0.96}
+              style={styles.deityCell}
               accessibilityRole="button"
-              accessibilityLabel={t('library.allGodsTitle')}>
-              <Text variant="body" style={[styles.sectionLink, { color: colors.accentText }]}>
-                {t('library.allCount', { count: ALL_DEITIES.length })}
+              accessibilityLabel={t(`deities.${d.id}.displayName`)}>
+              <View style={[styles.deityTile, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+                {src && (
+                  <Image
+                    source={src}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={150}
+                    cachePolicy="memory-disk"
+                  />
+                )}
+                <LinearGradient
+                  colors={['rgba(11,8,16,0)', 'rgba(11,8,16,0.55)']}
+                  start={{ x: 0.5, y: 0.45 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+              <Text variant="body-small" style={[styles.deityName, { color: colors.textSecondary }]} numberOfLines={1}>
+                {t(`deities.${d.id}.displayName`)}
               </Text>
             </MotionPressable>
-          </View>
-          <View style={styles.deityGrid}>
-            {GRID_DEITIES.map((d) => {
-              const src = getDeityImageSmall(d.id);
-              return (
-                <MotionPressable
-                  key={d.id}
-                  onPress={() => router.push({ pathname: '/god/[id]', params: { id: d.id } })}
-                  pressedScale={0.96}
-                  style={styles.deityCell}
-                  accessibilityRole="button"
-                  accessibilityLabel={t(`deities.${d.id}.displayName`)}>
-                  <View style={[styles.deityTile, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
-                    {src && (
-                      <Image source={src} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-                    )}
-                    <LinearGradient
-                      colors={['rgba(11,8,16,0)', 'rgba(11,8,16,0.55)']}
-                      start={{ x: 0.5, y: 0.45 }}
-                      end={{ x: 0.5, y: 1 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  </View>
-                  <Text variant="body-small" style={[styles.deityName, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {t(`deities.${d.id}.displayName`)}
-                  </Text>
-                </MotionPressable>
-              );
-            })}
-          </View>
-        </View>
+          );
+        })}
+      </View>
+    </View>
 
-        {/* ── Read ──────────────────────────────────────────────────────── */}
-        <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
-          {t('library.bucketRead')}
-        </Text>
-        <ListCard colors={colors} rows={[
-          { icon: 'flame',  title: t('library.allAartis.title'),   count: aartiCount,   go: () => router.push('/aarti') },
-          { icon: 'text',   title: t('library.allChalisas.title'), count: chalisaCount, go: () => router.push('/chalisa') },
-          { icon: 'school', title: t('texts.scriptures.title'),    go: () => router.push('/scripture') },
-          { icon: 'star',   title: t('texts.stotras.title'),       go: () => router.push('/stotra') },
-          { icon: 'lotus',  title: t('texts.sahasranama.title'),   go: () => router.push('/sahasranama') },
-          { icon: 'flower', title: t('texts.suktas.title'),        go: () => router.push('/sukta') },
-          { icon: 'text',   title: t('texts.kathas.title'),        go: () => router.push('/katha') },
-          { icon: 'hand',   title: t('practice.prayers.title'),    go: () => router.push('/prayers') },
-        ]} />
+    {/* ── Read ──────────────────────────────────────────────────────── */}
+    <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
+      {t('library.bucketRead')}
+    </Text>
+    <ListCard colors={colors} rows={[
+      { icon: 'flame',  title: t('library.allAartis.title'),   count: aartiCount,   go: () => router.push('/aarti') },
+      { icon: 'text',   title: t('library.allChalisas.title'), count: chalisaCount, go: () => router.push('/chalisa') },
+      { icon: 'school', title: t('texts.scriptures.title'),    go: () => router.push('/scripture') },
+      { icon: 'star',   title: t('texts.stotras.title'),       go: () => router.push('/stotra') },
+      { icon: 'lotus',  title: t('texts.sahasranama.title'),   go: () => router.push('/sahasranama') },
+      { icon: 'flower', title: t('texts.suktas.title'),        go: () => router.push('/sukta') },
+      { icon: 'text',   title: t('texts.kathas.title'),        go: () => router.push('/katha') },
+      { icon: 'hand',   title: t('practice.prayers.title'),    go: () => router.push('/prayers') },
+    ]} />
 
-        {/* ── Rituals & Festivals ───────────────────────────────────────── */}
-        <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
-          {t('library.bucketRituals')}
-        </Text>
-        <ListCard colors={colors} rows={[
-          { icon: 'gift',     title: t('practice.pujaVidhi.title'), go: () => router.push('/pooja') },
-          { icon: 'calendar', title: t('practice.festivals.title'), go: () => router.push('/festivals') },
-          { icon: 'flame',    title: t('practice.navratri.title'),  go: () => router.push('/navratri') },
-          { icon: 'sun',      title: t('practice.vaar.title'),      go: () => router.push({ pathname: '/vaar/[day]', params: { day: vaar.dayKey } }) },
-          { icon: 'map',      title: t('practice.tirtha.title'),    go: () => router.push('/tirtha') },
-        ]} />
+    {/* ── Rituals & Festivals ───────────────────────────────────────── */}
+    <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
+      {t('library.bucketRituals')}
+    </Text>
+    <ListCard colors={colors} rows={[
+      { icon: 'gift',     title: t('practice.pujaVidhi.title'), go: () => router.push('/pooja') },
+      { icon: 'calendar', title: t('practice.festivals.title'), go: () => router.push('/festivals') },
+      { icon: 'flame',    title: t('practice.navratri.title'),  go: () => router.push('/navratri') },
+      { icon: 'sun',      title: t('practice.vaar.title'),      go: () => router.push({ pathname: '/vaar/[day]', params: { day: vaar.dayKey } }) },
+      { icon: 'map',      title: t('practice.tirtha.title'),    go: () => router.push('/tirtha') },
+    ]} />
 
-        {/* ── Your Practice ─────────────────────────────────────────────── */}
-        <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
-          {t('library.bucketPractice')}
-        </Text>
-        <ListCard colors={colors} rows={[
-          { icon: 'circle-outline', title: t('jaap.title'),             go: () => router.push('/jaap') },
-          { icon: 'flower',         title: t('settings.manageDeities'), caption: manageDeitiesSub, go: () => router.push('/settings/deities') },
-          { icon: 'heart',          title: t('favorites.title'),        go: () => router.push('/favorites') },
-        ]} />
-
-      </ScrollView>
-
-      <AdBanner colors={colors} placement="libraryGodsInline" />
-
-      {walkthroughStep === 3 && deityGridRect && (
-        <WalkthroughSpotlight
-          spotlight={deityGridRect}
-          title={t('walkthrough.step3Title')}
-          description={t('walkthrough.step3Desc')}
-          tooltipPosition="below"
-          stepIndex={2}
-          totalSteps={3}
-          onNext={() => {
-            setWalkthroughStep(0);
-            router.push('/(tabs)');
-          }}
-          onSkip={() => setWalkthroughStep(0)}
-        />
-      )}
-    </SafeAreaView>
-    </ScreenMount>
+    {/* ── Your Practice ─────────────────────────────────────────────── */}
+    <Text variant="kicker" style={[styles.sectionKicker, styles.bucketLabel, { color: colors.textMuted }]}>
+      {t('library.bucketPractice')}
+    </Text>
+    <ListCard colors={colors} rows={[
+      { icon: 'circle-outline', title: t('jaap.title'),             go: () => router.push('/jaap') },
+      { icon: 'flower',         title: t('settings.manageDeities'), caption: manageDeitiesSub, go: () => router.push('/settings/deities') },
+      { icon: 'heart',          title: t('favorites.title'),        go: () => router.push('/favorites') },
+    ]} />
+    </>
   );
 }
 

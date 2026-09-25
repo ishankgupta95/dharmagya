@@ -16,6 +16,7 @@ import { FocusReader, type FocusVerse } from '@/components/reader/FocusReader';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import i18n, { resolveLanguage } from '@/i18n';
 import { getAartiForDeity, aartiVerses, titleFor, type ContentLang } from '@/services/content';
+import { buildCopyText } from '@/utils/verseCopy';
 
 // Diya reader (frame 07): a quiet nav row carries the title; the verses get
 // the screen. Verse-by-verse focus + floating position pill live in
@@ -45,6 +46,12 @@ export default function AartiDetailScreen() {
   const verses = useMemo<FocusVerse[]>(() => {
     if (!aarti) return [];
     const raw = aartiVerses(aarti, lang);
+    // Long-press copies the Devanagari verse plus the line on screen. Aartis
+    // ship no translation, so in English mode that line is the romanised verse
+    // (the only one an English-mode reader can read) and is copied on purpose;
+    // in Hindi mode it is the Devanagari itself and deduplicates away. See
+    // `buildCopyText` for the rule across readers.
+    const deva = lang === 'hi' ? raw : aartiVerses(aarti, 'hi');
     const refrain = normalize(raw[0] ?? '');
     return raw.map((text, i) => ({
       label:
@@ -52,6 +59,7 @@ export default function AartiDetailScreen() {
         (i === 0 || (i > 0 && normalize(text) === refrain) ? ` · ${tForLang('reader.refrainTag')}` : ''),
       text,
       isRefrain: i > 0 && normalize(text) === refrain,
+      copyText: buildCopyText([deva[i], text]),
     }));
   }, [aarti, lang, tForLang]);
 

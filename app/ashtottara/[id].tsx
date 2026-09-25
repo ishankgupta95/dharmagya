@@ -11,15 +11,18 @@ import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
+import { CopyableUnit, handleReaderTouchStart } from '@/components/reader/CopyableUnit';
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import i18n, { resolveLanguage } from '@/i18n';
 import {
   getAshtottaraForDeity,
   titleFor,
   type AshtottaraName,
+  type ContentLang,
 } from '@/services/content';
+import { buildCopyText } from '@/utils/verseCopy';
 
 export default function AshtottaraDetailScreen() {
   useInterstitialOnExit();
@@ -58,6 +61,9 @@ export default function AshtottaraDetailScreen() {
     );
   }
 
+  // Screen-reader chrome, so the app language (`t`), as for the back button.
+  const copyLabel = t('reader.copyAction');
+  const copyPrefix = `ashtottara-${ashtottara.deity}`;
   const compactTitle = titleFor(ashtottara, lang);
   const deityDisplay = tForLang(`deities.${ashtottara.deity}.displayName`);
   const about = lang === 'hi' ? ashtottara.about.hi : ashtottara.about.en;
@@ -92,7 +98,16 @@ export default function AshtottaraDetailScreen() {
           initialNumToRender={16}
           maxToRenderPerBatch={20}
           windowSize={11}
-          renderItem={({ item }) => <NameRow name={item} colors={colors} />}
+          onTouchStart={handleReaderTouchStart}
+          renderItem={({ item }) => (
+            <NameRow
+              name={item}
+              lang={lang}
+              colors={colors}
+              copyKey={`${copyPrefix}-name-${item.number}`}
+              copyLabel={copyLabel}
+            />
+          )}
           ListHeaderComponent={
             <View>
               <View style={styles.heroBlock}>
@@ -119,11 +134,13 @@ export default function AshtottaraDetailScreen() {
                   devanagari={ashtottara.openingShloka.devanagari}
                   iast={ashtottara.openingShloka.iast}
                   colors={colors}
+                  copyKey={`${copyPrefix}-opening`}
+                  copyLabel={copyLabel}
                 />
               )}
 
               <Kicker
-                color={palette.gold}
+                color={colors.accentText}
                 size={9}
                 withTrailingRule
                 ruleColor={colors.divider}
@@ -141,6 +158,8 @@ export default function AshtottaraDetailScreen() {
                   devanagari={ashtottara.closingShloka.devanagari}
                   iast={ashtottara.closingShloka.iast}
                   colors={colors}
+                  copyKey={`${copyPrefix}-closing`}
+                  copyLabel={copyLabel}
                 />
               )}
               <Text variant="body-italic" style={[styles.verifyNote, { color: colors.textMuted }]}>
@@ -158,48 +177,93 @@ export default function AshtottaraDetailScreen() {
   );
 }
 
-function NameRow({ name, colors }: { name: AshtottaraName; colors: ColorPalette }) {
+/** One of the 108 names. Long-press copies the Devanagari name (plus its
+ *  meaning in the reader language, should the library ever ship one — none do
+ *  at 0.8.0) and arms the row for native text selection. */
+function NameRow({
+  name, lang, colors, copyKey, copyLabel,
+}: {
+  name: AshtottaraName;
+  lang: ContentLang;
+  colors: ColorPalette;
+  copyKey: string;
+  copyLabel: string;
+}) {
   return (
-    <View style={styles.nameRow}>
-      <Text variant="mono" style={[styles.nameNumber, { color: colors.textMuted }]}>
-        {name.number}
-      </Text>
-      <View style={styles.nameText}>
-        <Text variant="deva" style={[styles.nameDeva, { color: colors.textPrimary }]}>
-          {name.archana}
-        </Text>
-        {!!name.iast && (
-          <Text variant="body-italic" style={[styles.nameIast, { color: colors.textTertiary }]}>
-            {name.iast}
+    <CopyableUnit
+      copyKey={copyKey}
+      copyLabel={copyLabel}
+      getCopyText={() => buildCopyText([name.archana, name.meaning?.[lang]])}
+      style={styles.nameRow}>
+      {({ selectable, a11y }) => (
+        <>
+          <Text variant="mono" style={[styles.nameNumber, { color: colors.textMuted }]}>
+            {name.number}
           </Text>
-        )}
-      </View>
-    </View>
+          <View style={styles.nameText}>
+            <Text
+              {...a11y}
+              selectable={selectable}
+              variant="deva"
+              style={[styles.nameDeva, { color: colors.textPrimary }]}>
+              {name.archana}
+            </Text>
+            {!!name.iast && (
+              <Text
+                selectable={selectable}
+                variant="body-italic"
+                style={[styles.nameIast, { color: colors.textTertiary }]}>
+                {name.iast}
+              </Text>
+            )}
+          </View>
+        </>
+      )}
+    </CopyableUnit>
   );
 }
 
+/** Opening / closing dhyana shloka. Long-press copies the Devanagari (there
+ *  is no translation) and arms the block for native text selection. */
 function ShlokaBlock({
-  label, devanagari, iast, colors,
+  label, devanagari, iast, colors, copyKey, copyLabel,
 }: {
   label: string;
   devanagari: string;
   iast?: string;
   colors: ColorPalette;
+  copyKey: string;
+  copyLabel: string;
 }) {
   return (
-    <View style={styles.shlokaBlock}>
-      <Kicker color={palette.gold} size={9} style={styles.shlokaLabel}>
-        {label}
-      </Kicker>
-      <Text variant="deva" style={[styles.shlokaDeva, { color: colors.textPrimary }]}>
-        {devanagari}
-      </Text>
-      {!!iast && (
-        <Text variant="body-italic" style={[styles.shlokaIast, { color: colors.textTertiary }]}>
-          {iast}
-        </Text>
+    <CopyableUnit
+      copyKey={copyKey}
+      copyLabel={copyLabel}
+      getCopyText={() => buildCopyText([devanagari])}
+      style={styles.shlokaBlock}>
+      {({ selectable, a11y }) => (
+        <>
+          <Kicker color={colors.accentText} size={9} style={styles.shlokaLabel}>
+            {label}
+          </Kicker>
+          <Text
+            {...a11y}
+            selectable={selectable}
+            variant="deva"
+            style={[styles.shlokaDeva, { color: colors.textPrimary }]}>
+            {devanagari}
+          </Text>
+          {!!iast && (
+            <Text
+              selectable={selectable}
+              variant="body-italic"
+              style={[styles.shlokaIast, { color: colors.textTertiary }]}>
+              {iast}
+            </Text>
+          )}
+        </>
       )}
-    </View>
+    </CopyableUnit>
   );
 }
 

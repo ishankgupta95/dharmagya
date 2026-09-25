@@ -13,9 +13,11 @@
  * their citations in its own module docs). The reader surfaces
  * `KATHA_DISCLAIMER` to match the accuracy posture the Puja Vidhi screens carry.
  *
- * Note: the narrative prose is English-primary — `hindi` exists only on a few
- * titles and samagri item names — so the reader is an English narrative reader
- * with a Devanagari title block, not a bilingual toggle like aarti/chalisa.
+ * Note: as of library v0.7.0 the narrative prose is genuinely bilingual — 90 of
+ * the 120 paragraphs carry both an `english` and a `hindi` face, as do all 11
+ * chapter titles — so the reader picks ONE face per pair in the app language
+ * and never stacks them. Still English-only upstream: the `about` summaries
+ * (empty on all six kathas), the samagri intro, and most samagri item names.
  */
 import {
   getAllKathas,
@@ -26,13 +28,47 @@ import {
   type KathaSlug,
   type Bilingual,
 } from 'hindu-devotional-texts';
+import { poojafy } from '@/utils/sanitizeContent';
 
 export type { Katha, KathaParagraph, KathaChapter, SamagriItem, KathaSlug, Bilingual };
 
 // ─── The six kathas + lookups ────────────────────────────────────────────────
 
+/**
+ * Respell the English face of one narrative paragraph; see `poojafy`. Only
+ * `english` is touched — the `hindi` / `sanskrit` / `iast` faces of the same
+ * paragraph are left exactly as the library ships them.
+ */
+function poojafyPara(p: KathaParagraph): KathaParagraph {
+  return p.english ? { ...p, english: poojafy(p.english) } : p;
+}
+
+/**
+ * Respell every English string the katha reader renders from the library's
+ * "Puja" spelling to the app's "Pooja". The samagri intro, the item list, and
+ * the vidhi paragraphs all describe the pooja the vrat is kept with, so they
+ * carry it in almost every katha; the narrative adhyays carry it occasionally.
+ *
+ * Field-explicit, and identity fields (`slug`, `deity`) are untouched —
+ * `getKathaBySlug` / `getKathasForDeity` / `FESTIVAL_MATCHERS` all key on
+ * those, never on rendered prose.
+ */
+function poojafyKatha(k: Katha): Katha {
+  return {
+    ...k,
+    about: { ...k.about, en: poojafy(k.about.en) },
+    samagri: {
+      ...k.samagri,
+      intro: k.samagri.intro ? poojafyPara(k.samagri.intro) : k.samagri.intro,
+      items: k.samagri.items.map((s) => ({ ...s, english: poojafy(s.english) })),
+    },
+    vidhi: k.vidhi.map(poojafyPara),
+    chapters: k.chapters.map((c) => ({ ...c, paragraphs: c.paragraphs.map(poojafyPara) })),
+  };
+}
+
 /** All six kathas, in the library's registry order (Satyanarayan first). */
-export const ALL_KATHAS: readonly Katha[] = getAllKathas();
+export const ALL_KATHAS: readonly Katha[] = getAllKathas().map(poojafyKatha);
 
 /** Look up a katha by slug; `undefined` for an unknown key. */
 export function getKathaBySlug(slug: string | undefined): Katha | undefined {
@@ -86,6 +122,6 @@ export function getKathaForFestivalName(
  * `PUJA_DISCLAIMER` / `NAVRATRI_SOURCES`.
  */
 export const KATHA_DISCLAIMER: Bilingual = {
-  en: "Vrat kathas are retold across many regional and family traditions — this is one widely-recited form, and the details of the puja vidhi and samagri vary by household. For any vrat, follow your family elders' and a pandit's guidance.",
+  en: "Vrat kathas are retold across many regional and family traditions — this is one widely-recited form, and the details of the pooja vidhi and samagri vary by household. For any vrat, follow your family elders' and a pandit's guidance.",
   hi: 'व्रत कथाएँ अनेक क्षेत्रीय एवं पारिवारिक परंपराओं में भिन्न रूपों में सुनाई जाती हैं — यह एक प्रचलित रूप है, तथा पूजा-विधि एवं सामग्री के विवरण परिवार-अनुसार बदलते हैं। किसी भी व्रत हेतु अपने परिवार के ज्येष्ठजनों एवं पंडित जी के परामर्श का अनुसरण करें।',
 };

@@ -1,4 +1,4 @@
-import { forwardRef, useCallback } from 'react';
+import { forwardRef } from 'react';
 import {
   Pressable,
   type PressableProps,
@@ -44,21 +44,28 @@ export const MotionPressable = forwardRef<View, MotionPressableProps>(
     const scale = useSharedValue(1);
     const spring = reduced ? REDUCED_SPRING : PRESS_SPRING;
 
-    const handlePressIn = useCallback(
-      (e: PressEvent) => {
-        scale.value = withSpring(pressedScale, spring);
-        onPressIn?.(e);
-      },
-      [scale, spring, pressedScale, onPressIn],
-    );
+    // Two things keep the React Compiler memoizing this component, and both
+    // matter — losing either costs all 244 call sites their memoization.
+    //  1. No `useCallback`: a dep array holding the shared value `scale`,
+    //     which the body then mutates, trips react-hooks/immutability.
+    //  2. These handlers are declared BEFORE `useAnimatedStyle` below. The
+    //     compiler freezes `scale` at the point the worklet captures it, so a
+    //     write appearing after that point is reported as "`scale` cannot be
+    //     modified" and bails out too. Measured on SegmentedChip: converting
+    //     its handlers to this exact expression form changed nothing, and
+    //     only moving them above `useAnimatedStyle` cleared the error.
+    // Do not reorder this block below `animatedStyle`.
+    // Both handlers have exactly one consumer — the Pressable props below —
+    // where referential identity is irrelevant.
+    const handlePressIn = (e: PressEvent) => {
+      scale.value = withSpring(pressedScale, spring);
+      onPressIn?.(e);
+    };
 
-    const handlePressOut = useCallback(
-      (e: PressEvent) => {
-        scale.value = withSpring(1, spring);
-        onPressOut?.(e);
-      },
-      [scale, spring, onPressOut],
-    );
+    const handlePressOut = (e: PressEvent) => {
+      scale.value = withSpring(1, spring);
+      onPressOut?.(e);
+    };
 
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],

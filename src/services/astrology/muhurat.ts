@@ -7,10 +7,17 @@ import {
   mundanRule,
   annaprashanRule,
   vidyarambhRule,
+  type AyanamsaType,
+  type MuhurtaFactor,
   type MuhurtaRule,
 } from 'panchang-ts';
-import { fetchPanchang } from './panchangService';
-import type { IPanchangDay } from '@/types';
+import {
+  fetchPanchang,
+  noonAtPlace,
+  panchangTimezoneMinutes,
+  FALLBACK_COORDS,
+  type PanchangCoords,
+} from './panchangService';
 
 // ─── Occasions ────────────────────────────────────────────────────────────────
 
@@ -49,10 +56,6 @@ const OCCASION_TO_RULE: Record<Occasion, MuhurtaRule> = {
   vidyarambh: vidyarambhRule,
 };
 
-// IST is the canonical Indian timezone the panchang is computed against;
-// matches the timezone used by `fetchPanchang` and the candidate generator.
-const IST_OFFSET_MIN = 330;
-
 // ─── Rule evaluation ──────────────────────────────────────────────────────────
 
 export interface MuhuratMatch {
@@ -66,17 +69,42 @@ export interface MuhuratMatch {
   yoga: string;
   /** Vara (day of week) name. */
   vara: string;
-  /** Full panchang for this day — kept so the UI doesn't need a second fetch. */
-  panchang: IPanchangDay;
+  /** Only the windows the muhurat card actually renders, so the UI needs no
+   *  second fetch. Deliberately NOT the whole `IPanchangDay`: that embedded a
+   *  ~10 KB object per matching day, i.e. ~2.4 MB per cached occasion row and
+   *  ~16 MB once all seven have been opened, ~80% of which (do-ghati, gowri,
+   *  hora, every anga array) no muhurat surface has ever read — and the whole
+   *  blob was re-stringified into SQLite on every occasion switch. */
+  windows: MuhuratDayWindows;
   /** Library's auspiciousness score [0..100] from `scoreMuhurta`. Higher is
-   *  more auspicious. Always present for fresh writes; SQLite cache schema
-   *  bumped to v5 to ensure no pre-score rows linger. */
+   *  more auspicious. Always present for fresh writes; the SQLite cache is
+   *  wiped by a `user_version` rung whenever the scoring inputs — or a window
+   *  the finder displays from the cached row, such as Brahma Muhurta — move
+   *  (v14 at time of writing, see src/utils/database.ts), so no stale rows
+   *  linger. */
   score: number;
-  /** Why the score landed where it did — short library-supplied notes on
-   *  which factors raised or lowered it (tithi / nakshatra / yoga / vara
-   *  matches and exclusions). Rendered as a "Why this day" line in the
-   *  expanded day detail. */
+  /** Why the score landed where it did, in structured form — one entry per
+   *  scoring rule that fired. `factor.code` keys an i18n string and
+   *  `factor.axis` says which anga to name, which is what the "Why this day"
+   *  list in the expanded day detail renders. */
+  factors: MuhurtaFactor[];
+  /** The library's English developer diagnostics for the same list. Kept only
+   *  as a last-resort fallback for a `code` we have no string for yet — the
+   *  library documents these as unlocalized and not a stable format, so they
+   *  must never be what a user sees by default. */
   reasons: string[];
+}
+
+/** The subset of a day's panchang the muhurat card renders. */
+export interface MuhuratDayWindows {
+  rahuKalamStart?: string;
+  rahuKalamEnd?: string;
+  abhijitMuhurtaStart?: string;
+  abhijitMuhurtaEnd?: string;
+  brahmaMuhurtaStart?: string;
+  brahmaMuhurtaEnd?: string;
+  /** Day choghadiya, pre-filtered to the auspicious slots the card lists. */
+  auspiciousChoghadiya: { name: string; start: string; end: string }[];
 }
 
 export interface ScanProgress {
@@ -94,7 +122,13 @@ export interface ScanOptions {
   startDate: Date;
   /** Inclusive end. */
   endDate: Date;
-  coords?: { lat: number; lon: number } | null;
+  coords?: PanchangCoords | null;
+  /** Sidereal convention. Required rather than defaulted: the muhurat screen
+   *  used to silently score every user under Lahiri while the Panchang tab
+   *  honoured their setting, which put a different nakshatra on the two
+   *  screens for the same date (36 days a year under Raman) and flipped
+   *  pass/fail on 33. An optional field would re-open that hole one layer up. */
+  ayanamsa: AyanamsaType;
   /** Abort to stop the scan early. Resolves with matches collected so far. */
   signal?: AbortSignal;
   /** Called synchronously after each match is found. */
@@ -126,7 +160,9 @@ export interface ValidateOptions {
   occasion: Occasion;
   /** YYYY-MM-DD strings, sorted ascending — output of generate-muhurat-candidates.js */
   candidates: string[];
-  coords?: { lat: number; lon: number } | null;
+  coords?: PanchangCoords | null;
+  /** See `ScanOptions.ayanamsa`. */
+  ayanamsa: AyanamsaType;
   signal?: AbortSignal;
   onMatch?: (match: MuhuratMatch) => void;
   onProgress?: (p: ScanProgress) => void;
@@ -150,7 +186,7 @@ export async function validateCandidates(opts: ValidateOptions): Promise<Muhurat
     }
     date.setHours(12, 0, 0, 0); // noon avoids DST-boundary drift, mirrors scanAuspiciousDays
 
-    const match = await evaluateAndDescribe(date, rule, opts.coords ?? null);
+    const match = await evaluateAndDescribe(date, rule, opts.coords ?? null, opts.ayanamsa);
     if (match) {
       out.push(match);
       opts.onMatch?.(match);
@@ -201,7 +237,7 @@ export async function scanAuspiciousDays(opts: ScanOptions): Promise<MuhuratMatc
   while (cursor.getTime() <= end.getTime()) {
     if (opts.signal?.aborted) return out;
 
-    const match = await evaluateAndDescribe(new Date(cursor), rule, opts.coords ?? null);
+    const match = await evaluateAndDescribe(new Date(cursor), rule, opts.coords ?? null, opts.ayanamsa);
     if (match) {
       out.push(match);
       opts.onMatch?.(match);
@@ -248,35 +284,76 @@ function ymdLocal(d: Date): string {
 async function evaluateAndDescribe(
   date: Date,
   rule: MuhurtaRule,
-  coords: { lat: number; lon: number } | null,
+  coords: PanchangCoords | null,
+  ayanamsa: AyanamsaType,
 ): Promise<MuhuratMatch | null> {
-  // The library normalizes `coords ?? null` to a fallback Indian location
-  // internally via `fetchPanchang`, but `scoreMuhurta` requires a real
-  // GeoLocation. Use Pune as the default — same fallback `fetchPanchang`
-  // applies so the two stay aligned.
-  const location = coords
-    ? { latitude: coords.lat, longitude: coords.lon }
-    : { latitude: 18.6298, longitude: 73.7997 };
+  // Resolve the location once and hand the identical value to both calls.
+  // `scoreMuhurta` needs a real GeoLocation, and left to itself `fetchPanchang`
+  // would resolve the null case independently — a live GPS fix when permission
+  // happens to be granted, otherwise Ujjain. Scoring one place while
+  // describing another is a real divergence, not a rounding error: at the
+  // ~1000 km between the old Pune literal and `FALLBACK_COORDS` the two
+  // disagree on score or pass for 11–19 candidate days a year per occasion.
+  // `FALLBACK_COORDS` is the app-wide no-location default (see
+  // `useLazyDailyPanchang` and the location settings copy, which names
+  // Ujjain to the user); passing it explicitly also spares a GPS fix on
+  // every matching day of a 365-day scan.
+  const resolved = coords ?? FALLBACK_COORDS;
+  const location = { latitude: resolved.lat, longitude: resolved.lon };
+  // The offset belongs to the place and the day, not to the phone right now —
+  // see `panchangTimezoneMinutes`. Resolving it per-day (rather than once at
+  // call time, as this file used to) keeps scoring and rendering on the same
+  // offset across a DST boundary mid-scan, which was the original worry: both
+  // sides now derive it identically, so they cannot disagree. Measured, the
+  // 60-minute delta changes no scores (0 of 133 cross-DST days), so this is
+  // about staying aligned with what the card prints, not about scoring.
+  const timezone = panchangTimezoneMinutes(resolved, date);
+  // `date` is device-local noon of the civil day being scanned (built by
+  // `validateCandidates` / `scanAuspiciousDays`), but `scoreMuhurta` picks the
+  // Hindu day off that instant in `timezone`, the place's offset. Device noon
+  // at or west of −06:30 is already past midnight IST, so a Pacific phone scored
+  // day D+1 while `MuhuratMatch.date` and the bundled candidate (generated at
+  // Ujjain for day D) said D. Re-anchor to noon of the same civil date in the
+  // place's zone — see `noonAtPlace`. `fetchPanchang` below does the same to
+  // the civil `date` it is handed, so both sides still read one Hindu day.
+  const at = noonAtPlace(date, timezone);
 
   let scored;
   try {
-    scored = scoreMuhurta(date, location, rule, { timezone: IST_OFFSET_MIN });
+    scored = scoreMuhurta(at, location, rule, { timezone, ayanamsa });
   } catch {
     return null;
   }
   if (!scored.passes) return null;
 
-  const panchang = await fetchPanchang(date, coords, false, 'en');
+  const panchang = await fetchPanchang(date, resolved, false, 'en', 'all', undefined, undefined, ayanamsa);
   if (!panchang) return null;
 
+  // Same coords, same offset, same ayanamsa and same anchored instant on both
+  // sides, so `panchang.tithis[0]` etc. are the very elements `scoreMuhurta`
+  // read at sunrise — which is what lets the UI name a factor's anga from these
+  // fields instead of maintaining its own index→name table against
+  // `factor.index`.
   return {
     date: new Date(date),
     tithi: panchang.tithis[0]?.name ?? '',
     nakshatra: panchang.nakshatras[0]?.name ?? '',
     yoga: panchang.yogas[0]?.name ?? '',
     vara: panchang.vara ?? '',
-    panchang,
+    windows: {
+      rahuKalamStart: panchang.rahuKalamStart,
+      rahuKalamEnd: panchang.rahuKalamEnd,
+      abhijitMuhurtaStart: panchang.abhijitMuhurtaStart,
+      abhijitMuhurtaEnd: panchang.abhijitMuhurtaEnd,
+      brahmaMuhurtaStart: panchang.brahmaMuhurtaStart,
+      brahmaMuhurtaEnd: panchang.brahmaMuhurtaEnd,
+      auspiciousChoghadiya: (panchang.choghadiya?.day ?? [])
+        .filter(s => s.quality === 'auspicious')
+        .slice(0, 3)
+        .map(s => ({ name: s.name, start: s.start, end: s.end })),
+    },
     score: scored.score,
-    reasons: scored.reasons ?? [],
+    factors: scored.factors,
+    reasons: scored.reasons,
   };
 }

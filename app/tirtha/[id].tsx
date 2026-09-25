@@ -77,17 +77,24 @@ export default function TirthaDetailScreen() {
   if (site.bhairava) infoRows.push({ label: t('tirtha.field.bhairava'), value: site.bhairava[lang] });
   if (site.direction) infoRows.push({ label: t('tirtha.field.direction'), value: site.direction[lang] });
 
+  // Hand off to the platform maps app with a text search for the site. iOS
+  // uses Apple's documented Maps link (`maps.apple.com/?q=`), which the OS
+  // routes straight to Apple Maps; the old `maps:0,0?q=` was not a
+  // documented form. No `ll=` pin: the tirtha data carries no coordinates
+  // and a guessed centre would bias the search. Android keeps its `geo:`
+  // intent. Google Maps on the web is the fallback everywhere.
   const openInMaps = () => {
     const query = encodeURIComponent(
       [site.name.en, site.location.en, site.state?.en].filter(Boolean).join(', '),
     );
+    const googleUrl = `https://maps.google.com/?q=${query}`;
     const url = Platform.select({
-      ios: `maps:0,0?q=${query}`,
+      ios: `https://maps.apple.com/?q=${query}`,
       android: `geo:0,0?q=${query}`,
-      default: `https://maps.google.com/?q=${query}`,
+      default: googleUrl,
     });
     Linking.openURL(url).catch(() => {
-      Linking.openURL(`https://maps.google.com/?q=${query}`).catch(() => { /* no maps handler */ });
+      Linking.openURL(googleUrl).catch(() => { /* no maps handler */ });
     });
   };
 
@@ -124,11 +131,16 @@ export default function TirthaDetailScreen() {
               </Text>
             </View>
           )}
-          <Text variant="deva-bold" style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            {site.name[lang]}
-          </Text>
-          <Text variant="display" style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            {lang === 'hi' ? site.name.en : (site.nameSanskrit ?? site.name.hi)}
+          {/*
+            One title in the app language — a screen title is chrome, so the
+            opposite-script name never stacks under it. IAST folding now happens
+            once at the config boundary (`sanitizeTirtha` in src/config/tirtha.ts)
+            so the list, search and this hero cannot spell a site three ways.
+          */}
+          <Text
+            variant={lang === 'hi' ? 'deva-bold' : 'display'}
+            style={[styles.heroTitle, { color: colors.textPrimary }]}>
+            {lang === 'hi' ? site.name.hi : site.name.en}
           </Text>
           {!!place && (
             <View style={styles.placeRow}>
@@ -284,7 +296,6 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 10 },
   heroTitle: { fontSize: 34, lineHeight: 46, marginTop: 14 },
-  heroSubtitle: { fontSize: 21, lineHeight: 27, marginTop: 2 },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   placeText: { fontSize: 13.5, lineHeight: 19 },
 

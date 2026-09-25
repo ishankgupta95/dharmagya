@@ -30,7 +30,7 @@ import {
   computeUpagrahas,
   computeVarshaphala,
   computeVimshottariDashaFromBirth,
-  computeVimshottariPratyantar,
+  computeVimshottariPratyantarIn,
   computeYogas,
   computeYoginiDasha,
   PanchangError,
@@ -281,8 +281,11 @@ export function computeDashaTimeline(
     currentMaha?.antarDashas.find(
       (ad) => ad.startDate.getTime() <= now && ad.endDate.getTime() > now,
     ) ?? null;
+  // The `In` form splits the antardasha's FULL span and clips it, so the birth
+  // antardasha (clipped at birth) gets the pratyantars that actually ran; for
+  // every other antardasha it equals `computeVimshottariPratyantar`.
   const currentPratyantars = currentAntardasha
-    ? computeVimshottariPratyantar(currentAntardasha)
+    ? computeVimshottariPratyantarIn(currentMaha, currentAntardasha)
     : [];
 
   return { full, currentAntardasha, currentPratyantars };

@@ -3,9 +3,11 @@
  *
  * The lib ships 63 observance entries (26 Ekādaśīs, 6 tithi-vrats, 31
  * festivals) carrying significance / origin story / scriptural source / roster
- * deity + cross-link slugs — but **no dates**. Dates come from the panchang-ts
- * bundled table (`src/data/festivals.ts`); this layer enriches a dated calendar
- * row by matching its (English) panchang name to a lib `FestivalEntry`.
+ * deity + cross-link slugs — but **no dates**. Dates come from the generated
+ * festival table (`src/data/festivals.ts` over
+ * `src/data/static/festivals-table.json` — panchang-ts v5 removed its own
+ * bundled tables); this layer enriches a dated calendar row by matching its
+ * (English) panchang name to a lib `FestivalEntry`.
  *
  * Matching: the panchang-ts table uses plain-ASCII display names ("Rama
  * Navami"), and the lib `id`s are plain-ASCII kebab ("rama-navami"), so a
@@ -58,9 +60,15 @@ function stripParens(s: string): string {
 
 /**
  * panchang-ts name (kebab) → lib festival id, for the cases a direct
- * id-equality match misses. Tuned against `getFestivalsForYear()` output — see
- * the coverage check in the PR notes; unmatched panchang majors fall through to
- * `undefined` (the row just stays un-tappable, no broken link).
+ * id-equality match misses. Tuned by replaying every emission of the generated
+ * table (`readFestivalsForYear`, 2024–2031: 180 distinct name/description
+ * pairs) through the resolver — 120 land on an entry. The rest genuinely have
+ * no lib entry at all (Lohri, Bonalu, the Sankranti family, Masik Karthigai,
+ * the Upakarmas, …): the lib ships 63 observances, so a miss is expected and
+ * falls through to `undefined` (the row just stays un-tappable, no broken
+ * link). Re-run that replay whenever the table is regenerated — a renamed
+ * emission silently strands its content, which is how "Kartika Purnima" was
+ * lost across the v5 table change.
  */
 const ALIAS: Record<string, string> = {
   // Festivals whose display name diverges from the lib id.
@@ -72,8 +80,20 @@ const ALIAS: Record<string, string> = {
   'janmashtami': 'krishna-janmashtami',
   'ugadi': 'gudi-padwa',
   'thiru-onam': 'onam',
+  // The table emits "Kartika Purnima"; the lib id drops the stem vowel
+  // ("kartik-"). "Dev Deepavali" is the same full moon under its other name —
+  // the table does not currently emit it, but the mapping is correct if it ever
+  // does.
+  'kartika-purnima': 'kartik-purnima',
   'dev-deepavali': 'kartik-purnima',
   'mesha-sankranti': 'baisakhi',
+  // panchang-ts 5.4 split Holi into `holika_dahan` (the Phalguna Purnima
+  // evening) and `holi` (Rangwali Holi, the next day in most years). The lib's
+  // one Holi entry covers both days — "the Phalguna full moon and the day that
+  // follows" — so the Holika Dahan row opens it too. The detail screen still
+  // dates it on the Holi row itself: its occurrence scan prefers a row that
+  // names the content directly (`namesFestivalContent`) over an aliased one.
+  'holika-dahan': 'holi',
   'narsimha-jayanti': 'narasimha-jayanti',
   'janaki-navami': 'sita-navami',
   'jagannath-rath-yatra': 'ratha-yatra',
@@ -94,6 +114,24 @@ const ALIAS: Record<string, string> = {
   'pashankusha-ekadashi': 'papankusha-ekadashi',
 };
 
+/** The kebab forms of an emission's name and description the resolvers try. */
+function emissionKeys(name: string, description?: string): string[] {
+  return [name, stripParens(name), description, description ? stripParens(description) : undefined]
+    .filter(Boolean)
+    .map((s) => kebab(s as string));
+}
+
+/**
+ * Whether an emission names content `id` itself — its own (paren-stripped)
+ * name or description IS the id — rather than reaching it through `ALIAS` or
+ * the Ekadashi stem match. Lets a screen that dates a content entry prefer the
+ * row that is that festival over one that merely shares its content (Holi over
+ * the Holika Dahan eve that also opens it).
+ */
+export function namesFestivalContent(name: string, description: string | undefined, id: string): boolean {
+  return emissionKeys(name, description).includes(id);
+}
+
 /**
  * Resolve the lib festival CONTENT for a panchang-ts festival emission. Tries
  * the ALIAS table, then an id-equality match on the (paren-stripped) kebab
@@ -102,9 +140,7 @@ const ALIAS: Record<string, string> = {
  * → `papamochani-ekadashi`). Returns `undefined` when nothing matches.
  */
 export function getFestivalContentForName(name: string, description?: string): FestivalEntry | undefined {
-  const candidates = [name, stripParens(name), description, description ? stripParens(description) : undefined]
-    .filter(Boolean)
-    .map((s) => kebab(s as string));
+  const candidates = emissionKeys(name, description);
 
   for (const k of candidates) {
     if (ALIAS[k] && BY_ID.has(ALIAS[k])) return BY_ID.get(ALIAS[k]);

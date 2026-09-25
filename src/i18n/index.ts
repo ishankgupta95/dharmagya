@@ -37,6 +37,7 @@ async function loadLanguage(lng: string): Promise<void> {
 
 const deviceLang = getDeviceLanguage();
 
+// eslint-disable-next-line import/no-named-as-default-member -- `i18n` is i18next's singleton and the named `use` export is that same instance's bound method (i18next binds its members in the constructor), so the instance call is the intended one.
 i18n.use(initReactI18next).init({
   // Both supported bundles are eager-loaded so reader screens can resolve
   // labels against either language regardless of the active app language —
@@ -54,6 +55,7 @@ i18n.use(initReactI18next).init({
 /** Change the active language, loading the bundle if needed. */
 export async function changeLanguage(lng: string): Promise<void> {
   await loadLanguage(lng);
+  // eslint-disable-next-line import/no-named-as-default-member -- same singleton as above; the named `changeLanguage` export is this instance's bound method, and this module's own `changeLanguage` wrapper needs the instance call, not a self-import.
   await i18n.changeLanguage(lng);
 }
 

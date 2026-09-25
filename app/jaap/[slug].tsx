@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation, useRoute } from 'expo-router';
+import { usePreventRemoveContext } from 'expo-router/react-navigation';
 import { useTranslation } from 'react-i18next';
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Haptics from 'expo-haptics';
@@ -174,7 +175,10 @@ export default function JaapCounterScreen() {
   );
   const [customSizeModalVisible, setCustomSizeModalVisible] = useState(false);
   const [customSizeDraft, setCustomSizeDraft] = useState('');
-  const startedAtRef = useRef<number>(Date.now());
+  // Stamped by the effect below — which also runs on mount, before any tap
+  // can read it — rather than at render time: `Date.now()` in render is an
+  // impure read the React Compiler refuses to memoise around.
+  const startedAtRef = useRef<number>(0);
 
   // Reset starts-at when mantra resolved (covers re-mount)
   useEffect(() => {
@@ -198,11 +202,19 @@ export default function JaapCounterScreen() {
   }, [progressFraction, ringProgressSV]);
 
   // ── Tap handlers ───────────────────────────────────────────────────────
-  // Rendering reads `count` + `malaCount`; the closures here use those values
-  // via the deps below. React batches both setState calls on a tap, so the
-  // re-render sees both updates together (one commit, one ring-progress
-  // animation kick-off). Keeping side effects (haptics + animation) outside
-  // the setter avoids the React 18 strict-mode double-invoke footgun.
+  // Rendering reads `count` + `malaCount`; the closures here capture those
+  // values from the render they were created in. React batches both setState
+  // calls on a tap, so the re-render sees both updates together (one commit,
+  // one ring-progress animation kick-off). Keeping side effects (haptics +
+  // animation) outside the setter avoids the React 18 strict-mode
+  // double-invoke footgun.
+  //
+  // `handleTap` is deliberately a plain function expression, NOT a
+  // useCallback: a dep array holding the shared values `scaleSV` /
+  // `completionSV` (which the body mutates) trips the React Compiler's
+  // immutability check and makes it bail out of memoizing this whole screen.
+  // Its only consumer is the tap-zone Pressable, where identity is
+  // irrelevant.
   //
   // Haptic intensity: `impactAsync(Heavy)` — earlier `selectionAsync()` was
   // unmistakably too weak (user feedback), and Medium is borderline on
@@ -211,7 +223,7 @@ export default function JaapCounterScreen() {
   // the user is often eyes-closed or chanting and needs confirmation without
   // looking. If 108-rep wrist fatigue becomes a real complaint we can dial
   // back to Medium.
-  const handleTap = useCallback(() => {
+  const handleTap = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 
     scaleSV.value = withSequence(
@@ -259,7 +271,7 @@ export default function JaapCounterScreen() {
       }
       setCount(next);
     }
-  }, [count, malaSize, scaleSV, completionSV]);
+  };
 
   const handleDecrement = useCallback(() => {
     if (count === 0 && malaCount === 0) return;
@@ -294,8 +306,9 @@ export default function JaapCounterScreen() {
   }, [hasCounted, totalCount, t]);
 
   // ── Save / exit flow ───────────────────────────────────────────────────
-  // Persist the jaap session synchronously so the SQLite write commits before
-  // `router.back()` resolves.
+  // Persist the jaap session synchronously (`runSync`) so the SQLite write
+  // has committed before any exit — `router.back()` or the iOS guard's
+  // re-dispatch of the blocked action — is even issued.
   const persistSession = useCallback(() => {
     if (!resolved || !hasCounted) return;
     insertJaapSession(db, {
@@ -309,32 +322,56 @@ export default function JaapCounterScreen() {
     });
   }, [db, resolved, hasCounted, malaSize, malaCount, totalCount]);
 
+  // Exit for the screen's own controls (back pill, check pill, Android
+  // hardware back) once the prompt has run (or was skipped because nothing
+  // was counted). The flag marks the pop as ours so the (iOS-only)
+  // `beforeRemove` guard below lets it through; `router.back()` only queues
+  // the action, so the flag has to stay set until that guard consumes it.
+  const exitingRef = useRef(false);
+  const leave = useCallback(() => {
+    exitingRef.current = true;
+    router.back();
+  }, []);
+
   const handleSaveExit = useCallback(() => {
     persistSession();
-    router.back();
-  }, [persistSession]);
+    leave();
+  }, [persistSession, leave]);
 
-  const confirmAndExit = useCallback(() => {
-    if (!hasCounted) {
-      router.back();
-      return;
-    }
-    Alert.alert(
-      t('jaap.saveBeforeExit'),
-      t('jaap.saveBeforeExitDesc', { count: totalCount }),
-      [
-        {
-          text: t('jaap.saveNo'),
-          style: 'destructive',
-          onPress: () => router.back(),
-        },
-        {
-          text: t('jaap.saveYes'),
-          onPress: handleSaveExit,
-        },
-      ],
-    );
-  }, [hasCounted, totalCount, handleSaveExit, t]);
+  // The save-before-exit prompt, parameterised on how to actually go: `leave`
+  // for the screen's own controls, or "continue the blocked action" for the
+  // iOS guard. Save persists first (synchronously), then exits.
+  const promptThenExit = useCallback(
+    (exit: () => void) => {
+      if (!hasCounted) {
+        exit();
+        return;
+      }
+      Alert.alert(
+        t('jaap.saveBeforeExit'),
+        t('jaap.saveBeforeExitDesc', { count: totalCount }),
+        [
+          {
+            text: t('jaap.saveNo'),
+            style: 'destructive',
+            onPress: exit,
+          },
+          {
+            text: t('jaap.saveYes'),
+            onPress: () => {
+              persistSession();
+              exit();
+            },
+          },
+        ],
+      );
+    },
+    [hasCounted, totalCount, persistSession, t],
+  );
+
+  // A zero-arg wrapper, not `promptThenExit` itself: this is handed straight
+  // to `onPress`, which would otherwise pass its press event in as `exit`.
+  const confirmAndExit = useCallback(() => promptThenExit(leave), [promptThenExit, leave]);
 
   // Hardware back on Android — same prompt as the nav-back button.
   useEffect(() => {
@@ -344,6 +381,63 @@ export default function JaapCounterScreen() {
     });
     return () => sub.remove();
   }, [confirmAndExit]);
+
+  // iOS — the native-stack swipe-back pops the screen without touching the
+  // back pill (audit L-04). Two halves, the same shape as react-navigation's
+  // `usePreventRemove` minus its unconditional preventDefault, which would
+  // also block the back pill's post-prompt `router.back()` (a fresh action):
+  //  1. While a session is in progress, register the route as prevented.
+  //     native-stack forwards that to react-native-screens as
+  //     `preventNativeDismiss`, so the interactive pop is cancelled natively
+  //     (the screen never leaves) and the stack dispatches a POP instead,
+  //     which arrives at `beforeRemove`.
+  //  2. On `beforeRemove`, unless the removal is ours, prevent it, run the
+  //     same prompt as the back pill, then CONTINUE THE BLOCKED ACTION
+  //     (`e.data.action`) rather than `router.back()`. For a swipe that is
+  //     the same single pop; for a multi-screen removal passing through a
+  //     counting jaap screen (a `dismissTo` / `popTo` issued from a screen
+  //     above it) it lands where that action was headed, where
+  //     `router.back()` would only have popped the top screen and left the
+  //     jaap screen up with its guard disarmed.
+  //     The re-dispatch is not re-intercepted: react-navigation stamps each
+  //     screen it has already emitted `beforeRemove` to onto the action and
+  //     skips it on re-dispatch, and `navigation.dispatch` emits
+  //     synchronously, so `exitingRef` — set around the call and cleared
+  //     straight after — covers it too without leaking into a later
+  //     removal if something else ends up blocking this one.
+  // Both halves are iOS-only (early return inside each effect, so the hook
+  // order stays unconditional). Android's classic stack ignores
+  // `preventNativeDismiss` and hardware back there is the BackHandler above,
+  // so on Android the guard would only catch non-back removals — e.g. the
+  // widget's /refresh-widget `dismissTo('/panchang')`, which must still pass
+  // straight through — and every `setPreventRemove` would re-render the root
+  // stack for a prop Android never reads. On Android `exitingRef` is set by
+  // `leave()` but never read, which is harmless.
+  const navigation = useNavigation();
+  const { key: routeKey } = useRoute();
+  const { setPreventRemove } = usePreventRemoveContext();
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !hasCounted) return;
+    setPreventRemove(routeKey, routeKey, true);
+    return () => setPreventRemove(routeKey, routeKey, false);
+  }, [setPreventRemove, routeKey, hasCounted]);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    return navigation.addListener('beforeRemove', (e) => {
+      if (exitingRef.current) {
+        exitingRef.current = false;
+        return;
+      }
+      if (!hasCounted) return;
+      e.preventDefault();
+      const blockedAction = e.data.action;
+      promptThenExit(() => {
+        exitingRef.current = true;
+        navigation.dispatch(blockedAction);
+        exitingRef.current = false;
+      });
+    });
+  }, [navigation, hasCounted, promptThenExit]);
 
   // ── Animated styles ────────────────────────────────────────────────────
   const tapScaleStyle = useAnimatedStyle(() => ({
@@ -455,11 +549,25 @@ export default function JaapCounterScreen() {
         </View>
 
         {/* ── Whole-screen tap zone ───────────────────────────────────────── */}
+        {/*
+          Accessibility: no `accessibilityLabel`. A Pressable is an
+          accessibility element, so a label replaces the child <Text> nodes
+          instead of adding to them — "Tap to count one repetition" was the
+          *only* thing announced, which put the mantra and the live count both
+          out of reach. Unlabelled, the mantra, the count and the mala/total
+          summary all speak; the action wording moves to the hint. The count
+          also rides on `accessibilityValue`, deliberately with only the
+          numeric min/now/max: RN folds a `text` member into the view's
+          contentDescription, which would swallow the children all over again.
+          No live region either — an unmanaged one on a counter that ticks
+          every tap is worse than silence.
+        */}
         <Pressable
           style={styles.tapZone}
           onPress={handleTap}
           accessibilityRole="button"
-          accessibilityLabel={t('a11y.tapToCount')}>
+          accessibilityHint={t('a11y.tapToCount')}
+          accessibilityValue={{ min: 0, now: count, max: malaSize }}>
 
           {/* ── Mantra reading area (always visible) ──────────────────────── */}
           <View style={[styles.mantraSection, { paddingHorizontal: spacing.screenH }]}>

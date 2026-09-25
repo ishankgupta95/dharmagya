@@ -1,7 +1,7 @@
 {
   "name": "widget-data",
-  "version": "0.1.0",
-  "description": "Local Expo module: bridges JS to Android SharedPreferences for the Today's Panchang home-screen widget. iOS surface stubbed for follow-up.",
-  "main": "index.ts",
+  "version": "0.2.0",
+  "description": "Local Expo module: bridges JS to the Today's Panchang home-screen widgets' shared storage. Android: a native module writing SharedPreferences (dharmagya_widget_prefs / today_panchang_payload) and pinging the AppWidgetProvider. iOS: no native code here — index.ios.ts writes the App Group UserDefaults through @bacons/apple-targets' ExtensionStorage and reloads the WidgetKit timeline.",
+  "main": "index",
   "private": true
 }

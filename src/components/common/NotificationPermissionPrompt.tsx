@@ -1,4 +1,5 @@
-import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +8,10 @@ import { Icon, type IconName } from './Icon';
 import { MotionPressable } from './MotionPressable';
 import { Ornament } from './Ornament';
 import { useStore } from '@/store/useStore';
+import {
+  ensureNotificationPermission,
+  getNotificationPermissionState,
+} from '@/services/notifications';
 import {
   darkColors,
   lightColors,
@@ -31,6 +36,100 @@ const ICONS: Record<PermissionPromptKind, IconName> = {
   festival: 'star',
 };
 
+/**
+ * The whole "may this notification toggle turn on?" flow, for a screen with
+ * one or more such toggles. Render `prompt` once; call `ensurePermission` from
+ * a toggle's ON handler and only commit the toggle when it resolves true.
+ *
+ * - Granted → true at once.
+ * - The OS can still ask → this editorial pre-prompt first, whose hint
+ *   promises that "the next screen is your phone's permission prompt", then
+ *   the system dialog.
+ * - The OS will not ask again (iOS after one denial, Android 13+ after two, or
+ *   notifications switched off in system settings) → no pre-prompt, since its
+ *   promise would be false; straight to the "Open Settings" alert instead
+ *   (`ensureNotificationPermission`). iOS never shows its dialog a second
+ *   time, so without this a user who once tapped "Don't Allow" had no way
+ *   back from inside the app.
+ *
+ * `granted` is the last known state — read on mount and again whenever the
+ * app returns to the foreground (the only way it can change underneath the
+ * screen is a trip to Settings). A toggle can skip the async check when it is
+ * true and commit in the same tick, so the switch never flickers.
+ */
+export function useNotificationPermissionGate() {
+  const [kind, setKind] = useState<PermissionPromptKind | null>(null);
+  const [granted, setGranted] = useState(false);
+  // Resolver of the pre-prompt currently on screen, so a toggle can `await`
+  // the user's choice.
+  const resolveRef = useRef<((proceed: boolean) => void) | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void getNotificationPermissionState().then((state) => {
+        if (active) setGranted(state.granted);
+      });
+    };
+    refresh();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refresh();
+    });
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, []);
+
+  const close = useCallback((proceed: boolean) => {
+    const resolve = resolveRef.current;
+    resolveRef.current = null;
+    setKind(null);
+    resolve?.(proceed);
+  }, []);
+
+  const ensurePermission = useCallback(
+    async (promptKind: PermissionPromptKind): Promise<boolean> => {
+      const state = await getNotificationPermissionState();
+      if (state.granted) {
+        setGranted(true);
+        return true;
+      }
+      if (state.canPrompt) {
+        // A second toggle while the card is still up settles the first one as
+        // declined rather than leaving its handler waiting forever.
+        resolveRef.current?.(false);
+        const proceed = await new Promise<boolean>((resolve) => {
+          resolveRef.current = resolve;
+          setKind(promptKind);
+        });
+        if (!proceed) return false;
+      }
+      const ok = await ensureNotificationPermission({ promptSettings: true });
+      setGranted(ok);
+      return ok;
+    },
+    [],
+  );
+
+  const prompt = (
+    <NotificationPermissionPrompt
+      visible={kind !== null}
+      kind={kind ?? 'tithi'}
+      onCancel={() => close(false)}
+      onContinue={() => close(true)}
+    />
+  );
+
+  return { granted, ensurePermission, prompt };
+}
+
+/**
+ * Editorial pre-prompt shown before the system notification dialog. Only show
+ * it while the OS can still ask (`NotificationPermissionState.canPrompt`): its
+ * hint says the phone's own prompt comes next, which is false once permission
+ * has been denied for good. `useNotificationPermissionGate` enforces that.
+ */
 export function NotificationPermissionPrompt({
   visible,
   kind,
@@ -97,7 +196,7 @@ export function NotificationPermissionPrompt({
                 style={[styles.btn, styles.btnPrimary, { backgroundColor: colors.accent }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('permissionPrompt.continueBtn')}>
-                <Text variant="mono-caps" style={[styles.btnText, { color: palette.parchmentBright }]}>
+                <Text variant="mono-caps" style={[styles.btnText, { color: palette.night }]}>
                   {t('permissionPrompt.continueBtn')}
                 </Text>
               </MotionPressable>

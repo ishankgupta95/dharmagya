@@ -63,6 +63,13 @@ export const palette = {
   crimsonText:    '#8C1D18',
   crimsonSoft:    '#FFEDEC',
 
+  // Affirmative — the app's single green. One value per ground, used for
+  // every "good/auspicious/visible" signal (ekadashi dot, auspicious flags,
+  // eclipse visibility). 6.32:1 on night, 4.78:1 on rice, 5.23:1 on white.
+  leaf:           '#5DA85D',   // dark-mode affirmative
+  leafDeep:       '#2F7A4F',   // light-mode affirmative
+  leafSoft:       '#E9F3EC',   // light-mode affirmative container
+
   // ── Legacy Sacred Editorial keys (deprecated — nearest Diya equivalent) ──
   // Kept so un-ported call sites compile and pick up the new scheme at once.
   /** @deprecated use `rice` */
@@ -119,6 +126,9 @@ export const darkColors = {
   danger:          palette.rose,
   dangerText:      palette.roseText,
   dangerSurface:   'rgba(210,64,92,0.10)',
+  success:         palette.leaf,
+  successText:     palette.leaf,
+  successSurface:  'rgba(93,168,93,0.10)',
 } as const;
 
 export const lightColors = {
@@ -143,6 +153,9 @@ export const lightColors = {
   danger:          palette.crimson,
   dangerText:      palette.crimsonText,
   dangerSurface:   palette.crimsonSoft,
+  success:         palette.leafDeep,
+  successText:     palette.leafDeep,
+  successSurface:  palette.leafSoft,
 } as const;
 
 // Unchanged from Sacred Editorial — the redesign reuses these hex-for-hex.
@@ -168,10 +181,15 @@ export const deityColors: Record<string, string> = {
   narasimha: '#D4A030',
 };
 
+// Theme-invariant signal colours. These were tuned against the dark ground —
+// only `error` clears AA on both. Use the per-theme `colors.success` /
+// `colors.successText` pair for anything affirmative.
 export const semanticColors = {
+  /** @deprecated theme-invariant, 1.84:1 on rice — use `colors.successText` */
   success: '#5DCAA5',
   error:   '#E24B4A',
   info:    '#4A9EF5',
+  /** @deprecated theme-invariant — use `colors.success` */
   auspicious: '#5DCAA5',
 } as const;
 

@@ -37,7 +37,7 @@ import {
 
 import i18n from '@/i18n';
 import { ALL_DEITIES } from '@/config/deities';
-import { sanitizeBilingual } from '@/utils/sanitizeContent';
+import { poojafy, sanitizeBilingual } from '@/utils/sanitizeContent';
 
 export type {
   Recitation,
@@ -70,6 +70,22 @@ const VERSE_KEY: Record<ContentLang, 'english' | 'hindi'> = {
 };
 
 const APP_DEITY_SLUGS = new Set<string>(ALL_DEITIES.map(d => d.id));
+
+/**
+ * Prepare a library `about` blurb for display: strip the package's
+ * reviewer-facing citation artifacts, then respell the English face to the
+ * app's "Pooja" (many blurbs describe the archana step of a pooja, or name the
+ * festival pooja the litany belongs to). The Devanagari `hi` face is untouched,
+ * and `poojafy` matches plain ASCII only, so IAST passes through unchanged.
+ *
+ * Deliberately NOT applied to aarti/chalisa verses: `verses.english` there is
+ * romanised Hindi lyric, not English prose, and respelling a recited line would
+ * put the reader out of step with what is being sung.
+ */
+function sanitizeAbout<T extends { en: string; hi: string }>(about: T): T {
+  const b = sanitizeBilingual(about);
+  return { ...b, en: poojafy(b.en) };
+}
 
 /** Aartis available in the app (filtered to our roster). */
 export function getAllAppAartis(): Recitation[] {
@@ -166,10 +182,14 @@ export function mantraMeaning(mantra: Mantra, lang: ContentLang): string {
 
 /** The 108-name archana litany for a deity, or `undefined`. Two roster deities
  *  have none by design (vaishno-devi uses the Durga ashtottara; khatu-shyam has
- *  no canonical 108-list), so callers must null-check before rendering. */
+ *  no canonical 108-list), so callers must null-check before rendering. The
+ *  `about` blurb goes through the same boundary sanitiser as the stotra /
+ *  sukta / sahasranama helpers below — most of these blurbs name the pooja the
+ *  litany is recited at, in the library's "puja" spelling. */
 export function getAshtottaraForDeity(deity: string): Ashtottara | undefined {
   if (!APP_DEITY_SLUGS.has(deity)) return undefined;
-  return pkgGetAshtottara(deity as Deity);
+  const a = pkgGetAshtottara(deity as Deity);
+  return a ? { ...a, about: sanitizeAbout(a.about) } : a;
 }
 
 // ─── Daily prayers (Nitya Karma) ──────────────────────────────────────────────
@@ -199,13 +219,13 @@ function deityTagInRoster(item: { deity?: string; deities?: readonly string[] })
 
 // Stotras / ashtakams — slug-keyed hymns (Shiva Tandava, Bajrang Baan, …).
 export function getAllAppStotras(): Stotra[] {
-  return pkgGetAllStotras().filter(deityTagInRoster).map((s) => ({ ...s, about: sanitizeBilingual(s.about) }));
+  return pkgGetAllStotras().filter(deityTagInRoster).map((s) => ({ ...s, about: sanitizeAbout(s.about) }));
 }
 
 export function getStotraBySlug(slug: string): Stotra | undefined {
   try {
     const s = pkgGetStotra(slug as StotraSlug);
-    return s ? { ...s, about: sanitizeBilingual(s.about) } : undefined;
+    return s ? { ...s, about: sanitizeAbout(s.about) } : undefined;
   } catch {
     return undefined;
   }
@@ -213,18 +233,18 @@ export function getStotraBySlug(slug: string): Stotra | undefined {
 
 export function getStotrasForDeity(deity: string): Stotra[] {
   if (!APP_DEITY_SLUGS.has(deity)) return [];
-  return pkgGetStotrasForDeity(deity as Deity).map((s) => ({ ...s, about: sanitizeBilingual(s.about) }));
+  return pkgGetStotrasForDeity(deity as Deity).map((s) => ({ ...s, about: sanitizeAbout(s.about) }));
 }
 
 // Suktas — Vedic hymns (Sri Suktam, Purusha Suktam, Sri Rudram, …); sectioned.
 export function getAllAppSuktas(): Sukta[] {
-  return pkgGetAllSuktas().filter(deityTagInRoster).map((s) => ({ ...s, about: sanitizeBilingual(s.about) }));
+  return pkgGetAllSuktas().filter(deityTagInRoster).map((s) => ({ ...s, about: sanitizeAbout(s.about) }));
 }
 
 export function getSuktaBySlug(slug: string): Sukta | undefined {
   try {
     const s = pkgGetSukta(slug as SuktaSlug);
-    return s ? { ...s, about: sanitizeBilingual(s.about) } : undefined;
+    return s ? { ...s, about: sanitizeAbout(s.about) } : undefined;
   } catch {
     return undefined;
   }
@@ -232,23 +252,23 @@ export function getSuktaBySlug(slug: string): Sukta | undefined {
 
 export function getSuktasForDeity(deity: string): Sukta[] {
   if (!APP_DEITY_SLUGS.has(deity)) return [];
-  return pkgGetSuktasForDeity(deity as Deity).map((s) => ({ ...s, about: sanitizeBilingual(s.about) }));
+  return pkgGetSuktasForDeity(deity as Deity).map((s) => ({ ...s, about: sanitizeAbout(s.about) }));
 }
 
 // Sahasranama — 1000-name litanies (Vishnu, Lalita). Deity-keyed in the lib.
 export function getAllAppSahasranamas(): Sahasranama[] {
   return pkgGetAllSahasranamas()
     .filter((s) => APP_DEITY_SLUGS.has(s.deity))
-    .map((s) => ({ ...s, about: sanitizeBilingual(s.about) }));
+    .map((s) => ({ ...s, about: sanitizeAbout(s.about) }));
 }
 
 export function getSahasranamaBySlug(slug: string): Sahasranama | undefined {
   const s = pkgGetAllSahasranamas().find((x) => x.slug === slug);
-  return s ? { ...s, about: sanitizeBilingual(s.about) } : undefined;
+  return s ? { ...s, about: sanitizeAbout(s.about) } : undefined;
 }
 
 export function getSahasranamaForDeity(deity: string): Sahasranama | undefined {
   if (!APP_DEITY_SLUGS.has(deity)) return undefined;
   const s = pkgGetSahasranama(deity as Deity);
-  return s ? { ...s, about: sanitizeBilingual(s.about) } : undefined;
+  return s ? { ...s, about: sanitizeAbout(s.about) } : undefined;
 }

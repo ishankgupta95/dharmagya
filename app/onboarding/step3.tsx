@@ -35,7 +35,7 @@ function findNearestCity(lat: number, lon: number): City | null {
 
 // Onboarding 4/5 · Location (Diya) — the reason is given before the system
 // dialog appears, and "Choose a city" is offered at equal weight: denying
-// location must not dead-end the app (Skip keeps the Varanasi default).
+// location must not dead-end the app (Skip keeps the Ujjain default).
 export default function OnboardingStep3() {
   const { t } = useTranslation();
   const { setUserLocation, locationName } = useStore();
@@ -60,6 +60,8 @@ export default function OnboardingStep3() {
         const { latitude, longitude } = loc.coords;
         const match = findNearestCity(latitude, longitude);
         const name = match ? `${match.name}, ${match.state}` : t('common.gpsLabel');
+        // No timezone: the device is standing at these coordinates, so its own
+        // per-date offset is the correct one to render the panchang in.
         setUserLocation({ lat: latitude, lon: longitude }, name);
         if (match) maybeAutoSetRegion(match);
         router.push('/onboarding/birth');
@@ -67,6 +69,16 @@ export default function OnboardingStep3() {
         // Denied is fine — the two alternatives stay on screen.
         Alert.alert(t('locationPermission.gpsDenied'), t('locationPermission.gpsDeniedDesc'));
       }
+    } catch {
+      // A rejection here is not a permission problem — location services off,
+      // the system "turn on location" dialog dismissed, or no fix obtainable.
+      // Unhandled it just stopped the spinner and left the step looking dead.
+      Alert.alert(
+        t('locationPermission.gpsFailed', { defaultValue: "Couldn't get your location" }),
+        t('locationPermission.gpsFailedDesc', {
+          defaultValue: 'Try again, or choose your city below.',
+        }),
+      );
     } finally {
       setGpsLoading(false);
     }
@@ -76,9 +88,15 @@ export default function OnboardingStep3() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       {/* Onboarding always renders on the night ground */}
       <StatusBar style="light" />
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Bounded rather than absoluteFill — same reason as step 1: an <Svg>
+          root costs a retained full-size ARGB_8888 bitmap plus a software fill
+          over every pixel of it. This glow is centred at 32% with a vertical
+          radius of 34%, so it never reaches past y = 66%; the box is cut to
+          that and cy/ry re-expressed as fractions OF THAT BOX (32/66, 34/66),
+          which leaves the ellipse pixel-identical. */}
+      <Svg style={styles.wash} pointerEvents="none">
         <Defs>
-          <SvgRadialGradient id="locGlow" cx="50%" cy="32%" rx="70%" ry="34%">
+          <SvgRadialGradient id="locGlow" cx="50%" cy="48.48%" rx="70%" ry="51.52%">
             <Stop offset="0" stopColor={palette.turmeric} stopOpacity={0.16} />
             <Stop offset="1" stopColor={palette.turmeric} stopOpacity={0} />
           </SvgRadialGradient>
@@ -145,6 +163,9 @@ export default function OnboardingStep3() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: onb.base },
+
+  // Height is the glow's own reach (cy 32% + ry 34%) — see the call site.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: '66%' },
 
   content: { flex: 1, paddingTop: 20 },
   iconBadge: {

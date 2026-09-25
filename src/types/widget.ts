@@ -1,101 +1,99 @@
 /**
- * Payload written from JS into native shared storage (Android SharedPreferences,
- * iOS App Groups). The widget process reads only what's here — never calls
- * panchang-ts directly.
+ * Payload written from JS into native shared storage and read by the
+ * home-screen widgets:
  *
- * All fields are pre-formatted strings so the native widget code stays dumb.
- * Numbers are intentionally avoided — locale-specific number rendering
- * (Devanagari numerals) is resolved on the JS side before write.
+ *   Android — SharedPreferences `dharmagya_widget_prefs` / `today_panchang_payload`
+ *   iOS     — UserDefaults(suiteName: "group.com.ishank1995.dharmagya"), same key
+ *
+ * The widget process reads only what's here — it never calls panchang-ts.
+ * Every field is a pre-formatted string so the native renderers stay dumb:
+ * native never formats a number or a date, never uppercases Devanagari, and
+ * never splits or re-assembles an `until` string. Locale-specific digits
+ * (Devanagari numerals) are resolved on the JS side before the write.
+ *
+ * Schema v3: two days — `[today, tomorrow]` — each carrying its own
+ * device-local `ymd` so the renderers pick the right day at draw time
+ * (FRESH / ROLLED / STALE) without any scheduled refresh.
  */
 export interface WidgetSlot {
-  /** Field ID from the widget catalog (tithi/yoga/sunset/...). Used only for
-   *  diagnostics — native side acts on label/value/until directly. */
+  /** Field ID from the widget catalog (tithi/yoga/sunset/...). Diagnostics
+   *  only — native acts on label/value/until directly. */
   id: string;
-  /** Already-localised slot kicker (e.g. "Tithi" / "तिथि"). Native uppercases. */
+  /** Already-localised slot kicker in Title Case (e.g. "Tithi" / "तिथि").
+   *  Native uppercases Latin kickers; Devanagari is left as-is. */
   label: string;
   /** Already-localised + digit-converted primary value (e.g. "Krishna Panchami",
    *  "5:48 AM", "4:30 PM – 6:00 PM"). */
   value: string;
   /** Optional end-time annotation for elements that expire (tithi, nakshatra,
-   *  yoga, karana). Already prefixed with the localised "until" word. Null
-   *  when the field is fixed (sunrise, vara) or end-time isn't applicable. */
+   *  yoga, karana), already in the language's word order ("until 6:12 PM" /
+   *  "६:१२ PM तक"). Null when the field is fixed (sunrise, vara) or an
+   *  end-time isn't applicable. */
   until: string | null;
 }
 
-export interface WidgetPayload {
-  /** Schema version. v=2 introduced the slot-based layout. Native side reads
-   *  defensively and falls back to "—" for unrecognised shapes. */
-  v: 2;
-  /** ISO YYYY-MM-DD of the day the snapshot was computed for. */
+export interface WidgetDay {
+  /** Device-local YYYY-MM-DD of this day. Renderers compare it with the
+   *  device's local date at draw time to decide today / rolled / stale. */
   ymd: string;
-  /** Wallclock timestamp ms when this snapshot was written. */
-  writtenAtMs: number;
-  /** 'en' or 'hi'. The widget reads this and renders strings as-is. */
-  lang: 'en' | 'hi';
-  /** Localised display label for the widget header (e.g. "Today" / "आज"). */
-  todayLabel: string;
-  /** Long date string (e.g. "Wed, 6 May 2026" / "बुध, ६ मई २०२६"). */
+  /** Long date string (e.g. "Sat, 20 Sep 2026" / "शनि, २० सित॰ २०२६"). */
   dateLong: string;
-  /** Four user-configurable info slots. Indices 0–1 render in the main rows
-   *  with kicker + value + optional `until`; indices 2–3 render as a 2-column
-   *  footer with kicker + value (no `until`). */
+  /** Short date string without the year (e.g. "Sat, 20 Sep" / "शनि, २० सित॰"). */
+  dateShort: string;
+  /** Four user-configurable info slots (settings/widget). Indices 0–1 render
+   *  as the main rows with kicker + value + optional `until`; indices 2–3
+   *  render as a two-column footer with kicker + value (no `until`). */
   slots: [WidgetSlot, WidgetSlot, WidgetSlot, WidgetSlot];
-  /** Optional location label (e.g. "Pune") shown on medium widget when present. */
-  locationLabel: string | null;
-  /** Resolved theme mirror — Kotlin picks light vs dark colors at render time. */
-  isDarkMode: boolean;
-
-  // ─── v1 legacy fields ──────────────────────────────────────────────────
-  // The prebuild plugin scaffold (plugins/withTodayPanchangWidget.js) still
-  // reads the v1 flat schema — `tithiName` / `nakshatraName` / `sunrise` /
-  // `rahuKalam` plus a `labels` object — directly from SharedPreferences.
-  // We emit both shapes so whichever native Kotlin ships in a given build
-  // can render real values. Drop these only after the plugin templates are
-  // migrated to read `slots[]`.
-  tithiName: string;
-  tithiEndTime: string;
-  nakshatraName: string;
-  nakshatraEndTime: string;
-  sunrise: string;
-  rahuKalam: string;
-  labels: {
-    tithi: string;
-    nakshatra: string;
-    sunrise: string;
-    rahuKalam: string;
-    until: string;
-  };
 }
 
-const PLACEHOLDER_SLOTS: WidgetPayload['slots'] = [
-  { id: 'tithi', label: 'Tithi', value: '—', until: null },
-  { id: 'nakshatra', label: 'Nakshatra', value: '—', until: null },
-  { id: 'sunrise', label: 'Sunrise', value: '—', until: null },
-  { id: 'rahuKalam', label: 'Rahu Kalam', value: '—', until: null },
-];
+/** Mirrors the store's `themeMode`. 'system' lets the widget follow the
+ *  platform scheme at render time; the explicit values force a register. */
+export type WidgetTheme = 'system' | 'light' | 'dark';
 
-/** Sentinel payload rendered when no panchang data has ever been written. */
-export const WIDGET_PLACEHOLDER: WidgetPayload = {
-  v: 2,
-  ymd: '',
-  writtenAtMs: 0,
-  lang: 'en',
-  todayLabel: 'Today',
-  dateLong: '—',
-  slots: PLACEHOLDER_SLOTS,
-  locationLabel: null,
-  isDarkMode: true,
-  tithiName: '—',
-  tithiEndTime: '',
-  nakshatraName: '—',
-  nakshatraEndTime: '',
-  sunrise: '—',
-  rahuKalam: '—',
-  labels: {
-    tithi: 'Tithi',
-    nakshatra: 'Nakshatra',
-    sunrise: 'Sunrise',
-    rahuKalam: 'Rahu Kalam',
-    until: 'until',
-  },
-};
+export interface WidgetPayload {
+  /** Schema version. v3 introduced the two-day `days[]` array and dropped the
+   *  v1 flat keys (`tithiName` / `nakshatraName` / `sunrise` / `rahuKalam` /
+   *  `labels` / top-level `dateLong`). Nothing reads them any more: the
+   *  Android Kotlin written by `plugins/withTodayPanchangWidget.js` and the
+   *  WidgetKit decoder in `targets/widget/PanchangPayload.swift` both read
+   *  `days[]` / `slots[]` only and render `v < 3` as EMPTY. Those renderers
+   *  ship in the same native build as this JS (CNG regenerates the Kotlin at
+   *  prebuild; there is no OTA update channel), so an older v1 reader can
+   *  never be handed a v3 payload. Do not re-add the flat keys unless the
+   *  plugin is rolled back to a v1 reader.
+   *
+   *  Release gate: that guarantee only holds while this builder, the plugin
+   *  and `targets/widget` land in the same commit and the same native build.
+   *  A dev client prebuilt before the v3 plugin shows a blank widget with
+   *  this JS until it is rebuilt, and if an OTA channel (`expo-updates`) is
+   *  ever added, bump `runtimeVersion` with any payload schema change. */
+  v: 3;
+  /** Wallclock timestamp ms when this snapshot was written. */
+  writtenAtMs: number;
+  /** 'en' or 'hi'. Renderers render strings as-is; script decisions
+   *  (serif twin, uppercasing, tracking) are per string, not per language. */
+  lang: 'en' | 'hi';
+  /** Theme preference — see WidgetTheme. */
+  theme: WidgetTheme;
+  /** Resolved theme mirror kept for v2 readers only; v3 renderers ignore it
+   *  and derive the colour register from `theme`. */
+  isDarkMode: boolean;
+  /** Localised header kicker for today (e.g. "Today" / "आज"). */
+  todayLabel: string;
+  /** Localised kicker for the tomorrow block ("Tomorrow" / "कल"). */
+  tomorrowLabel: string;
+  /** Replaces `todayLabel` when neither day matches the device date
+   *  ("Out of date" / "पुराना डेटा"). */
+  staleLabel: string;
+  /** Accessibility label of the Android refresh chip ("Refresh widget" /
+   *  "विजेट रिफ्रेश करें"). */
+  refreshLabel: string;
+  /** Body line shown in place of the tomorrow block when it has no data
+   *  ("Open Dharmagya to update" / "अपडेट के लिए धर्मज्ञ खोलें"). */
+  openToUpdateLabel: string;
+  /** Optional location label (e.g. "Pune") appended to today's header meta. */
+  locationLabel: string | null;
+  /** Exactly two entries: `[today, tomorrow]` as of `writtenAtMs`. Always
+   *  two — a failed compute still emits its day with "—" values. */
+  days: [WidgetDay, WidgetDay];
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +29,7 @@ import {
   computeGhatasthapanaMuhurat,
   formatMuhuratRange,
   formatNavratriDayLabel,
+  navratriDayYmd,
   nextNavratri,
   type GhatasthapanaMuhurat,
   type NavratriDay,
@@ -78,9 +79,16 @@ export default function NavratriGuideScreen() {
   }, [kind, userLocation, ayanamsa, masaSystem]);
 
   const [selectedDay, setSelectedDay] = useState<1|2|3|4|5|6|7|8|9>(pickInitialDay(window));
-  useEffect(() => {
+  // Re-seed the picker when the window changes (kind toggle, or a location /
+  // ayanamsa / masa change). Adjusted during render — React's "adjusting
+  // state when a prop changes" — guarded by the previous window, so the new
+  // day is in the same commit as the new window rather than one effect later.
+  // On mount the two are equal and nothing runs.
+  const [prevWindow, setPrevWindow] = useState(window);
+  if (window !== prevWindow) {
+    setPrevWindow(window);
     setSelectedDay(pickInitialDay(window));
-  }, [window]);
+  }
 
   const masaInfo = getNavratriMasa(kind);
   const isGupt = !masaInfo.fullGuide;
@@ -196,7 +204,10 @@ export default function NavratriGuideScreen() {
                 userLocation={userLocation}
                 masaSystem={masaSystem}
                 ayanamsa={ayanamsa}
-                vijayadashami={window.vijayadashami}
+                // Only Sharad has a named Day 10. The card's copy is
+                // Sharad-specific (Durga visarjan, Ravan Dahan, Shami
+                // Pujan), so Chaitra gets null and renders nothing.
+                vijayadashami={window.kind === 'sharad' ? window.vijayadashami : null}
                 lang={lang}
                 colors={colors}
                 isDarkMode={isDarkMode}
@@ -271,7 +282,8 @@ interface DayCardProps {
   userLocation: { lat: number; lon: number } | null;
   masaSystem: 'purnimanta' | 'amanta';
   ayanamsa: import('panchang-ts').AyanamsaType;
-  vijayadashami: Date;
+  /** Null for kinds with no named Day 10 — the card is skipped. */
+  vijayadashami: Date | null;
   lang: Lang;
   colors: ColorPalette;
   isDarkMode: boolean;
@@ -360,7 +372,7 @@ function DayCard({
           <Icon name="flower" size={14} color={palette.night} />
           <Text variant="mono-caps" style={styles.jaapBtnText}>{t('navratri.startJaap')}</Text>
         </MotionPressable>
-        <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
+        <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
           {t('navratri.mantraReviewNote')}
         </Text>
       </View>
@@ -376,6 +388,12 @@ function DayCard({
         <Text variant="body" style={[styles.mantraMeaning, { color: colors.textSecondary }]}>
           {form.dhyana.meaning[lang]}
         </Text>
+        {/* The dhyana renders its own IAST line, so it carries its own copy of
+            the provisional-transliteration caption rather than leaning on the
+            mantra card's — the caption belongs everywhere they render. */}
+        <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
+          {t('navratri.mantraReviewNote')}
+        </Text>
       </SectionCard>
 
       {/* ── Bhog ──────────────────────────────────────────────────────── */}
@@ -389,23 +407,34 @@ function DayCard({
       </SectionCard>
 
       {/* ── Day 1: Ghatasthapana muhurat ──────────────────────────────── */}
-      {isFirstDay && ghatasthapana && (
+      {/* The card stays on Day 1 even when no window could be published — it is
+          the only entry point to the Ghatasthapana pooja vidhi, and Day 1 is the
+          one day that rite matters. Only the window itself is conditional. */}
+      {isFirstDay && (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Kicker color={colors.accentText} size={10}>{t('navratri.ghatasthapanaLabel')}</Kicker>
-          <Text variant="display-italic" style={[styles.muhuratWindow, { color: colors.textPrimary }]}>
-            {formatMuhuratRange(ghatasthapana.start, ghatasthapana.end)}
-          </Text>
-          {ghatasthapana.isAbhijitFallback && (
+          {ghatasthapana ? (
+            <>
+              <Text variant="display-italic" style={[styles.muhuratWindow, { color: colors.textPrimary }]}>
+                {formatMuhuratRange(ghatasthapana.startLocal, ghatasthapana.endLocal)}
+              </Text>
+              {ghatasthapana.isAbhijitFallback && (
+                <Text variant="body-italic" style={[styles.muhuratNote, { color: colors.textSecondary }]}>
+                  {t('navratri.ghatasthapanaAbhijitFallback')}
+                </Text>
+              )}
+              {!ghatasthapana.isAbhijitFallback && (
+                <Text variant="body-italic" style={[styles.muhuratNote, { color: colors.textMuted }]}>
+                  {t('navratri.ghatasthapanaWindowNote')}
+                </Text>
+              )}
+            </>
+          ) : (
             <Text variant="body-italic" style={[styles.muhuratNote, { color: colors.textSecondary }]}>
-              {t('navratri.ghatasthapanaAbhijitFallback')}
+              {t('navratri.ghatasthapanaNoWindow')}
             </Text>
           )}
-          {!ghatasthapana.isAbhijitFallback && (
-            <Text variant="body-italic" style={[styles.muhuratNote, { color: colors.textMuted }]}>
-              {t('navratri.ghatasthapanaWindowNote')}
-            </Text>
-          )}
-          {(ghatasthapana.warnings.chitra || ghatasthapana.warnings.vaidhriti) && (
+          {ghatasthapana && (ghatasthapana.warnings.chitra || ghatasthapana.warnings.vaidhriti) && (
             <View style={[styles.warningRow, { borderColor: colors.borderAccent }]}>
               <Icon name="info-circle" size={14} color={colors.accent} />
               <Text variant="body-italic" style={[styles.warningText, { color: colors.textSecondary }]}>
@@ -452,12 +481,20 @@ function DayCard({
         </MotionPressable>
       )}
 
-      {/* ── Day 9: Vijayadashami / Dussehra preview ───────────────────── */}
-      {day.day === 9 && (
+      {/* ── Day 9: Vijayadashami / Dussehra preview (Sharad only) ───────
+          Dussehra can fall on Day 9's own civil date (4 of the 8 shipped
+          years — in 2028 the table itself puts Maha Navami and Dussehra on one
+          day), and "Day 10 — Wed, 27 Sep" under a card headed Day 9 dated
+          Wed 27 Sep contradicts itself. Say "also today" instead. */}
+      {day.day === 9 && vijayadashami && (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Kicker color={colors.accentText} size={10}>{t('navratri.vijayadashamiLabel')}</Kicker>
           <Text variant="body" style={[styles.paragraph, { color: colors.textSecondary, marginTop: 10 }]}>
-            {t('navratri.vijayadashamiText', { date: formatNavratriDayLabel(vijayadashami, lang) })}
+            {navratriDayYmd(vijayadashami) === navratriDayYmd(day.date)
+              ? t('navratri.vijayadashamiToday', {
+                  defaultValue: 'Vijayadashami / Dussehra also falls today.',
+                })
+              : t('navratri.vijayadashamiText', { date: formatNavratriDayLabel(vijayadashami, lang) })}
           </Text>
         </View>
       )}

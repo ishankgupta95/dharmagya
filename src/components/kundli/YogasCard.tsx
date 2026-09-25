@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { Yoga, YogaType } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
-import { borderRadius, palette, type ColorPalette } from '@/config/theme';
+import { borderRadius, type ColorPalette } from '@/config/theme';
 
 interface YogasCardProps {
   yogas: Yoga[];
@@ -79,7 +79,14 @@ interface YogaRowProps {
 }
 
 function YogaRow({ yoga, colors }: YogaRowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // `computeYogas` takes no language option, so `reasons` / `bhanga.reasons`
+  // are English sentences on a Hindi chart — with a Devanagari rashi spliced
+  // mid-sentence ("Saturn in मकर in both D1 and D9"), which reads worse than
+  // either language alone. Suppress them rather than print half-translated
+  // prose under a fully translated card; the yoga name, the type kicker and
+  // the cancelled tag still carry the verdict.
+  const showLibraryProse = i18n.language !== 'hi';
   // Negative + cancellation yogas read in a muted/warning tone; everything
   // else uses the regular accent. Yoga names are intentionally not
   // locale-resolved (library convention — proper nouns). When the library
@@ -89,7 +96,11 @@ function YogaRow({ yoga, colors }: YogaRowProps) {
   // yoga is matched but cancelled by X" at a glance.
   const isNegative = yoga.type === 'negative';
   const bhangaApplies = yoga.bhanga?.applies === true;
-  const accent = isNegative || bhangaApplies ? palette.sindoor : palette.goldLeaf;
+  // Per-theme ink, not fixed hexes: `palette.sindoor` is the light-mode accent
+  // ink and was 2.56:1 on the dark card, `palette.goldLeaf` is the turmeric
+  // fill and was 2.29:1 on the light one. The bullet is a 6px mark (3:1 floor)
+  // and the tag/kicker are 8–9px text (4.5:1) — both failed on one ground.
+  const accent = isNegative || bhangaApplies ? colors.dangerText : colors.accentText;
   return (
     <View style={styles.row}>
       <View style={[styles.bullet, { backgroundColor: accent }]} />
@@ -107,14 +118,14 @@ function YogaRow({ yoga, colors }: YogaRowProps) {
             {yoga.name}
           </Text>
           {bhangaApplies && (
-            <View style={[styles.bhangaTag, { borderColor: palette.sindoor }]}>
-              <Text variant="mono-caps" style={[styles.bhangaTagText, { color: palette.sindoor }]}>
+            <View style={[styles.bhangaTag, { borderColor: colors.dangerText }]}>
+              <Text variant="mono-caps" style={[styles.bhangaTagText, { color: colors.dangerText }]}>
                 {t('kundli.yogas.bhangaTag')}
               </Text>
             </View>
           )}
         </View>
-        {yoga.reasons.map((r, i) => (
+        {showLibraryProse && yoga.reasons.map((r, i) => (
           <Text
             key={i}
             variant="body-italic"
@@ -122,9 +133,9 @@ function YogaRow({ yoga, colors }: YogaRowProps) {
             {r}
           </Text>
         ))}
-        {bhangaApplies && yoga.bhanga && (
+        {bhangaApplies && yoga.bhanga && showLibraryProse && (
           <View style={styles.bhangaBlock}>
-            <Text variant="mono-caps" style={[styles.bhangaKicker, { color: palette.sindoor }]}>
+            <Text variant="mono-caps" style={[styles.bhangaKicker, { color: colors.dangerText }]}>
               {t('kundli.yogas.bhangaCancelled')}
             </Text>
             {yoga.bhanga.reasons.map((r, i) => (

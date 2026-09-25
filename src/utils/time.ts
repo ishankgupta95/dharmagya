@@ -5,6 +5,39 @@
  */
 export const DEFAULT_BIRTH_TIMEZONE = 'Asia/Kolkata';
 
+/**
+ * The device's own IANA timezone, falling back to `DEFAULT_BIRTH_TIMEZONE`
+ * when `Intl` is unavailable or returns nothing usable (some Hermes bundle
+ * configs ship without full ICU). Use this only where the user is asserting
+ * that a place *is* where they are now — never as a stand-in for a place they
+ * merely picked off the city list.
+ */
+export function deviceTimezone(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) return tz;
+  } catch {
+    /* fall through */
+  }
+  return DEFAULT_BIRTH_TIMEZONE;
+}
+
+/**
+ * UTC offset in minutes east for an IANA zone at a given instant, or `null`
+ * when the zone cannot be resolved. `Asia/Kolkata` short-circuits to +05:30
+ * because IST has never observed DST — that keeps `Intl` off the panchang hot
+ * path entirely for the curated (India-only) city list, and `Intl` with a
+ * `timeZone` is not guaranteed to be present in every Hermes bundle config.
+ */
+export function offsetMinutesForZone(timezone: string, at: Date): number | null {
+  if (timezone === DEFAULT_BIRTH_TIMEZONE) return 330;
+  try {
+    return offsetMinutesAt(timezone, at.getTime());
+  } catch {
+    return null;
+  }
+}
+
 function offsetMinutesAt(timezone: string, utcMs: number): number {
   const dtf = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,

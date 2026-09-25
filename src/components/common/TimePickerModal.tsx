@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 
 import { AppText as Text } from './AppText';
 import { borderRadius, darkColors, lightColors, palette, spacing } from '@/config/theme';
@@ -50,10 +51,17 @@ function IosTimePicker({ visible, onClose, value, onPick, title, is24Hour }: Tim
   const isDark = useStore((s) => s.isDarkMode);
   const colors = isDark ? darkColors : lightColors;
   const [draft, setDraft] = useState<Date>(() => hhmmToDate(value));
-
-  useEffect(() => {
+  // Re-seed the wheel when the sheet opens, or when the bound `value` changes
+  // while it is open — React's "adjust state when a prop changes" pattern,
+  // done during render (React re-renders right away, no effect round-trip) by
+  // comparing against the last-seen `{ visible, value }`. The trigger set is
+  // deliberately the old effect's `[visible, value]`; `value` is an `HH:mm`
+  // string here, so a mid-open reset only happens on a real time change.
+  const [seen, setSeen] = useState({ visible, value });
+  if (seen.visible !== visible || seen.value !== value) {
+    setSeen({ visible, value });
     if (visible) setDraft(hhmmToDate(value));
-  }, [visible, value]);
+  }
 
   function handleChange(_event: DateTimePickerEvent, selected?: Date) {
     if (selected) setDraft(selected);
@@ -134,6 +142,18 @@ function AndroidTimePicker({ visible, onClose, value, onPick, is24Hour }: TimePi
   );
 }
 
+// Bottom padding for the iOS sheet: 28pt of breathing room, or the window's
+// bottom safe-area inset + 12 when that is larger, so Done clears the 34pt
+// home indicator (audit L-02). Read from the window metrics rather than
+// `useSafeAreaInsets()`: this sheet also opens from inside NativeTabs, whose
+// per-tab SafeAreaProvider reports the tab bar's height as the bottom inset,
+// but a Modal is presented over the bar, so the window inset is the right one.
+// A launch-time constant is safe — the app is portrait-only on iPhone and
+// iPad's bottom inset does not change with orientation. Android never renders
+// this sheet (it gets the system dialog), so the edge-to-edge nav-bar inset
+// cannot double-pad it.
+const SHEET_PADDING_BOTTOM = Math.max(28, (initialWindowMetrics?.insets.bottom ?? 0) + 12);
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -146,7 +166,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
     paddingTop: 24,
-    paddingBottom: 28,
+    paddingBottom: SHEET_PADDING_BOTTOM,
     paddingHorizontal: spacing.screenH,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },

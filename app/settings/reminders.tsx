@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ScrollView, Switch, StyleSheet, Alert } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, ScrollView, Switch, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -17,10 +17,7 @@ import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
-import {
-  NotificationPermissionPrompt,
-  type PermissionPromptKind,
-} from '@/components/common/NotificationPermissionPrompt';
+import { useNotificationPermissionGate } from '@/components/common/NotificationPermissionPrompt';
 import { useLocaleFormatters } from '@/utils/format';
 
 const TITHI_KEYS: TithiReminderKey[] = ['ekadashi', 'pradosha', 'purnima', 'amavasya', 'sankashti', 'shivaratri'];
@@ -56,43 +53,34 @@ export default function RemindersScreen() {
   const setFestivalReminderTime = useStore(s => s.setFestivalReminderTime);
   const { formatTime: formatDisplayTime } = useLocaleFormatters();
 
+  // Quiet hours are edited in Settings, but this screen re-schedules the whole
+  // reminder horizon on mount and after every toggle — so it has to apply the
+  // same shift the root layout does, or a visit here silently rewrites the
+  // schedule with the quiet window dropped.
+  const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
+  const quietHoursStart = useStore(s => s.quietHoursStart);
+  const quietHoursEnd = useStore(s => s.quietHoursEnd);
+  const quietHours = useMemo(
+    () => ({ enabled: quietHoursEnabled, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }),
+    [quietHoursEnabled, quietHoursStart, quietHoursEnd],
+  );
+
   const [tithiTimePickerOpen, setTithiTimePickerOpen] = useState(false);
   const [festivalTimePickerOpen, setFestivalTimePickerOpen] = useState(false);
 
-  // Permission pre-prompt: when the user flips a reminder ON for the first
-  // time we show an editorial card explaining what they'll receive before the
-  // OS dialog appears. The ref holds the resolver of an in-flight prompt so
-  // toggles can `await` the user's choice.
-  const [prePromptKind, setPrePromptKind] = useState<PermissionPromptKind | null>(null);
-  const prePromptResolveRef = useRef<((proceed: boolean) => void) | null>(null);
-
-  const ensurePermissionWithPreprompt = useCallback(
-    async (kind: PermissionPromptKind): Promise<boolean> => {
-      const { hasNotificationPermission, requestNotificationPermission } =
-        await import('@/services/notifications');
-      if (await hasNotificationPermission()) return true;
-
-      const proceed = await new Promise<boolean>((resolve) => {
-        prePromptResolveRef.current = resolve;
-        setPrePromptKind(kind);
-      });
-      if (!proceed) return false;
-
-      const granted = await requestNotificationPermission();
-      if (!granted) {
-        Alert.alert(t('settings.permissionRequired'), t('settings.permissionRequiredDesc'));
-      }
-      return granted;
-    },
-    [t],
-  );
-
-  const closePrePrompt = useCallback((proceed: boolean) => {
-    const resolve = prePromptResolveRef.current;
-    prePromptResolveRef.current = null;
-    setPrePromptKind(null);
-    resolve?.(proceed);
-  }, []);
+  // Permission: every OFF → ON flip goes through the gate unless the last
+  // known state is already "granted" — not just the first reminder. It used to
+  // be checked only while no reminder was on, so once notifications had been
+  // switched off in the system Settings, turning on a second reminder
+  // "worked" here while nothing could ever fire. The gate shows the editorial
+  // pre-prompt and the OS dialog while the OS can still ask, and an "Open
+  // Settings" alert once it can't (iOS never asks twice). The toggle only
+  // commits on a grant, so a refusal leaves the switch off.
+  const {
+    granted: notificationsGranted,
+    ensurePermission,
+    prompt: permissionPrompt,
+  } = useNotificationPermissionGate();
 
   // Navratri context — `prefs.festival.major` triggers the 9-day Navratri
   // sequence, which needs panchang-compute inputs.
@@ -110,7 +98,7 @@ export default function RemindersScreen() {
         void rescheduleReminders(
           prefs,
           { tithi: tithiReminderTime, festival: festivalReminderTime },
-          undefined,
+          quietHours,
           { coords: userLocation, ayanamsa, masaSystem },
         );
       } else {
@@ -120,21 +108,15 @@ export default function RemindersScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [prefs, tithiReminderTime, festivalReminderTime, userLocation, ayanamsa, masaSystem]);
+  }, [prefs, tithiReminderTime, festivalReminderTime, quietHours, userLocation, ayanamsa, masaSystem]);
 
   async function handleTithiToggle(key: TithiReminderKey, val: boolean) {
-    if (val && !hasAnyReminderEnabled(prefs)) {
-      const ok = await ensurePermissionWithPreprompt('tithi');
-      if (!ok) return;
-    }
+    if (val && !notificationsGranted && !(await ensurePermission('tithi'))) return;
     setTithi(key, val);
   }
 
   async function handleFestivalToggle(key: FestivalReminderKey, val: boolean) {
-    if (val && !hasAnyReminderEnabled(prefs)) {
-      const ok = await ensurePermissionWithPreprompt('festival');
-      if (!ok) return;
-    }
+    if (val && !notificationsGranted && !(await ensurePermission('festival'))) return;
     setFestival(key, val);
   }
 
@@ -234,12 +216,7 @@ export default function RemindersScreen() {
         title={t('reminders.festivalTimePickerTitle')}
       />
 
-      <NotificationPermissionPrompt
-        visible={prePromptKind !== null}
-        kind={prePromptKind ?? 'tithi'}
-        onCancel={() => closePrePrompt(false)}
-        onContinue={() => closePrePrompt(true)}
-      />
+      {permissionPrompt}
     </SafeAreaView>
     </ScreenMount>
   );

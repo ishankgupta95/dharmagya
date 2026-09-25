@@ -76,7 +76,12 @@ export const AppText = memo(function AppText({ style, variant, ...props }: AppTe
   }, [variant, style]);
 
   if (scale === 1) {
-    return <Text style={mergedStyle} {...props} />;
+    // Android defaults to BREAK_STRATEGY_HIGH_QUALITY, which runs an optimal
+    // (whole-paragraph) line breaker. Almost everything here is a short label
+    // or a body paragraph where the greedy breaker is visually identical, so
+    // "simple" is the right default. Placed BEFORE the spread so a call site
+    // that genuinely wants balanced breaking can still pass its own value.
+    return <Text textBreakStrategy="simple" style={mergedStyle} {...props} />;
   }
 
   const flat = StyleSheet.flatten(mergedStyle) ?? {};
@@ -92,5 +97,5 @@ export const AppText = memo(function AppText({ style, variant, ...props }: AppTe
     ...(scaledLineHeight !== undefined ? { lineHeight: scaledLineHeight } : {}),
   };
 
-  return <Text style={scaledStyle} {...props} />;
+  return <Text textBreakStrategy="simple" style={scaledStyle} {...props} />;
 });

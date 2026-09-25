@@ -1,14 +1,15 @@
 import {
+  computeEclipsesInRange,
   getInstantPanchang,
-  getUpcomingSolarEclipse,
-  getUpcomingLunarEclipse,
+  getSunrise,
   PanchangError,
   type AyanamsaType,
   type FestivalInfo,
   type FestivalRegion,
 } from 'panchang-ts';
 
-import festivalsData from '@/data/festivals';
+import festivalsData, { festivalsForDay } from '@/data/festivals';
+import { pickHeadlineMajor } from '@/utils/festivalHeadline';
 import { pmark, ptime } from '@/utils/perfProfile';
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ export interface CalendarFestival {
  */
 export interface CalendarDay {
   date: Date;
-  /** Lunar day index, 0..29 across the synodic month. */
+  /** Lunar day index, 0..29 across the synodic month. `-1` on compute failure. */
   tithi: number;
   paksha: 'shukla' | 'krishna';
   /** Sunrise-time nakshatra name (already sampled by `buildDay`). Empty on
@@ -49,13 +50,14 @@ export interface CalendarDay {
   eclipse: 'solar' | 'lunar' | null;
   /** True when any festival on this day matches a slug in `selectedDeities`. */
   isUserDeityFestival: boolean;
-  /** Generic tithi name for the day, e.g. "Pratipada", "Purnima", "Amavasya". */
+  /** Generic tithi name for the day, e.g. "Pratipada", "Purnima", "Amavasya".
+   *  Empty on compute failure, same as `nakshatra` / `yoga`. */
   tithiName: string;
   /**
    * Highest-priority event label for the cell's third line. Major festival
    * name when present (e.g. "Holi", "Rama Navami"); else specific Sankranti
    * /Ekadashi name; else "Purnima" / "Amavasya" / "Pradosh"; else the generic
-   * `tithiName`. Always non-empty.
+   * `tithiName`. Empty only when the day's snapshot failed to compute.
    */
   primaryEventName: string;
   /**
@@ -89,38 +91,102 @@ export interface CalendarMonth {
 }
 
 export interface CalendarMonthOptions {
+  /** Scopes region-specific festivals (Pongal, Lohri, Gudi Padwa, Bihu, …).
+   *  The bundled table is generated at `'all'`, so this is applied per row at
+   *  read time via `festivalsForDay`. `'all'` keeps every regional variant. */
   region: FestivalRegion;
   ayanamsa: AyanamsaType;
   /** Deity slugs the user has marked as Isht; festivals matching these get
    *  `isUserDeityFestival: true`. */
   selectedDeities: string[];
   /** purnimanta (default — North Indian) vs amanta (South Indian). Drives the
-   *  Hindu-month label shown in the calendar header. */
+   *  Hindu-month label shown in the calendar header, and — since panchang-ts
+   *  5.4 — the days of the month-system-dependent observances (Shravan Somvar,
+   *  Mangala Gauri, Kartik Somvar, Magha Shanivar) via `festivalsForDay`. */
   masaSystem: 'purnimanta' | 'amanta';
 }
 
-// ─── Festival index (built once at module load) ──────────────────────────────
-// `festivalsData` is the panchang-ts bundled festival table, year-keyed (see
+// ─── Festival index (built lazily, one civil year at a time) ─────────────────
+// `festivalsData` is the panchang-ts festival table, year-keyed (see
 // `src/data/festivals.ts`). Flatten into a single `Map<YYYY-MM-DD, row>` so
 // per-cell lookup is O(1). Eclipses are not in this table (the lib excludes
 // them — visibility is location-dependent); they're sourced live per-month via
 // `eclipsesForCells` below.
+//
+// WHY LAZY, AND WHY IT MATTERS HERE SPECIFICALLY. `src/data/festivals.ts`
+// decodes its rows per year on first access and caches them, so nothing pays
+// for a year it never reads. This module used to defeat that entirely: it built
+// the flat index in a module-scope IIFE that walked `Object.keys(FESTIVAL_DATA)`,
+// and the proxy's `ownKeys` trap has to decode EVERY year to answer that (8
+// years / ~1,250 rows as shipped). `app/(tabs)/panchang.tsx` imports this module
+// statically, so the (tabs) layout pulled the whole decode onto the pre-paint
+// tick — the deferral existed on paper only.
+//
+// So ingest per year, on demand, driven by the dates actually looked up. A
+// 42-cell month grid spans at most two civil years, so a cold Panchang open
+// decodes 1–2 years instead of all 8, and that stays true as the table's rolling
+// window grows. Rows are keyed by `row.date` (not by the year key they arrived
+// under), so ingesting a year can only ever ADD entries the old flat map also
+// had — contents are identical once the same years are in.
 
 interface FestivalJsonRow {
   date: string;
-  festivals: { name: string; type: string; description?: string }[];
+  festivals: { key: string; name: string; type: string; description?: string }[];
 }
-const FESTIVAL_DATA = festivalsData as Record<string, FestivalJsonRow[]>;
+// Deliberately `| undefined` on the value: the proxy in `src/data/festivals.ts`
+// returns `undefined` for any year outside the table's range, which a plain
+// `Record<string, T[]>` would let us dereference blind.
+const FESTIVAL_DATA = festivalsData as Record<string, FestivalJsonRow[] | undefined>;
 
-const FESTIVAL_INDEX: Map<string, FestivalJsonRow> = (() => {
-  const m = new Map<string, FestivalJsonRow>();
-  for (const yearKey of Object.keys(FESTIVAL_DATA)) {
-    for (const row of FESTIVAL_DATA[yearKey]) {
-      m.set(row.date, row);
-    }
+const FESTIVAL_INDEX = new Map<string, FestivalJsonRow>();
+/** Years already folded into `FESTIVAL_INDEX`. Holds out-of-range years too, so
+ *  a repeatedly-visited empty year costs one proxy read, not one per cell. One
+ *  small number per year the user has navigated to — bounded in practice by how
+ *  far the calendar is scrolled. */
+const INDEXED_YEARS = new Set<number>();
+
+/**
+ * How close to Jan 1 / Dec 31 a date has to be for the adjacent year's rows to
+ * be ingested as well.
+ *
+ * The shipped table files every row under its own date's year (verified: 1,254
+ * rows, zero mismatches, zero cross-year duplicate dates), and the generator
+ * builds it a year at a time via the library's `buildFestivalsTable`, so this
+ * guard is belt-and-braces rather than a live requirement. It exists because the
+ * table is REGENERATED on every panchang-ts bump: if a festival whose date is
+ * computed near the boundary ever lands in the neighbouring year's array, a
+ * strictly own-year lookup would silently drop it — a blank day rather than a
+ * visible error, which is the failure mode this file is least able to notice.
+ * A week of slack covers any plausible misfiling, and it is close to free: a
+ * month grid that contains a boundary date already spans both years, so it was
+ * going to decode both anyway.
+ */
+const YEAR_BOUNDARY_SLACK_DAYS = 7;
+
+function indexYear(year: number): void {
+  if (INDEXED_YEARS.has(year)) return;
+  // Mark BEFORE reading: an out-of-range year legitimately yields no rows, and
+  // it must still count as ingested or every miss re-runs the proxy lookup.
+  INDEXED_YEARS.add(year);
+  const rows = FESTIVAL_DATA[String(year)];
+  if (!rows) return;
+  for (const row of rows) FESTIVAL_INDEX.set(row.date, row);
+}
+
+/** The festival-table row for `date`, ingesting whatever year(s) that lookup
+ *  depends on first. */
+function festivalRow(date: Date): FestivalJsonRow | undefined {
+  const year = date.getFullYear();
+  indexYear(year);
+  const month = date.getMonth();
+  const day = date.getDate();
+  if (month === 0 && day <= YEAR_BOUNDARY_SLACK_DAYS) {
+    indexYear(year - 1);
+  } else if (month === 11 && day > 31 - YEAR_BOUNDARY_SLACK_DAYS) {
+    indexYear(year + 1);
   }
-  return m;
-})();
+  return FESTIVAL_INDEX.get(ymdKey(date));
+}
 
 // ─── LRU month cache ─────────────────────────────────────────────────────────
 // Sync values (CalendarMonth), not promises — `getCalendarMonth` is now a
@@ -154,12 +220,51 @@ function monthKey(
   ayanamsa: AyanamsaType,
   selectedDeities: string[],
   masaSystem: 'purnimanta' | 'amanta',
+  region: FestivalRegion,
 ): string {
-  // `region` is only used by `getDailyPanchang` festival emission — we read
-  // markers from the static `festivals.json` instead, which is already region-
-  // collapsed. So region isn't part of the key.
+  // The pre-computed festival table is built with `region: 'all'` — the most
+  // inclusive setting — and `purnimanta`, so region and month system are
+  // applied per row at READ time via `festivalsForDay` (see `buildDay`). That
+  // makes both real inputs to the cells, so they have to be part of the cache
+  // key or a region / month-system change serves a stale month.
   const d = selectedDeities.length === 0 ? '_' : selectedDeities.slice().sort().join(',');
-  return `${year}-${month}|${lat.toFixed(3)}|${lon.toFixed(3)}|${ayanamsa}|${d}|${masaSystem}`;
+  return `${year}-${month}|${lat.toFixed(3)}|${lon.toFixed(3)}|${ayanamsa}|${d}|${masaSystem}|${region}`;
+}
+
+// ─── LRU sunrise-probe cache ─────────────────────────────────────────────────
+// The month LRU alone throws away a lot of work. Two reasons, both measured:
+//  (a) adjacent 42-cell grids overlap — across the 12 month steps of a year an
+//      average of ~12 of 42 cells are shared with the previous grid;
+//  (b) `monthKey` embeds `region` + `masaSystem`, neither of which touches the
+//      ephemeris (both only reshape FESTIVAL_INDEX rows, and masaSystem also
+//      picks between two already-computed strings), so toggling either evicted
+//      every month and re-ran all 84 ephemeris calls.
+// So cache the expensive half separately, keyed on exactly what it depends on:
+// the calendar day, the coordinates and the ayanamsa. `probeAtSunrise` +
+// `getInstantPanchang` are pure over those four (the polar-night fallback is a
+// deterministic solar-time formula), so the entry is safe to reuse — including
+// the failure shape, which is likewise deterministic for the same inputs.
+// ~200 entries ≈ 5 months of grids, a few KB.
+
+interface ProbeResult {
+  tithiIdx: number;
+  paksha: 'shukla' | 'krishna';
+  pournami: boolean;
+  amavasya: boolean;
+  nakshatra: string;
+  yoga: string;
+}
+
+const PROBE_CACHE = new Map<string, ProbeResult>();
+const PROBE_CACHE_MAX = 200;
+
+function probeKey(
+  date: Date,
+  lat: number,
+  lon: number,
+  ayanamsa: AyanamsaType,
+): string {
+  return `${ymdKey(date)}|${lat.toFixed(3)}|${lon.toFixed(3)}|${ayanamsa}`;
 }
 
 // ─── Cell construction ───────────────────────────────────────────────────────
@@ -195,11 +300,13 @@ function ymdKey(d: Date): string {
  * Eclipses for a calendar grid window, sourced live from panchang-ts (the
  * bundled festival table excludes eclipses by design — visibility is
  * location-dependent). Computed once per month build (cache miss only), not
- * per cell. A 42-day window can hold at most one solar and one lunar eclipse
- * (consecutive same-kind eclipses are ≥148 days apart), so a single lookahead
- * per kind suffices. Peak instants are mapped to their device-local calendar
- * day to match the grid's device-local cells (mirrors `eclipseDateOf` in
- * panchangService).
+ * per cell. Consecutive same-kind eclipses are NOT always months apart:
+ * penumbral lunar pairs one lunation (~29.5 days) apart do land inside one
+ * 42-day grid (2020-06-06/07-05, 2031-05-07/06-05, 2056-06-27/07-27), so the
+ * whole window is enumerated rather than taking one lookahead per kind — a
+ * single lookahead silently dropped the second. Peak instants are mapped to
+ * their device-local calendar day to match the grid's device-local cells
+ * (mirrors `eclipseDateOf` in panchangService).
  */
 function eclipsesForCells(
   cellDates: Date[],
@@ -208,20 +315,19 @@ function eclipsesForCells(
   const map = new Map<string, 'solar' | 'lunar'>();
   if (cellDates.length === 0) return map;
   const first = cellDates[0];
-  const last = cellDates[cellDates.length - 1];
-  const spanDays = Math.ceil((last.getTime() - first.getTime()) / 86_400_000) + 2;
-  const loc = { latitude: coords.lat, longitude: coords.lon };
+  // Each cell date is that day's local midnight, so the range has to run one
+  // day past the last cell to cover the whole final cell.
+  const end = new Date(cellDates[cellDates.length - 1].getTime() + 86_400_000);
   try {
-    const solar = getUpcomingSolarEclipse(first, loc, spanDays);
-    if (solar) map.set(ymdKey(new Date(solar.peak)), 'solar');
-  } catch (e) {
-    if (e instanceof PanchangError) console.warn('[calendar]', e.code, e.message);
-  }
-  try {
-    const lunar = getUpcomingLunarEclipse(first, loc, spanDays);
-    if (lunar) {
-      const k = ymdKey(new Date(lunar.peak));
-      if (!map.has(k)) map.set(k, 'lunar');
+    const eclipses = computeEclipsesInRange(first, end, {
+      latitude: coords.lat,
+      longitude: coords.lon,
+    });
+    for (const e of eclipses) {
+      const k = ymdKey(new Date(e.peak));
+      // Solar takes a shared day (it is the one that carries sutak); otherwise
+      // the first peak of that day claims the cell.
+      if (e.kind === 'solar' || !map.has(k)) map.set(k, e.kind);
     }
   } catch (e) {
     if (e instanceof PanchangError) console.warn('[calendar]', e.code, e.message);
@@ -230,23 +336,37 @@ function eclipsesForCells(
 }
 
 /**
- * Best-effort sunrise probe for the given longitude. Returns a `Date` at
- * approximately 6 AM local solar time on the cell date — close enough to
- * actual sunrise across India that the tithi prevailing at this instant
- * matches the lib's sunrise-tithi for ≥97% of days year-round. The remaining
- * boundary cases miss by ±1 in `tithi.number`; for pournami/amavasya
- * specifically that's 0-2 misses per year out of 12 events. Users tap into
- * a cell for canonical detail, so the grid only needs visual approximation.
+ * The instant to sample the cell's tithi / nakshatra / yoga at: the day's real
+ * sunrise, plus a few seconds so a boundary lands inside the anga rather than
+ * on its edge.
+ *
+ * A fixed "6 AM local solar time" stand-in used to be good enough for a purely
+ * decorative grid, but the cell's own label is now what the tapped-day headline
+ * prints, so an off-by-one tithi shows up as (say) two consecutive "Amavasya"
+ * cells and a headline that contradicts the Pancha Anga row two reveals below.
+ * Real sunrise swings ~±45 min across the year, which is exactly the band the
+ * fixed probe got wrong.
+ *
+ * `getSunrise` throws under midnight sun / polar night, so keep the solar-time
+ * approximation as the fallback: an approximate cell is better than a blank one.
  */
-function probeAtSunriseApprox(date: Date, lon: number): Date {
+function probeAtSunrise(date: Date, coords: { lat: number; lon: number }): Date {
   const utcMidnight = Date.UTC(
     date.getFullYear(),
     date.getMonth(),
     date.getDate(),
   );
-  // 6 AM local solar time = 06:00 - lon*4 minutes UTC = (6 - lon/15) hours UTC.
-  const offsetH = 6 - (lon / 15);
-  return new Date(utcMidnight + offsetH * 3600000);
+  // Local solar midnight = 00:00 - lon*4 minutes UTC; search forward from there
+  // so the first sunrise found is this calendar day's.
+  const solarMidnight = new Date(utcMidnight - (coords.lon / 15) * 3600000);
+  try {
+    return new Date(
+      getSunrise(solarMidnight, { latitude: coords.lat, longitude: coords.lon }).getTime() + 30_000,
+    );
+  } catch {
+    // 6 AM local solar time = 06:00 - lon*4 minutes UTC = (6 - lon/15) hours UTC.
+    return new Date(utcMidnight + (6 - coords.lon / 15) * 3600000);
+  }
 }
 
 // Tithi names by synodic index 0..29. Both pakshas reuse the same 1..15 names
@@ -262,37 +382,6 @@ const TITHI_NAMES: readonly string[] = [
   'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Amavasya',
 ];
 
-/**
- * Headline tier for `type === 'major'` festivals. When multiple majors share a
- * single day, the one nearest the top of this list wins the cell's primary
- * label. Anything not in the list defaults to "whichever was first in the
- * JSON", which is alphabetical — fine when there's no collision, broken when
- * (e.g.) "Narak Chaturdashi" lexically precedes "Diwali".
- */
-const HEADLINE_MAJORS: readonly string[] = [
-  'Diwali',
-  'Holi',
-  'Maha Shivaratri',
-  'Krishna Janmashtami',
-  'Janmashtami',
-  'Rama Navami',
-  'Ganesh Chaturthi',
-  'Hanuman Jayanti',
-  'Vijayadashami',
-  'Dussehra',
-  'Raksha Bandhan',
-  'Karva Chauth',
-  'Akshaya Tritiya',
-  'Maha Navami',
-  'Govardhan Puja',
-  'Bhai Dooj',
-  'Dhanteras',
-  'Vasant Panchami',
-  'Ugadi',
-  'Gudi Padwa',
-  'Mahalaya Amavasya',
-  'Thiru Onam',
-];
 
 /**
  * Pick the most informative single label for a calendar cell, in priority
@@ -312,26 +401,17 @@ function pickPrimaryEvent(
 ): { label: string; category: CalendarDay['eventCategory'] } {
   // 1. Major festival (Holi, Diwali, Rama Navami, etc.) — the cultural anchors.
   //    These trump eclipses for the headline because that's what users open the
-  //    calendar to find. Eclipse co-occurrences (Holi 2024/2025/2026 on a lunar
+  //    calendar to find. Eclipse co-occurrences (Holika Dahan 2026 on a lunar
   //    eclipse, etc.) are still surfaced via `CalendarDay.eclipse` so the
   //    FlagStrip / day detail can flag them — just not as the primary label.
   //
   //    When multiple majors share a day (e.g. Diwali + Narak Chaturdashi on
-  //    2026-11-08, Dussehra + Maha Navami, Holi + Phagli), pick the
+  //    2026-11-08, Durga Ashtami + Maha Navami in some years), pick the
   //    higher-recognition one via `HEADLINE_MAJORS`. Falls back to the first
   //    major in the array when none are ranked.
   const majors = festivals.filter(f => f.type === 'major');
   if (majors.length > 0) {
-    let chosen = majors[0];
-    let bestRank = Number.POSITIVE_INFINITY;
-    for (const f of majors) {
-      const rank = HEADLINE_MAJORS.indexOf(f.name);
-      if (rank >= 0 && rank < bestRank) {
-        bestRank = rank;
-        chosen = f;
-      }
-    }
-    return { label: chosen.name, category: 'festival' };
+    return { label: pickHeadlineMajor(majors).name, category: 'festival' };
   }
   // 2. Eclipse — content-semantic dark plinth when no major festival overlaps.
   if (eclipse) {
@@ -347,12 +427,24 @@ function pickPrimaryEvent(
     return { label: sk?.name ?? 'Sankranti', category: 'sankranti' };
   }
   // 4. Ekadashi — prefer the Smarta description (e.g. "Putrada Ekadashi") over
-  //    the generic emission. festivals.json puts the specific name in `description`.
+  //    the generic emission. The festival table puts the specific name in
+  //    `description`.
   if (ekadashi) {
     const ek = festivals.find(f => f.type === 'smarta_ekadashi')
       ?? festivals.find(f => f.type === 'vaishnava_ekadashi')
       ?? festivals.find(f => f.type === 'ekadashi');
-    return { label: ek?.description ?? 'Ekadashi', category: 'ekadashi' };
+    // On a viddha / vriddha day the library puts a whole explanatory sentence
+    // in `description` instead of the classical name ("Dashami-viddha
+    // Ekadashi: Vaishnava fast observed today (Dwadashi)."), which then
+    // rendered as a clipped English headline in both languages. Only promote
+    // it when it reads as a name; otherwise fall back to the generic marker,
+    // which `localizePrimaryEvent` can translate. Nothing is lost — the
+    // sentence itself still renders, localized, in the flag strip below.
+    const desc = ek?.description?.trim();
+    return {
+      label: desc && /ekadashi$/i.test(desc) ? desc : 'Ekadashi',
+      category: 'ekadashi',
+    };
   }
   // 5. Purnima / Amavasya / Pradosh — celestial markers when no named festival.
   if (pournami) return { label: 'Purnima', category: 'pournami' };
@@ -424,22 +516,33 @@ function festivalMatchesDeity(
   return false;
 }
 
-function buildDay(
+/**
+ * The two ephemeris calls behind a cell — sunrise, then the instant snapshot at
+ * it — memoized in `PROBE_CACHE`. This is the whole expensive half of a cell;
+ * everything below it in `buildDay` is a Map lookup and some string picking.
+ */
+function probeDay(
   date: Date,
   coords: { lat: number; lon: number },
   ayanamsa: AyanamsaType,
-  selectedDeities: string[],
-  eclipseMap: Map<string, 'solar' | 'lunar'>,
-): CalendarDay {
-  // Tithi/paksha — light snapshot at sunrise approx (≈60µs per call).
-  let tithiIdx = 0;
+): ProbeResult {
+  const key = probeKey(date, coords.lat, coords.lon, ayanamsa);
+  const cached = lruHit(PROBE_CACHE, key);
+  if (cached) return cached;
+
+  // Tithi/paksha — light snapshot at the day's sunrise (≈60µs per call).
+  // -1 means "not computed": the probe can legitimately fail (polar night), and
+  // defaulting to 0 published a fabricated "Pratipada / Shukla" that the cell
+  // and the glance line then printed as fact next to a "Calculation failed"
+  // detail pane. Emitting an empty name matches `nakshatra` / `yoga`.
+  let tithiIdx = -1;
   let paksha: 'shukla' | 'krishna' = 'shukla';
   let pournami = false;
   let amavasya = false;
   let nakshatra = '';
   let yoga = '';
   try {
-    const probe = probeAtSunriseApprox(date, coords.lon);
+    const probe = probeAtSunrise(date, coords);
     const inst = getInstantPanchang(
       probe,
       { latitude: coords.lat, longitude: coords.lon },
@@ -462,9 +565,36 @@ function buildDay(
     // Fall through with defaults.
   }
 
-  // Markers — pre-indexed festivals.json lookup (≈O(1)).
-  const row = FESTIVAL_INDEX.get(ymdKey(date));
-  const rawList = row ? collapseEkadashi(row.festivals) : [];
+  const result: ProbeResult = { tithiIdx, paksha, pournami, amavasya, nakshatra, yoga };
+  lruSet(PROBE_CACHE, key, result, PROBE_CACHE_MAX);
+  return result;
+}
+
+function buildDay(
+  date: Date,
+  coords: { lat: number; lon: number },
+  ayanamsa: AyanamsaType,
+  selectedDeities: string[],
+  eclipseMap: Map<string, 'solar' | 'lunar'>,
+  region: FestivalRegion,
+  masaSystem: 'purnimanta' | 'amanta',
+): CalendarDay {
+  const { tithiIdx, paksha, pournami, amavasya, nakshatra, yoga } =
+    probeDay(date, coords, ayanamsa);
+
+  // Markers — indexed festival-table lookup via `festivalRow` (≈O(1) after the
+  // day's year is ingested, which the first cell of the grid pays for).
+  // The table is generated at `region: 'all'` + purnimanta, so the user's
+  // Region and month system have to be applied here; without the region a
+  // Tamil Nadu user's grid carries Lohri, Gudi Padwa, Bonalu, Bihu, Gangaur,
+  // the three Teejs and ~20 more, and without the corrections an Amanta user
+  // sees the North Indian Shravan Mondays and a Kerala user loses the Masik
+  // Karthigai that falls on Karthigai Deepam. Called even when the table has no
+  // row: a correction can add a day it does not carry.
+  const row = festivalRow(date);
+  const rawList = collapseEkadashi([
+    ...festivalsForDay(ymdKey(date), row?.festivals ?? [], region, masaSystem),
+  ]);
   const festivals: CalendarFestival[] = rawList.map(f => ({
     name: f.name,
     type: f.type as CalendarFestivalType,
@@ -540,6 +670,7 @@ export function getCalendarMonth(
     opts.ayanamsa,
     opts.selectedDeities,
     opts.masaSystem,
+    opts.region,
   );
   const hit = lruHit(MONTH_CACHE, key);
   if (hit) {
@@ -551,7 +682,7 @@ export function getCalendarMonth(
   const cellDates = buildCells(year, month);
   const eclipseMap = eclipsesForCells(cellDates, coords);
   const cells = cellDates.map(d =>
-    buildDay(d, coords, opts.ayanamsa, opts.selectedDeities, eclipseMap),
+    buildDay(d, coords, opts.ayanamsa, opts.selectedDeities, eclipseMap, opts.region, opts.masaSystem),
   );
   endBuild();
 
@@ -567,8 +698,11 @@ export function getCalendarMonth(
       { ayanamsa: opts.ayanamsa, computeEndTimes: false },
     );
     if (inst) {
+      // `chandramasa.name` follows whichever `masaSystem` was requested, and
+      // this call passes none — so it is always the purnimanta name. Read the
+      // two absolute fields, which are system-independent.
       hinduMasa = opts.masaSystem === 'amanta'
-        ? inst.calendar.chandramasa.name
+        ? inst.calendar.chandramasa.amantaName
         : inst.calendar.chandramasa.purnimantaName;
       vikramSamvat = inst.calendar.samvat.vikramSamvat;
     }
@@ -603,96 +737,7 @@ export function peekCalendarMonth(
     opts.ayanamsa,
     opts.selectedDeities,
     opts.masaSystem,
+    opts.region,
   );
   return MONTH_CACHE.get(key) ?? null;
-}
-
-// ─── Yearly drilldowns (P9.3) ────────────────────────────────────────────────
-// Drilldown lists ("Ekadashi this year", "Sankrantis this year") read the
-// panchang-ts bundled festival table (see `src/data/festivals.ts`). It covers
-// FESTIVALS_MIN_YEAR..FESTIVALS_MAX_YEAR; years outside that window return an
-// empty list. Eclipses are NOT in the table — `getUpcomingEclipsesLocal` is kept
-// as a stub returning `[]`; live eclipses come from `fetchUpcomingEclipses`
-// (panchangService) and the month grid's `eclipsesForCells`.
-
-function parseYmd(s: string): Date {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-export interface EkadashiEntry {
-  date: Date;
-  name: string;
-  description?: string;
-}
-
-export function getEkadashiForYear(year: number): EkadashiEntry[] {
-  const rows = FESTIVAL_DATA[String(year)];
-  if (!rows) return [];
-  const out: EkadashiEntry[] = [];
-  for (const row of rows) {
-    for (const f of row.festivals) {
-      if (
-        f.type === 'ekadashi' ||
-        f.type === 'smarta_ekadashi' ||
-        f.type === 'vaishnava_ekadashi'
-      ) {
-        out.push({ date: parseYmd(row.date), name: f.name, description: f.description });
-        break;
-      }
-    }
-  }
-  return out;
-}
-
-export interface SankrantiEntry {
-  date: Date;
-  name: string;
-  description?: string;
-}
-
-export function getSankrantisForYearLocal(year: number): SankrantiEntry[] {
-  const rows = FESTIVAL_DATA[String(year)];
-  if (!rows) return [];
-  const out: SankrantiEntry[] = [];
-  for (const row of rows) {
-    for (const f of row.festivals) {
-      if (f.type === 'sankranti') {
-        out.push({ date: parseYmd(row.date), name: f.name, description: f.description });
-        break;
-      }
-    }
-  }
-  return out;
-}
-
-export interface UpcomingEclipseEntry {
-  date: Date;
-  kind: 'solar' | 'lunar';
-  name: string;
-  description?: string;
-}
-
-export function getUpcomingEclipsesLocal(
-  fromDate: Date,
-  lookaheadYears = 2,
-): UpcomingEclipseEntry[] {
-  const out: UpcomingEclipseEntry[] = [];
-  const fromTime = fromDate.getTime();
-  const fromY = fromDate.getFullYear();
-  for (let y = fromY; y <= fromY + lookaheadYears; y++) {
-    const rows = FESTIVAL_DATA[String(y)];
-    if (!rows) continue;
-    for (const row of rows) {
-      const d = parseYmd(row.date);
-      if (d.getTime() < fromTime) continue;
-      for (const f of row.festivals) {
-        if (f.type === 'eclipse') {
-          const kind: 'solar' | 'lunar' = /lunar|chandra/i.test(f.name) ? 'lunar' : 'solar';
-          out.push({ date: d, kind, name: f.name, description: f.description });
-        }
-      }
-    }
-  }
-  return out;
 }

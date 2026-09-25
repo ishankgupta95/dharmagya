@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,7 +34,12 @@ export default function OnboardingBirth() {
   const [dateOpen, setDateOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
 
-  const birthDateObj = userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null;
+  // Memoised on the ISO string: the date picker is bound to this Date, and a
+  // fresh identity on every render would read as a new value while it is open.
+  const birthDateObj = useMemo(
+    () => (userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null),
+    [userBirthDate],
+  );
   const dateLabel = birthDateObj
     ? birthDateObj.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
         day: 'numeric',
@@ -95,7 +100,7 @@ export default function OnboardingBirth() {
       </ScrollView>
 
       <View style={[styles.bottom, { paddingHorizontal: spacing.screenH }]}>
-        <PrimaryCta label={t('onboarding.startExploring')} onPress={handleFinish} />
+        <PrimaryCta label={t('onboarding.startExploring')} onPress={handleFinish} style={styles.cta} />
         <MotionPressable
           onPress={handleFinish}
           hitSlop={10}
@@ -192,5 +197,9 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 17, lineHeight: 24, marginTop: 3 },
 
   bottom: { paddingBottom: 10, paddingTop: 8, gap: 14, alignItems: 'center' },
+  // The container centres the "Add later" link, which would also shrink-wrap
+  // the pill (it has no horizontal padding of its own) so its label ran into
+  // the rounded ends. Full width, like the CTA on every other onboarding step.
+  cta: { alignSelf: 'stretch' },
   skipText: { fontSize: 13.5, color: onb.textFaint, marginBottom: 2 },
 });

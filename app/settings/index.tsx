@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { View, Text as RNText, ScrollView, Switch, Modal, StyleSheet, Alert, Linking, TextInput } from 'react-native';
+import { useState, useEffect, useMemo } from 'react';
+import { View, Text as RNText, ScrollView, Switch, Modal, StyleSheet, Alert, Linking, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import Constants from 'expo-constants';
 import { AppText as Text } from '@/components/common/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
@@ -19,15 +19,20 @@ import {
   cancelDailyReminder,
   scheduleSunriseAlert,
   cancelSunriseAlert,
+  ensureNotificationPermission,
+  type QuietHours,
 } from '@/services/notifications';
 import {
   deriveJanmaIndicesFromStore,
   fetchPanchangForToday,
+  FALLBACK_COORDS,
 } from '@/services/astrology/panchangService';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
+import { showAdPrivacyOptions, useAdsReady } from '@/services/adsConsent';
+import { isWidgetBridgeAvailable } from '../../modules/widget-data';
 
 const SUNRISE_OFFSET_OPTIONS: { key: string; min: number }[] = [
   { key: '0', min: 0 },
@@ -107,6 +112,9 @@ export default function SettingsScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
   const { formatTime: formatDisplayTime } = useLocaleFormatters();
+  // UMP says whether this user must be able to revisit their ad-consent
+  // choices; the "Ad privacy options" row exists only when it does.
+  const { privacyOptionsRequired } = useAdsReady();
 
   function handleLanguageChange(lang: AppLanguage) {
     setLanguage(lang);
@@ -227,7 +235,7 @@ export default function SettingsScreen() {
       userBirthDate, userBirthTime, userBirthPlace,
     });
     fetchPanchangForToday(
-      userLocation, resolveLanguage(language), region, ayanamsa, janmaNakshatra, janmaRashi,
+      userLocation ?? FALLBACK_COORDS, resolveLanguage(language), region, ayanamsa, janmaNakshatra, janmaRashi,
     ).then((p) => {
       if (p?.sunrise && p.sunrise !== '—') setSunriseTime(p.sunrise);
       if (typeof p?.ayanamsa === 'number') setAyanamsaValue(p.ayanamsa);
@@ -242,16 +250,23 @@ export default function SettingsScreen() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
+  // Every reschedule triggered from this screen has to carry quiet hours, the
+  // same way `app/_layout.tsx` does on cold start and on resume. Without it a
+  // reminder set here is written at its raw clock time and fires inside the
+  // user's quiet window until the next cold start silently re-shifts it.
+  const quietHours: QuietHours = {
+    enabled: quietHoursEnabled,
+    startHHmm: quietHoursStart,
+    endHHmm: quietHoursEnd,
+  };
+
   async function handleDailyReminderToggle(val: boolean) {
     if (val) {
-      const ok = await scheduleDailyReminder(dailyReminderTime);
-      if (!ok) {
-        Alert.alert(
-          t('settings.permissionRequired'),
-          t('settings.permissionRequiredDesc'),
-        );
-        return;
-      }
+      // canAskAgain-aware: shows the OS dialog while it can still appear, and
+      // a Cancel / Open Settings alert once iOS (or Android 13+) stops asking.
+      if (!(await ensureNotificationPermission({ promptSettings: true }))) return;
+      const ok = await scheduleDailyReminder(dailyReminderTime, quietHours);
+      if (!ok) return;
     } else {
       await cancelDailyReminder();
     }
@@ -261,14 +276,14 @@ export default function SettingsScreen() {
   async function handleDailyReminderTimeChange(timeHHmm: string) {
     setDailyReminderTime(timeHHmm);
     if (dailyReminderEnabled) {
-      await scheduleDailyReminder(timeHHmm);
+      await scheduleDailyReminder(timeHHmm, quietHours);
     }
   }
 
   async function handleSunriseOffsetChange(min: number) {
     setSunriseAlertOffsetMin(min);
-    if (sunriseAlertEnabled && sunriseTime) {
-      await scheduleSunriseAlert(sunriseTime, min);
+    if (sunriseAlertEnabled) {
+      await scheduleSunriseAlert(userLocation ?? FALLBACK_COORDS, min);
     }
   }
 
@@ -280,7 +295,12 @@ export default function SettingsScreen() {
     setUserBirthDate(null);
   }
 
-  const userBirthDateObj = userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null;
+  // Memoised on the ISO string: the date picker is bound to this Date, and a
+  // fresh identity on every render would read as a new value while it is open.
+  const userBirthDateObj = useMemo(
+    () => (userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null),
+    [userBirthDate],
+  );
   const birthDateLabel = userBirthDateObj
     ? userBirthDateObj.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
         day: 'numeric',
@@ -295,14 +315,9 @@ export default function SettingsScreen() {
         Alert.alert(t('settings.sunriseUnavailable'), t('settings.sunriseUnavailableDesc'));
         return;
       }
-      const ok = await scheduleSunriseAlert(sunriseTime, sunriseAlertOffsetMin);
-      if (!ok) {
-        Alert.alert(
-          t('settings.permissionRequired'),
-          t('settings.permissionRequiredDesc'),
-        );
-        return;
-      }
+      if (!(await ensureNotificationPermission({ promptSettings: true }))) return;
+      const ok = await scheduleSunriseAlert(userLocation ?? FALLBACK_COORDS, sunriseAlertOffsetMin);
+      if (!ok) return;
     } else {
       await cancelSunriseAlert();
     }
@@ -518,21 +533,28 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Home Screen Widget ──────────────────────────────────────── */}
-        <SectionHeader label={t('settings.widgetSection')} colors={colors} />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <MotionPressable
-            onPress={() => router.push('/settings/widget')}
-            accessibilityRole="button"
-            accessibilityLabel={t('settings.widgetCustomize')}>
-            <SettingRow
-              icon="apps"
-              label={t('settings.widgetCustomize')}
-              sublabel={t('settings.widgetCustomizeDesc')}
-              colors={colors}
-              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
-            />
-          </MotionPressable>
-        </View>
+        {/* The native WidgetData bridge exists only on Android until the
+            WidgetKit pass lands, so on iOS the whole section disappears rather
+            than offering a row that leads to a widget that cannot be placed. */}
+        {isWidgetBridgeAvailable && (
+          <>
+            <SectionHeader label={t('settings.widgetSection')} colors={colors} />
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <MotionPressable
+                onPress={() => router.push('/settings/widget')}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.widgetCustomize')}>
+                <SettingRow
+                  icon="apps"
+                  label={t('settings.widgetCustomize')}
+                  sublabel={t('settings.widgetCustomizeDesc')}
+                  colors={colors}
+                  right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+                />
+              </MotionPressable>
+            </View>
+          </>
+        )}
 
         {/* Deities + Mantra Jaap moved to the Library tab's "Your Practice"
             bucket in P16.5 (/settings/deities + /jaap stay routable). */}
@@ -751,7 +773,12 @@ export default function SettingsScreen() {
             accessibilityLabel={t('settings.replayWalkthrough')}
             onPress={() => {
               setWalkthroughStep(1);
-              router.navigate('/');
+              // `dismissTo`, not `navigate`: Settings is a pushed sibling of
+              // the `(tabs)` group, so a NAVIGATE stacks a SECOND tab
+              // navigator on top of it instead of popping back to the live
+              // one — leaving Settings on the back stack and two tab trees
+              // mounted for the rest of the session.
+              router.dismissTo('/');
             }}>
             <SettingRow
               icon="walk"
@@ -797,7 +824,7 @@ export default function SettingsScreen() {
           <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.sendFeedback')}
-            onPress={() => Linking.openURL('mailto:ishank1995dev@gmail.com?subject=Dharmagya%20Feedback')}>
+            onPress={() => { void Linking.openURL('mailto:ishank1995dev@gmail.com?subject=Dharmagya%20Feedback').catch(() => {}); }}>
             <SettingRow
               icon="chat"
               label={t('settings.sendFeedback')}
@@ -812,7 +839,7 @@ export default function SettingsScreen() {
           <MotionPressable
             accessibilityRole="button"
             accessibilityLabel={t('settings.privacyPolicy')}
-            onPress={() => Linking.openURL('https://dharmagya.app/privacy')}>
+            onPress={() => { void Linking.openURL('https://dharmagya.app/privacy').catch(() => {}); }}>
             <SettingRow
               icon="shield"
               label={t('settings.privacyPolicy')}
@@ -821,6 +848,28 @@ export default function SettingsScreen() {
               right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
             />
           </MotionPressable>
+
+          {/* UMP privacy-options form — the "withdraw later" half of the
+              consent promise in the privacy policy. Rendered only where UMP
+              requires it (regulated regions), so no dead row elsewhere. */}
+          {privacyOptionsRequired && (
+            <>
+              <Divider colors={colors} />
+
+              <MotionPressable
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.adPrivacyOptions')}
+                onPress={() => { void showAdPrivacyOptions(); }}>
+                <SettingRow
+                  icon="shield"
+                  label={t('settings.adPrivacyOptions')}
+                  sublabel={t('settings.adPrivacyOptionsDesc')}
+                  colors={colors}
+                  right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+                />
+              </MotionPressable>
+            </>
+          )}
 
           <Divider colors={colors} />
 
@@ -1028,6 +1077,23 @@ export default function SettingsScreen() {
   );
 }
 
+// ─── Sheet bottom padding (safe area) ───────────────────────────────────────
+
+// Every bottom sheet here lives in a transparent Modal, which draws to the
+// physical screen bottom: under the 34pt home indicator on iOS, and under the
+// navigation bar on Android (edge-to-edge is on, so RN makes the modal's
+// dialog window edge-to-edge too). 36 is the sheets' original bottom padding;
+// the inset only takes over where the system area plus a 12pt gap exceeds it
+// — a home-indicator iPhone (34 → 46) or Android 3-button nav (48dp → 60,
+// where 36 left the bottom of the Done/Close button under the bar). Android
+// gesture nav (≤24dp) and home-button iPhones (0) keep exactly 36.
+const SHEET_BOTTOM_PAD = 36;
+
+function useSheetBottomPad(): number {
+  const { bottom } = useSafeAreaInsets();
+  return Math.max(SHEET_BOTTOM_PAD, bottom + 12);
+}
+
 // ─── Name Sheet (free-text input) ───────────────────────────────────────────
 
 interface NameSheetProps {
@@ -1040,18 +1106,33 @@ interface NameSheetProps {
 
 function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) {
   const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
   const [draft, setDraft] = useState(value);
 
   // Re-sync the draft each time the sheet opens, so re-opens show the latest
   // saved value rather than a stale one. Local edits stay local until Save.
-  useEffect(() => {
+  // Done as a render-time "prop changed" adjustment (React docs: storing
+  // information from previous renders) rather than a setState-in-effect: the
+  // same trigger set — any change of (visible, value) while visible — but the
+  // TextInput never paints one frame of the stale draft first.
+  const [seen, setSeen] = useState({ visible, value });
+  if (seen.visible !== visible || seen.value !== value) {
+    setSeen({ visible, value });
     if (visible) setDraft(value);
-  }, [visible, value]);
+  }
 
+  // The autoFocus input opens the keyboard with the sheet, and on iOS the
+  // keyboard would cover the input and its Save/Close buttons. The overlay
+  // itself is the KeyboardAvoidingView, so the dim backdrop grows with the
+  // keyboard padding instead of leaving an undimmed band behind the
+  // translucent keyboard. Android keeps a plain overlay (behavior undefined
+  // renders a bare View with the same style): unchanged there.
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+      <KeyboardAvoidingView
+        style={styles.sheetOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {t('settings.namePickerTitle')}
@@ -1087,7 +1168,7 @@ function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) 
             </Text>
           </MotionPressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1114,10 +1195,11 @@ function OptionSheet<T extends string>({
   visible, onClose, title, options, value, onChange, colors,
 }: OptionSheetProps<T>) {
   const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {title}
@@ -1138,7 +1220,7 @@ function OptionSheet<T extends string>({
                   accessibilityLabel={opt.label}
                   accessibilityState={{ selected: active }}>
                   <View style={styles.sheetItemText}>
-                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accentText : colors.textPrimary }]}>
                       {opt.label}
                     </Text>
                     {opt.desc && (
@@ -1147,7 +1229,7 @@ function OptionSheet<T extends string>({
                       </Text>
                     )}
                   </View>
-                  {active && <Icon name="check" size={18} color={colors.accent} />}
+                  {active && <Icon name="check" size={18} color={colors.accentText} />}
                 </MotionPressable>
               );
             })}
@@ -1223,11 +1305,12 @@ const FONT_SIZE_STEPS: { key: FontSize; tKey: string; sample: number }[] = [
 
 function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSheetProps) {
   const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
   const activeStep = FONT_SIZE_STEPS.find(s => s.key === value);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {t('settings.fontSizePickerTitle')}
@@ -1262,7 +1345,10 @@ function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSh
                   accessibilityState={{ selected: active }}>
                   <RNText style={[styles.segmentGlyph, {
                     fontSize: step.sample,
-                    color: active ? '#FFFFFF' : colors.textSecondary,
+                    // Text ON a turmeric fill is `palette.night`; white is
+                    // 2.29:1 here, so the selected step was the least legible
+                    // glyph in an accessibility control.
+                    color: active ? palette.night : colors.textSecondary,
                   }]}>
                     A
                   </RNText>
@@ -1312,6 +1398,7 @@ function RegionRow({
   region, onChange, colors,
 }: { region: Region; onChange: (r: Region) => void; colors: ColorPalette }) {
   const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
   const [open, setOpen] = useState(false);
 
   function tr(r: Region): string {
@@ -1332,10 +1419,10 @@ function RegionRow({
         accessibilityRole="button"
         accessibilityLabel={tr(r)}
         accessibilityState={{ selected: active }}>
-        <Text variant="body" style={[styles.regionItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+        <Text variant="body" style={[styles.regionItemLabel, { color: active ? colors.accentText : colors.textPrimary }]}>
           {tr(r)}
         </Text>
-        {active && <Icon name="check" size={18} color={colors.accent} />}
+        {active && <Icon name="check" size={18} color={colors.accentText} />}
       </MotionPressable>
     );
   }
@@ -1361,7 +1448,7 @@ function RegionRow({
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={styles.regionOverlay}>
-          <View style={[styles.regionSheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <View style={[styles.regionSheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
             <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
             <Text variant="display-italic" style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
               {t('settings.regionPickerTitle')}
@@ -1432,7 +1519,7 @@ function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
   return (
     <View style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-        <Icon name={icon} size={16} color={colors.accent} />
+        <Icon name={icon} size={16} color={colors.accentText} />
       </View>
       <View style={[styles.rowText, hasSublabel && styles.rowTextShrinkable]}>
         <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
@@ -1546,7 +1633,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     padding: 20,
     paddingTop: 12,
-    paddingBottom: 36,
+    // paddingBottom is inline: useSheetBottomPad() (safe-area aware).
     maxHeight: '75%',
   },
   regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
@@ -1584,7 +1671,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     padding: 20,
     paddingTop: 12,
-    paddingBottom: 36,
+    // paddingBottom is inline: useSheetBottomPad() (safe-area aware).
   },
   sheetGrabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, marginBottom: 14 },
   sheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },

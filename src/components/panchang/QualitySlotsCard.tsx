@@ -6,14 +6,17 @@ import { type ColorPalette } from '@/config/theme';
 import type { IQualitySlot } from '@/types';
 import { MotionPressable } from '@/components/common/MotionPressable';
 
-const MUTED_GREEN = '#3F7A3F';
-
 function valueColor(quality: IQualitySlot['quality'], colors: ColorPalette): string {
   switch (quality) {
+    // Both branches take the per-theme *ink* token. The card paints no ground
+    // of its own, so it sits on `colors.base`: a fixed #3F7A3F green was
+    // 3.56:1 on the dark ground and the `colors.accent` fill was 2.09:1 on the
+    // light one — whichever theme was in use, one of the two categories in
+    // "Good & avoid times" was below AA.
     case 'auspicious':
-      return MUTED_GREEN;
+      return colors.success;
     case 'inauspicious':
-      return colors.accent;
+      return colors.accentText;
     default:
       return colors.textSecondary;
   }
@@ -32,13 +35,32 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
   return (
     <View style={styles.card}>
       <View style={[styles.header, { borderBottomColor: colors.divider }]}>
-        <Text variant="mono-caps" style={[styles.label, { color: colors.accent }]}>{label}</Text>
+        <Text variant="mono-caps" style={[styles.label, { color: colors.accentText }]}>{label}</Text>
         <View style={styles.tabs}>
           {(['day', 'night'] as const).map((key, i) => (
             <MotionPressable
               key={key}
               onPress={() => setTab(key)}
-              hitSlop={6}
+              // 2 + 29.7 + 14 = 45.7dp of reachable target. Most of that is the
+              // tab box itself (`paddingVertical: 7` around an 11.7dp Geist line
+              // box — 9px at 1.3em — plus the 4dp underline), because slop below
+              // the tabs is mostly unreachable: the slot rows are *later*
+              // siblings inside `styles.card`, and RN hit-tests children in
+              // reverse order (TouchTargetHelper: `for (i in childrenCount - 1
+              // downTo 0)`), so the first row claims any point inside its own box
+              // before the header is ever visited. Only the header's
+              // paddingBottom (10) + hairline border + marginBottom (4) ≈ 14.3dp
+              // is genuinely free, hence `bottom: 14` — anything past that is
+              // inert. Top is capped at 2dp for the opposite reason: this card is
+              // the first child of an AccordionSection body, whose `paddingTop: 4`
+              // is all that separates these tabs from the accordion's own toggle.
+              // That toggle is an *earlier* sibling, so upward slop crossing the
+              // 4dp gap would win over it — and the chevron shares this
+              // right-hand x-range, so its lower half would flip Day/Night
+              // instead of collapsing the section. Horizontal slop is half the
+              // 10dp `marginRight` between the two tabs, so they stay adjacent
+              // and never overlap.
+              hitSlop={{ top: 2, bottom: 14, left: 5, right: 5 }}
               style={[styles.tab, i === 0 && { marginRight: 10 }]}
               accessibilityRole="tab"
               accessibilityLabel={key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
@@ -47,7 +69,7 @@ export function QualitySlotsCard({ label, slots, colors }: Props) {
                 variant="mono-caps"
                 style={[
                   styles.tabText,
-                  { color: tab === key ? colors.accent : colors.textTertiary },
+                  { color: tab === key ? colors.accentText : colors.textTertiary },
                 ]}>
                 {key === 'day' ? t('panchang.dayTab') : t('panchang.nightTab')}
               </Text>
@@ -83,8 +105,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   label: { fontSize: 9.5 },
-  tabs: { flexDirection: 'row', alignItems: 'center' },
-  tab: { paddingVertical: 2, alignItems: 'center' },
+  // Deliberately no `alignItems: 'center'`: the tabs stretch to the row height
+  // so the inactive tab — which renders no underline and would otherwise be
+  // 4dp shorter and 2dp lower — gets the same touch box and the same label
+  // baseline as the active one.
+  tabs: { flexDirection: 'row' },
+  // paddingVertical carries the touch target, not hitSlop; see the note above.
+  tab: { paddingVertical: 7, alignItems: 'center' },
   tabText: { fontSize: 9 },
   tabUnderline: {
     marginTop: 3,

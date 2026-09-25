@@ -1,6 +1,6 @@
 import { useMemo, memo } from 'react';
 import { MotionPressable } from '@/components/common/MotionPressable';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet, type ListRenderItemInfo } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -106,6 +106,30 @@ export default function FavoritesScreen() {
     }
   };
 
+  // Each row carries its own slice of the grouped card (side borders always,
+  // top/bottom border + radius on the first/last row) — the search results
+  // pattern — because a FlatList can't wrap its cells in one bordered View.
+  const lastIndex = items.length - 1;
+  const renderItem = ({ item, index }: ListRenderItemInfo<FavoriteItem>) => (
+    <View
+      style={[
+        styles.rowShell,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        index === 0 && styles.rowShellFirst,
+        index === lastIndex && styles.rowShellLast,
+      ]}>
+      {index > 0 && <View style={[styles.rowDivider, { backgroundColor: colors.divider }]} />}
+      <FavoriteRow
+        item={item}
+        colors={colors}
+        isHi={isHi}
+        verseIndex={readingPositions[item.favId]}
+        onOpen={openItem}
+        onRemove={toggleFavorite}
+      />
+    </View>
+  );
+
   return (
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
@@ -129,35 +153,34 @@ export default function FavoritesScreen() {
       {items.length === 0 ? (
         <EmptyState colors={colors} />
       ) : (
-        <ScrollView
+        // Virtualized: saved texts are bounded only by the catalogue (~70
+        // aartis, chalisas, stotras, suktas, sahasranamas and scriptures), and
+        // every row mounts an avatar image, a pressable and an animated heart.
+        // Rows are NOT fixed height (caption line height follows the system
+        // font scale), so no getItemLayout.
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.favId}
+          renderItem={renderItem}
           contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}>
-
-          <Text variant="kicker-small" style={[styles.sectionKicker, { color: colors.textMuted }]}>
-            {t('favorites.textsSection', { count: items.length })}
-          </Text>
-
-          <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {items.map((item, i) => (
-              <View key={item.favId}>
-                {i > 0 && <View style={[styles.rowDivider, { backgroundColor: colors.divider }]} />}
-                <FavoriteRow
-                  item={item}
-                  colors={colors}
-                  isHi={isHi}
-                  verseIndex={readingPositions[item.favId]}
-                  onPress={() => openItem(item)}
-                  onRemove={() => toggleFavorite(item.favId)}
-                />
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          ListHeaderComponent={
+            <Text variant="kicker-small" style={[styles.sectionKicker, { color: colors.textMuted }]}>
+              {t('favorites.textsSection', { count: items.length })}
+            </Text>
+          }
+          ListFooterComponent={
+            <>
+              <View style={styles.adWrap}>
+                <AdBanner colors={colors} placement="favoritesInline" inline />
               </View>
-            ))}
-          </View>
-
-          <View style={styles.adWrap}>
-            <AdBanner colors={colors} placement="favoritesInline" inline />
-          </View>
-          <View style={{ height: 32 }} />
-        </ScrollView>
+              <View style={{ height: 32 }} />
+            </>
+          }
+        />
       )}
 
     </SafeAreaView>
@@ -171,8 +194,10 @@ interface FavoriteRowProps {
   isHi: boolean;
   /** Saved reading position (verse index) from the reader, if any. */
   verseIndex: number | undefined;
-  onPress: () => void;
-  onRemove: () => void;
+  /** Screen-level handlers, bound to this row here so the memoized row keeps
+   *  equal props across list re-renders (a per-row closure never would). */
+  onOpen: (item: FavoriteItem) => void;
+  onRemove: (favId: string) => void;
 }
 
 const TYPE_BADGE: Record<FavoriteType, string> = {
@@ -193,7 +218,7 @@ const TYPE_ICON: Record<FavoriteType, IconName> = {
   scripture: 'school',
 };
 
-const FavoriteRow = memo(function FavoriteRow({ item, colors, isHi, verseIndex, onPress, onRemove }: FavoriteRowProps) {
+const FavoriteRow = memo(function FavoriteRow({ item, colors, isHi, verseIndex, onOpen, onRemove }: FavoriteRowProps) {
   const { t } = useTranslation();
   const typeLabel = t(TYPE_BADGE[item.type]);
   // "Chalisa · Verse 18" — the reader stores positions under the same key.
@@ -207,7 +232,7 @@ const FavoriteRow = memo(function FavoriteRow({ item, colors, isHi, verseIndex, 
   return (
     <MotionPressable
       pressedScale={0.98}
-      onPress={onPress}
+      onPress={() => onOpen(item)}
       style={styles.row}
       accessibilityRole="button"
       accessibilityLabel={`${item.titleEnglish} — ${caption}`}>
@@ -228,7 +253,7 @@ const FavoriteRow = memo(function FavoriteRow({ item, colors, isHi, verseIndex, 
       </View>
       <FavoriteHeart
         active
-        onPress={onRemove}
+        onPress={() => onRemove(item.favId)}
         size={18}
         inactiveColor={colors.textMuted}
         activeColor={colors.accent}
@@ -249,8 +274,18 @@ function EmptyState({ colors }: { colors: ColorPalette }) {
       <Text variant="body" style={[styles.emptySub, { color: colors.textTertiary }]}>
         {t('favorites.emptyDesc')}
       </Text>
+      {/* Favourites is *pushed* on top of the tab tree (Library → Your Practice
+          → Favourites), so the divergence point for this href is the root stack,
+          not the tab navigator. That means `push` keeps its PUSH event and
+          appends a SECOND `(tabs)` route — back would then land the user right
+          back on the empty screen they were leaving, with two NativeTabs
+          instances mounted. `navigate` is NOT a safe simplification here: the
+          StackRouter only reuses the *focused* route, which is `favorites`, so
+          it duplicates `(tabs)` too (and `replace` drops the tab tree we came
+          from). `dismissTo` dispatches POP_TO, which pops back to the `(tabs)`
+          entry already on the stack and hands it `screen: 'library'`. */}
       <MotionPressable
-        onPress={() => router.push('/(tabs)/library')}
+        onPress={() => router.dismissTo('/(tabs)/library')}
         style={[styles.browseBtn, { borderColor: colors.borderAccent }]}
         accessibilityRole="button"
         accessibilityLabel={t('favorites.browseLibrary')}>
@@ -276,10 +311,23 @@ const styles = StyleSheet.create({
   listContent: { paddingTop: 2, paddingBottom: 32 },
   sectionKicker: { fontSize: 9.5, marginBottom: 11, paddingHorizontal: 4 },
 
-  listCard: {
-    borderRadius: borderRadius.list,
-    borderWidth: 1,
+  // Grouped-card rows (same shape as search results): side borders always,
+  // top/bottom border + radius only on the first/last row, so the list still
+  // reads as the one bordered card it was before virtualization.
+  rowShell: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
     overflow: 'hidden',
+  },
+  rowShellFirst: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: borderRadius.list,
+    borderTopRightRadius: borderRadius.list,
+  },
+  rowShellLast: {
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: borderRadius.list,
+    borderBottomRightRadius: borderRadius.list,
   },
   row: {
     flexDirection: 'row',

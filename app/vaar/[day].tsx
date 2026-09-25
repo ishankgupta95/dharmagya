@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,10 +55,14 @@ export default function VaarDevataScreen() {
 
   // Keep the local selection in sync if the route param itself changes while
   // the screen is already mounted (e.g. a remedy-nudge tap from underneath).
-  useEffect(() => {
+  // Adjusted during render, guarded by the previous param, so the new day
+  // lands in the same commit as the new param rather than one effect later.
+  const [prevRouteDay, setPrevRouteDay] = useState(routeDay);
+  if (routeDay !== prevRouteDay) {
+    setPrevRouteDay(routeDay);
     const k = getVaarDevataByKey(routeDay)?.dayKey;
     if (k) setDayKey(k);
-  }, [routeDay]);
+  }
 
   // `dayKey` is only ever set from a valid lookup, so the fallback is defensive.
   const vaar: VaarDevata = getVaarDevataByKey(dayKey) ?? VAAR_DEVATA[0];
@@ -116,7 +120,7 @@ export default function VaarDevataScreen() {
                   active={active}
                   onPress={() => setDayKey(v.dayKey)}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.dayChip}
@@ -124,7 +128,7 @@ export default function VaarDevataScreen() {
                   <Text
                     variant="mono-caps"
                     numberOfLines={1}
-                    style={[styles.dayChipText, { color: active ? palette.parchmentBright : colors.textSecondary }]}>
+                    style={[styles.dayChipText, { color: active ? palette.night : colors.textSecondary }]}>
                     {v.dayShort[lang]}
                   </Text>
                 </SegmentedChip>
@@ -183,13 +187,13 @@ export default function VaarDevataScreen() {
             <MotionPressable
               onPress={() => startJaap(vaar)}
               pressedScale={0.97}
-              style={[styles.jaapBtn, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
+              style={[styles.jaapBtn, { backgroundColor: colors.accent }]}
               accessibilityRole="button"
               accessibilityLabel={t('vaar.a11yStartJaap')}>
-              <Icon name="flower" size={14} color={palette.parchmentBright} />
+              <Icon name="flower" size={14} color={palette.night} />
               <Text variant="mono-caps" style={styles.jaapBtnText}>{tForLang('vaar.startJaap')}</Text>
             </MotionPressable>
-            <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
+            <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
               {tForLang('vaar.mantraReviewNote')}
             </Text>
           </View>
@@ -430,7 +434,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     marginTop: 16,
   },
-  jaapBtnText: { fontSize: 11, color: palette.parchmentBright },
+  jaapBtnText: { fontSize: 11, color: palette.night },
   reviewNote: { fontSize: 11.5, lineHeight: 17, marginTop: 12 },
 
   // Bulleted list (offerings)

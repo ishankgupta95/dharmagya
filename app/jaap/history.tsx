@@ -128,7 +128,11 @@ export default function JaapHistoryScreen() {
               {t('jaap.historyEmptyDesc')}
             </Text>
             <MotionPressable
-              onPress={() => router.replace('/jaap')}
+              // `/jaap` is always the immediate parent (its only two entry
+              // points are on that screen), so pop back to it. `replace` built
+              // a SECOND jaap list on top of the existing one and made the
+              // first back press look dead.
+              onPress={() => router.dismissTo('/jaap')}
               style={[styles.emptyCta, { borderColor: colors.accent }]}
               accessibilityRole="button"
               accessibilityLabel={t('jaap.historyBeginCta')}>

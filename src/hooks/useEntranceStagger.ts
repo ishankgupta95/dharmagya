@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useSharedValue,
   useAnimatedStyle,
@@ -32,11 +32,14 @@ export function useEntranceStagger(
   enabled: boolean = true,
 ): AnimatedStyle<ViewStyle> {
   const { dur } = useReducedMotion();
-  const enabledAtMountRef = useRef(enabled);
-  const progress = useSharedValue(enabledAtMountRef.current ? 0 : 1);
+  // The first-render snapshot of `enabled` (see above). A `useState` initial
+  // value holds it for the component's lifetime without reading a ref during
+  // render; later values of `enabled` are ignored by design.
+  const [enabledAtMount] = useState(enabled);
+  const progress = useSharedValue(enabledAtMount ? 0 : 1);
 
   useEffect(() => {
-    if (!enabledAtMountRef.current) return;
+    if (!enabledAtMount) return;
     const rawDelay = Math.min(index * stagger.base, STAGGER_CAP_MS);
     progress.value = withDelay(
       dur(rawDelay),
@@ -48,7 +51,7 @@ export function useEntranceStagger(
     return () => {
       cancelAnimation(progress);
     };
-  }, [progress, index, dur]);
+  }, [progress, index, dur, enabledAtMount]);
 
   return useAnimatedStyle(() => ({
     opacity: progress.value,

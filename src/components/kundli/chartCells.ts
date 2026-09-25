@@ -11,7 +11,20 @@ import {
 export interface ChartCell {
   /** Rashi 0..11 (0 = Mesha … 11 = Meena). */
   rashi: number;
-  /** House 1..12 from the chart's lagna. */
+  /**
+   * Whole-sign house 1..12 counted from the chart's lagna.
+   *
+   * This is the diagram's PLACEMENT INDEX, not the cuspal house number.
+   * `NorthChart` keys its twelve geometry slots off it, which only works
+   * because the whole-sign derivation is a bijection over 1..12 — feeding it
+   * cuspal numbers would collide two rashis on one key and drop cells (with
+   * their planets) from the chart entirely.
+   *
+   * So it must NOT be printed as "the house" when the active house system is
+   * `equal` or `placidus-kp`: `PlanetPlacement.house` follows the chosen
+   * system there, and the Aspects card / planet tables print that instead.
+   * Callers gate the printed digit via the charts' `showHouseNumber` prop.
+   */
   house: number;
   /** Localized rashi short label (e.g. "Mesha" or "मेष"). */
   rashiName: string;

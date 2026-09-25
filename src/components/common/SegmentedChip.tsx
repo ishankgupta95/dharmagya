@@ -59,18 +59,15 @@ export function SegmentedChip({
 
   const hasBorder = inactiveBorder !== undefined && activeBorder !== undefined;
 
-  const animatedStyle = useAnimatedStyle(() => {
-    const bg = interpolateColor(progress.value, [0, 1], [inactiveBg, activeBg]);
-    const border = hasBorder
-      ? interpolateColor(progress.value, [0, 1], [inactiveBorder!, activeBorder!])
-      : undefined;
-    return {
-      backgroundColor: bg,
-      ...(border !== undefined ? { borderColor: border } : null),
-      transform: [{ scale: pressScale.value }],
-    };
-  });
-
+  // Handlers are declared BEFORE `useAnimatedStyle`, not after. The React
+  // Compiler freezes `pressScale` at the point it is captured by the worklet
+  // passed to `useAnimatedStyle`; any write that appears after that freeze
+  // point is reported as react-hooks/immutability ("`pressScale` cannot be
+  // modified") and the compiler then bails out of memoizing this component
+  // entirely. Writing before the capture keeps the value mutable — same
+  // ordering as MotionPressable. (The `useEffect` write to `progress` above
+  // is fine for the same reason.) Handlers have exactly one consumer each —
+  // the Pressable props below — so referential identity is irrelevant.
   function handlePress() {
     if (!active) {
       Haptics.selectionAsync().catch(() => { /* non-critical */ });
@@ -85,6 +82,18 @@ export function SegmentedChip({
   function handlePressOut() {
     pressScale.value = withTiming(1, { duration: dur(durations.fast), easing: easings.standard });
   }
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const bg = interpolateColor(progress.value, [0, 1], [inactiveBg, activeBg]);
+    const border = hasBorder
+      ? interpolateColor(progress.value, [0, 1], [inactiveBorder!, activeBorder!])
+      : undefined;
+    return {
+      backgroundColor: bg,
+      ...(border !== undefined ? { borderColor: border } : null),
+      transform: [{ scale: pressScale.value }],
+    };
+  });
 
   return (
     <AnimatedPressable

@@ -5,7 +5,7 @@ import type { KaalSarpDoshaInfo, MangalDoshaInfo, PitruDoshaInfo } from 'panchan
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { RemedyNudge } from './RemedyNudge';
-import { borderRadius, palette, type ColorPalette } from '@/config/theme';
+import { borderRadius, type ColorPalette } from '@/config/theme';
 
 interface DoshaCardProps {
   mangal: MangalDoshaInfo;
@@ -14,15 +14,22 @@ interface DoshaCardProps {
   colors: ColorPalette;
 }
 
-const SAFE_GREEN = '#3FA37D';
-const CANCELLED_AMBER = '#BA7E2A';
 
 export function DoshaCard({ mangal, kaalSarp, pitru, colors }: DoshaCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // `MangalDoshaInfo.cancellations` / `PitruDoshaInfo.reasons` are the
+  // library's English diagnostics — `computeMangalDosha` / `computePitruDosha`
+  // take no language option, so they stay English on a Hindi chart and even
+  // name rashis in the Western zodiac ("Mars exalted in Capricorn") that this
+  // app uses nowhere else. Rendering them under a Devanagari heading was worse
+  // than omitting them: the severity, the house grid and the "cancelled" badge
+  // already carry the verdict, so suppress the prose rather than assert an
+  // untranslated (and off-vocabulary) sentence as the explanation.
+  const showLibraryProse = i18n.language !== 'hi';
   return (
     <>
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <MangalRow mangal={mangal} colors={colors} />
+        <MangalRow mangal={mangal} colors={colors} showCancellations={showLibraryProse} />
         <View style={[styles.divider, { backgroundColor: colors.divider }]} />
         <DoshaRow
           title={
@@ -34,7 +41,7 @@ export function DoshaCard({ mangal, kaalSarp, pitru, colors }: DoshaCardProps) {
           }
           kicker={t('kundli.kaalSarpKicker')}
           icon={kaalSarp.afflicted ? 'alert-circle' : 'check-circle'}
-          accent={kaalSarp.afflicted ? palette.sindoor : SAFE_GREEN}
+          accent={kaalSarp.afflicted ? colors.dangerText : colors.successText}
           meta={[
             { label: t('kundli.rahuHouse'), value: String(kaalSarp.rahuHouse) },
             { label: t('kundli.ketuHouse'), value: String(kaalSarp.ketuHouse) },
@@ -51,9 +58,13 @@ export function DoshaCard({ mangal, kaalSarp, pitru, colors }: DoshaCardProps) {
           title={pitru.afflicted ? t('kundli.pitruAfflicted') : t('kundli.pitruNotAfflicted')}
           kicker={t('kundli.pitruKicker')}
           icon={pitru.afflicted ? 'alert-circle' : 'check-circle'}
-          accent={pitru.afflicted ? palette.sindoor : SAFE_GREEN}
+          accent={pitru.afflicted ? colors.dangerText : colors.successText}
           meta={[]}
-          footnote={pitru.afflicted && pitru.reasons.length > 0 ? pitru.reasons.join('; ') : null}
+          footnote={
+            showLibraryProse && pitru.afflicted && pitru.reasons.length > 0
+              ? pitru.reasons.join('; ')
+              : null
+          }
           colors={colors}
         />
       </View>
@@ -87,7 +98,16 @@ export function DoshaCard({ mangal, kaalSarp, pitru, colors }: DoshaCardProps) {
 //                                      reading their chart understand "you're
 //                                      technically partial-manglik but it's
 //                                      neutralized by X."
-function MangalRow({ mangal, colors }: { mangal: MangalDoshaInfo; colors: ColorPalette }) {
+function MangalRow({
+  mangal,
+  colors,
+  showCancellations,
+}: {
+  mangal: MangalDoshaInfo;
+  colors: ColorPalette;
+  /** See the note on `showLibraryProse` in `DoshaCard`. */
+  showCancellations: boolean;
+}) {
   const { t } = useTranslation();
   const severity = mangal.severity;
   const isCancelled = !mangal.afflicted && severity !== 'none';
@@ -97,13 +117,13 @@ function MangalRow({ mangal, colors }: { mangal: MangalDoshaInfo; colors: ColorP
   let accent: string;
   if (severity === 'none') {
     icon = 'check-circle';
-    accent = SAFE_GREEN;
+    accent = colors.successText;
   } else if (isCancelled) {
     icon = 'info-circle';
-    accent = CANCELLED_AMBER;
+    accent = colors.accentText;
   } else {
     icon = 'alert-circle';
-    accent = palette.sindoor;
+    accent = colors.dangerText;
   }
 
   // Reorder so the cancellation callout (when present) sits below the title +
@@ -123,10 +143,10 @@ function MangalRow({ mangal, colors }: { mangal: MangalDoshaInfo; colors: ColorP
               {t(titleKey)}
             </Text>
             {isCancelled && (
-              <View style={[styles.cancelledTag, { borderColor: CANCELLED_AMBER }]}>
+              <View style={[styles.cancelledTag, { borderColor: colors.accentText }]}>
                 <Text
                   variant="mono-caps"
-                  style={[styles.cancelledTagText, { color: CANCELLED_AMBER }]}>
+                  style={[styles.cancelledTagText, { color: colors.accentText }]}>
                   {t('kundli.mangal.cancelledTag')}
                 </Text>
               </View>
@@ -135,16 +155,16 @@ function MangalRow({ mangal, colors }: { mangal: MangalDoshaInfo; colors: ColorP
         </View>
       </View>
 
-      {isCancelled && mangal.cancellations.length > 0 && (
+      {showCancellations && isCancelled && mangal.cancellations.length > 0 && (
         <View
           style={[
             styles.cancelledBlock,
             {
-              backgroundColor: CANCELLED_AMBER + '14',
-              borderColor: CANCELLED_AMBER + '55',
+              backgroundColor: colors.accentText + '14',
+              borderColor: colors.accentText + '55',
             },
           ]}>
-          <Text variant="mono-caps" style={[styles.cancelledBlockKicker, { color: CANCELLED_AMBER }]}>
+          <Text variant="mono-caps" style={[styles.cancelledBlockKicker, { color: colors.accentText }]}>
             {t('kundli.mangal.cancelledBy')}
           </Text>
           {mangal.cancellations.map((c, i) => (
@@ -199,7 +219,12 @@ function MetaCol({ label, value, bad, colors }: MetaColProps) {
         variant="body"
         style={[
           styles.metaValue,
-          { color: bad ? palette.sindoor : colors.textPrimary },
+          // `palette.sindoor` is the LIGHT-mode accent ink (#7A5900) — a fixed
+          // hex, so on the dark card the afflicted house numbers (the actual
+          // data of this row) rendered at 2.56:1. The per-theme danger ink is
+          // both legible and the right semantic, matching the afflicted flag
+          // chips in the Basics row.
+          { color: bad ? colors.dangerText : colors.textPrimary },
         ]}>
         {value}
       </Text>

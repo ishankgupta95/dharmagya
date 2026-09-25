@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,7 @@ import { MotionPressable } from '@/components/common/MotionPressable';
 import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { LangToggle } from '@/components/common/LangToggle';
 import { VerseBlock } from '@/components/reader/VerseBlock';
+import { handleReaderTouchStart } from '@/components/reader/CopyableUnit';
 import { SCRIPTURE_DISCLAIMER } from '@/config/scriptures';
 import i18n, { resolveLanguage } from '@/i18n';
 import { getStotraBySlug, titleFor, type ContentLang } from '@/services/content';
@@ -26,6 +27,13 @@ import { getStotraBySlug, titleFor, type ContentLang } from '@/services/content'
  * language; the Devanagari/IAST recitation is driven by `VerseBlock`. Carries
  * a form/language caption (Ashtakam · Awadhi) and the provisional-review note
  * when the lib flags the transliteration `reviewPending`.
+ *
+ * Virtualized like the scripture reader: the longest stotras run 44–58 verses
+ * (Hanuman Bahuk, Bajrang Baan), each a Devanagari shloka plus a meaning
+ * paragraph. The hero, toggle and About card are the list header; the review
+ * note, disclaimer and ad slot are the footer. No `getItemLayout` (verse
+ * heights vary); `removeClippedSubviews` stays at FlatList's default, ON for
+ * Android, as in the scripture reader (see the note there).
  */
 export default function StotraReaderScreen() {
   const { t } = useTranslation();
@@ -74,6 +82,7 @@ export default function StotraReaderScreen() {
     .filter(Boolean)
     .join(' · ');
   const about = stotra.about[lang]?.trim();
+  const copyLabel = t('reader.copyAction');
 
   return (
     <ScreenMount>
@@ -98,54 +107,75 @@ export default function StotraReaderScreen() {
           />
         </View>
 
-        <ScrollView
+        <FlatList
+          data={stotra.verses}
+          // Verses carry no id; the array is static, so the index is the verse
+          // number.
+          keyExtractor={(_, i) => String(i + 1)}
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}>
-
-          <View style={styles.heroBlock}>
-            <Text
-              variant={lang === 'hi' ? 'deva-bold' : 'display-italic'}
-              style={[styles.heroTitle, { color: colors.textPrimary }]}>
-              {heroTitle}
-            </Text>
-            <Text variant="mono-caps" style={[styles.heroSubtitle, { color: colors.textMuted }]}>
-              {subtitle}
-            </Text>
-            <Ornament variant="lotus" tone={ornamentTone} style={styles.heroOrnament} />
-          </View>
-
-          <LangToggle lang={lang} onChange={setLang} colors={colors} />
-
-          {!!about && (
-            <View style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Kicker color={colors.accent} size={10}>{tForLang('scripture.aboutLabel')}</Kicker>
-              <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
-                {about}
-              </Text>
-            </View>
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          onTouchStart={handleReaderTouchStart}
+          renderItem={({ item, index }) => (
+            <VerseBlock
+              verse={item}
+              index={index + 1}
+              lang={lang}
+              colors={colors}
+              t={tForLang}
+              copyKey={`stotra-${stotra.slug}-${index + 1}`}
+              copyLabel={copyLabel}
+            />
           )}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.heroBlock}>
+                <Text
+                  variant={lang === 'hi' ? 'deva-bold' : 'display-italic'}
+                  style={[styles.heroTitle, { color: colors.textPrimary }]}>
+                  {heroTitle}
+                </Text>
+                <Text variant="mono-caps" style={[styles.heroSubtitle, { color: colors.textMuted }]}>
+                  {subtitle}
+                </Text>
+                <Ornament variant="lotus" tone={ornamentTone} style={styles.heroOrnament} />
+              </View>
 
-          {stotra.verses.map((verse, i) => (
-            <VerseBlock key={i} verse={verse} index={i + 1} lang={lang} colors={colors} t={tForLang} />
-          ))}
+              <LangToggle lang={lang} onChange={setLang} colors={colors} />
 
-          <View style={styles.footer}>
-            {stotra.reviewPending && (
-              <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
-                {tForLang('reader.reviewNote')}
-              </Text>
-            )}
-            <Kicker color={colors.textMuted} size={9}>{tForLang('scripture.sourcesLabel')}</Kicker>
-            <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
-              {SCRIPTURE_DISCLAIMER[lang]}
-            </Text>
-            <View style={styles.adWrap}>
-              <AdBanner colors={colors} placement="godDetailInline" inline />
+              {!!about && (
+                <View style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Kicker color={colors.accent} size={10}>{tForLang('scripture.aboutLabel')}</Kicker>
+                  <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
+                    {about}
+                  </Text>
+                </View>
+              )}
             </View>
-          </View>
+          }
+          ListFooterComponent={
+            <View>
+              <View style={styles.footer}>
+                {stotra.reviewPending && (
+                  <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
+                    {tForLang('reader.reviewNote')}
+                  </Text>
+                )}
+                <Kicker color={colors.textMuted} size={9}>{tForLang('scripture.sourcesLabel')}</Kicker>
+                <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
+                  {SCRIPTURE_DISCLAIMER[lang]}
+                </Text>
+                <View style={styles.adWrap}>
+                  <AdBanner colors={colors} placement="godDetailInline" inline />
+                </View>
+              </View>
 
-          <View style={{ height: 32 }} />
-        </ScrollView>
+              <View style={{ height: 32 }} />
+            </View>
+          }
+        />
       </SafeAreaView>
     </ScreenMount>
   );

@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import {
   View,
   ScrollView,
   StyleSheet,
   InteractionManager,
   PixelRatio,
+  AppState,
 } from 'react-native';
-import { AppText as Text } from '@/components/common/AppText';
+import { AppText as Text, FONT_SCALE } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/common/Icon';
 import { MotionPressable } from '@/components/common/MotionPressable';
@@ -24,12 +25,13 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 import { useStore } from '@/store/useStore';
+import { FESTIVALS_MIN_YEAR, FESTIVALS_MAX_YEAR } from '@/data/festivals';
+import type { FontSize } from '@/store/useStore';
 import { useLocaleFormatters } from '@/utils/format';
 import {
   darkColors,
   lightColors,
   palette,
-  semanticColors,
   borderRadius,
   spacing,
   typeScale,
@@ -38,9 +40,11 @@ import {
   type ColorPalette,
 } from '@/config/theme';
 import { useLazyDailyPanchang } from '@/hooks/useLazyDailyPanchang';
-import { buildDayVerdict } from '@/utils/dayVerdict';
-import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang } from '@/services/astrology/panchangService';
+import { buildDayVerdict, VERDICT_REVIEW_PENDING } from '@/utils/dayVerdict';
+import { computeJanmaNakshatraIndex, computeJanmaRashiIndex, fetchInstantPanchang, FALLBACK_COORDS } from '@/services/astrology/panchangService';
+import { isSameDay } from '@/utils/calendar';
 import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
+import { timezoneLabel } from '@/utils/timezoneLabel';
 import { resolveLanguage } from '@/i18n';
 import {
   localizeChandraMasa,
@@ -59,8 +63,8 @@ import { QualitySlotsCard } from '@/components/panchang/QualitySlotsCard';
 import { HoraCard } from '@/components/panchang/HoraCard';
 import { PlanetaryPositionsCard } from '@/components/panchang/PlanetaryPositionsCard';
 import { AccordionSection } from '@/components/panchang/AccordionSection';
-import { CalGridDense } from '@/components/panchang/CalGridDense';
-import { AUSPICIOUS_GREEN, eventDotColor } from '@/components/panchang/calendarColors';
+import { CalGridDense, cellA11yLabel, makeCellDateFormatter } from '@/components/panchang/CalGridDense';
+import { eventDotColor } from '@/components/panchang/calendarColors';
 import {
   getCalendarMonth,
   peekCalendarMonth,
@@ -72,18 +76,30 @@ import { pmark, pAccordionResetCount } from '@/utils/perfProfile';
 import { durations, easings } from '@/config/motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
-function isSameDay(a: Date, b: Date) {
-  return a.getDate() === b.getDate() &&
-    a.getMonth() === b.getMonth() &&
-    a.getFullYear() === b.getFullYear();
-}
-
 function isSameMonth(a: Date, b: Date) {
   return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
 }
 
 function ymdKey(d: Date) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+// The month picker's bounds. Module constants rather than `new Date(...)` in
+// the JSX: a fresh pair of Dates per render is a fresh pair of props for the
+// modal (and the native picker under it) every time this screen renders.
+const PICKER_MIN_DATE = new Date(1900, 0, 1);
+const PICKER_MAX_DATE = new Date(2100, 11, 31);
+
+// How old the "at this moment" stamp may be before a return to the live view
+// (tab focus, back to today, app resume) takes a fresh one. Anything younger
+// is kept, so the stamp taken at mount is not replaced — and the screen not
+// re-rendered — when the tab is opened moments after it mounted.
+const INSTANT_STALE_MS = 30_000;
+
+/** `setInstantAtMs` updater: the current time if the stamp is stale, else the stamp. */
+function restampIfStale(prev: number): number {
+  const now = Date.now();
+  return now - prev >= INSTANT_STALE_MS ? now : prev;
 }
 
 // ─── Accordion category keys (also used as i18n a11y labels) ───────────────
@@ -99,13 +115,6 @@ const CATEGORY_KEYS = {
   planetary: 'panchang.planetary',
 } as const;
 
-// P16.3 content gate: the "today's verdict" copy is conservative + descriptive
-// (it only restates windows panchang-ts already flags, plus an eclipse caution
-// — no predictive "good day for X" claims). It carries a provisional posture
-// until the en+hi wording passes a qualified-reviewer pass before the bundle
-// ships. Flip to false only after that review.
-const VERDICT_REVIEW_PENDING = true;
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 interface LimbRowProps {
@@ -116,26 +125,23 @@ interface LimbRowProps {
   isToday?: boolean;
 }
 
-function parseTimeToMinutes(timeStr: string): number | null {
-  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return null;
-  let h = parseInt(match[1], 10);
-  const m = parseInt(match[2], 10);
-  const ampm = match[3].toUpperCase();
-  if (ampm === 'AM' && h === 12) h = 0;
-  if (ampm === 'PM' && h !== 12) h += 12;
-  return h * 60 + m;
-}
-
+/**
+ * Which element of a limb is running right now.
+ *
+ * Compares instants, not wall clocks. The library tiles each limb across
+ * [sunrise, nextSunrise], so an anga's end time routinely lands after midnight
+ * — "3:04 AM" parses to 184 minutes, which is below the current minute-of-day
+ * for the whole waking day, so a minutes-since-midnight comparison fell
+ * straight through to the last element and the "active now" dot silently
+ * vanished from the tithi / nakshatra / yoga rows on ~1 day in 5.
+ */
 function getActiveIndex(elements: IPanchangElement[]): number {
   if (elements.length <= 1) return 0;
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMs = Date.now();
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
-    if (!el.endTime) return i;
-    const endMin = parseTimeToMinutes(el.endTime);
-    if (endMin !== null && nowMinutes < endMin) return i;
+    if (el.endTimeMs === undefined) return i;
+    if (nowMs < el.endTimeMs) return i;
   }
   return elements.length - 1;
 }
@@ -164,19 +170,49 @@ function getActiveIndex(elements: IPanchangElement[]): number {
 // indented past the label column rather than boxed. Past a 1.3× font scale the
 // row stops being a row: the label moves onto its own line above the value
 // (frame 40) so nothing clips.
-const LEDGER_STACKED = PixelRatio.getFontScale() >= LEDGER_STACK_SCALE;
+const fontSizeSelector = (s: { fontSize: FontSize }) => s.fontSize;
+
+/**
+ * Whether the ledger rows stack. Text in this app is scaled by BOTH the OS
+ * font scale (via `allowFontScaling`) and the app's own font-size setting (via
+ * `AppText`), while the layout constants — the 70dp label column, the 12dp gap
+ * — are scaled by neither. So the trigger has to be the product: reading only
+ * `PixelRatio.getFontScale()` meant the app's own "Large" setting (exactly
+ * 1.3×, the designed threshold) enlarged every ledger string by 30% and never
+ * stacked, clipping the values it was built to protect. Computed per render
+ * rather than at module load so an OS font-scale change also takes effect —
+ * the activity is recreated but the JS context and its module constants are not.
+ */
+function useLedgerStacked(): boolean {
+  const fontSize = useStore(fontSizeSelector);
+  return PixelRatio.getFontScale() * FONT_SCALE[fontSize] >= LEDGER_STACK_SCALE;
+}
 
 const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday }: LimbRowProps) {
+  const stacked = useLedgerStacked();
   const isStatic = elements.length === 1 && !elements[0].endTime;
 
   if (isStatic) {
+    // Static rows stack too. They were returning above the stacking branch
+    // entirely, so vara / anandadi / chandra rashi / surya nakshatra / masa
+    // stayed a single clipped line at every font scale — and those carry the
+    // longest labels ("SURYA NAKSHATRA") against the longest values.
     return (
       <>
-        <View style={styles.staticRow}>
-          <Text variant="kicker" style={[styles.kicker, { color: colors.textMuted }]} numberOfLines={1}>
+        <View style={stacked ? styles.staticRowStacked : styles.staticRow}>
+          <Text
+            variant="kicker"
+            style={[styles.kicker, stacked && styles.kickerStacked, { color: colors.textMuted }]}
+            numberOfLines={1}>
             {label}
           </Text>
-          <Text style={[styles.staticValue, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text
+            style={[
+              styles.staticValue,
+              stacked && styles.staticValueStacked,
+              { color: colors.textPrimary },
+            ]}
+            numberOfLines={stacked ? 2 : 1}>
             {elements[0].name}
           </Text>
         </View>
@@ -189,7 +225,7 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
   return (
     <>
       <View style={styles.dynamicLimb}>
-        {LEDGER_STACKED && (
+        {stacked && (
           <Text variant="kicker" style={[styles.kicker, styles.kickerStacked, { color: colors.textMuted }]}>
             {label}
           </Text>
@@ -202,7 +238,7 @@ const LimbRow = memo(function LimbRow({ label, elements, colors, isLast, isToday
           const nameColor = isPrimary ? colors.textPrimary : colors.textSecondary;
           return (
             <View key={i} style={[styles.limbLine, i > 0 && styles.limbLineNext]}>
-              {LEDGER_STACKED ? null : isPrimary ? (
+              {stacked ? null : isPrimary ? (
                 <Text variant="kicker" style={[styles.kicker, { color: colors.textMuted }]} numberOfLines={1}>
                   {label}
                 </Text>
@@ -263,7 +299,7 @@ const MuhuratRow = memo(function MuhuratRow({ label, start, end, tone, colors, i
   return (
     <>
       <View style={styles.muhuratRow}>
-        <View style={[styles.muhuratDot, { backgroundColor: tone === 'good' ? AUSPICIOUS_GREEN : semanticColors.error }]} />
+        <View style={[styles.muhuratDot, { backgroundColor: tone === 'good' ? colors.success : colors.danger }]} />
         <Text style={[styles.muhuratLabel, { color: colors.textSecondary }]} numberOfLines={1}>{label}</Text>
         <Text style={[styles.muhuratTime, { color: colors.textPrimary }]} numberOfLines={1}>
           {start} – {end}
@@ -282,10 +318,13 @@ interface SunMoonStripProps {
   nextSunrise: string;
   colors: ColorPalette;
   labels: { sunrise: string; sunset: string; nextSunrise: string; moonrise: string; moonset: string };
+  /** Short zone name ("IST") when the times are not on the phone's clock. */
+  zoneLabel?: string | null;
+  zoneA11yLabel?: string;
 }
 
 const SunMoonStrip = memo(function SunMoonStrip({
-  sunrise, sunset, moonrise, moonset, nextSunrise, colors, labels,
+  sunrise, sunset, moonrise, moonset, nextSunrise, colors, labels, zoneLabel, zoneA11yLabel,
 }: SunMoonStripProps) {
   // Split into two equal-height rows divided by a hairline:
   //   row 1 (sun)  — sunrise / sunset / next sunrise   (3 cells)
@@ -312,9 +351,27 @@ const SunMoonStrip = memo(function SunMoonStrip({
           <Text variant="mono-caps" style={[styles.sunMoonLabel, { color: colors.textMuted }]} numberOfLines={1}>
             {labels[it.key]}
           </Text>
-          <Text style={[styles.sunMoonTime, { color: colors.textPrimary }]} numberOfLines={1}>
-            {it.time}
-          </Text>
+          {it.key === 'sunrise' && zoneLabel ? (
+            // The zone rides beside the sunrise time and wraps under it when
+            // the cell is too narrow (small phone, large text), so the time
+            // itself is never the thing that gets clipped.
+            <View style={styles.sunMoonTimeRow}>
+              <Text style={[styles.sunMoonTime, styles.sunMoonTimeShrink, { color: colors.textPrimary }]} numberOfLines={1}>
+                {it.time}
+              </Text>
+              <Text
+                variant="kicker"
+                style={[styles.zoneTag, { color: colors.textSecondary }]}
+                numberOfLines={1}
+                accessibilityLabel={zoneA11yLabel}>
+                {zoneLabel}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.sunMoonTime, { color: colors.textPrimary }]} numberOfLines={1}>
+              {it.time}
+            </Text>
+          )}
         </View>
       ))}
     </View>
@@ -353,7 +410,7 @@ const AlmanacGroup = memo(function AlmanacGroup({ rows, tone, colors }: AlmanacG
   );
 });
 
-interface FlagStripItem { key: string; label: string; tone: 'gold' | 'green' | 'sindoor' | 'error' }
+interface FlagStripItem { key: string; label: string; tone: 'accent' | 'success' | 'danger' }
 
 interface FlagStripProps {
   items: FlagStripItem[];
@@ -362,22 +419,34 @@ interface FlagStripProps {
 
 const FlagStrip = memo(function FlagStrip({ items, colors }: FlagStripProps) {
   if (items.length === 0) return null;
-  const toneToColor = (tone: FlagStripItem['tone']): string => {
+  // A flag needs three colours, not one. The earlier version derived the chip
+  // fill, the dot and the label from a single theme-invariant hex, which meant
+  // the label was accent-on-accent-tint: 1.95:1 at 11px on the light ground.
+  // Fill comes off the theme's `*Surface` container; the label AND the dot both
+  // come off the matching `*Text` ink, so both schemes clear AA (worst case
+  // 4.60:1) and the dot clears the 3:1 non-text floor. The fill tokens are the
+  // wrong value for the dot — `colors.accent` on the near-white light accent
+  // container is only 2.17:1. The old 'gold' and 'sindoor' tones are folded
+  // into one 'accent': both aliased to #D8A31A and were already
+  // indistinguishable on screen.
+  const toneToStyle = (tone: FlagStripItem['tone']): { fill: string; ink: string } => {
     switch (tone) {
-      case 'gold':    return palette.goldLeaf;
-      case 'green':   return AUSPICIOUS_GREEN;
-      case 'sindoor': return palette.sindoorWarm;
-      case 'error':   return semanticColors.error;
+      case 'accent':  return { fill: colors.accentSurface,  ink: colors.accentText };
+      case 'success': return { fill: colors.successSurface, ink: colors.successText };
+      case 'danger':  return { fill: colors.dangerSurface,  ink: colors.dangerText };
     }
   };
   return (
     <View style={styles.flagStrip}>
       {items.map(it => {
-        const c = toneToColor(it.tone);
+        const s = toneToStyle(it.tone);
+        // Edge keeps the old 33% alpha but is derived from the ink rather than
+        // the fill: the light containers are near-white, so a fill-derived
+        // hairline would vanish into the page.
         return (
-          <View key={it.key} style={[styles.flag, { backgroundColor: c + '1A', borderColor: c + '55' }]}>
-            <View style={[styles.flagDot, { backgroundColor: c }]} />
-            <Text style={[styles.flagText, { color: c }]} numberOfLines={1}>{it.label}</Text>
+          <View key={it.key} style={[styles.flag, { backgroundColor: s.fill, borderColor: s.ink + '55' }]}>
+            <View style={[styles.flagDot, { backgroundColor: s.ink }]} />
+            <Text style={[styles.flagText, { color: s.ink }]} numberOfLines={1}>{it.label}</Text>
           </View>
         );
       })}
@@ -388,7 +457,7 @@ const FlagStrip = memo(function FlagStrip({ items, colors }: FlagStripProps) {
 // ─── Calendar view toggle ──────────────────────────────────────────────────
 // Editorial-style segmented control that lives directly above the calendar
 // grid. Both states are always visible — current state is communicated by an
-// accent-colour label/icon plus a hairline gold underline rule beneath the
+// accent-colour label/icon plus a hairline accent underline rule beneath the
 // selected option. Outer hairline rules + a centre divider frame the pair as
 // a deliberate editorial stop between the month strip and the grid (replaces
 // the old action-labelled chip in the header, which was cramped + cropped +
@@ -411,7 +480,12 @@ const CalendarViewToggle = memo(function CalendarViewToggle({
     label: string,
   ) => {
     const isSelected = layout === key;
-    const tone = isSelected ? colors.accent : colors.textTertiary;
+    // `accentText`, not `accent`, for the same reason as the underline below:
+    // the accent FILL token is turmeric in both schemes, which is 2.09:1 as
+    // 13px words on the rice ground. `accentText` is #7A5900 on light (5.90:1)
+    // and turmeric on dark (8.02:1), so label, icon and underline all clear AA
+    // in both schemes and read as one selected state.
+    const tone = isSelected ? colors.accentText : colors.textTertiary;
     return (
       <MotionPressable
         onPress={() => onSelect(key)}
@@ -426,11 +500,19 @@ const CalendarViewToggle = memo(function CalendarViewToggle({
           </Text>
         </View>
         {/* Always reserve underline space so layout doesn't jump on switch.
-            Color flips between gold and transparent. */}
+            Color flips between the accent ink and transparent. It was a
+            theme-invariant `palette.gold`, which is #7A5900 in both schemes —
+            5.90:1 on rice but only 2.85:1 on the night ground, so the one cue
+            for "which view am I on?" all but vanished in dark mode.
+            `colors.accentText` is the same #7A5900 on light (nothing changes
+            there) and turmeric on dark, where it reads 8.02:1. The `accent`
+            fill token is the wrong choice for this hairline: it is turmeric in
+            BOTH schemes, which would have traded the dark-mode failure for a
+            2.09:1 light-mode one. */}
         <View
           style={[
             styles.viewToggleUnderline,
-            { backgroundColor: isSelected ? palette.gold : 'transparent' },
+            { backgroundColor: isSelected ? colors.accentText : 'transparent' },
           ]}
         />
       </MotionPressable>
@@ -474,7 +556,29 @@ export default function PanchangScreen() {
   const { digits } = useLocaleFormatters();
   const colors = isDarkMode ? darkColors : lightColors;
 
-  const today = useMemo(() => new Date(), []);
+  // NativeTabs has no lazy/freeze gate (see `app/(tabs)/_layout.tsx`), so every
+  // tab screen mounts on cold start and this screen's mount work — the daily
+  // compute, the instant snapshot, the ~80–120ms 42-cell month build and two
+  // intervals — used to run behind Home's first paint, landing right where the
+  // user's first tap does. Everything expensive below is gated on this latch.
+  //
+  // One-way by design: once the tab HAS been opened it behaves exactly as it
+  // did before, so switching away and back tears nothing down and resets no
+  // state. `useIsFocused` reads the live focus state synchronously on the
+  // first render (useSyncExternalStore), so a user who lands straight on this
+  // tab pays no extra frame.
+  const isFocused = useIsFocused();
+  const [hasBeenFocused, setHasBeenFocused] = useState(isFocused);
+  if (isFocused && !hasBeenFocused) setHasBeenFocused(true);
+
+  // `today` is state, not a mount-time constant. The screen is a NativeTabs
+  // trigger and stays mounted for the whole session, so a frozen value meant
+  // that after midnight the "TODAY" kicker, the calendar's today ring and the
+  // `isViewingToday` gate all still pointed at yesterday — with the live "at
+  // this moment" line (computed from the real now) printed underneath
+  // yesterday's ledger, and the jump-back chip hidden because the screen
+  // believed it was already on today.
+  const [today, setToday] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [calMonth, setCalMonth] = useState<Date>(
     new Date(today.getFullYear(), today.getMonth(), 1),
@@ -488,8 +592,12 @@ export default function PanchangScreen() {
   const birthMoment = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
     const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    // `??` on a local hoisted out of the try: a nullish coalescing *inside* a
+    // try block is a React Compiler bailout, and it costs nothing here since
+    // the fallback cannot throw. Only wallclockInZoneToUtc needs guarding.
+    const bt = userBirthTime ?? '12:00';
     try {
-      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+      return wallclockInZoneToUtc(userBirthDate, bt, tz);
     } catch {
       return null;
     }
@@ -511,10 +619,59 @@ export default function PanchangScreen() {
     selectedDate, userLocation, panchangLang, region, janmaNakshatra, janmaRashi, ayanamsa,
   );
 
+  // Fires on the tab's first focus, not on cold start — `firstEffect` is the
+  // marker for "this screen started doing work", and under NativeTabs that is
+  // now the moment the user opens it.
   useEffect(() => {
+    if (!hasBeenFocused) return;
     pAccordionResetCount();
     pmark('panchangScreen:firstEffect');
-  }, []);
+  }, [hasBeenFocused]);
+
+  // Latest-value channel for `roll` below, which is installed once and must not
+  // tear down its timer + AppState listener on every date tap. Written in an
+  // effect, never during render: `roll` only ever fires from a timer or an
+  // AppState transition — i.e. after a commit — so it always sees the values
+  // the last commit published.
+  const todayRef = useRef(today);
+  const selectedDateRef = useRef(selectedDate);
+  useEffect(() => {
+    todayRef.current = today;
+    selectedDateRef.current = selectedDate;
+  }, [today, selectedDate]);
+
+  // Advance `today` across midnight. Only `today` moves on its own: if the
+  // user is parked on a date they chose, leave them there and let
+  // `isViewingToday` flip to false — that is the correct cascade (the
+  // jump-back chip reappears, the kicker stops claiming "Today", the live
+  // moment line tears down). `selectedDate` follows only when it was still
+  // tracking the old today.
+  useEffect(() => {
+    if (!hasBeenFocused) return;
+    const roll = () => {
+      const now = new Date();
+      const prev = todayRef.current;
+      if (isSameDay(prev, now)) return;
+      todayRef.current = now;
+      setToday(now);
+      if (isSameDay(selectedDateRef.current, prev)) {
+        setSelectedDate(now);
+        setCalMonth(m => (isSameMonth(now, m) ? m : new Date(now.getFullYear(), now.getMonth(), 1)));
+      }
+    };
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') roll();
+    });
+    const id = setInterval(roll, 5 * 60 * 1000);
+    // The tab can sit mounted-but-unfocused across a midnight — or across a
+    // background/resume whose 'active' event this listener was not installed
+    // for — so `today` is caught up once as the gate opens instead of waiting
+    // up to five minutes for the first tick. Deferred to a timer rather than
+    // called inline: a synchronous setState in an effect body is the cascading
+    // render `react-hooks/set-state-in-effect` exists to stop.
+    const catchUp = setTimeout(roll, 0);
+    return () => { sub.remove(); clearInterval(id); clearTimeout(catchUp); };
+  }, [hasBeenFocused]);
 
   const firstRealDataMarkedRef = useRef(false);
   useEffect(() => {
@@ -525,37 +682,92 @@ export default function PanchangScreen() {
   }, [panchang]);
 
   // P16.3: the day's plain verdict needs the daily compute (Rahu Kalam /
-  // Abhijit windows), so request it once on mount instead of waiting for an
-  // accordion open. Runs after first paint (effect), so cold-start paint isn't
-  // blocked; the compute is cached for the rest of the session and auto-syncs
-  // on date change.
+  // Abhijit windows), so request it once the tab is first opened instead of
+  // waiting for an accordion open. Runs after that first paint (effect), so
+  // paint isn't blocked; the compute is cached for the rest of the session and
+  // auto-syncs on date change.
   useEffect(() => {
+    if (!hasBeenFocused) return;
     request();
-  }, [request]);
+  }, [request, hasBeenFocused]);
 
   // ── Instant snapshot — only relevant when viewing today ─────────────────
-  const [instant, setInstant] = useState<IInstantPanchang | null>(null);
+  // Derived during render, not written from an effect. The effect shape
+  // (compute → setInstant → the whole screen renders again) cost a second
+  // full render on first focus, on every return to today and on every input
+  // change, plus a no-op commit on every tap away from today for its
+  // `setInstant(null)` branch. The only state left is the moment the snapshot
+  // describes — state rather than a clock read inside the memo, so the memo
+  // has a real, reactive dependency to recompute on. The ~3 ms compute now
+  // sits on the first focused render: cheaper than the render it replaces,
+  // and `hasBeenFocused` keeps it off cold start.
   const isViewingToday = isSameDay(selectedDate, today);
+  // Lazy mount-time stamp: free on cold start, and already current for a deep
+  // link that lands straight on this tab.
+  const [instantAtMs, setInstantAtMs] = useState(() => Date.now());
+
+  // The moment line is live while the tab is on screen AND showing today.
+  // Every time it goes live — the tab's first focus, a return from another
+  // tab, a return to today from another date — the stamp is re-taken here,
+  // during render, if it is stale. NativeTabs mounts this screen at cold start,
+  // so on first focus the stamp is the LAUNCH moment; re-stamping from an
+  // effect (as this used to, via a zero-delay timer) committed that launch-time
+  // tithi / nakshatra / yoga first, recomputed it a frame later, and ran
+  // `fetchInstantPanchang` twice. As a render-time adjustment the fresh stamp
+  // lands in the same commit that turns the line on: one compute, no stale
+  // frame, no extra commit. On first focus the discarded pass computes nothing
+  // (`hasBeenFocused` is still false in it, so the memo below returns null).
+  // The initial value is the live state at mount, so a deep link that lands
+  // here at cold start sees no transition and pays no extra pass; and the
+  // staleness guard keeps a stamp that is only moments old.
+  const momentLive = isFocused && isViewingToday;
+  const [seenMomentLive, setSeenMomentLive] = useState(momentLive);
+  if (momentLive !== seenMomentLive) {
+    setSeenMomentLive(momentLive);
+    if (momentLive) setInstantAtMs(restampIfStale);
+  }
+
+  const instant = useMemo<IInstantPanchang | null>(() => {
+    if (!hasBeenFocused || !isViewingToday) return null;
+    const coords = userLocation ?? FALLBACK_COORDS;
+    return fetchInstantPanchang(new Date(instantAtMs), coords, panchangLang, ayanamsa);
+  }, [hasBeenFocused, isViewingToday, instantAtMs, userLocation, panchangLang, ayanamsa]);
+
+  // While live: a five-minute tick, and a guarded re-stamp when the app comes
+  // back to the foreground (focus does not change on resume, so the render-time
+  // re-stamp above cannot see it). Keyed on `momentLive`, not on the one-way
+  // `hasBeenFocused`: the tab never unmounts, and an unkeyed tick re-rendered
+  // this whole screen every five minutes from behind whatever tab the user was
+  // actually on. Nothing is lost by stopping it — the next return re-stamps.
   useEffect(() => {
-    if (!isViewingToday) {
-      setInstant(null);
-      return;
-    }
-    const coords = userLocation ?? { lat: 25.3176, lon: 83.0103 };
-    setInstant(fetchInstantPanchang(new Date(), coords, panchangLang, ayanamsa));
-    const id = setInterval(() => {
-      setInstant(fetchInstantPanchang(new Date(), coords, panchangLang, ayanamsa));
-    }, 5 * 60 * 1000);
-    return () => clearInterval(id);
-  }, [isViewingToday, userLocation, panchangLang, ayanamsa]);
+    if (!momentLive) return;
+    const id = setInterval(() => setInstantAtMs(Date.now()), 5 * 60 * 1000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setInstantAtMs(restampIfStale);
+    });
+    return () => { clearInterval(id); sub.remove(); };
+  }, [momentLive]);
+
+  // A14: the zone the day's times are rendered in. Same resolution as
+  // `useLazyDailyPanchang`: a stored place carries its own zone (none for a GPS
+  // fix: device clock), and no place at all means FALLBACK_COORDS, i.e. Ujjain
+  // on IST. Printed for the fallback always, and for a chosen place whose
+  // offset is not the phone's; null otherwise (see `timezoneLabel`).
+  const zoneLabel = useMemo(
+    () => timezoneLabel(userLocation, FALLBACK_COORDS, selectedDate),
+    [userLocation, selectedDate],
+  );
+  const zoneA11yLabel = zoneLabel ? t('a11y.timesInZone', { zone: zoneLabel }) : undefined;
 
   // Calendar cells + per-day event category for the visible month.
   const calYear = calMonth.getFullYear();
   const calMonthIdx = calMonth.getMonth();
-  const calLat = userLocation?.lat ?? 25.3176;
-  const calLon = userLocation?.lon ?? 83.0103;
-  // Peek the cache synchronously; on miss the screen paints first, then a
-  // `useEffect` runs the ~80–120ms build off the render path (P11.1).
+  const calLat = userLocation?.lat ?? FALLBACK_COORDS.lat;
+  const calLon = userLocation?.lon ?? FALLBACK_COORDS.lon;
+  // Peek the cache synchronously (a Map lookup); on miss the screen paints
+  // first, then a `useEffect` runs the ~80–120ms build off the render path
+  // (P11.1) — and only once the tab has been opened, so a cold start that
+  // never leaves Home never pays for it.
   const cachedMonth = useMemo(
     () => peekCalendarMonth(calYear, calMonthIdx, { lat: calLat, lon: calLon }, {
       region,
@@ -565,9 +777,16 @@ export default function PanchangScreen() {
     }),
     [calYear, calMonthIdx, calLat, calLon, region, ayanamsa, masaSystem],
   );
-  const [computedMonth, setComputedMonth] = useState<CalendarMonth | null>(null);
+  // The deferred build lands asynchronously, so `computedMonth` can still be
+  // holding the PREVIOUS month (or the previous location / ayanamsa) at the
+  // moment the inputs change — `cachedMonth` goes null in the same commit as
+  // the month flips. Stamp each build with the inputs it was made for and only
+  // accept it when they still match; otherwise the grid rendered last month's
+  // 42 cells, live and tappable, under this month's header.
+  const monthIdentity = `${calYear}|${calMonthIdx}|${calLat}|${calLon}|${region}|${ayanamsa}|${masaSystem}`;
+  const [computedMonth, setComputedMonth] = useState<{ id: string; data: CalendarMonth } | null>(null);
   useEffect(() => {
-    if (cachedMonth) return;
+    if (!hasBeenFocused || cachedMonth) return;
     let cancelled = false;
     const handle = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
@@ -577,11 +796,11 @@ export default function PanchangScreen() {
         selectedDeities: [],
         masaSystem,
       });
-      if (!cancelled) setComputedMonth(built);
+      if (!cancelled) setComputedMonth({ id: monthIdentity, data: built });
     });
     return () => { cancelled = true; handle.cancel(); };
-  }, [cachedMonth, calYear, calMonthIdx, calLat, calLon, region, ayanamsa, masaSystem]);
-  const monthData = cachedMonth ?? computedMonth;
+  }, [hasBeenFocused, cachedMonth, monthIdentity, calYear, calMonthIdx, calLat, calLon, region, ayanamsa, masaSystem]);
+  const monthData = cachedMonth ?? (computedMonth?.id === monthIdentity ? computedMonth.data : null);
 
   const cells: (Date | null)[] = useMemo(
     () => monthData ? monthData.cells.map(c => c.date) : [],
@@ -660,6 +879,10 @@ export default function PanchangScreen() {
   }, []);
   const goToday = useCallback(() => {
     const now = new Date();
+    // Refresh `today` as well — otherwise, post-midnight, this lands on the
+    // right day but leaves `isViewingToday` false, so the kicker prints a date
+    // instead of "TODAY" and the live moment line stays suppressed.
+    setToday(now);
     setCalMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedDate(now);
   }, []);
@@ -712,27 +935,33 @@ export default function PanchangScreen() {
     });
   }, []);
 
-  const swipeGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetX([-15, 15])
-        .failOffsetY([-15, 15])
-        .onUpdate(e => {
-          swipeX.value = e.translationX;
-        })
-        .onEnd(e => {
-          'worklet';
-          const committed =
-            Math.abs(e.translationX) > 80 || Math.abs(e.velocityX) > 400;
-          if (committed) {
-            // Negative dx → swipe left → next day; positive dx → previous day.
-            const delta = e.translationX < 0 ? 1 : -1;
-            runOnJS(goToDay)(delta);
-          }
-          swipeX.value = withSpring(0, { damping: 18, stiffness: 200 });
-        }),
-    [swipeX, goToDay],
-  );
+  // Built inline, NOT wrapped in useMemo: a dep array holding the shared value
+  // `swipeX` (which the gesture callbacks mutate) trips the React Compiler's
+  // immutability check and makes it bail out of memoizing this whole screen —
+  // 529 memo slots for the rest of the tree against one rebuilt gesture object.
+  // The compiler will NOT cache this binding either (it refuses to hoist a value
+  // whose closures mutate a shared value), so a fresh Gesture.Pan() is built on
+  // every render. That is safe: RNGH's GestureDetector explicitly supports an
+  // unmemoized gesture — needsToReattach() stays false (same handler name, same
+  // thread), so it takes the updateHandlers() path and swaps the config on the
+  // existing native handler rather than dropping and re-attaching it.
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onUpdate(e => {
+      swipeX.value = e.translationX;
+    })
+    .onEnd(e => {
+      'worklet';
+      const committed =
+        Math.abs(e.translationX) > 80 || Math.abs(e.velocityX) > 400;
+      if (committed) {
+        // Negative dx → swipe left → next day; positive dx → previous day.
+        const delta = e.translationX < 0 ? 1 : -1;
+        runOnJS(goToDay)(delta);
+      }
+      swipeX.value = withSpring(0, { damping: 18, stiffness: 200 });
+    });
 
   const contentAnimStyle = useAnimatedStyle(() => ({
     opacity: transitionProgress.value,
@@ -749,7 +978,21 @@ export default function PanchangScreen() {
   }, [panchangLayout, setPanchangLayout]);
 
   const monthNames = t('panchang.monthNames', { returnObjects: true }) as string[];
-  const dayHeaders = t('panchang.dayHeaders', { returnObjects: true }) as string[];
+  // `returnObjects` deep-copies, so this is a new array on every render — and
+  // it is a prop of the `memo`'d dense grid, whose shallow compare it would
+  // otherwise fail every time. `t` is the honest dependency and it is stable
+  // per language: react-i18next hands it out through a cached
+  // `useSyncExternalStore` snapshot that is rebuilt only when the language, the
+  // keyPrefix or the store revision changes.
+  const dayHeaders = useMemo(
+    () => t('panchang.dayHeaders', { returnObjects: true }) as string[],
+    [t],
+  );
+
+  // Built once per language and reused across all 42 compact cells — see
+  // `makeCellDateFormatter`. The dense grid keeps its own, since it is memo'd
+  // and re-renders independently.
+  const cellDateFmt = useMemo(() => makeCellDateFormatter(panchangLang), [panchangLang]);
 
   const selectedGregorian = selectedDate.toLocaleDateString(
     panchangLang === 'hi' ? 'hi-IN' : 'en-IN',
@@ -780,7 +1023,7 @@ export default function PanchangScreen() {
         : name;
       if (seen.has(label)) return;
       seen.add(label);
-      out.push({ key: `fest-${i}`, label, tone: 'gold' as const });
+      out.push({ key: `fest-${i}`, label, tone: 'accent' as const });
     });
     return out;
   }, [selectedCell, panchangLang]);
@@ -813,11 +1056,14 @@ export default function PanchangScreen() {
 
   // P16.3 — plain "today's verdict". Shared with the Home Panchang hero via
   // buildDayVerdict (see that helper for the content-gate posture). Eclipse is
-  // read from the synchronous cell snapshot so the caution shows before the
-  // daily compute resolves.
+  // read from `panchang`, never from the calendar cell: the cell buckets an
+  // eclipse by its device-local peak date while the daily compute attributes it
+  // to the Hindu (sunrise-to-sunrise) day, so a pre-dawn peak lands a day apart
+  // (4 of the 18 eclipses between 2026 and 2031 at IST). Home passes the same
+  // source, so the two surfaces cannot disagree about which day owns it.
   const verdict = useMemo(
-    () => buildDayVerdict(panchang, !!selectedCell?.eclipse, t),
-    [selectedCell, panchang, t],
+    () => buildDayVerdict(panchang, !!panchang?.eclipse, t),
+    [panchang, t],
   );
 
   // Pancha Anga is the canonical "what is this day?" view, so it defaults
@@ -870,16 +1116,30 @@ export default function PanchangScreen() {
         <Text variant="display" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('panchang.headerTitle')}
         </Text>
-        <View style={[styles.locPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* Tappable — see the matching note on the Home pill. */}
+        <MotionPressable
+          onPress={() => router.push('/location-permission')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.locPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.changeLocation', {
+            location: locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault')),
+          })}>
           <Icon name="location" size={10} color={colors.accent} />
           <Text variant="kicker" style={[styles.locText, { color: colors.textTertiary }]} numberOfLines={1}>
             {locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'))}
           </Text>
-        </View>
+        </MotionPressable>
       </View>
 
       <ScrollView
         ref={scrollRef}
+        // iOS: react-native-screens only applies the tab-bar content inset to the
+        // first ScrollView in the tab screen's first-descendant chain, and here the
+        // header row comes first, so React Native's iOS default (Never) stuck.
+        // Without this the end of the scroll content sits permanently under
+        // the floating tab bar and cannot be tapped (Android ignores the prop).
+        contentInsetAdjustmentBehavior="automatic"
         onScroll={(e) => {
           scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
         }}
@@ -1012,16 +1272,39 @@ export default function PanchangScreen() {
                     : !inCurrentMonth
                       ? colors.textDisabled
                       : isMajorEvent
-                        ? colors.accent
+                        // accent-as-WORDS: `colors.accent` is the fill token and
+                        // is 2.09:1 on the light ground, so festival day numbers
+                        // rendered fainter than ordinary ones. The dense grid
+                        // already uses `accentText` for the same job.
+                        ? colors.accentText
                         : colors.textPrimary;
+
+                  // The compact cell draws only a day number and a coloured
+                  // dot, so the label is the *only* place the tithi and the
+                  // festival name can reach a screen reader — the dot has no
+                  // text equivalent at all. A Pressable is accessible by
+                  // default, so this label replaces the child <Text>; the old
+                  // `toDateString()` was English-only and said nothing else.
+                  const cellEventLabel = inCurrentMonth && dayInfo && dayInfo.eventCategory !== 'plain'
+                    ? localizePrimaryEvent(dayInfo.primaryEventName, panchangLang)
+                    : '';
+                  const cellTithiLabel = inCurrentMonth && dayInfo?.tithiName
+                    ? localizeTithi(
+                        `${dayInfo.paksha === 'shukla' ? 'Shukla' : 'Krishna'} ${dayInfo.tithiName}`,
+                        panchangLang,
+                      )
+                    : '';
+                  const a11yLabel = cellA11yLabel(
+                    cellDateFmt, cellDate, cellTithiLabel, cellEventLabel,
+                  );
 
                   return (
                     <MotionPressable
                       key={idx}
-                                    onPress={() => handlePickDay(cellDate)}
+                      onPress={() => handlePickDay(cellDate)}
                       style={styles.calCell}
                       accessibilityRole="button"
-                      accessibilityLabel={cellDate.toDateString()}
+                      accessibilityLabel={a11yLabel}
                       accessibilityState={{ selected: isSelected }}>
 
                       <View
@@ -1045,6 +1328,22 @@ export default function PanchangScreen() {
           )}
         </SkeletonCrossfade>
 
+        {/* The grid keeps computing tithi / nakshatra for any year the picker
+            reaches (1900–2100), but festival names only exist for the years
+            the bundled table covers — outside that range Holi, Diwali, every
+            Ekadashi and every Sankranti are simply absent from a grid that
+            otherwise looks complete. State the coverage rather than let the
+            absence read as "no festivals". */}
+        {(calYear < FESTIVALS_MIN_YEAR || calYear > FESTIVALS_MAX_YEAR) && (
+          <Text variant="body-italic" style={[styles.festivalRangeNote, { color: colors.textTertiary }]}>
+            {t('panchang.festivalDataRange', {
+              from: digits(String(FESTIVALS_MIN_YEAR)),
+              to: digits(String(FESTIVALS_MAX_YEAR)),
+              defaultValue: 'Festival dates are available for {{from}}–{{to}}.',
+            })}
+          </Text>
+        )}
+
         <View style={[styles.postCalRule, { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider }]} />
 
         {/* ── Date-dependent content (fades on date change, swipe-able) ──── */}
@@ -1053,12 +1352,18 @@ export default function PanchangScreen() {
 
         {/* ── Selected-day line ────────────────────────────────────────────── */}
         <View style={styles.selectedLine}>
-          <Text variant="mono-caps" style={[styles.selectedKicker, { color: colors.accent }]}>
+          <Text variant="mono-caps" style={[styles.selectedKicker, { color: colors.accentText }]}>
             {isViewingToday ? t('panchang.todayChip') : selectedGregorian}
           </Text>
-          {monthData && monthData.vikramSamvat > 0 && showVikramSamvat && (
+          {/* The Samvat belongs to the SELECTED DAY, not to the month. It rolls
+              at Chaitra Shukla Pratipada, so `CalendarMonth.vikramSamvat` —
+              sampled once from the 15th — is a year out for every day on the
+              far side of that boundary (43 days across the shipped range), and
+              it also changed under an unchanged date when the month arrows
+              were used to browse. */}
+          {panchang && panchang.vikramSamvat > 0 && showVikramSamvat && (
             <Text variant="body-italic" style={[styles.selectedSamvat, { color: colors.textTertiary }]}>
-              {t('panchang.vsSamvat', { year: digits(String(monthData.vikramSamvat)) })}
+              {t('panchang.vsSamvat', { year: digits(String(panchang.vikramSamvat)) })}
             </Text>
           )}
         </View>
@@ -1080,15 +1385,30 @@ export default function PanchangScreen() {
             and provisional — see VERDICT_REVIEW_PENDING. */}
         {(verdict || momentLine.length > 0) && (
           <View style={[styles.verdictCard, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
-            <Text variant="mono-caps" style={[styles.glanceKicker, { color: colors.accent }]}>
-              {t('panchang.glanceTitle')}
-            </Text>
+            {/* The verdict's best / avoid windows are the only times this tab
+                shows before anything is expanded, so the zone they are in is
+                stated here too, not only beside sunrise inside Sun & Moon.
+                Only a timed verdict gets it — the eclipse caution has none. */}
+            <View style={styles.verdictHead}>
+              <Text variant="mono-caps" style={[styles.glanceKicker, { color: colors.accent }]}>
+                {t('panchang.glanceTitle')}
+              </Text>
+              {!!zoneLabel && !!verdict && !verdict.caution && (
+                <Text
+                  variant="kicker"
+                  style={[styles.zoneTag, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                  accessibilityLabel={zoneA11yLabel}>
+                  {zoneLabel}
+                </Text>
+              )}
+            </View>
             {verdict && (
               <Text
                 variant="body"
                 style={[
                   styles.verdictText,
-                  { color: verdict.caution ? semanticColors.error : colors.textPrimary },
+                  { color: verdict.caution ? colors.dangerText : colors.textPrimary },
                 ]}>
                 {verdict.text}
               </Text>
@@ -1096,7 +1416,7 @@ export default function PanchangScreen() {
             {verdict && VERDICT_REVIEW_PENDING && (
               <Text
                 variant="body-italic"
-                style={[styles.verdictProvisional, { color: colors.textMuted }]}>
+                style={[styles.verdictProvisional, { color: colors.textSecondary }]}>
                 {t('panchang.verdictProvisional')}
               </Text>
             )}
@@ -1210,11 +1530,11 @@ export default function PanchangScreen() {
                 <FlagStrip
                   colors={colors}
                   items={[
-                    ...(panchang.isAdhikaMasa ? [{ key: 'adhika', label: t('panchang.adhikaMasa'), tone: 'gold' as const }] : []),
+                    ...(panchang.isAdhikaMasa ? [{ key: 'adhika', label: t('panchang.adhikaMasa'), tone: 'accent' as const }] : []),
                     ...panchang.specialYogas.map((y, i) => ({
-                      key: `yoga-${i}`, label: localizeYoga(y.name, panchangLang), tone: 'green' as const,
+                      key: `yoga-${i}`, label: localizeYoga(y.name, panchangLang), tone: 'success' as const,
                     })),
-                    ...(panchang.panchaka ? [{ key: 'panchaka', label: t('panchang.panchaka'), tone: 'sindoor' as const }] : []),
+                    ...(panchang.panchaka ? [{ key: 'panchaka', label: t('panchang.panchaka'), tone: 'accent' as const }] : []),
                     ...(panchang.gandaMula
                       ? [{
                           key: 'ganda',
@@ -1222,7 +1542,7 @@ export default function PanchangScreen() {
                             panchang.gandaMula.severity === 'severe' ? 'panchang.gandaMulaSevere' : 'panchang.gandaMulaMild',
                             { nakshatra: panchang.gandaMula.nakshatraName },
                           ),
-                          tone: panchang.gandaMula.severity === 'severe' ? ('error' as const) : ('sindoor' as const),
+                          tone: panchang.gandaMula.severity === 'severe' ? ('danger' as const) : ('accent' as const),
                         }]
                       : []),
                   ]}
@@ -1258,6 +1578,8 @@ export default function PanchangScreen() {
                   moonrise: t('panchang.moonrise'),
                   moonset: t('panchang.moonset'),
                 }}
+                zoneLabel={zoneLabel}
+                zoneA11yLabel={zoneA11yLabel}
               />
               <View style={[styles.durationRow, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
                 <View style={styles.durationCell}>
@@ -1285,7 +1607,7 @@ export default function PanchangScreen() {
           open={isCategoryOpen(CATEGORY_KEYS.auspicious)}
           onToggle={() => togglePanchangCategory(CATEGORY_KEYS.auspicious)}
           onFirstOpen={onAnyAccordionFirstOpen}
-          accentColor={AUSPICIOUS_GREEN}
+          accentColor={colors.successText}
           colors={colors}>
           {panchang ? (
             <AlmanacGroup
@@ -1317,7 +1639,7 @@ export default function PanchangScreen() {
           open={isCategoryOpen(CATEGORY_KEYS.inauspicious)}
           onToggle={() => togglePanchangCategory(CATEGORY_KEYS.inauspicious)}
           onFirstOpen={onAnyAccordionFirstOpen}
-          accentColor={semanticColors.error}
+          accentColor={colors.dangerText}
           colors={colors}>
           {panchang ? (
             <AlmanacGroup
@@ -1343,48 +1665,76 @@ export default function PanchangScreen() {
           )}
         </AccordionSection>
 
-        {/* Eclipse — only when present (read sync from cell snapshot) */}
-        {selectedCell?.eclipse && (
+        {/* Eclipse — gated on the daily compute, not the calendar cell. The
+            cell buckets an eclipse by its device-local peak date while the
+            compute attributes it to the Hindu (sunrise-to-sunrise) day, so a
+            pre-dawn peak sits one civil day earlier; gating on one and reading
+            the other left the card a permanent "tap to reveal" dead-end on the
+            civil date and absent on the Hindu day. One source, no placeholder
+            branch: the compute is requested on mount (see the P16.3 effect
+            above), so `panchang` is resolved by the time this can be true. */}
+        {panchang?.eclipse && (
           <AccordionSection
             storageKey={CATEGORY_KEYS.eclipse}
             title={t('panchang.eclipseSection')}
             open={isCategoryOpen(CATEGORY_KEYS.eclipse)}
             onToggle={() => togglePanchangCategory(CATEGORY_KEYS.eclipse)}
             onFirstOpen={onAnyAccordionFirstOpen}
-            accentColor={semanticColors.error}
+            accentColor={colors.dangerText}
             colors={colors}>
-            {panchang?.eclipse ? (
-              <View style={[styles.eclipseCard, { backgroundColor: semanticColors.error + '1E', borderColor: semanticColors.error + '66' }]}>
-                <View style={styles.eclipseHeader}>
-                  <Icon
-                    name={panchang.eclipse.kind === 'solar' ? 'sun' : 'moon'}
-                    size={18}
-                    color={semanticColors.error}
-                  />
-                  <Text style={[styles.eclipseTitle, { color: colors.textPrimary }]}>
-                    {panchang.eclipse.kind === 'solar' ? t('panchang.eclipseSolar') : t('panchang.eclipseLunar')}
-                    {'  ·  '}
-                    {t(`panchang.eclipseSubtype.${panchang.eclipse.subtype}`)}
-                  </Text>
-                </View>
-                <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
-                  {t('panchang.eclipseWindow', { start: panchang.eclipse.start, end: panchang.eclipse.end })}
-                </Text>
-                <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
-                  {t('panchang.eclipsePeak', { time: panchang.eclipse.peak })}
+            <View style={[styles.eclipseCard, { backgroundColor: colors.dangerSurface, borderColor: colors.danger + '66' }]}>
+              <View style={styles.eclipseHeader}>
+                <Icon
+                  name={panchang.eclipse.kind === 'solar' ? 'sun' : 'moon'}
+                  size={18}
+                  color={colors.danger}
+                />
+                <Text style={[styles.eclipseTitle, { color: colors.textPrimary }]}>
+                  {panchang.eclipse.kind === 'solar' ? t('panchang.eclipseSolar') : t('panchang.eclipseLunar')}
                   {'  ·  '}
-                  {t('panchang.eclipseObscuration', { value: Math.round(panchang.eclipse.obscuration * 100) })}
-                </Text>
-                <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
-                  {t('panchang.eclipseSutak', { start: panchang.eclipse.sutakStart, end: panchang.eclipse.sutakEnd })}
-                </Text>
-                <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? semanticColors.success : colors.textMuted }]}>
-                  {panchang.eclipse.visibleFromLocation ? t('panchang.eclipseVisible') : t('panchang.eclipseNotVisible')}
+                  {t(`panchang.eclipseSubtype.${panchang.eclipse.subtype}`)}
                 </Text>
               </View>
-            ) : (
-              renderPlaceholder(CATEGORY_KEYS.eclipse)
-            )}
+              <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
+                {t('panchang.eclipseWindow', { start: panchang.eclipse.start, end: panchang.eclipse.end })}
+              </Text>
+              {/* `obscuration` is the umbral disc-area fraction, so a penumbral
+                  lunar eclipse reads exactly 0 — printing "Coverage: 0%" beside
+                  a real eclipse reads as a bug, not as a fact. Peak always
+                  prints; coverage joins it only when the umbra actually bites.
+                  And only for a peak that is actually seen: since panchang-ts
+                  5.4 a solar eclipse peaking below the horizon is labelled by
+                  its deepest VISIBLE phase (an annular reads "Partial"), while
+                  `obscuration` stays the unseen peak's 83%. */}
+              <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
+                {t('panchang.eclipsePeak', { time: panchang.eclipse.peak })}
+                {panchang.eclipse.obscuration > 0 &&
+                  (panchang.eclipse.kind === 'lunar' || panchang.eclipse.peakVisible) && (
+                  <>
+                    {'  ·  '}
+                    {t('panchang.eclipseObscuration', { value: Math.round(panchang.eclipse.obscuration * 100) })}
+                  </>
+                )}
+              </Text>
+              {/* Both sutak instants are null when no sutak applies (penumbral
+                  lunar). i18next stringifies null to '', so interpolating them
+                  would print the empty range "Sutak:  – " — say the thing
+                  instead. The truthiness check also absorbs the '' that older
+                  cached rows carry from the pre-v5 `?? ''` coercion. */}
+              <Text style={[styles.eclipseRow, { color: colors.textSecondary }]}>
+                {panchang.eclipse.sutakStart && panchang.eclipse.sutakEnd
+                  ? t('panchang.eclipseSutak', { start: panchang.eclipse.sutakStart, end: panchang.eclipse.sutakEnd })
+                  : t('panchang.eclipseNoSutak')}
+              </Text>
+              {/* Both branches are the same factual row, so the negative one is
+                  quiet-but-legible (`textSecondary`, matching the rows above)
+                  rather than muted — at 12px on the danger container muted was
+                  2.55:1, under even the large-text floor. Green carries the
+                  affirmative signal; grey is the plain statement. */}
+              <Text style={[styles.eclipseVisibility, { color: panchang.eclipse.visibleFromLocation ? colors.successText : colors.textSecondary }]}>
+                {panchang.eclipse.visibleFromLocation ? t('panchang.eclipseVisible') : t('panchang.eclipseNotVisible')}
+              </Text>
+            </View>
           </AccordionSection>
         )}
 
@@ -1512,8 +1862,8 @@ export default function PanchangScreen() {
         onClose={() => setPickerOpen(false)}
         value={selectedDate}
         onPick={handlePickFromModal}
-        minDate={new Date(1900, 0, 1)}
-        maxDate={new Date(2100, 11, 31)}
+        minDate={PICKER_MIN_DATE}
+        maxDate={PICKER_MAX_DATE}
         minYear={1900}
         maxYear={2100}
         colors={colors}
@@ -1659,6 +2009,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   postCalRule: { marginTop: 6, marginBottom: 10 },
+  festivalRangeNote: { fontSize: 12, lineHeight: 17, marginTop: 10 },
 
   // Selected-day line
   selectedLine: {
@@ -1685,7 +2036,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 8,
   },
-  glanceKicker: { fontSize: 8.5, letterSpacing: 1.1 },
+  glanceKicker: { fontSize: 8.5, letterSpacing: 1.1, flexShrink: 1 },
   glanceTithiText: { fontSize: 13, flex: 1, lineHeight: 18 },
 
   // ─── Today's verdict card + Full almanac reveal (P16.3) ──────────────────
@@ -1696,6 +2047,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.card,
     borderWidth: 1,
     gap: 6,
+  },
+  verdictHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   verdictText: { fontSize: 15, lineHeight: 21 },
   verdictProvisional: { fontSize: 11, lineHeight: 15 },
@@ -1734,6 +2091,10 @@ const styles = StyleSheet.create({
   },
   // Frame 40 — past 1.3× the label sits on its own line above the value.
   kickerStacked: { minWidth: 0, paddingTop: 10 },
+  // Static ledger row, stacked: label above value, both left-aligned. A
+  // right-aligned full-width value under a left-aligned label reads as a bug.
+  staticRowStacked: { paddingVertical: 6 },
+  staticValueStacked: { flex: 0, textAlign: 'left' },
 
   // Dynamic limb (tithi / nakshatra / yoga / karana) — one line per element.
   dynamicLimb: {
@@ -1767,7 +2128,7 @@ const styles = StyleSheet.create({
   secondaryName: {
     fontSize: 15,
     lineHeight: 21,
-    fontFamily: 'NotoSerifDevanagari_400Regular',
+    fontFamily: 'NotoSerifDevanagari_500Medium',
     letterSpacing: 0.05,
   },
   secondaryEndTime: {
@@ -1844,6 +2205,19 @@ const styles = StyleSheet.create({
   },
   sunMoonLabel: { fontSize: 7.5, letterSpacing: 0.8 },
   sunMoonTime: { fontSize: 12.5, ...typeScale.figuresMedium },
+  // Sunrise time + zone tag. Wraps rather than shrinking the time: the tag
+  // drops under the time when the cell cannot hold both on one line.
+  sunMoonTimeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'baseline',
+    columnGap: 4,
+  },
+  sunMoonTimeShrink: { flexShrink: 1 },
+  // Zone tag ("IST") beside a time — small, secondary ink, never accent: it
+  // qualifies the value, it is not a value itself.
+  zoneTag: { fontSize: 9, letterSpacing: 0.8 },
 
   flagStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   flag: {
@@ -1911,14 +2285,14 @@ const styles = StyleSheet.create({
 
   eclipseCard: { borderRadius: borderRadius.card, borderWidth: 1, padding: 14, marginBottom: 8, gap: 6 },
   eclipseHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  eclipseTitle: { fontSize: 14, fontFamily: 'NotoSerifDevanagari_700Bold' },
-  eclipseRow: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
+  eclipseTitle: { fontSize: 14, fontFamily: 'NotoSerifDevanagari_600SemiBold' },
+  eclipseRow: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium' },
   eclipseVisibility: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium', marginTop: 4 },
 
   durationRow: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.cardInner, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 8 },
   durationCell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   durationDivider: { width: 0.5, height: 16 },
-  durationText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_400Regular' },
+  durationText: { fontSize: 12, fontFamily: 'NotoSerifDevanagari_500Medium' },
   durationValue: { fontSize: 13, fontFamily: 'Geist_500Medium', fontVariant: ['tabular-nums'] },
 
   // Accordion body placeholder when daily compute hasn't completed yet.
@@ -1934,7 +2308,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: 12,
-    fontFamily: 'NotoSerifDevanagari_400Regular',
+    fontFamily: 'NotoSerifDevanagari_500Medium',
     fontStyle: 'italic',
     flex: 1,
   },

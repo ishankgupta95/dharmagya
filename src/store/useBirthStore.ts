@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from 'expo-sqlite/kv-store';
+import type { AyanamsaType } from 'panchang-ts';
 
 export type Sex = 'male' | 'female';
 
@@ -37,6 +38,14 @@ export interface BirthChartEntry {
      *  the opt-in Bhakoot navamsa-lord cancellation. Old cached entries
      *  without this field force a recompute on next access (see match.tsx). */
     navamsaRashi?: number;
+    /** Ayanamsa the cached values were computed under. Every field in this
+     *  block is ayanamsa-dependent (~11% of births change moon rashi or
+     *  nakshatra between Lahiri and Raman), so a block computed under a
+     *  different setting is a cache MISS, not a hit — otherwise a match
+     *  scored the user's freshly-recomputed Moon against a partner's frozen
+     *  one. Optional so entries persisted before this field existed also
+     *  invalidate themselves, exactly as `navamsaRashi` does above. */
+    ayanamsa?: AyanamsaType;
   };
   /** When the entry was created (ms epoch). Used to sort the picker list. */
   createdAt: number;
@@ -55,38 +64,70 @@ interface BirthStore {
 
 export const useBirthStore = create<BirthStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       charts: [],
 
-      upsertChart: (entry) =>
-        set((s) => {
-          const idx = s.charts.findIndex((c) => c.id === entry.id);
-          if (idx >= 0) {
-            const existing = s.charts[idx];
-            // Drop cached derived if inputs changed.
-            const inputsChanged =
-              existing.dateTimeIso !== entry.dateTimeIso ||
-              existing.place.lat !== entry.place.lat ||
-              existing.place.lon !== entry.place.lon;
-            const next = [...s.charts];
-            next[idx] = inputsChanged ? { ...entry, derived: undefined } : entry;
-            return { charts: next };
-          }
-          if (s.charts.length >= MAX_SECONDARY_CHARTS) return {};
-          return { charts: [...s.charts, entry] };
-        }),
+      // The no-op guards below bail out BEFORE `set` rather than returning `{}`
+      // from it: an empty patch still allocates a new state object, notifies
+      // every subscriber and triggers a full persist write.
+      upsertChart: (entry) => {
+        const { charts } = get();
+        const idx = charts.findIndex((c) => c.id === entry.id);
+        if (idx < 0) {
+          // At capacity and this is a new id — the old code returned `{}` here.
+          if (charts.length >= MAX_SECONDARY_CHARTS) return;
+          set({ charts: [...charts, entry] });
+          return;
+        }
+        const existing = charts[idx];
+        // Deliberately NOT guarded on "entry is value-equal to existing": this
+        // is the user's own saved birth data, arriving as a freshly-built
+        // object from the editor, so an equality check would have to enumerate
+        // every field of BirthChartEntry and a single missed field silently
+        // discards an edit the user believes they saved. The call fires once
+        // per explicit save (a cold path), so the render it costs is not worth
+        // that failure mode. See setDerived for the case where a guard IS safe.
+        //
+        // Drop cached derived if inputs changed.
+        const inputsChanged =
+          existing.dateTimeIso !== entry.dateTimeIso ||
+          existing.place.lat !== entry.place.lat ||
+          existing.place.lon !== entry.place.lon;
+        const next = [...charts];
+        next[idx] = inputsChanged ? { ...entry, derived: undefined } : entry;
+        set({ charts: next });
+      },
 
       removeChart: (id) =>
         set((s) => ({ charts: s.charts.filter((c) => c.id !== id) })),
 
-      setDerived: (id, derived) =>
-        set((s) => {
-          const idx = s.charts.findIndex((c) => c.id === id);
-          if (idx < 0) return {};
-          const next = [...s.charts];
-          next[idx] = { ...next[idx], derived };
-          return { charts: next };
-        }),
+      setDerived: (id, derived) => {
+        const { charts } = get();
+        const idx = charts.findIndex((c) => c.id === id);
+        // Unknown id — the old code returned `{}` here.
+        if (idx < 0) return;
+        // Unlike upsertChart, `derived` is a pure cache of computed scalars,
+        // and every field of the block is compared below, so keeping this list
+        // in sync with the `derived` type is mandatory — but the cost of
+        // getting it wrong is one redundant recompute on the next open, not a
+        // lost user edit. Worth guarding because match.tsx persists this from
+        // an effect keyed on the chart object, so each write re-creates that
+        // object and re-arms the effect.
+        const cached = charts[idx].derived;
+        if (
+          cached
+          && cached.moonRashi === derived.moonRashi
+          && cached.moonNakshatra === derived.moonNakshatra
+          && cached.lagnaRashi === derived.lagnaRashi
+          && cached.navamsaRashi === derived.navamsaRashi
+          && cached.ayanamsa === derived.ayanamsa
+        ) {
+          return;
+        }
+        const next = [...charts];
+        next[idx] = { ...charts[idx], derived };
+        set({ charts: next });
+      },
     }),
     {
       name: 'dharmagya-birth-charts',

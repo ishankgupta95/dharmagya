@@ -4,13 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import {
-  computeVimshottariPratyantar,
+  computeVimshottariPratyantarIn,
   type AntarDasha,
   type CharaDashaResult,
   type DashaLord,
   type MahaDasha,
   type NarayanDashaResult,
   type PratyantarDasha,
+  type YoginiAntarDasha,
   type YoginiDashaResult,
   type YoginiMahaDasha,
 } from 'panchang-ts';
@@ -156,8 +157,11 @@ export function DashaSection({ embedded = false }: DashaSectionProps = {}) {
   const birthDate = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
     const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    // Keep value blocks (`??`) out of the try body: the React Compiler
+    // refuses to memoise any component with one inside a try/catch.
+    const time = userBirthTime ?? '12:00';
     try {
-      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+      return wallclockInZoneToUtc(userBirthDate, time, tz);
     } catch {
       return null;
     }
@@ -246,17 +250,16 @@ export function DashaSection({ embedded = false }: DashaSectionProps = {}) {
       : (currentMaha?.antarDashas.find(
           (ad) => ad.startDate.getTime() <= now && ad.endDate.getTime() > now,
         ) ?? null);
-  const currentPratyantars = useMemo(() => {
-    if (system === 'vimshottari') return timeline?.currentPratyantars ?? [];
-    if (system === 'ashtottari' && currentAntardasha) {
-      try {
-        return computeVimshottariPratyantar(currentAntardasha);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  }, [system, timeline, currentAntardasha]);
+  // Third-level periods are Vimshottari-only. `computeVimshottariPratyantarIn`
+  // is exactly what its name says — 9 lords in Vimshottari order, sliced by
+  // years-out-of-120 — so feeding it an Ashtottari antardasha invented nine
+  // sub-periods in the wrong sequence, the last of them ruled by Ketu, which
+  // Satya Acharya's eight-lord scheme has no such thing as.
+  const currentPratyantars = useMemo(
+    () => (system === 'vimshottari' ? (timeline?.currentPratyantars ?? []) : []),
+    [system, timeline],
+  );
+  const supportsPratyantar = system === 'vimshottari';
 
   const birthDateLabel = birthDate
     ? birthDate.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
@@ -460,6 +463,7 @@ export function DashaSection({ embedded = false }: DashaSectionProps = {}) {
               onToggle={handleMahaToggle}
               openAntardashaIndex={effectiveExpanded === i ? openAntardashaInsideMaha : null}
               onAntardashaToggle={handleAntardashaToggle}
+              supportsPratyantar={supportsPratyantar}
               colors={colors}
               t={t}
             />
@@ -558,6 +562,8 @@ interface MahadashaRowProps {
   onToggle: (index: number) => void;
   openAntardashaIndex: number | null;
   onAntardashaToggle: (idx: number) => void;
+  /** False for Ashtottari — see `currentPratyantars`. */
+  supportsPratyantar: boolean;
   colors: ColorPalette;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
@@ -572,6 +578,7 @@ const MahadashaRow = memo(function MahadashaRow({
   onToggle,
   openAntardashaIndex,
   onAntardashaToggle,
+  supportsPratyantar,
   colors,
   t,
 }: MahadashaRowProps) {
@@ -628,12 +635,14 @@ const MahadashaRow = memo(function MahadashaRow({
             <AntardashaRow
               key={j}
               index={j}
+              md={md}
               ad={ad}
               lang={lang}
               colors={colors}
               t={t}
-              expanded={openAntardashaIndex === j}
+              expanded={supportsPratyantar && openAntardashaIndex === j}
               onToggle={onAntardashaToggle}
+              supportsPratyantar={supportsPratyantar}
             />
           ))}
         </View>
@@ -644,64 +653,93 @@ const MahadashaRow = memo(function MahadashaRow({
 
 interface AntardashaRowProps {
   index: number;
+  /** The antardasha's own mahadasha: the birth antardasha is clipped at birth,
+   *  and only its parent says where the full span it was cut from began. */
+  md: MahaDasha;
   ad: AntarDasha;
   lang: string;
   colors: ColorPalette;
   t: (k: string, o?: Record<string, unknown>) => string;
   expanded: boolean;
   onToggle: (index: number) => void;
+  /** False for Ashtottari — see `currentPratyantars`. The row then has no
+   *  drilldown at all, so it renders as a plain non-pressable row: no chevron,
+   *  no press feedback, no expanded state. */
+  supportsPratyantar: boolean;
 }
 
 const AntardashaRow = memo(function AntardashaRow({
   index,
+  md,
   ad,
   lang,
   colors,
   t,
   expanded,
   onToggle,
+  supportsPratyantar,
 }: AntardashaRowProps) {
-  const now = Date.now();
+  // Render-stable timestamp, as in the sections above: fixed at mount (an
+  // antardasha spans months, so intra-session drift is irrelevant) and keeps
+  // the render pure.
+  const [now] = useState(() => Date.now());
   const adActive = ad.startDate.getTime() <= now && ad.endDate.getTime() > now;
   // Pratyantars are computed lazily on expand to avoid 9×9×9 work for the
   // full 120-year cycle. Memo per-row keeps re-renders cheap.
-  const pratyantars = useMemo(() => (expanded ? computeVimshottariPratyantar(ad) : []), [expanded, ad]);
+  const pratyantars = useMemo(
+    () => (expanded && supportsPratyantar ? computeVimshottariPratyantarIn(md, ad) : []),
+    [expanded, supportsPratyantar, md, ad],
+  );
   const handlePress = useCallback(() => onToggle(index), [onToggle, index]);
+
+  const rowContent = (
+    <>
+      <View
+        style={[
+          styles.antarDot,
+          { backgroundColor: adActive ? colors.accent : colors.divider },
+        ]}
+      />
+      <Text
+        variant="body"
+        style={[
+          styles.antarLord,
+          { color: adActive ? colors.textPrimary : colors.textSecondary },
+        ]}>
+        {t(`dasha.planet.${DASHA_LORD_TO_KEY[ad.lord]}`)}
+      </Text>
+      <Text variant="mono" style={[styles.antarRange, { color: colors.textMuted }]}>
+        {t('dasha.dateRangeLong', {
+          start: formatRangeDate(ad.startDate, lang),
+          end: formatRangeDate(ad.endDate, lang),
+        })}
+      </Text>
+    </>
+  );
 
   return (
     <View>
-      <MotionPressable
-        pressedScale={0.97}
-        onPress={handlePress}
-        style={styles.antarRow}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}>
-        <View
-          style={[
-            styles.antarDot,
-            { backgroundColor: adActive ? colors.accent : colors.divider },
-          ]}
-        />
-        <Text
-          variant="body"
-          style={[
-            styles.antarLord,
-            { color: adActive ? colors.textPrimary : colors.textSecondary },
-          ]}>
-          {t(`dasha.planet.${DASHA_LORD_TO_KEY[ad.lord]}`)}
-        </Text>
-        <Text variant="mono" style={[styles.antarRange, { color: colors.textMuted }]}>
-          {t('dasha.dateRangeLong', {
-            start: formatRangeDate(ad.startDate, lang),
-            end: formatRangeDate(ad.endDate, lang),
-          })}
-        </Text>
-        <Icon
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={12}
-          color={colors.textMuted}
-        />
-      </MotionPressable>
+      {supportsPratyantar ? (
+        <MotionPressable
+          pressedScale={0.97}
+          onPress={handlePress}
+          style={styles.antarRow}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}>
+          {rowContent}
+          <Icon
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color={colors.textMuted}
+          />
+        </MotionPressable>
+      ) : (
+        // Ashtottari rows have no third level to open, so they must not be a
+        // MotionPressable at all: it wires onPressIn/onPressOut regardless of
+        // whether `onPress` is set, so the row would still shrink under the
+        // finger — a press affordance for a drilldown that cannot exist.
+        <View style={styles.antarRow} accessible>{rowContent}</View>
+      )}
 
       {expanded && (
         <View style={[styles.pratyantarWrap, { borderLeftColor: colors.borderAccent }]}>
@@ -738,6 +776,96 @@ const AntardashaRow = memo(function AntardashaRow({
   );
 });
 
+/**
+ * Index of the mahadasha actually containing `nowMs`, or -1.
+ *
+ * The library clamps its own "not found" to 0 (`Math.max(0, findIndex(...))`),
+ * which is harmless for Vimshottari — 120 years always covers a lifetime — but
+ * wrong for Yogini (one 36-year cycle) and for Chara / Narayan (96 years from
+ * an arbitrary pre-1900 birth date). Past the end of the array the clamp made
+ * the FIRST period the "CURRENT" one — for a 1985 birth, whose single 36-year
+ * Yogini cycle closed in 2020, the card claimed the Ulka mahadasha with an
+ * "until" date of June 1990. Resolve it from the dates instead. Yogini feeds
+ * this its *projected* cycle (see `currentYoginiCycle`) so it always lands on
+ * a real period; Chara / Narayan simply run out of list past ~96 years, and
+ * then render no current card rather than a false one.
+ */
+function activeMahaIndex(
+  mahaDashas: readonly { startDate: Date; endDate: Date }[],
+  nowMs: number,
+): number {
+  return mahaDashas.findIndex(
+    (md) => md.startDate.getTime() <= nowMs && md.endDate.getTime() > nowMs,
+  );
+}
+
+/** The Yogini wheel is a fixed 36 years: 1+2+3+4+5+6+7+8. */
+const YOGINI_CYCLE_YEARS = 36;
+
+/**
+ * The eight Yogini periods covering `nowMs`.
+ *
+ * `computeYoginiDasha` only ever returns the FIRST cycle — eight periods from
+ * birth, the first of them the balance of the janma yogini — and `asOfDate`
+ * merely picks an index inside that list, it does not advance it. So past
+ * ~36 years of age the returned list has already run out and there is no
+ * period containing today at all.
+ *
+ * The wheel repeats unchanged, though: after the eighth period the same eight
+ * yoginis come round again in the same order, each now at its full nominal
+ * length, 36 years end to end. So walk the returned cycle forward by whole
+ * cycles until it contains `nowMs`, rebuilding each mahadasha's antardashas
+ * the way the library does — a years/36 slice apiece, starting from the
+ * mahadasha's own yogini. Everything is derived from the returned list, so the
+ * projection inherits the library's own year length and rotation.
+ *
+ * Returned untouched while the user is still inside the first cycle.
+ */
+function currentYoginiCycle(mahaDashas: YoginiMahaDasha[], nowMs: number): YoginiMahaDasha[] {
+  const last = mahaDashas[mahaDashas.length - 1];
+  if (!last || nowMs < last.endDate.getTime()) return mahaDashas;
+
+  const cycleEndMs = last.endDate.getTime();
+  // The library's nominal year, read back off a full period rather than
+  // guessed. (Only the first period is a partial, so the last is always full.)
+  const lastSpanMs = cycleEndMs - last.startDate.getTime();
+  if (lastSpanMs <= 0 || last.years <= 0) return mahaDashas;
+  const msPerYear = lastSpanMs / last.years;
+  const cycleMs = YOGINI_CYCLE_YEARS * msPerYear;
+  const cyclesAhead = Math.floor((nowMs - cycleEndMs) / cycleMs) + 1;
+
+  const out: YoginiMahaDasha[] = [];
+  let cursor = cycleEndMs + (cyclesAhead - 1) * cycleMs;
+  for (let i = 0; i < mahaDashas.length; i++) {
+    const md = mahaDashas[i];
+    const spanMs = md.years * msPerYear;
+    const startMs = cursor;
+    cursor += spanMs;
+    const antarDashas: YoginiAntarDasha[] = [];
+    let antarCursor = startMs;
+    for (let k = 0; k < mahaDashas.length; k++) {
+      const src = mahaDashas[(i + k) % mahaDashas.length];
+      const antarStartMs = antarCursor;
+      antarCursor += (src.years / YOGINI_CYCLE_YEARS) * spanMs;
+      antarDashas.push({
+        yogini: src.yogini,
+        lord: src.lord,
+        startDate: new Date(antarStartMs),
+        endDate: new Date(antarCursor),
+      });
+    }
+    out.push({
+      yogini: md.yogini,
+      lord: md.lord,
+      startDate: new Date(startMs),
+      endDate: new Date(cursor),
+      years: md.years,
+      antarDashas,
+    });
+  }
+  return out;
+}
+
 interface YoginiTimelineProps {
   result: YoginiDashaResult;
   colors: ColorPalette;
@@ -747,8 +875,17 @@ interface YoginiTimelineProps {
 }
 
 function YoginiTimeline({ result, colors, isDarkMode, lang, t }: YoginiTimelineProps) {
-  const now = Date.now();
-  const currentMaha = result.mahaDashas[result.currentIndex];
+  // Render-stable timestamp, same as `CharaTimeline` / `NarayanTimeline`: fixed
+  // at mount (Yogini periods run for years, so intra-session drift is
+  // irrelevant) and keeps the render pure, so the compiler doesn't bail out.
+  const [now] = useState(() => Date.now());
+  // The 36-year wheel the user is living in — the library's own first cycle
+  // until they turn ~36, a projected repeat of it after that. Memoised because
+  // it rebuilds the whole cycle: without this the fresh array identity defeats
+  // every `YoginiRow` memo() below.
+  const mahaDashas = useMemo(() => currentYoginiCycle(result.mahaDashas, now), [result.mahaDashas, now]);
+  const activeIdx = activeMahaIndex(mahaDashas, now);
+  const currentMaha = activeIdx >= 0 ? mahaDashas[activeIdx] : null;
   const currentAntar =
     currentMaha?.antarDashas.find(
       (ad) => ad.startDate.getTime() <= now && ad.endDate.getTime() > now,
@@ -788,11 +925,11 @@ function YoginiTimeline({ result, colors, isDarkMode, lang, t }: YoginiTimelineP
       <SectionLabel style={styles.sectionLabelSpacing}>
         {t('dasha.yoginiFullCycle')}
       </SectionLabel>
-      {result.mahaDashas.map((md, i) => (
+      {mahaDashas.map((md, i) => (
         <YoginiRow
           key={i}
           md={md}
-          isActive={i === result.currentIndex}
+          isActive={i === activeIdx}
           colors={colors}
           lang={lang}
           t={t}
@@ -858,7 +995,12 @@ interface CharaTimelineProps {
 }
 
 function CharaTimeline({ result, colors, isDarkMode, rashiNames, lang, t }: CharaTimelineProps) {
-  const currentMaha = result.mahaDashas[result.currentIndex];
+  // Render-stable timestamp, same as `DashaSection`: fixed at mount (Chara
+  // periods run for years, so intra-session drift is irrelevant) and keeps the
+  // render pure, so the compiler doesn't bail out of this component.
+  const [now] = useState(() => Date.now());
+  const activeIdx = activeMahaIndex(result.mahaDashas, now);
+  const currentMaha = activeIdx >= 0 ? result.mahaDashas[activeIdx] : null;
   return (
     <>
       {currentMaha && (
@@ -884,7 +1026,7 @@ function CharaTimeline({ result, colors, isDarkMode, rashiNames, lang, t }: Char
         {t('dasha.charaFullCycle')}
       </SectionLabel>
       {result.mahaDashas.map((md, i) => {
-        const isActive = i === result.currentIndex;
+        const isActive = i === activeIdx;
         return (
           <View
             key={i}
@@ -934,7 +1076,12 @@ interface NarayanTimelineProps {
 }
 
 function NarayanTimeline({ result, colors, isDarkMode, rashiNames, lang, t }: NarayanTimelineProps) {
-  const currentMaha = result.mahaDashas[result.currentIndex];
+  // Render-stable timestamp, same as `DashaSection`: fixed at mount (Narayan
+  // periods run for years, so intra-session drift is irrelevant) and keeps the
+  // render pure, so the compiler doesn't bail out of this component.
+  const [now] = useState(() => Date.now());
+  const activeIdx = activeMahaIndex(result.mahaDashas, now);
+  const currentMaha = activeIdx >= 0 ? result.mahaDashas[activeIdx] : null;
   const directionLabel =
     result.direction === 'forward'
       ? t('dasha.narayan.directionForward')
@@ -964,7 +1111,7 @@ function NarayanTimeline({ result, colors, isDarkMode, rashiNames, lang, t }: Na
         {t('dasha.narayanFullCycle')}
       </SectionLabel>
       {result.mahaDashas.map((md, i) => {
-        const isActive = i === result.currentIndex;
+        const isActive = i === activeIdx;
         return (
           <View
             key={i}

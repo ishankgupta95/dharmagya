@@ -11,8 +11,9 @@ import { Kicker } from '@/components/common/Kicker';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { AdBanner } from '@/components/common/AdBanner';
+import { CopyableUnit, handleReaderTouchStart } from '@/components/reader/CopyableUnit';
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { useInterstitialOnExit } from '@/hooks/useInterstitialOnExit';
 import { resolveLanguage } from '@/i18n';
 import {
@@ -22,6 +23,7 @@ import {
   type PrayerOccasion,
   type ContentLang,
 } from '@/services/content';
+import { buildCopyText } from '@/utils/verseCopy';
 
 // Stable display order for the occasion groups — follows the rhythm of the day.
 const OCCASION_ORDER: PrayerOccasion[] = [
@@ -67,7 +69,8 @@ export default function PrayersScreen() {
 
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          onTouchStart={handleReaderTouchStart}>
 
           {/* ── Hero ──────────────────────────────────────────────────────── */}
           <View style={styles.heroBlock}>
@@ -92,7 +95,7 @@ export default function PrayersScreen() {
             groups.map(group => (
               <View key={group.occasion}>
                 <Kicker
-                  color={palette.gold}
+                  color={colors.accentText}
                   size={9}
                   withTrailingRule
                   ruleColor={colors.divider}
@@ -101,7 +104,13 @@ export default function PrayersScreen() {
                   {t(`prayers.occasion.${group.occasion}`)}
                 </Kicker>
                 {group.prayers.map(prayer => (
-                  <PrayerCard key={prayer.slug} prayer={prayer} lang={lang} colors={colors} />
+                  <PrayerCard
+                    key={prayer.slug}
+                    prayer={prayer}
+                    lang={lang}
+                    colors={colors}
+                    copyLabel={t('reader.copyAction')}
+                  />
                 ))}
               </View>
             ))
@@ -121,31 +130,58 @@ export default function PrayersScreen() {
   );
 }
 
-function PrayerCard({ prayer, lang, colors }: { prayer: Prayer; lang: ContentLang; colors: ColorPalette }) {
+/** One prayer. Long-press copies the Devanagari text plus its meaning in the
+ *  app language and arms the card for native text selection (see
+ *  `CopyableUnit`); the screen-reader copy action sits on the prayer text. */
+function PrayerCard({
+  prayer, lang, colors, copyLabel,
+}: {
+  prayer: Prayer;
+  lang: ContentLang;
+  colors: ColorPalette;
+  copyLabel: string;
+}) {
+  const meaning = prayerMeaning(prayer, lang);
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text variant="deva-bold" style={[styles.cardTitleNative, { color: colors.textPrimary }]}>
-        {prayer.titleHindi}
-      </Text>
-      <Text variant="body-italic" style={[styles.cardTitleEn, { color: colors.textTertiary }]}>
-        {prayer.titleEnglish}
-      </Text>
-      <Ornament variant="double-rule" style={styles.cardRule} />
-      <Text variant="deva" style={[styles.cardDeva, { color: colors.textPrimary }]}>
-        {prayer.text.devanagari}
-      </Text>
-      {!!prayer.text.iast && (
-        <Text variant="body-italic" style={[styles.cardIast, { color: colors.textTertiary }]}>
-          {prayer.text.iast}
-        </Text>
+    <CopyableUnit
+      copyKey={`prayer-${prayer.slug}`}
+      copyLabel={copyLabel}
+      getCopyText={() => buildCopyText([prayer.text.devanagari, meaning])}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {({ selectable, a11y }) => (
+        <>
+          <Text variant="deva-bold" style={[styles.cardTitleNative, { color: colors.textPrimary }]}>
+            {prayer.titleHindi}
+          </Text>
+          <Text variant="body-italic" style={[styles.cardTitleEn, { color: colors.textTertiary }]}>
+            {prayer.titleEnglish}
+          </Text>
+          <Ornament variant="double-rule" style={styles.cardRule} />
+          <Text
+            {...a11y}
+            selectable={selectable}
+            variant="deva"
+            style={[styles.cardDeva, { color: colors.textPrimary }]}>
+            {prayer.text.devanagari}
+          </Text>
+          {!!prayer.text.iast && (
+            <Text
+              selectable={selectable}
+              variant="body-italic"
+              style={[styles.cardIast, { color: colors.textTertiary }]}>
+              {prayer.text.iast}
+            </Text>
+          )}
+          {/* Hindi meaning is Devanagari prose → `deva`; English → `body`. */}
+          <Text
+            selectable={selectable}
+            variant={lang === 'hi' ? 'deva' : 'body'}
+            style={[styles.cardMeaning, { color: colors.textSecondary }]}>
+            {meaning}
+          </Text>
+        </>
       )}
-      {/* Hindi meaning is Devanagari prose → `deva`; English → `body`. */}
-      <Text
-        variant={lang === 'hi' ? 'deva' : 'body'}
-        style={[styles.cardMeaning, { color: colors.textSecondary }]}>
-        {prayerMeaning(prayer, lang)}
-      </Text>
-    </View>
+    </CopyableUnit>
   );
 }
 

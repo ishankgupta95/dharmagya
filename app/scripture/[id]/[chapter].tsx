@@ -1,17 +1,19 @@
-import { useMemo, useRef, useState } from 'react';
-import { View, ScrollView, StyleSheet, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, FlatList, View, StyleSheet, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, spacing } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { LangToggle, type ContentLang } from '@/components/common/LangToggle';
 import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { VerseBlock } from '@/components/reader/VerseBlock';
+import { handleReaderTouchStart } from '@/components/reader/CopyableUnit';
 import i18n, { resolveLanguage } from '@/i18n';
 
 import { MotionPressable } from '@/components/common/MotionPressable';
@@ -19,10 +21,17 @@ import {
   getScriptureBySlug,
   SCRIPTURE_DISCLAIMER,
   type Chapter,
-  type ScriptureVerse,
 } from '@/config/scriptures';
 
 type Lang = ContentLang;
+
+/** Module-level so its identity never changes — VirtualizedList refuses to
+ *  accept a new `viewabilityConfig` / `onViewableItemsChanged` after mount. */
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 30 };
+
+/** How far (px) the list must move from its initial offset before a non-drag
+ *  scroll counts as "the reader actually scrolled" for progress tracking. */
+const SCROLL_GATE_PX = 24;
 
 /**
  * Scripture verse reader — one chapter at a time. Reads `id` + `chapter` from
@@ -31,6 +40,8 @@ type Lang = ContentLang;
  * Devanagari shloka + Hindi bhāvārtha; English mode = the IAST transliteration
  * + English translation. The meaning sits in its own MEANING block below the
  * shloka. Geeta + Sundarkand both carry all four fields for every verse.
+ * Verses render through the shared `VerseBlock`, which also carries the
+ * long-press copy (Devanagari + meaning in the toggle's language).
  */
 export default function ScriptureChapterScreen() {
   const { t } = useTranslation();
@@ -65,29 +76,87 @@ export default function ScriptureChapterScreen() {
     };
   }, [scripture, chapterData]);
 
-  // Per-chapter reading progress (frame 21). The furthest-scrolled verse is
-  // approximated from the scroll fraction and stored under
+  // Per-chapter reading progress (frame 21). Stored under
   // `scripture-<slug>-<chapter>`; it only ever advances, so re-reading the top
   // of a chapter never loses progress. The detail screen renders it as the
   // per-chapter bar + the Continue card.
-  const setReadingPosition = useStore((s) => s.setReadingPosition);
+  //
+  // The index comes from `onViewableItemsChanged`, NOT from the scroll offset:
+  // under virtualization `contentSize` is an estimate that keeps shifting as
+  // rows are measured, so an offset/height fraction would drift. Viewability
+  // reports the real row indices.
+  //
+  // Writes are batched to scroll-end. The 361-verse chapters would otherwise
+  // persist the store hundreds of times in a single read, each one allocating
+  // a fresh `readingPositions` object and waking every subscriber.
+  // `furthestRef` is the live high-water mark; `committedRef` is how much of it
+  // has actually been written.
   const positionKey = scripture && chapterData ? `scripture-${scripture.slug}-${chapterData.number}` : null;
-  const verseCount = chapterData?.verses.length ?? 0;
   const furthestRef = useRef(-1);
-  const handleScrollProgress = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!positionKey || verseCount === 0) return;
+  const committedRef = useRef(-1);
+  const positionKeyRef = useRef(positionKey);
+  // The old offset-driven handler could not fire without a scroll, so merely
+  // opening a chapter never touched `lastReadKey`. Viewability DOES fire on
+  // first layout, so without this gate a mis-tap into a chapter would steal the
+  // Library "Continue" card on the way back out. The gate opens on any real
+  // scroll movement: a touch drag (`onScrollBeginDrag`), or — because that
+  // event only fires for finger drags — an `onScroll` whose offset has moved
+  // more than `SCROLL_GATE_PX` from the top. The second path is what VoiceOver
+  // three-finger page scrolls, TalkBack scroll actions, hardware-keyboard /
+  // Full Keyboard Access scrolling and programmatic scrolls go through.
+  const hasScrolledRef = useRef(false);
+
+  // Both callbacks close over refs and the store singleton only, so a lazy
+  // `useState` initializer pins their identity for the life of the screen —
+  // required by VirtualizedList, which refuses a changed
+  // `onViewableItemsChanged`, and it lets the commit run from effect cleanup.
+  // (A ref would do the same but can't be read during render.)
+  const [handleViewableItemsChanged] = useState(() => ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const key = positionKeyRef.current;
+    if (!key) return;
     if (furthestRef.current < 0) {
-      furthestRef.current = useStore.getState().readingPositions[positionKey] ?? 0;
+      // Seed from what's already stored so scrolling near the top of a
+      // part-read chapter never walks progress backwards.
+      const stored = useStore.getState().readingPositions[key] ?? 0;
+      furthestRef.current = stored;
+      committedRef.current = stored;
     }
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const scrollable = contentSize.height - layoutMeasurement.height;
-    const fraction = scrollable > 0 ? Math.min(1, Math.max(0, contentOffset.y / scrollable)) : 1;
-    const index = Math.round(fraction * (verseCount - 1));
-    if (index > furthestRef.current) {
-      furthestRef.current = index;
-      setReadingPosition(positionKey, index);
+    let max = furthestRef.current;
+    for (const token of viewableItems) {
+      // Header/footer cells come through with a null index.
+      if (token.index != null && token.index > max) max = token.index;
     }
-  };
+    furthestRef.current = max;
+  });
+
+  const [commitProgress] = useState(() => () => {
+    const key = positionKeyRef.current;
+    if (!key || !hasScrolledRef.current) return;
+    const index = furthestRef.current;
+    if (index < 0 || index <= committedRef.current) return;
+    committedRef.current = index;
+    useStore.getState().setReadingPosition(key, index);
+  });
+
+  // Chapter nav uses router.replace, so this screen is reused across chapters:
+  // flush the outgoing chapter's progress in cleanup, then reset for the new
+  // key. The same cleanup covers unmount (back out of the reader mid-chapter).
+  useEffect(() => {
+    positionKeyRef.current = positionKey;
+    furthestRef.current = -1;
+    committedRef.current = -1;
+    hasScrolledRef.current = false;
+    return () => { commitProgress(); };
+  }, [positionKey, commitProgress]);
+
+  // Backgrounding the app is the other way out of a read that never fires a
+  // scroll-end we'd see.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background') commitProgress();
+    });
+    return () => sub.remove();
+  }, [commitProgress]);
 
   if (!scripture || !chapterData) {
     return (
@@ -118,6 +187,8 @@ export default function ScriptureChapterScreen() {
   const chapterHeading = lang === 'hi'
     ? (chapterData.titleSanskrit ?? chapterData.titleEnglish ?? '')
     : (chapterData.titleEnglish ?? chapterData.titleSanskrit ?? '');
+  // Screen-reader chrome, so the app language (`t`), as for the back button.
+  const copyLabel = t('reader.copyAction');
 
   return (
     <ScreenMount>
@@ -139,162 +210,154 @@ export default function ScriptureChapterScreen() {
           <View style={[styles.backPill, { borderWidth: 0 }]} />
         </View>
 
-        <ScrollView
+        {/* Virtualized: Ramcharitmanas kands run 120–360 verses of Devanagari,
+            and laying every one of them out up front costs seconds of
+            complex-script shaping before the first frame. No `getItemLayout`;
+            verse heights vary far too much. `removeClippedSubviews` is left at
+            FlatList's default, which is ON for Android (off on iOS): rendered
+            cells that scroll off screen are detached from the native view tree.
+            This list has always shipped that way on Android, and fast flings
+            through long chapters and namavalis render every row on the API 36
+            emulator, so it is kept for the lighter native tree on low-end
+            phones. */}
+        <FlatList
+          data={chapterData.verses}
+          // Verses carry no id and the chapter array is static, so the index
+          // is the verse number (index + 1).
+          keyExtractor={(_, i) => String(i)}
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-          onScroll={handleScrollProgress}
-          scrollEventThrottle={250}
-          showsVerticalScrollIndicator={false}>
-
-          {/* ── Chapter heading ─────────────────────────────────────────── */}
-          <View style={styles.heroBlock}>
-            <Kicker color={palette.gold} size={11} style={styles.heroKicker}>
-              {tForLang('scripture.chapterKicker', { num: chapterData.number })}
-            </Kicker>
-            <Text
-              variant={lang === 'hi' ? 'deva-bold' : 'display-italic'}
-              style={[styles.heroTitle, { color: colors.textPrimary }]}>
-              {chapterHeading}
-            </Text>
-            <Text variant="mono-caps" style={[styles.heroVerseCount, { color: colors.textMuted }]}>
-              {tForLang('scripture.versesNCount', { count: chapterData.verses.length })}
-            </Text>
-            <Ornament variant="lotus" tone={ornamentTone} style={styles.heroOrnament} />
-          </View>
-
-          {/* ── Lang toggle (shared component) ──────────────────────────── */}
-          <LangToggle lang={lang} onChange={setLang} colors={colors} />
-
-          {/* ── Verses ─────────────────────────────────────────────────── */}
-          {chapterData.verses.map((verse, i) => (
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          onViewableItemsChanged={handleViewableItemsChanged}
+          onScrollBeginDrag={() => { hasScrolledRef.current = true; }}
+          // Any touch outside a long-pressed verse ends its text-selection mode.
+          onTouchStart={handleReaderTouchStart}
+          // Non-drag scrolls (screen readers, keyboard, programmatic) never
+          // fire `onScrollBeginDrag`, so also open the gate once the offset has
+          // moved past the threshold. The list always starts at the top (no
+          // `contentOffset` / `initialScrollIndex`), so 0 is the baseline; the
+          // handler is a single ref flip and a no-op once the gate is open.
+          // VirtualizedList already listens to scroll events for windowing and
+          // merely forwards them here, so this adds no native listener. The
+          // 64ms `scrollEventThrottle` below applies on BOTH platforms —
+          // Android honours it too (ReactScrollViewHelper drops SCROLL events
+          // inside the window; VirtualizedList's own default is per-frame) —
+          // and because the list's windowing and viewability updates ride this
+          // same forwarded stream, it slows those to ~15Hz as well. Accepted
+          // trade-off: verse cells are tall and `windowSize={7}` keeps a deep
+          // render buffer, and it keeps the JS-thread traffic light.
+          onScroll={(e) => {
+            if (hasScrolledRef.current) return;
+            if (Math.abs(e.nativeEvent.contentOffset.y) > SCROLL_GATE_PX) hasScrolledRef.current = true;
+          }}
+          scrollEventThrottle={64}
+          onMomentumScrollEnd={commitProgress}
+          // Momentum alone misses a drag that stops without a fling.
+          onScrollEndDrag={commitProgress}
+          renderItem={({ item, index }) => (
             <VerseBlock
-              key={i}
-              verse={verse}
-              index={i + 1}
+              verse={item}
+              index={index + 1}
               lang={lang}
               colors={colors}
               t={tForLang}
+              copyKey={`${positionKey ?? 'scripture'}-${index + 1}`}
+              copyLabel={copyLabel}
             />
-          ))}
-
-          {/* ── Chapter navigation ──────────────────────────────────────── */}
-          {(prevChapter || nextChapter) && (
-            <View style={styles.chapterNav}>
-              {prevChapter ? (
-                <MotionPressable
-                  pressedScale={0.97}
-                  onPress={() => router.replace({
-                    pathname: '/scripture/[id]/[chapter]',
-                    params: { id: scripture.slug, chapter: String(prevChapter.number) },
-                  })}
-                  style={[styles.chapterNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={tForLang('scripture.prevChapterA11y', { num: prevChapter.number })}>
-                  <Icon name="chevron-left" size={14} color={colors.accent} />
-                  <View style={styles.chapterNavTextWrap}>
-                    <Text variant="mono-caps" style={[styles.chapterNavKicker, { color: colors.textMuted }]}>
-                      {tForLang('scripture.prevChapter')}
-                    </Text>
-                    <Text variant="body-italic" style={[styles.chapterNavTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                      {tForLang('scripture.chapterKicker', { num: prevChapter.number })}
-                    </Text>
-                  </View>
-                </MotionPressable>
-              ) : (
-                <View style={styles.chapterNavSpacer} />
-              )}
-              {nextChapter ? (
-                <MotionPressable
-                  pressedScale={0.97}
-                  onPress={() => router.replace({
-                    pathname: '/scripture/[id]/[chapter]',
-                    params: { id: scripture.slug, chapter: String(nextChapter.number) },
-                  })}
-                  style={[styles.chapterNavBtn, styles.chapterNavBtnNext, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={tForLang('scripture.nextChapterA11y', { num: nextChapter.number })}>
-                  <View style={[styles.chapterNavTextWrap, { alignItems: 'flex-end' }]}>
-                    <Text variant="mono-caps" style={[styles.chapterNavKicker, { color: colors.textMuted }]}>
-                      {tForLang('scripture.nextChapter')}
-                    </Text>
-                    <Text variant="body-italic" style={[styles.chapterNavTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                      {tForLang('scripture.chapterKicker', { num: nextChapter.number })}
-                    </Text>
-                  </View>
-                  <Icon name="chevron-right" size={14} color={colors.accent} />
-                </MotionPressable>
-              ) : (
-                <View style={styles.chapterNavSpacer} />
-              )}
-            </View>
           )}
+          ListHeaderComponent={
+            <View>
+              {/* ── Chapter heading ───────────────────────────────────── */}
+              <View style={styles.heroBlock}>
+                <Kicker color={colors.accentText} size={11} style={styles.heroKicker}>
+                  {tForLang('scripture.chapterKicker', { num: chapterData.number })}
+                </Kicker>
+                <Text
+                  variant={lang === 'hi' ? 'deva-bold' : 'display-italic'}
+                  style={[styles.heroTitle, { color: colors.textPrimary }]}>
+                  {chapterHeading}
+                </Text>
+                <Text variant="mono-caps" style={[styles.heroVerseCount, { color: colors.textMuted }]}>
+                  {tForLang('scripture.versesNCount', { count: chapterData.verses.length })}
+                </Text>
+                <Ornament variant="lotus" tone={ornamentTone} style={styles.heroOrnament} />
+              </View>
 
-          {/* ── Sources / disclaimer ──────────────────────────────────── */}
-          <View style={styles.sourcesBlock}>
-            <Kicker color={colors.textMuted} size={9}>{tForLang('scripture.sourcesLabel')}</Kicker>
-            <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
-              {SCRIPTURE_DISCLAIMER[lang]}
-            </Text>
-          </View>
+              {/* ── Lang toggle (shared component) ────────────────────── */}
+              <LangToggle lang={lang} onChange={setLang} colors={colors} />
+            </View>
+          }
+          ListFooterComponent={
+            <View>
+              {/* ── Chapter navigation ──────────────────────────────────────── */}
+              {(prevChapter || nextChapter) && (
+                <View style={styles.chapterNav}>
+                  {prevChapter ? (
+                    <MotionPressable
+                      pressedScale={0.97}
+                      onPress={() => router.replace({
+                        pathname: '/scripture/[id]/[chapter]',
+                        params: { id: scripture.slug, chapter: String(prevChapter.number) },
+                      })}
+                      style={[styles.chapterNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={tForLang('scripture.prevChapterA11y', { num: prevChapter.number })}>
+                      <Icon name="chevron-left" size={14} color={colors.accent} />
+                      <View style={styles.chapterNavTextWrap}>
+                        <Text variant="mono-caps" style={[styles.chapterNavKicker, { color: colors.textMuted }]}>
+                          {tForLang('scripture.prevChapter')}
+                        </Text>
+                        <Text variant="body-italic" style={[styles.chapterNavTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                          {tForLang('scripture.chapterKicker', { num: prevChapter.number })}
+                        </Text>
+                      </View>
+                    </MotionPressable>
+                  ) : (
+                    <View style={styles.chapterNavSpacer} />
+                  )}
+                  {nextChapter ? (
+                    <MotionPressable
+                      pressedScale={0.97}
+                      onPress={() => router.replace({
+                        pathname: '/scripture/[id]/[chapter]',
+                        params: { id: scripture.slug, chapter: String(nextChapter.number) },
+                      })}
+                      style={[styles.chapterNavBtn, styles.chapterNavBtnNext, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={tForLang('scripture.nextChapterA11y', { num: nextChapter.number })}>
+                      <View style={[styles.chapterNavTextWrap, { alignItems: 'flex-end' }]}>
+                        <Text variant="mono-caps" style={[styles.chapterNavKicker, { color: colors.textMuted }]}>
+                          {tForLang('scripture.nextChapter')}
+                        </Text>
+                        <Text variant="body-italic" style={[styles.chapterNavTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                          {tForLang('scripture.chapterKicker', { num: nextChapter.number })}
+                        </Text>
+                      </View>
+                      <Icon name="chevron-right" size={14} color={colors.accent} />
+                    </MotionPressable>
+                  ) : (
+                    <View style={styles.chapterNavSpacer} />
+                  )}
+                </View>
+              )}
 
-          <View style={{ height: 32 }} />
-        </ScrollView>
+              {/* ── Sources / disclaimer ──────────────────────────────────── */}
+              <View style={styles.sourcesBlock}>
+                <Kicker color={colors.textMuted} size={9}>{tForLang('scripture.sourcesLabel')}</Kicker>
+                <Text variant="body-italic" style={[styles.sourcesText, { color: colors.textMuted }]}>
+                  {SCRIPTURE_DISCLAIMER[lang]}
+                </Text>
+              </View>
+
+              <View style={{ height: 32 }} />
+            </View>
+          }
+        />
       </SafeAreaView>
     </ScreenMount>
-  );
-}
-
-// ─── VerseBlock ─────────────────────────────────────────────────────────────
-
-function VerseBlock({
-  verse,
-  index,
-  lang,
-  colors,
-  t,
-}: {
-  verse: ScriptureVerse;
-  index: number;
-  lang: Lang;
-  colors: ColorPalette;
-  t: (key: string, opts?: Record<string, unknown>) => string;
-}) {
-  // One script per mode — the toggle picks the whole verse's script, so no line
-  // is ever shown twice. Hindi: Devanagari shloka + Hindi bhāvārtha. English:
-  // IAST transliteration + English translation. IAST falls back to Devanagari
-  // if a scripture lacks it; meaning falls back to the other language.
-  const isHi = lang === 'hi';
-  const meaning = isHi ? (verse.hindi ?? verse.english) : (verse.english ?? verse.hindi);
-  const showDevaShloka = isHi || !verse.iast;
-  return (
-    <View style={styles.verseBlock}>
-      <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider}
-        wrapperStyle={styles.verseKickerWrap}>
-        {t('scripture.verseKicker', { num: index })}
-      </Kicker>
-      {showDevaShloka ? (
-        <Text variant="deva-bold" style={[styles.verseSanskrit, { color: colors.textPrimary }]}>
-          {verse.devanagari}
-        </Text>
-      ) : (
-        <Text variant="body-italic" style={[styles.verseIast, { color: colors.textPrimary }]}>
-          {verse.iast}
-        </Text>
-      )}
-      {!!meaning && (
-        <View style={[styles.meaningBlock, { borderLeftColor: colors.borderAccent }]}>
-          <Kicker color={colors.accent} size={8} style={styles.meaningLabel}>
-            {t('scripture.meaningLabel')}
-          </Kicker>
-          {/* Hindi bhāvārtha is Devanagari prose → `deva`; English is Latin →
-              `body`. (Matches the katha reader's prose-by-script convention.) */}
-          <Text
-            variant={isHi ? 'deva' : 'body'}
-            style={[styles.meaningText, { color: colors.textSecondary }]}>
-            {meaning}
-          </Text>
-        </View>
-      )}
-    </View>
   );
 }
 
@@ -330,37 +393,6 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 24, lineHeight: 32, textAlign: 'center' },
   heroVerseCount: { fontSize: 9, letterSpacing: 1.6, marginTop: 12 },
   heroOrnament: { marginTop: 14, width: '50%' },
-
-  // Verse blocks
-  verseBlock: {
-    paddingVertical: 18,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'transparent',
-  },
-  verseKickerWrap: { marginBottom: 10 },
-  verseSanskrit: {
-    fontSize: 18,
-    lineHeight: 30,
-    textAlign: 'center',
-  },
-  verseIast: {
-    fontSize: 16,
-    lineHeight: 26,
-    textAlign: 'center',
-  },
-  // Meaning sits in a left-ruled block so it reads as commentary, distinct
-  // from the centered recitation lines above it.
-  meaningBlock: {
-    marginTop: 16,
-    paddingLeft: 14,
-    borderLeftWidth: 2,
-  },
-  meaningLabel: { letterSpacing: 2.0, marginBottom: 6 },
-  meaningText: {
-    fontSize: 14.5,
-    lineHeight: 23,
-    textAlign: 'left',
-  },
 
   // Sources
   sourcesBlock: { marginTop: 12, gap: 8 },

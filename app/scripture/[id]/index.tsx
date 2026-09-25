@@ -122,7 +122,7 @@ function SaptashatiOutlineScreen() {
             <Text variant="body" style={[styles.aboutText, { color: colors.textSecondary }]}>
               {SAPTASHATI_ABOUT[lang]}
             </Text>
-            <Text variant="body-italic" style={[styles.aboutReviewNote, { color: colors.textMuted }]}>
+            <Text variant="body-italic" style={[styles.aboutReviewNote, { color: colors.textSecondary }]}>
               {tForLang('scripture.reviewNote')}
             </Text>
           </View>
@@ -172,7 +172,7 @@ function SaptashatiOutlineScreen() {
                 key={ch.number}
                 style={[styles.chapterCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.chapterHead}>
-                  <Kicker color={palette.gold} size={9} withTrailingRule ruleColor={colors.divider}
+                  <Kicker color={colors.accentText} size={9} withTrailingRule ruleColor={colors.divider}
                     wrapperStyle={styles.chapterKickerWrap}>
                     {tForLang('scripture.chapterKicker', { num: ch.number })}
                   </Kicker>
@@ -230,7 +230,6 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
     () => scripture.chapters.reduce((n, ch) => n + ch.verses.length, 0),
     [scripture],
   );
-  const heroTitle = lang === 'hi' ? scripture.titleHindi : scripture.titleEnglish;
 
   // Per-chapter progress from the reader's `scripture-<slug>-<n>` keys
   // (frame 21): each chapter is its own achievable thing, so there is no
@@ -250,7 +249,15 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
 
   // Continue card — the chapter the reader last left, rolled to the next
   // chapter once one completes.
-  const continueTarget = useMemo(() => {
+  //
+  // Deliberately NOT wrapped in useMemo: the React Compiler could not preserve
+  // the manual memoization here (the `let best` accumulator reassigned inside a
+  // loop defeats its equivalence check), so it bailed out of memoizing this
+  // component entirely — the hand-written memo cost more than it bought. As a
+  // plain expression over `scripture.chapters` + `readingPositions` the compiler
+  // memoizes it automatically, and the work itself is a cheap object lookup per
+  // chapter. Kept as an IIFE so the early-return control flow reads unchanged.
+  const continueTarget = ((): { chapterNumber: number; furthest: number; verseCount: number } | null => {
     let best: { chapterNumber: number; furthest: number; verseCount: number } | null = null;
     for (const ch of scripture.chapters) {
       const furthest = readingPositions[`scripture-${scripture.slug}-${ch.number}`];
@@ -270,7 +277,7 @@ function LibraryScriptureDetailScreen({ scripture }: { scripture: Scripture }) {
       }
     }
     return null;
-  }, [scripture, readingPositions]);
+  })();
   const hasAnyProgress = scripture.chapters.some(
     ch => readingPositions[`scripture-${scripture.slug}-${ch.number}`] != null,
   );

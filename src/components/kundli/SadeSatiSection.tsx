@@ -5,13 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
-import { SectionLabel } from '@/components/common/SectionLabel';
 import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { RemedyNudge } from './RemedyNudge';
 import { useStore } from '@/store/useStore';
 import { borderRadius, darkColors, lightColors } from '@/config/theme';
 import { computeSadeSatiCached } from '@/services/astrology/kundliService';
-import { computeJanmaRashiIndex } from '@/services/astrology/panchangService';
 import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
 
 const RASHI_NAMES_EN = [
@@ -32,7 +30,26 @@ function formatLongDate(d: Date | null, lang: string): string | null {
   });
 }
 
-export function SadeSatiSection() {
+interface SadeSatiSectionProps {
+  /**
+   * Natal Moon rashi index, taken from the SAME D1 chart the identity card
+   * reads. Deriving it locally used a Lahiri-hardcoded helper, so a user on any
+   * other ayanamsa saw two adjacent cards naming two different Moon signs — and
+   * the Sade Sati status/date was computed from the sign they were not shown.
+   * `null` when there is no birth data.
+   */
+  natalMoonRashi: number | null;
+}
+
+/**
+ * Body of the Sade Sati status section. The caller wraps this in the
+ * default-closed accordion that carries the `sadeSati.title` header, so this
+ * component prints no title of its own — and, more importantly, its transit
+ * search (`computeSadeSatiCached`, ~14-21ms warm under panchang-ts 5.3; 5.4
+ * reports it ~18× faster, unmeasured here) is never reached until the user
+ * actually opens the section.
+ */
+export function SadeSatiSection({ natalMoonRashi }: SadeSatiSectionProps) {
   const { t, i18n } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
   const userBirthDate = useStore((s) => s.userBirthDate);
@@ -52,15 +69,6 @@ export function SadeSatiSection() {
     }
   }, [userBirthDate, userBirthTime, userBirthPlace]);
 
-  const natalMoonRashi = useMemo<number | null>(() => {
-    if (!birthDate) return null;
-    try {
-      return computeJanmaRashiIndex(birthDate);
-    } catch {
-      return null;
-    }
-  }, [birthDate]);
-
   const sadeSati = useMemo(() => {
     if (natalMoonRashi === null) return null;
     return computeSadeSatiCached(natalMoonRashi, new Date(), ayanamsa);
@@ -71,9 +79,6 @@ export function SadeSatiSection() {
   if (!birthDate) {
     return (
       <View>
-        <SectionLabel style={styles.sectionLabelSpacing}>
-          {t('sadeSati.title')}
-        </SectionLabel>
         <Text variant="body-italic" style={[styles.prompt, { color: colors.textMuted }]}>
           {t('sadeSati.notSetPrompt')}
         </Text>
@@ -84,9 +89,6 @@ export function SadeSatiSection() {
   if (!sadeSati || natalMoonRashi === null) {
     return (
       <View>
-        <SectionLabel style={styles.sectionLabelSpacing}>
-          {t('sadeSati.title')}
-        </SectionLabel>
         <Text variant="body-italic" style={[styles.prompt, { color: colors.textMuted }]}>
           {t('sadeSati.computeFailed')}
         </Text>
@@ -98,11 +100,10 @@ export function SadeSatiSection() {
 
   return (
     <View>
-      <SectionLabel style={styles.sectionLabelSpacing}>
-        {t('sadeSati.title')}
-      </SectionLabel>
-
-      <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+      {/* mandalaSize 110, not 180: at 2.75 density a 180dp mandala rasterises
+          to a 495×495 ARGB_8888 software bitmap (~980KB) for a mark drawn at
+          8% opacity. 110dp is a 2.7× bitmap cut, visually identical. */}
+      <NightCard padding={20} mandalaSize={110} mandalaOpacity={0.08}>
         <Kicker color={plinth.accent} size={10}>
           {t('sadeSati.natalMoonLabel')}
         </Kicker>
@@ -189,8 +190,7 @@ export function SadeSatiSection() {
 }
 
 const styles = StyleSheet.create({
-  sectionLabelSpacing: { marginTop: 24, marginBottom: 10 },
-  prompt: { fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 16 },
+  prompt: { fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 12 },
 
   natalMoonName: { fontSize: 24, lineHeight: 30, marginTop: 8, marginBottom: 4 },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 14 },

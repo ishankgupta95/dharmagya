@@ -4,7 +4,7 @@ import type { AyanamsaType, FestivalRegion, Language } from 'panchang-ts';
 import {
   FALLBACK_COORDS,
   getCachedPanchangDay,
-  getCachedGrahaPositions,
+  type PanchangCoords,
 } from '@/services/astrology/panchangService';
 import type { IPanchangDay } from '@/types';
 
@@ -45,7 +45,7 @@ interface UseLazyDailyPanchangResult {
  */
 export function useLazyDailyPanchang(
   date: Date,
-  location: { lat: number; lon: number } | null,
+  location: PanchangCoords | null,
   language: Language = 'en',
   region: FestivalRegion = 'all',
   janmaNakshatra?: number,
@@ -64,6 +64,9 @@ export function useLazyDailyPanchang(
 
   const lat = location?.lat ?? FALLBACK_COORDS.lat;
   const lon = location?.lon ?? FALLBACK_COORDS.lon;
+  // A chosen place carries its own zone; a GPS fix does not (the device is
+  // standing there). Falling back to FALLBACK_COORDS pulls in Ujjain/IST.
+  const tz = location ? location.timezone : FALLBACK_COORDS.timezone;
 
   useEffect(() => {
     if (!requested) {
@@ -73,35 +76,43 @@ export function useLazyDailyPanchang(
       // when requested === true.
       return;
     }
-    setError(false);
-    setLoading(true);
-    setIsFullyLoaded(false);
-
-    const coords = { lat, lon };
-
-    let full: IPanchangDay | null;
-    try {
-      full = getCachedPanchangDay(date, coords, {
-        computeEndTimes: true, language, region, janmaNakshatra, janmaRashi, ayanamsa,
-      });
-    } catch {
-      setError(true);
+    // The compute is synchronous (a cache lookup; ~5ms on a Pixel 3a on a
+    // miss), so the "started" flags and the "done" flags have always landed in
+    // one batched render: `loading` has never been observable as true and is
+    // kept for API parity only. The work runs in a microtask rather than the
+    // effect body — a synchronous setState here is a cascading render (and the
+    // compiler's set-state-in-effect rule), while a microtask completes in the
+    // same tick, before the next frame — so what consumers observe per commit
+    // is unchanged: the previous panchang for the frame of the date change,
+    // then the new one. `cancelled` drops a compute whose inputs changed (or
+    // whose owner unmounted) before the microtask ran.
+    let cancelled = false;
+    const coords: PanchangCoords = { lat, lon, timezone: tz };
+    queueMicrotask(() => {
+      if (cancelled) return;
+      let full: IPanchangDay | null;
+      try {
+        full = getCachedPanchangDay(date, coords, {
+          computeEndTimes: true, language, region, janmaNakshatra, janmaRashi, ayanamsa,
+        });
+      } catch {
+        full = null;
+      }
+      if (!full) {
+        setError(true);
+        setIsFullyLoaded(false);
+        setLoading(false);
+        return;
+      }
+      setPanchang(full);
+      setError(false);
+      setIsFullyLoaded(true);
       setLoading(false);
-      return;
-    }
-    if (!full) {
-      setError(true);
-      setLoading(false);
-      return;
-    }
-    if (!full.planetaryPositions) {
-      try { full.planetaryPositions = getCachedGrahaPositions(date, language, ayanamsa); }
-      catch { /* non-critical */ }
-    }
-    setPanchang(full);
-    setIsFullyLoaded(true);
-    setLoading(false);
-  }, [requested, date, lat, lon, language, region, janmaNakshatra, janmaRashi, ayanamsa, retryCount]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [requested, date, lat, lon, tz, language, region, janmaNakshatra, janmaRashi, ayanamsa, retryCount]);
 
   return { panchang, isFullyLoaded, loading, error, requested, request, retry };
 }

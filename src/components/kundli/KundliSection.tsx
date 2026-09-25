@@ -30,7 +30,7 @@ import {
   DIVISIONAL_CHARTS_BEYOND_D9,
 } from '@/services/astrology/kundliService';
 import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
-import { buildKundliReading, getDashaPeriodTheme } from '@/config/kundliReading';
+import { buildKundliReading, getDashaPeriodTheme, READING_REVIEW_PENDING } from '@/config/kundliReading';
 import { DoshaCard } from './DoshaCard';
 import { RemedyNudge } from './RemedyNudge';
 import { ShadbalaChart } from './ShadbalaChart';
@@ -128,9 +128,33 @@ export function KundliSection() {
   const [kpOpen, setKpOpen] = useState(false);
   const [shadbalaOpen, setShadbalaOpen] = useState(false);
   const [bhavaBalaOpen, setBhavaBalaOpen] = useState(false);
+  // Sade Sati is a transit search (Saturn walked forward/backward for the
+  // 7.5-year arc boundaries), not a table lookup — measured at ~14-21ms warm,
+  // roughly 90% of this tab's synchronous compute and an order of magnitude
+  // more than the entire computeKundli bundle. It used to run unconditionally
+  // in the Basics layer, inside the commit the tab switch waits on. Gated the
+  // same way Shadbala/Bhava Bala are: the accordion doesn't mount its children
+  // when closed, so the compute is simply never reached until asked for.
+  // (Measured under panchang-ts 5.3. 5.4 reports computeSadeSati ~18× faster —
+  // it stopped sampling Saturn where it cannot change sign — so re-measure on
+  // the Pixel 3a before relying on this cost, or on the gate still being
+  // needed.)
+  const [sadeSatiOpen, setSadeSatiOpen] = useState(false);
   // Local draft for the name TextInput so we only commit on blur, not on
   // every keystroke (avoids re-renders + per-key store writes).
   const [nameDraft, setNameDraft] = useState<string>(userName ?? '');
+  // Re-seed when the store value changes under us — the Settings sheet is the
+  // other writer and this tab stays mounted for the whole session, so the
+  // field kept showing whatever it was seeded with at mount. Worse, because
+  // the draft commits on BLUR, merely focusing a stale-empty field and tapping
+  // away wrote '' back and wiped the name the user had just saved. Adjusted
+  // during render rather than in an effect so the corrected value paints in
+  // the same commit instead of flashing the stale one for a frame.
+  const [seededName, setSeededName] = useState<string | null>(userName);
+  if (seededName !== userName) {
+    setSeededName(userName);
+    setNameDraft(userName ?? '');
+  }
   // "Now" for the running-mahadasha progress bar, captured once at mount:
   // dasha progress moves by years, so a static snapshot is exact enough and
   // keeps render pure.
@@ -161,8 +185,11 @@ export function KundliSection() {
   const birthInstant = useMemo<Date | null>(() => {
     if (!userBirthDate) return null;
     const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
+    // Keep the `??` outside the try: a value block inside try/catch makes the
+    // React Compiler bail out of this whole component.
+    const time = userBirthTime ?? '12:00';
     try {
-      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
+      return wallclockInZoneToUtc(userBirthDate, time, tz);
     } catch {
       return null;
     }
@@ -236,19 +263,24 @@ export function KundliSection() {
   const styleChipTextNorth = useMemo(
     () => [
       styles.styleChipText,
-      { color: chartStyle === 'north' ? palette.parchmentBright : colors.textSecondary },
+      { color: chartStyle === 'north' ? palette.night : colors.textSecondary },
     ],
     [chartStyle, colors.textSecondary],
   );
   const styleChipTextSouth = useMemo(
     () => [
       styles.styleChipText,
-      { color: chartStyle === 'south' ? palette.parchmentBright : colors.textSecondary },
+      { color: chartStyle === 'south' ? palette.night : colors.textSecondary },
     ],
     [chartStyle, colors.textSecondary],
   );
 
-  const userBirthDateObj = userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null;
+  // Memoised on the ISO string: the date picker is bound to this Date, and a
+  // fresh identity on every render would read as a new value while it is open.
+  const userBirthDateObj = useMemo(
+    () => (userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null),
+    [userBirthDate],
+  );
   const birthDateLabel = userBirthDateObj
     ? userBirthDateObj.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
         day: 'numeric',
@@ -271,7 +303,9 @@ export function KundliSection() {
         label={t('kundli.fieldName')}
         optionalLabel={t('kundli.optional')}
         onChangeText={setNameDraft}
-        onCommit={() => setUserName(nameDraft)}
+        // Redundant-write guard: with the re-seed above an untouched field
+        // already equals the store value, so a bare focus/blur writes nothing.
+        onCommit={() => { if (nameDraft !== (userName ?? '')) setUserName(nameDraft); }}
         colors={colors}
       />
       <View style={[styles.formDivider, { backgroundColor: colors.divider }]} />
@@ -424,6 +458,10 @@ export function KundliSection() {
 
   // Chart cells. D1 is shown in Basics; the Advanced varga is computed lazily
   // and only when the Advanced switch is open.
+  // Read the system the library actually applied, not the store setting — the
+  // two can differ (KP cusps force their own), and this is what decides whether
+  // the chart's whole-sign digit matches the tables below it.
+  const wholeSignHouses = bundle.d1.bhava.system === 'whole-sign';
   const d1Cells = cellsFromD1(bundle.d1, lang);
   const advChartCells = (() => {
     if (!advancedOpen) return null;
@@ -452,8 +490,11 @@ export function KundliSection() {
       {/* ── BASICS ───────────────────────────────────────────────────────── */}
 
       {/* Identity snapshot — Lagna + Moon sign + Sun sign. */}
+      {/* mandalaSize 110, not 180: at 2.75 density a 180dp mandala rasterises to
+          a 495×495 ARGB_8888 software bitmap (~980KB) for a mark drawn at 8%
+          opacity. 110dp is a 2.7× bitmap cut with no perceptible difference. */}
       <View style={styles.lagnaWrap}>
-        <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+        <NightCard padding={20} mandalaSize={110} mandalaOpacity={0.08}>
           <Kicker color={plinth.accent} size={10}>
             {t('kundli.lagnaLabel')}
           </Kicker>
@@ -543,6 +584,16 @@ export function KundliSection() {
                 </Text>
               </View>
             ))}
+
+            {/* Same provisional caption the panchang verdict carries — this is
+                interpretive content still awaiting its en+hi accuracy review. */}
+            {READING_REVIEW_PENDING && (
+              <Text
+                variant="body-italic"
+                style={[styles.readingProvisional, { color: colors.textSecondary }]}>
+                {t('kundli.reading.provisional')}
+              </Text>
+            )}
           </View>
         </>
       )}
@@ -587,8 +638,20 @@ export function KundliSection() {
         </View>
       )}
 
-      {/* Sade Sati status (chart-derived sub-section). */}
-      <SadeSatiSection />
+      {/* Sade Sati status (chart-derived sub-section), default-collapsed. */}
+      {/* Same D1 the identity card above reads, so the two cards cannot name
+          different Moon signs under a non-Lahiri ayanamsa. The accordion header
+          carries the title, so SadeSatiSection renders body content only. */}
+      <View style={styles.aspectsWrap}>
+        <AccordionSection
+          storageKey="kundli.sadeSati"
+          title={t('sadeSati.title')}
+          open={sadeSatiOpen}
+          onToggle={() => setSadeSatiOpen((o) => !o)}
+          colors={colors}>
+          <SadeSatiSection natalMoonRashi={moonRashiIdx} />
+        </AccordionSection>
+      </View>
 
       {/* Highlights — top doshas / yogas as plain chips. */}
       <SectionLabel style={styles.sectionLabelSpacing}>
@@ -656,10 +719,13 @@ export function KundliSection() {
       </View>
 
       <View style={styles.chartWrap}>
+        {/* The digit is the whole-sign placement index; suppress it when the
+            chart was cast under another house system, or it contradicts the
+            cuspal house the Aspects card prints for the same planet. */}
         {chartStyle === 'north' ? (
-          <NorthChart cells={d1Cells} size={chartSize} />
+          <NorthChart cells={d1Cells} size={chartSize} showHouseNumber={wholeSignHouses} />
         ) : (
-          <SouthChart cells={d1Cells} size={chartSize} />
+          <SouthChart cells={d1Cells} size={chartSize} showHouseNumber={wholeSignHouses} />
         )}
       </View>
 
@@ -746,11 +812,13 @@ export function KundliSection() {
           </ScrollView>
 
           <View style={styles.chartWrap}>
+            {/* D1 follows the chosen house system; every divisional chart is
+                whole-sign by classical rule, so its digit is always right. */}
             {advChartCells &&
               (chartStyle === 'north' ? (
-                <NorthChart cells={advChartCells} size={chartSize} />
+                <NorthChart cells={advChartCells} size={chartSize} showHouseNumber={activeChart !== 'D1' || wholeSignHouses} />
               ) : (
-                <SouthChart cells={advChartCells} size={chartSize} />
+                <SouthChart cells={advChartCells} size={chartSize} showHouseNumber={activeChart !== 'D1' || wholeSignHouses} />
               ))}
           </View>
 
@@ -854,7 +922,6 @@ export function KundliSection() {
                 upagrahas={upagrahas}
                 specialLagnas={specialLagnas}
                 colors={colors}
-                isDarkMode={isDarkMode}
               />
             </AccordionSection>
           </View>
@@ -960,6 +1027,11 @@ interface NameInputRowProps {
   colors: ColorPalette;
 }
 
+// Keyboard avoidance is the host's job, not this row's: the section renders
+// inside the Kundli tab's ScrollView (`app/(tabs)/astrology.tsx`), which sets
+// `automaticallyAdjustKeyboardInsets` so iOS scrolls this input clear of the
+// keyboard. A KeyboardAvoidingView here would sit INSIDE that ScrollView and
+// measure against the wrong frame.
 function NameInputRow({
   value,
   placeholder,
@@ -1040,7 +1112,7 @@ function SexSelectRow({
               variant="mono-caps"
               style={[
                 styles.sexChipText,
-                { color: value === 'male' ? palette.parchmentBright : colors.textSecondary },
+                { color: value === 'male' ? palette.night : colors.textSecondary },
               ]}>
               {maleLabel}
             </Text>
@@ -1058,7 +1130,7 @@ function SexSelectRow({
               variant="mono-caps"
               style={[
                 styles.sexChipText,
-                { color: value === 'female' ? palette.parchmentBright : colors.textSecondary },
+                { color: value === 'female' ? palette.night : colors.textSecondary },
               ]}>
               {femaleLabel}
             </Text>
@@ -1189,6 +1261,7 @@ const styles = StyleSheet.create({
   readingBulletRow: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'flex-start' },
   readingBulletIc: { marginTop: 3 },
   readingBulletText: { flex: 1, fontSize: 13.5, lineHeight: 20 },
+  readingProvisional: { fontSize: 11, lineHeight: 15, marginTop: 14 },
 
   flagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   flagChip: {

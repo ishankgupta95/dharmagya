@@ -238,7 +238,7 @@ const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
         </Text>
         <Text
           variant="mono-caps"
-          style={[styles.pill, { color: palette.gold }]}
+          style={[styles.pill, { color: colors.accentText }]}
           numberOfLines={1}>
           {pillText}
         </Text>

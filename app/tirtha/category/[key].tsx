@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { ScreenMount } from '@/components/common/ScreenMount';
@@ -102,7 +102,7 @@ function SiteRow({
           {place}
         </Text>
         {!!site.jyotirlingaNumber && (
-          <Text variant="mono-caps" style={[styles.rowBadge, { color: palette.gold }]}>
+          <Text variant="mono-caps" style={[styles.rowBadge, { color: colors.accentText }]}>
             {t('tirtha.jyotirlingaNumber', { num: site.jyotirlingaNumber })}
           </Text>
         )}

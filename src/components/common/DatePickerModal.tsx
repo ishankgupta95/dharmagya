@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 
 import { AppText as Text } from './AppText';
 import { borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
@@ -54,36 +55,53 @@ function maxBound(p: DatePickerModalProps): Date {
 
 // In 'month' mode the caller only wants year+month, so keep `value`'s day-of-month
 // (clamped to the picked month's length) — matches the old month-jumper.
-function applyMode(picked: Date, mode: 'day' | 'month', value: Date | null): Date {
-  if (mode !== 'month' || !value) return picked;
+function applyMode(picked: Date, mode: 'day' | 'month', valueMs: number | null): Date {
+  if (mode !== 'month' || valueMs === null) return picked;
   const daysInMonth = new Date(picked.getFullYear(), picked.getMonth() + 1, 0).getDate();
-  return new Date(picked.getFullYear(), picked.getMonth(), Math.min(value.getDate(), daysInMonth));
+  const valueDay = new Date(valueMs).getDate();
+  return new Date(picked.getFullYear(), picked.getMonth(), Math.min(valueDay, daysInMonth));
 }
+
+// Both platform pickers read the bound date as `valueMs` — its timestamp, a
+// primitive — never as the `value` Date object. Each has "re-seed the wheel
+// when the value changes" logic, and keying it on the object's identity meant
+// a parent that rebuilds an equal Date on every render (e.g.
+// `new Date(iso + 'T12:00:00')` inline) snapped the wheel back under the
+// user's thumb mid-scroll. A real change of date (a different instant) still
+// re-seeds. The timestamp is taken here, in the wrapper, so it reaches the
+// platform components as a primitive prop: computed inside them, the React
+// Compiler folds the `.getTime()` call into the memo scope it feeds, and
+// that scope then invalidates on `value`'s identity again.
+type PlatformPickerProps = DatePickerModalProps & { valueMs: number | null };
 
 export function DatePickerModal(props: DatePickerModalProps) {
+  const valueMs = props.value ? props.value.getTime() : null;
   if (Platform.OS === 'android') {
-    return <AndroidDatePicker {...props} />;
+    return <AndroidDatePicker {...props} valueMs={valueMs} />;
   }
-  return <IosDatePicker {...props} />;
+  return <IosDatePicker {...props} valueMs={valueMs} />;
 }
 
-function AndroidDatePicker(props: DatePickerModalProps) {
-  const { visible, onClose, onPick, onClear, value, mode = 'day' } = props;
+function AndroidDatePicker(props: PlatformPickerProps) {
+  const { visible, onClose, onPick, onClear, valueMs, mode = 'day' } = props;
   const { t } = useTranslation();
   if (!visible) return null;
 
+  // The library re-seeds the open dialog's wheel (`updateDate`) whenever the
+  // `value` timestamp OR the `onChange` identity changes, so `handleChange`
+  // closes over `valueMs` only and its memo is keyed on that primitive.
   function handleChange(event: DateTimePickerEvent, selected?: Date) {
     if (event.type === 'neutralButtonPressed') {
       onClear?.();
     } else if (event.type === 'set' && selected) {
-      onPick(applyMode(selected, mode, value));
+      onPick(applyMode(selected, mode, valueMs));
     }
     onClose();
   }
 
   return (
     <DateTimePicker
-      value={value ?? new Date()}
+      value={valueMs === null ? new Date() : new Date(valueMs)}
       mode="date"
       display="spinner"
       onChange={handleChange}
@@ -94,21 +112,29 @@ function AndroidDatePicker(props: DatePickerModalProps) {
   );
 }
 
-function IosDatePicker(props: DatePickerModalProps) {
-  const { visible, onClose, onPick, onClear, value, title, colors, mode = 'day' } = props;
+function IosDatePicker(props: PlatformPickerProps) {
+  const { visible, onClose, onPick, onClear, valueMs, title, colors, mode = 'day' } = props;
   const { t } = useTranslation();
   const isDark = useStore((s) => s.isDarkMode);
-  const [draft, setDraft] = useState<Date>(() => value ?? new Date());
-
-  useEffect(() => {
-    if (visible) setDraft(value ?? new Date());
-  }, [visible, value]);
+  const [draft, setDraft] = useState<Date>(() => (valueMs === null ? new Date() : new Date(valueMs)));
+  // Re-seed the wheel when the sheet opens, or when the bound date changes
+  // while it is open — React's "adjust state when a prop changes" pattern,
+  // done during render (React re-renders right away, no effect round-trip) by
+  // comparing against the last-seen `{ visible, valueMs }`. Keyed on the
+  // timestamp (see `PlatformPickerProps`), so a new Date object holding the
+  // same instant is not a change. `Object.is` so an Invalid Date's NaN
+  // compares equal to itself instead of re-rendering forever.
+  const [seen, setSeen] = useState({ visible, valueMs });
+  if (seen.visible !== visible || !Object.is(seen.valueMs, valueMs)) {
+    setSeen({ visible, valueMs });
+    if (visible) setDraft(valueMs === null ? new Date() : new Date(valueMs));
+  }
 
   function handleChange(_event: DateTimePickerEvent, selected?: Date) {
     if (selected) setDraft(selected);
   }
   function handleDone() {
-    onPick(applyMode(draft, mode, value));
+    onPick(applyMode(draft, mode, valueMs));
     onClose();
   }
   function handleClear() {
@@ -179,6 +205,18 @@ function IosDatePicker(props: DatePickerModalProps) {
   );
 }
 
+// Bottom padding for the iOS sheet: 28pt of breathing room, or the window's
+// bottom safe-area inset + 12 when that is larger, so Done / Clear clear the
+// 34pt home indicator (audit L-02). Read from the window metrics rather than
+// `useSafeAreaInsets()`: this sheet also opens from inside NativeTabs, whose
+// per-tab SafeAreaProvider reports the tab bar's height as the bottom inset,
+// but a Modal is presented over the bar, so the window inset is the right one.
+// A launch-time constant is safe — the app is portrait-only on iPhone and
+// iPad's bottom inset does not change with orientation. Android never renders
+// this sheet (it gets the system dialog), so the edge-to-edge nav-bar inset
+// cannot double-pad it.
+const SHEET_PADDING_BOTTOM = Math.max(28, (initialWindowMetrics?.insets.bottom ?? 0) + 12);
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -191,7 +229,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
     paddingTop: 24,
-    paddingBottom: 28,
+    paddingBottom: SHEET_PADDING_BOTTOM,
     paddingHorizontal: spacing.screenH,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },

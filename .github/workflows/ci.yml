@@ -1,0 +1,172 @@
+# The three checks this repo actually gates on. There is no test runner here —
+# `tsc`, `npm run check:data` and `expo lint` are the whole safety net, and until
+# now all three only ran when someone remembered to run them.
+#
+# Deliberately JS-only: `/android` and `/ios` are git-ignored generated folders,
+# so nothing here needs a native toolchain, an SDK, or EAS credentials.
+name: CI
+
+on:
+  # No branch filter on `push`. Work on this repo happens on long-lived branches
+  # that are pushed directly and only occasionally opened as a PR (`tactile-polish`
+  # carried ~110 fixes without one), so filtering to `master` would mean the
+  # checks never run on the branch that needs them.
+  push:
+  pull_request:
+
+# A branch that gets three pushes in a minute only needs the last one checked.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: data · lint · typecheck
+    runs-on: ubuntu-latest
+
+    env:
+      # THE LINT BASELINE. `expo lint` exits non-zero on ANY problem, and this
+      # repo deliberately carries a non-zero count: pre-existing
+      # `react-hooks/*` (React Compiler) surfaces inherited from the SDK 54 → 56
+      # upgrade. Silencing them to make CI green would delete real signal, so the
+      # lint step compares against these numbers instead of against zero — an
+      # increase fails, a decrease passes and asks for the baseline to be lowered.
+      #
+      # Update BOTH numbers in the same commit that changes the count, and say
+      # why in PLAN.md, which records the baseline's history (33 → 32 → 26 → 0;
+      # 0 on 2026-09-23, when every react-hooks error was fixed).
+      LINT_BASELINE_ERRORS: 0
+      LINT_BASELINE_WARNINGS: 0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # package.json declares no `engines` and there is no .nvmrc, so this
+          # tracks the version the app is developed against (v24.x), which is
+          # also the current LTS line. Pin it here rather than floating, so a
+          # CI-only failure is never a Node version nobody chose.
+          node-version: '24'
+          cache: npm
+
+      # `npm ci` on this lockfile is by far the slowest step, and node_modules
+      # changes only when the lockfile does. There is no `postinstall`, so a
+      # restored tree is complete as-is.
+      - name: Restore node_modules
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node24-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # Cheapest check first, and the one most likely to be stale: it compares
+      # every committed engine-output artifact against the locked panchang-ts,
+      # then asserts the app's hardcoded assumptions about those artifacts
+      # (festival-name matchers, the region-breadth threshold) still hold.
+      - name: Generated data
+        run: npm run check:data
+
+      - name: Lint
+        env:
+          # Outside the working tree on purpose: the report is a build artifact,
+          # and .gitignore has no entry for it.
+          LINT_REPORT: ${{ runner.temp }}/eslint-report.json
+        run: |
+          # `--no-cache` because a warm .eslintcache would let a partial run
+          # report a partial count, which this step would then compare against
+          # the full baseline and pass. The exit code is intentionally discarded
+          # (see LINT_BASELINE_ERRORS above); the JSON report is the verdict.
+          npx expo lint --no-cache -- --format json --output-file "$LINT_REPORT" || true
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const reportPath = process.env.LINT_REPORT;
+
+          if (!fs.existsSync(reportPath)) {
+            console.error(
+              'eslint wrote no report. `expo lint` forwards everything after `--` to eslint, so either\n' +
+                'that passthrough changed or the lint run died before producing output. Re-run\n' +
+                '`npx expo lint --no-cache -- --format json --output-file /tmp/eslint.json` locally.',
+            );
+            process.exit(1);
+          }
+
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          const errors = report.reduce((n, f) => n + f.errorCount, 0);
+          const warnings = report.reduce((n, f) => n + f.warningCount, 0);
+          const baseErrors = Number(process.env.LINT_BASELINE_ERRORS);
+          const baseWarnings = Number(process.env.LINT_BASELINE_WARNINGS);
+
+          // Which rule moved is the first thing anyone wants to know, and the
+          // baseline is a single number that cannot say. Print the tally always.
+          const byRule = new Map();
+          for (const file of report) {
+            for (const m of file.messages) {
+              const rule = m.ruleId ?? '(fatal / parse error)';
+              const tally = byRule.get(rule) ?? { error: 0, warning: 0 };
+              tally[m.severity === 2 ? 'error' : 'warning']++;
+              byRule.set(rule, tally);
+            }
+          }
+          console.log(`${errors + warnings} problems (${errors} errors, ${warnings} warnings) by rule:`);
+          for (const [rule, t] of [...byRule].sort((a, b) => (b[1].error + b[1].warning) - (a[1].error + a[1].warning))) {
+            console.log(`  ${String(t.error + t.warning).padStart(3)}  ${rule}  (${t.error}E ${t.warning}W)`);
+          }
+
+          if (errors > baseErrors || warnings > baseWarnings) {
+            console.error(
+              `\nLint regressed: ${errors} errors / ${warnings} warnings against a baseline of ` +
+                `${baseErrors} / ${baseWarnings}.\n` +
+                'Fix the new problem rather than raising the baseline. A `react-hooks/purity` or\n' +
+                '`react-hooks/refs` hit is not cosmetic — it makes the React Compiler bail out of the\n' +
+                'whole component. Every problem follows:\n',
+            );
+            for (const file of report) {
+              for (const m of file.messages) {
+                const where = `${file.filePath}:${m.line ?? 0}:${m.column ?? 0}`;
+                console.error(`  ${m.severity === 2 ? 'error  ' : 'warning'} ${where}  ${m.ruleId ?? ''}  ${m.message}`);
+              }
+            }
+            process.exit(1);
+          }
+
+          if (errors < baseErrors || warnings < baseWarnings) {
+            console.log(
+              `\nLint improved: ${errors} errors / ${warnings} warnings, below the ` +
+                `${baseErrors} / ${baseWarnings} baseline. Lower LINT_BASELINE_ERRORS / ` +
+                'LINT_BASELINE_WARNINGS in this workflow so the gain is held.',
+            );
+          }
+          NODE
+
+      # tsconfig.json includes `expo-env.d.ts` and `.expo/types/**`, both of
+      # which the Expo CLI generates and .gitignore excludes — a clean checkout
+      # has neither.
+      #
+      # `expo-env.d.ts` matters and is written verbatim below: it is the only
+      # reference to `expo/types`, which declares `__DEV__` and the asset module
+      # shims (`*.png`, `*.webp`). Without it tsc reports errors no developer
+      # sees locally.
+      #
+      # `.expo/types/router.d.ts` is deliberately NOT recreated. It only
+      # *narrows* typed routes — expo-router's default `__routes` has no `href`
+      # member, so `Href` falls back to `string | HrefObject`. Its absence can
+      # therefore loosen this check but never invent a failure, and recreating it
+      # would mean running a full Metro export on every push to gain route-string
+      # typos. Local `tsc` remains the stricter of the two.
+      - name: Restore Expo type scaffolding
+        run: |
+          if [ ! -f expo-env.d.ts ]; then
+            printf '/// <reference types="expo/types" />\n' > expo-env.d.ts
+          fi
+
+      - name: Typecheck
+        run: npx tsc --noEmit

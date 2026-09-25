@@ -1,0 +1,164 @@
+{
+ "_meta": {
+  "panchangTsVersion": "5.4.0",
+  "referenceLocation": "Ujjain",
+  "startYear": 2020,
+  "endYear": 2050,
+  "regions": [
+   "tamil-nadu",
+   "kerala",
+   "karnataka",
+   "andhra-pradesh",
+   "telangana",
+   "west-bengal",
+   "odisha",
+   "assam",
+   "bihar",
+   "jharkhand",
+   "gujarat",
+   "maharashtra",
+   "goa",
+   "rajasthan",
+   "punjab",
+   "haryana",
+   "himachal-pradesh",
+   "uttarakhand",
+   "uttar-pradesh",
+   "madhya-pradesh",
+   "nepal"
+  ],
+  "generatedAt": "2026-09-25T02:48:37.010Z",
+  "note": "Festival key -> the regions that emit it, for keys NOT emitted by every region. Built by scripts/generate-festivals-table.js because the festival table is generated at region \"all\" and carries no per-festival region tag. A key absent here is pan-Indian and always shown."
+ },
+ "keys": {
+  "ayyappa_makara_jyothi": [
+   "kerala"
+  ],
+  "baisakhi": [
+   "haryana",
+   "punjab"
+  ],
+  "bathukamma_saddula": [
+   "telangana"
+  ],
+  "bathukamma_start": [
+   "telangana"
+  ],
+  "bhai_dooj": [
+   "bihar",
+   "gujarat",
+   "haryana",
+   "jharkhand",
+   "madhya-pradesh",
+   "maharashtra",
+   "nepal",
+   "rajasthan",
+   "uttar-pradesh",
+   "west-bengal"
+  ],
+  "bohag_bihu": [
+   "assam"
+  ],
+  "bonalu": [
+   "telangana"
+  ],
+  "gangaur": [
+   "rajasthan"
+  ],
+  "govardhan_puja": [
+   "bihar",
+   "gujarat",
+   "haryana",
+   "jharkhand",
+   "madhya-pradesh",
+   "punjab",
+   "rajasthan",
+   "uttar-pradesh"
+  ],
+  "gudi_padwa": [
+   "goa",
+   "maharashtra"
+  ],
+  "harela": [
+   "uttarakhand"
+  ],
+  "hariyali_teej": [
+   "bihar",
+   "haryana",
+   "madhya-pradesh",
+   "rajasthan",
+   "uttar-pradesh"
+  ],
+  "hartalika_teej": [
+   "bihar",
+   "madhya-pradesh",
+   "maharashtra",
+   "rajasthan",
+   "uttar-pradesh"
+  ],
+  "kajari_teej": [
+   "madhya-pradesh",
+   "rajasthan",
+   "uttar-pradesh"
+  ],
+  "karaga": [
+   "karnataka"
+  ],
+  "karthigai_deepam": [
+   "tamil-nadu"
+  ],
+  "kati_bihu": [
+   "assam"
+  ],
+  "lohri": [
+   "haryana",
+   "himachal-pradesh",
+   "punjab"
+  ],
+  "magh_bihu": [
+   "assam"
+  ],
+  "phagli": [
+   "himachal-pradesh"
+  ],
+  "pohela_boishakh": [
+   "west-bengal"
+  ],
+  "pongal": [
+   "tamil-nadu"
+  ],
+  "puthandu": [
+   "tamil-nadu"
+  ],
+  "raja_basi": [
+   "odisha"
+  ],
+  "raja_pahili": [
+   "odisha"
+  ],
+  "raja_sankranti": [
+   "odisha"
+  ],
+  "sair": [
+   "himachal-pradesh"
+  ],
+  "singh_sankranti": [
+   "bihar",
+   "jharkhand",
+   "nepal",
+   "odisha"
+  ],
+  "uttarayan": [
+   "gujarat"
+  ],
+  "varamahalakshmi": [
+   "andhra-pradesh",
+   "karnataka",
+   "tamil-nadu",
+   "telangana"
+  ],
+  "vishu": [
+   "kerala"
+  ]
+ }
+}

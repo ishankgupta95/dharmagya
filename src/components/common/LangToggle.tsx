@@ -60,20 +60,42 @@ interface LangChipProps {
   colors: ColorPalette;
 }
 
+/**
+ * One segment of the toggle. The selected pill uses the shared `colors.accent`
+ * fill — the same token every other SegmentedChip in the app passes. The old
+ * hard-coded `palette.ink` (#221B24, a Sacred Editorial leftover) read 16.80:1
+ * on the light card but only 1.02:1 against the dark composited container, i.e.
+ * the selection affordance vanished entirely in dark mode.
+ *
+ * Turmeric alone does not clear the 3:1 non-text floor in *both* schemes
+ * though: against the toggle container it is 7.21:1 on dark
+ * (rgba(255,255,255,0.045) over #171220 → #211D2A) but only 2.29:1 on the light
+ * card (#FFFFFF). So the selected chip also carries a hairline
+ * `colors.accentText` border — the same border-on-chip device `vaar` and
+ * `muhurat` use — which is #7A5900 on light (6.45:1 against the white
+ * container) and turmeric on dark (border == fill, the 7.21:1 fill already
+ * carries it). Inactive chips keep a transparent border so the two segments
+ * stay the same size and nothing shifts when the selection moves.
+ *
+ * Label colours follow theme Rule 2: text on a turmeric fill is
+ * `palette.night`, never white (8.02:1).
+ */
 function LangChip({ label, active, onPress, colors }: LangChipProps) {
   return (
     <SegmentedChip
       active={active}
       onPress={onPress}
       inactiveBg="transparent"
-      activeBg={palette.ink}
+      activeBg={colors.accent}
+      inactiveBorder="transparent"
+      activeBorder={colors.accentText}
       style={styles.chip}
       accessibilityLabel={label}>
       <Text
         variant="mono-caps"
         style={[
           styles.chipText,
-          { color: active ? palette.parchmentBright : colors.textTertiary },
+          { color: active ? palette.night : colors.textSecondary },
         ]}>
         {label}
       </Text>
@@ -97,6 +119,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 7,
     borderRadius: 17,
+    borderWidth: 1,
     minWidth: 96,
     alignItems: 'center',
   },

@@ -14,10 +14,18 @@ export default {
     close: 'Close',
     pickDate: 'Pick a date',
     pickTime: 'Pick a time',
-    year: 'Year',
     gpsLabel: 'GPS',
-    locationDefault: 'Varanasi',
-    locationDefaultLong: 'Varanasi (default)',
+    locationDefault: 'Ujjain',
+    locationDefaultLong: 'Ujjain (default)',
+  },
+
+  // ── Root crash screen (the ErrorBoundary export in app/_layout.tsx) ─────
+  // Read through a tSafe() wrapper that passes these same strings as
+  // defaultValue, so the screen still renders if the bundle never loaded.
+  // The retry button reuses `common.retry`.
+  appError: {
+    title: 'Something went wrong',
+    body: 'The app could not finish loading. Try again, or close and reopen it.',
   },
 
   // ── Accessibility labels for icon-only buttons and screen-reader hints ──
@@ -25,6 +33,7 @@ export default {
     back: 'Go back',
     close: 'Close',
     clearSearch: 'Clear search',
+    changeLocation: 'Panchang for {{location}}. Change location',
     addFavorite: 'Add to favorites',
     removeFavorite: 'Remove from favorites',
     previousMonth: 'Previous month',
@@ -32,17 +41,15 @@ export default {
     today: 'Jump to today',
     openDatePicker: 'Open date picker',
     openSettings: 'Open settings',
-    openDasha: 'Open Vimshottari Dasha',
     openPanchang: 'Open Panchang',
     openMuhuratFinder: 'Open Muhurat finder',
     openDeity: 'Open {{name}}',
-    openAarti: 'Open Aarti',
-    openChalisa: 'Open Chalisa',
     openJaap: 'Open Mantra Jaap',
     openJaapHistory: 'Open Jaap history',
     tapToCount: 'Tap to count one repetition',
     decrement: 'Subtract one',
     resetCount: 'Reset count',
+    timesInZone: 'Times shown in {{zone}}',
   },
 
   // ── Tabs ────────────────────────────────────────────────────────────────
@@ -55,29 +62,13 @@ export default {
     // ellipsising on the bottom bar. (Was "Jyotish"; the in-screen title is
     // realigned to "Kundli" in P16.2 when the tab is restructured.)
     astrology: 'Kundli',
-    devotion: 'Devotion',
     library: 'Library',
-    settings: 'Settings',
   },
 
   // ── Home Screen ─────────────────────────────────────────────────────────
   home: {
-    greetingMorning: 'Good Morning',
-    greetingAfternoon: 'Good Afternoon',
-    greetingEvening: 'Good Evening',
-    panchangKicker: 'The Five Limbs',
-    panchangTitleDeva: 'आज का पंचांग',
-    featuredKicker: 'For your deities · Today',
-    dashaCurrentBody: 'You are in {{planet}} Major Period',
-    // P16.4 — light two-hero Home feed
+    // P16.4 — Home panchang hero
     panchangHeroKicker: "TODAY'S PANCHANG",
-    kundliHeroKicker: 'YOUR KUNDLI',
-    kundliSetupTitle: 'Set up your kundli',
-    kundliSetupDesc: 'Add your birth details for your chart & daily timings.',
-    kundliOpenPrompt: 'See your full chart',
-    actionJaap: 'Start a jaap',
-    actionMuhurat: 'Find an auspicious time',
-    actionKundli: 'Open your kundli',
     // Diya — Today screen
     fullLink: 'Full',
     rahuBeginsIn: 'Rahu Kaal begins in {{time}}',
@@ -90,9 +81,6 @@ export default {
     quickMuhuratCaption: 'Good times today',
     quickKundliCaption: 'Chart & dasha',
     abhijitAt: 'Abhijit {{time}}',
-    setDashaPrompt: 'Set your birth date to unlock your 120-year timeline',
-    sadeSatiBanner: 'Sade Sati · Phase {{phase}} active — see Astrology',
-    tithi: 'TITHI',
     nakshatra: 'NAKSHATRA',
     yoga: 'YOGA',
     karana: 'KARANA',
@@ -100,20 +88,6 @@ export default {
     sunset: 'SUNSET',
     untilTime: 'until {{time}}',
     couldNotLoadPanchang: 'Could not load Panchang',
-    fromYourFavourites: 'FROM YOUR FAVOURITES',
-    featuredChalisa: 'FEATURED CHALISA',
-    aartiNumber: 'Aarti № {{num}}',
-    chalisaNumber: 'Chalisa № {{num}}',
-    forYourDeities: 'FOR YOUR DEITIES',
-    yourDeities: 'YOUR DEITIES',
-    yourDeitiesManage: 'Manage',
-    favorites: 'Favorites',
-    festivals: 'Festivals',
-    jaap: 'Mantra Jaap',
-    findMuhuratTitle: 'Find an auspicious date',
-    findMuhuratDesc: 'Auspicious timings for weddings, housewarming, naming & more',
-    dashaLink: {
-    },
   },
 
   // ── Panchang Screen ─────────────────────────────────────────────────────
@@ -127,7 +101,6 @@ export default {
     calculationFailed: 'Calculation failed',
     calculationFailedDesc:
       'Unable to compute Panchang for this date. This may be due to an invalid date or location.',
-    fallbackNote: 'Using fallback: Varanasi (25.32°N)',
     // Pancha Anga limb labels — italic Fraunces kickers in the redesigned
     // card. Title Case (proper-noun convention for Sanskrit terms); naked
     // labels without parenthetical clarifications.
@@ -182,6 +155,7 @@ export default {
     eclipsePeak: 'Peak at {{time}}',
     eclipseWindow: '{{start}} – {{end}}',
     eclipseSutak: 'Sutak: {{start}} – {{end}}',
+    eclipseNoSutak: 'No sutak applies to this eclipse.',
     rahuKalam: 'RAHU KALAM',
     yamaganda: 'YAMAGANDA',
     gulikaKalam: 'GULIKA KALAM',
@@ -214,6 +188,10 @@ export default {
     layoutCompact: 'Default',
     layoutDense: 'Detailed',
     layoutSettingLabel: 'Calendar layout',
+    // Shown under the month grid only when the browsed year falls outside the
+    // festival table's coverage — the grid still renders tithi/nakshatra, so
+    // without this the missing festivals read as "none this month".
+    festivalDataRange: 'Festival dates are available for {{from}}–{{to}}.',
     glanceTitle: 'AT A GLANCE',
     // P16.3 — plain "today's verdict" (conservative + descriptive; provisional
     // until reviewed, see VERDICT_REVIEW_PENDING) + the Full-almanac reveal.
@@ -234,7 +212,6 @@ export default {
 
   // ── Library Screen ──────────────────────────────────────────────────────
   library: {
-    godsTitle: 'Gods',
     searchPlaceholder: 'Search gods, aartis, chalisas…',
     countAartis_one: '{{count}} aarti',
     countAartis_other: '{{count}} aartis',
@@ -252,35 +229,24 @@ export default {
     continueKicker: 'Continue',
     continueVerse: 'Verse {{num}} of {{total}}',
     allCount: 'All {{count}}',
-    favoritesSubtitle: "Aartis and chalisas you've saved",
     allGodsTitle: 'All Gods',
-    allGodsSubtitle: 'Browse the 19 deities — aartis, chalisas, stotras & more',
     allAartis: {
       title: 'Aarti',
       count: '{{count}} aartis',
       verseCount: '{{count}} verses',
-      rowSubtitle: 'Every aarti, across all deities',
-      eyebrow: 'READ & RECITE',
-      intro: 'Every aarti in the app, gathered in one place.',
       a11yOpen: 'Open {{name}} aarti',
     },
     allChalisas: {
       title: 'Chalisa',
       count: '{{count}} chalisas',
-      rowSubtitle: 'Every chalisa, across all deities',
-      eyebrow: 'READ & RECITE',
-      intro: 'Every chalisa in the app, gathered in one place.',
       a11yOpen: 'Open {{name}} chalisa',
     },
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
   god: {
-    aartiBadge: 'Aarti',
-    chalisaBadge: 'Chalisa',
     kathaBadge: 'Vrat Katha',
     scriptureBadge: 'Scripture',
-    ashtottaraBadge: '108 Names',
     sahasranamaBadge: '1000 Names',
     stotraBadge: 'Stotra',
     suktaBadge: 'Vedic Sukta',
@@ -299,10 +265,6 @@ export default {
     notFound: 'Chalisa not available for this deity.',
   },
   reader: {
-    aartiLabel: 'Aarti',
-    chalisaLabel: 'Chalisa',
-    ashtottaraLabel: '108 Names',
-    prayerLabel: 'Daily Prayer',
     verseLabel: 'Verse {{num}}',
     refrainTag: 'refrain',
     dohaLabel: 'Doha',
@@ -312,10 +274,14 @@ export default {
     reviewNote: 'Transliteration is under scholarly review — treat as provisional.',
     prevVerse: 'Previous verse',
     nextVerse: 'Next verse',
+    a11yFocusVerseHint: 'Brings this verse into focus',
+    copyAction: 'Copy',
+    copied: 'Copied',
+    copiedSelectHint: 'Copied. Long-press again to select text.',
+    copyFailed: "Couldn't copy. Please try again.",
   },
   ashtottara: {
     badge: 'Ashtottara · 108 Names',
-    intro: 'The Ashtottara Shatanamavali — 108 names of the deity, each recited with an offering of a flower or akshat during worship.',
     nameCount: '{{count}} names',
     openingShloka: 'Opening shloka',
     closingShloka: 'Closing shloka',
@@ -380,6 +346,8 @@ export default {
     noFestivals: 'No festivals found for {{year}}',
     searchPlaceholder: 'Search festivals…',
     noSearchResults: 'No matches for "{{query}}" in {{year}}',
+    loadingYear: 'Loading festivals for {{year}}…',
+    computeFailed: "Couldn't calculate the festivals for {{year}}. Please try again.",
     soonBadge: 'Soon',
     upcomingEclipses: 'COMING ECLIPSES',
     solarEclipse: 'Surya Grahan',
@@ -390,6 +358,7 @@ export default {
     smartaFast: 'Smarta fast',
     vaishnavaFast: 'Vaishnava fast',
     alsoObservedAs: 'Also: {{names}}',
+    footer: 'Descriptions here are under scholarly review — treat them as provisional. Dates and customs vary by region and tradition.',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
@@ -507,8 +476,7 @@ export default {
     location: 'LOCATION',
     gpsLocation: 'GPS Location',
     myLocation: 'My location',
-    usingDefault: 'Using default (Varanasi)',
-    deities: 'DEITIES',
+    usingDefault: 'Using default (Ujjain)',
     manageDeities: 'Manage Your Deities',
     manageDeitiesCount: '{{count}} selected',
     manageDeitiesNone: 'None selected — tap to choose',
@@ -545,6 +513,7 @@ export default {
     sunriseOffsetPickerTitle: 'Sunrise Alert Timing',
     permissionRequired: 'Permission Required',
     permissionRequiredDesc: 'Please allow notifications in Settings to enable this.',
+    permissionOpenSettings: 'Open Settings',
     sunriseUnavailable: 'Sunrise Unavailable',
     sunriseUnavailableDesc: 'Could not determine sunrise time for today.',
     about: 'ABOUT',
@@ -562,6 +531,8 @@ export default {
     shareAppMessage: 'Try Dharmagya — a daily panchang, aarti, and chalisa companion.',
     privacyPolicy: 'Privacy Policy',
     privacyPolicyDesc: 'How we handle your data',
+    adPrivacyOptions: 'Ad Privacy Options',
+    adPrivacyOptionsDesc: 'Review or change your ad consent choices',
     widgetSection: 'HOME SCREEN WIDGET',
     widgetCustomize: 'Customize Widget',
     widgetCustomizeDesc: 'Pick which panchang fields show on the home-screen widget',
@@ -582,6 +553,11 @@ export default {
     slot4Label: 'Footer right',
     slot4Desc: 'Compact value, lower-right',
     footerHint: 'Changes apply the next time the widget refreshes (or instantly when you tap the ↻ icon on it).',
+    footerHintIos: 'Changes apply within a few minutes; the widget also refreshes whenever you open the app.',
+    sizesNote: 'Larger widget sizes also show tomorrow below today.',
+    refreshing: 'REFRESHING',
+    refreshed: 'REFRESHED',
+    refreshTarget: 'Today\u2019s Panchang',
   },
 
   // ── Notification permission pre-prompt ──────────────────────────────────
@@ -644,9 +620,22 @@ export default {
       sankashti: '🕉️ Sankashti tomorrow',
       shivaratri: '🔱 Shivratri tomorrow',
     },
+    // Quiet hours can push an evening-before reminder onto the observance day
+    // itself; these mirror tithiTitle/tithiBody with "today" so a fast day is
+    // never announced as tomorrow's.
+    tithiTitleToday: {
+      ekadashi: '🌙 Ekadashi today',
+      pradosha: '🌒 Pradosha today',
+      purnima: '🌕 Purnima today',
+      amavasya: '🌑 Amavasya today',
+      sankashti: '🕉️ Sankashti today',
+      shivaratri: '🔱 Shivratri today',
+    },
     tithiBody: '{{name}} is tomorrow — prepare your observance.',
+    tithiBodyToday: '{{name}} is today — keep your observance.',
     festivalTitle: '🪔 {{name}}',
     festivalBody: '{{name}} is tomorrow.',
+    festivalBodyToday: '{{name}} is today.',
     tithiTimeLabel: 'Reminder Time (evening before)',
     festivalTimeLabel: 'Reminder Time (evening before)',
     tithiTimePickerTitle: 'Tithi Reminder Time',
@@ -667,15 +656,11 @@ export default {
     step2Desc: 'All five limbs of the panchang, sunrise/sunset, auspicious & inauspicious times, and planetary positions — all in one place.',
     // Step 3 – Library screen: explain what's here
     step3Title: 'Deities, Aartis & More',
-    step3Desc: 'Browse deities, read aartis and chalisas. Bookmark your favourites for quick access from the home screen.',
-    // Step 4 – Home: spotlight on settings gear
-    step4Title: 'Personalise Your Experience',
-    step4Desc: 'Change the app language, switch themes, adjust font size, set your location, and manage notifications.',
+    step3Desc: 'Browse deities, read aartis and chalisas. Bookmark what you like and find it under Saved, in Your Practice.',
   },
 
   // ── Vimshottari Dasha ───────────────────────────────────────────────────
   dasha: {
-    title: 'Vimshottari Dasha',
     birthDateLabel: 'YOUR BIRTH DATE',
     setBirthDate: 'Set your birth date',
     changeBirthDate: 'Change',
@@ -741,15 +726,14 @@ export default {
     noCitiesFound: 'No cities found for "{{query}}"',
     gpsDenied: 'Location access denied',
     gpsDeniedDesc: 'Search for your city below to set your location manually.',
+    // Distinct from gpsDenied: permission was granted (or never asked) but no
+    // fix came back — location services off, dialog dismissed, or no signal.
+    gpsFailed: "Couldn't get your location",
+    gpsFailedDesc: 'Try again, or choose your city below.',
   },
 
   // ── Onboarding ──────────────────────────────────────────────────────────
   onboarding: {
-    // Step 1
-    tagline: 'Your daily bridge to the divine',
-    orientingLine: 'Panchang, kundli, and daily worship in one place',
-    beginJourney: 'Begin Journey',
-    stepCounter: 'Step {{current}} of {{total}}',
     // Step — Intent (keystone, P16.6)
     intentTitle: 'What brings you here?',
     intentSubtitle: 'Pick what matters most — you can change this anytime in Settings.',
@@ -760,21 +744,8 @@ export default {
     birthTitle: 'Your birth details',
     birthSubtitle: 'So your chart & timings are accurate. You can add these later in Kundli.',
     birthAddLater: 'Add later in Kundli',
-    // Step 2
-    step2of3: 'Step 2 of 3',
-    chooseDeities: 'Choose Your Deities',
-    chooseDeitiesDesc:
-      "We'll highlight aartis and chalisas for the deities you love. You can change this anytime.",
+    // Deity picker — also reused by the Settings deity screen.
     selectedCount: '{{count}} selected',
-    // Step 3
-    step3of3: 'Step 3 of 3',
-    preferences: 'Set Your Preferences',
-    dark: 'Dark',
-    light: 'Light',
-    useGpsLocation: 'Use GPS Location',
-    gpsDesc: 'Accurate sunrise & Panchang times',
-    usePuneDefault: 'Use Varanasi (default)',
-    puneDesc: 'No location permission needed',
     startExploring: 'Start Exploring  🙏',
     // Diya onboarding (frames 1–5)
     welcomeBody: 'Panchang, muhurat and pooja for every day — calculated on your phone, working offline.',
@@ -841,12 +812,42 @@ export default {
     avoidRahu: 'Avoid Rahu Kalam: {{start}} – {{end}}',
     scoreOutOf: '/ 100',
     scoreAccessibility: 'Score {{score}} out of 100',
+    a11yDayHint: "Shows this day's best times and the reasons behind its score",
     whyThisDay: 'WHY THIS DAY',
     scoreBand: {
       excellent: 'Highly auspicious',
       good: 'Auspicious',
       mild: 'Mildly auspicious',
       marginal: 'Marginally auspicious',
+    },
+    // Score factors from the muhurta engine, keyed off `factor.code` — these
+    // render as the "Why this day" bullets. The library's own `reasons` array
+    // is English developer diagnostics ("sarvartha_siddhi bonus"), so every
+    // code it can emit gets a sentence here. Codes on the tithi/nakshatra/
+    // vara/yoga axes interpolate the anga name; the rest name no single anga
+    // and deliberately take no {{name}}, which would leave a dangling dash.
+    factor: {
+      auspicious_tithi: 'Auspicious tithi — {{name}}',
+      inauspicious_tithi: 'Inauspicious tithi — {{name}}',
+      auspicious_nakshatra: 'Auspicious nakshatra — {{name}}',
+      inauspicious_nakshatra: 'Inauspicious nakshatra — {{name}}',
+      auspicious_vara: 'Auspicious weekday — {{name}}',
+      inauspicious_vara: 'Inauspicious weekday — {{name}}',
+      auspicious_yoga: 'Auspicious yoga — {{name}}',
+      inauspicious_yoga: 'Inauspicious yoga — {{name}}',
+      vara_tithi_siddha: 'Siddha yoga — auspicious weekday and tithi pairing',
+      vara_tithi_amrita: 'Amrita yoga — auspicious weekday and tithi pairing',
+      vara_tithi_dagdha: 'Dagdha yoga — inauspicious weekday and tithi pairing',
+      vara_tithi_visha: 'Visha yoga — inauspicious weekday and tithi pairing',
+      vara_tithi_hutasana: 'Hutasana yoga — inauspicious weekday and tithi pairing',
+      vara_tithi_krakacha: 'Krakacha yoga — inauspicious weekday and tithi pairing',
+      vara_tithi_samvartaka: 'Samvartaka yoga — inauspicious weekday and tithi pairing',
+      bhadra: 'Bhadra Kala falls during part of the day',
+      amrit_siddhi: 'Amrit Siddhi yoga',
+      sarvartha_siddhi: 'Sarvartha Siddhi yoga — auspicious for all undertakings',
+      ravi_pushya: 'Ravi Pushya yoga',
+      guru_pushya: 'Guru Pushya yoga',
+      jwalamukhi: 'Jwalamukhi yoga — inauspicious',
     },
     occasion: {
       vivah: { name: 'Vivah (Marriage)', chip: 'Marriage', desc: 'Wedding ceremony muhurat' },
@@ -859,12 +860,9 @@ export default {
     },
   },
 
-  // ── Astrology tab (Kundli / Dasha / Sade Sati) ──────────────────────────
+  // ── Astrology tab ───────────────────────────────────────────────────────
   astrology: {
-    title: 'Astrology',
     kundli: 'Kundli',
-    dasha: 'Dasha',
-    sadeSati: 'Sade Sati',
   },
 
   kundli: {
@@ -898,6 +896,7 @@ export default {
       natureLabel: 'YOUR NATURE',
       strengthsLabel: 'STRENGTHS',
       cautionsLabel: 'THINGS TO WATCH',
+      provisional: 'A general guide drawn from your chart, not a prediction.',
     },
     highlightsLabel: 'HIGHLIGHTS',
     noFlags: 'No major doshas in your chart.',
@@ -936,7 +935,6 @@ export default {
     fromLagna: 'FROM LAGNA',
     fromMoon: 'FROM MOON',
     fromVenus: 'FROM VENUS',
-    cancellation: 'Cancellation',
     dignitySection: 'PLANETARY DIGNITY',
     shadbalaSection: 'SHADBALA · SIX-FOLD STRENGTH',
     dignity: {
@@ -948,14 +946,8 @@ export default {
       enemy: 'Enemy',
       debilitated: 'Debilitated',
     },
-    matchKicker: 'COMPATIBILITY',
-    matchCardTitle: 'Match two charts (Ashtakoot Guna Milan)',
     matchOthersKicker: 'OTHER COMPATIBILITY',
     matchOthersTitle: 'Match two other people',
-    openVarshaphalaKicker: 'ANNUAL CHART',
-    openVarshaphala: 'Varshaphala — annual return chart',
-    openPrashnaKicker: 'PRASHNA · QUERY CHART',
-    openPrashna: 'Cast a prashna chart',
     formIntro: 'Add your birth details to compute your kundli. Saved here, used everywhere.',
     fieldName: 'YOUR NAME',
     fieldNamePlaceholder: 'Your name',
@@ -1005,7 +997,7 @@ export default {
       sectionTitle: 'ASHTAKAVARGA',
       sarvaShort: 'SARVA',
       sarvaFootnote: 'Sarvashtaka — sum across all rashis: {{sum}} (canonical 337).',
-      bhinnaFootnote: '{{graha}}’s Bhinnashtaka — total {{sum}} (chart-invariant per BPHS Ch. 66).',
+      bhinnaFootnote: '{{graha}}’s Bhinnashtaka — total {{sum}} (the same in every chart).',
     },
     varshaphala: {
       headerTitle: 'Annual Chart',
@@ -1038,14 +1030,14 @@ export default {
       natalTithiLabel: 'NATAL TITHI',
       shuklaTithi: 'Shukla {{n}}',
       krishnaTithi: 'Krishna {{n}}',
-      tithiBasis: 'Pravesha tithi matches the natal tithi by construction.',
+      tithiBasis: 'The return is cast when the Sun–Moon separation comes back to its natal value.',
       praveshAt: 'Tithi pravesha at {{date}} · {{time}}',
       bhavaCuspsSection: 'BHAVA CUSPS',
-      cuspsHint: 'Cusps under the {{system}} house system.',
+      cuspsHint: 'Cusps under the {{system}} system.',
       planetsSection: 'PLANETS AT PRAVESHA',
       computeFailed: 'Could not compute Tithi Pravesha for these inputs.',
       disclaimer:
-        'Tithi Pravesha is the South-Indian annual return cast at the soli-lunar moment that re-aligns Sun and Moon to their natal positions. The natal tithi is preserved by construction.',
+        'Tithi Pravesha is the South-Indian annual return cast at the soli-lunar moment that re-aligns Sun and Moon to their natal positions.',
     },
     advancedPoints: {
       sectionTitle: 'ADVANCED POINTS',
@@ -1093,7 +1085,7 @@ export default {
       computeFailed: 'Could not cast a prashna chart for these inputs.',
       prashnaLagnaLabel: 'PRASHNA LAGNA',
       bhavaCuspsSection: 'BHAVA CUSPS',
-      cuspsHint: 'Cusps under the {{system}} house system.',
+      cuspsHint: 'Cusps under the {{system}} system.',
       planetsSection: 'PLANETS AT QUERY',
       disclaimer:
         'Prashna (horary) reads the chart of the question itself. The querent is the lagna; the question, the karaka of the matter; the answer, the planetary configuration at the query moment.',
@@ -1123,7 +1115,7 @@ export default {
     nextArc: 'Next arc begins around {{date}}.',
     aboutLabel: 'ABOUT SADE SATI',
     aboutDesc:
-      'Sade Sati is Saturn’s 7.5-year transit through the 12th, 1st, and 2nd rashis from your natal Moon. Classical sources (Parashara, BPHS) regard it as a period of discipline and re-evaluation rather than misfortune.',
+      'Sade Sati is Saturn’s 7.5-year transit through the 12th, 1st, and 2nd rashis from your natal Moon. It is traditionally read as a period of discipline and re-evaluation rather than misfortune.',
   },
 
   match: {
@@ -1152,14 +1144,34 @@ export default {
     fieldBirthPlace: 'BIRTH PLACE',
     pickDate: 'Tap to choose a date',
     pickPlace: 'Tap to choose a city',
-    currentLocation: 'Current location',
     resultTitle: 'COMPATIBILITY',
-    totalScoreLabel: 'ASHTAKOOT TOTAL',
     verdictExcellent: 'Excellent compatibility',
     verdictGood: 'Good compatibility',
     verdictAcceptable: 'Acceptable compatibility',
     verdictPoor: 'Low compatibility',
     cancellationsLabel: 'CANCELLATIONS APPLIED',
+    // One line per panchang-ts `AshtakootResult.cancellations` entry, keyed by
+    // `CANCELLATION_KEYS` in app/kundli/match.tsx.
+    cancellations: {
+      ganaSameRashiLord:
+        'Gana: both Moon signs are ruled by the same planet, so the temperament mismatch no longer counts against the match.',
+      ganaMutualFriendship:
+        'Gana: the planets ruling the two Moon signs are friends of each other, so the temperament mismatch no longer counts against the match.',
+      bhakootSameRashiLord:
+        'Bhakoot: both Moon signs are ruled by the same planet, so the unfavorable distance between the Moon signs no longer counts against the match.',
+      bhakootMutualFriendship:
+        'Bhakoot: the planets ruling the two Moon signs are friends of each other, so the unfavorable distance between the Moon signs no longer counts against the match.',
+      bhakootSameLagnaLord:
+        'Bhakoot: both ascendants (lagna) are ruled by the same planet, so the unfavorable distance between the Moon signs no longer counts against the match.',
+      bhakootSameSeventhLord:
+        'Bhakoot: the 7th house, the house of marriage, is ruled by the same planet in both charts, so the unfavorable distance between the Moon signs no longer counts against the match.',
+      bhakootSameNavamsaLord:
+        'Bhakoot: in both marriage charts (D9 · Navamsa) the Moon sits in a sign ruled by the same planet, so the unfavorable distance between the Moon signs no longer counts against the match.',
+      nadiSameNakshatra:
+        'Nadi: both were born under the same nakshatra (birth star), so sharing the same Nadi no longer counts against the match.',
+      nadiSameRashi:
+        'Nadi: both Moons are in the same sign, so sharing the same Nadi no longer counts against the match.',
+    },
     disclaimer:
       'Ashtakoot is one of many classical compatibility tests. Use it as guidance, not a final verdict — full kundli analysis examines doshas, dasha overlap, and planetary aspects beyond this 36-point cut.',
     systemAshtakoot: '36-POINT · ASHTAKOOT',
@@ -1175,7 +1187,6 @@ export default {
       nadi: 'Nadi · Health & genetics',
     },
     pathuPorutham: {
-      totalScoreLabel: 'PATHU PORUTHAM',
       recommended: 'Recommended — favorable Tamil match',
       notRecommended: 'Not recommended in Tamil tradition',
       pass: 'PASS',
@@ -1210,8 +1221,6 @@ export default {
   // ── Mantra Jaap ─────────────────────────────────────────────────────────
   jaap: {
     title: 'Mantra Jaap',
-    titleEyebrow: 'Jaap',
-    pickerIntro: 'Pick a mantra to begin counting. Each tap on the central bead adds one repetition.',
     chooseMantra: 'CHOOSE A MANTRA',
     customMantra: 'Custom Mantra',
     customMantraDesc: 'Type your own mantra to count.',
@@ -1258,7 +1267,6 @@ export default {
     historyDurationShort: '{{seconds}}s',
     universalMantra: 'Universal',
     deityChip: 'For {{name}}',
-    homeBody: 'Begin a mantra jaap',
   },
 
   vaar: {
@@ -1266,7 +1274,6 @@ export default {
     todaysDeityKicker: "TODAY'S DEITIES",
     rulingGraha: 'Ruled by {{graha}}',
     dayColorLabel: "Day's colour",
-    ishtDevataInFocus: 'Your Isht Devata is in focus today',
     startJaap: 'Start Jaap',
     // Detail screen
     detailTitle: "{{day}}'s Deities",
@@ -1294,7 +1301,6 @@ export default {
   // ── Navratri / Navadurga 9-day guide (P14.3) ────────────────────────────
   navratri: {
     title: 'Navratri',
-    sharadName: 'Sharad Navratri',
     dayShortLabel: 'DAY',
     // Index screen
     dayKicker: 'DAY {{day}} · {{name}}',
@@ -1310,7 +1316,8 @@ export default {
     bhogLabel: 'Bhog / prasad',
     ghatasthapanaLabel: 'Ghatasthapana muhurat',
     ghatasthapanaWindowNote: 'Computed for your location — the first one-third of the day while Pratipada prevails.',
-    ghatasthapanaAbhijitFallback: 'Pratipada ends before sunrise — use the Abhijit muhurta window instead.',
+    ghatasthapanaAbhijitFallback: 'Pratipada does not fall in the first third of the day — use the Abhijit muhurat window instead.',
+    ghatasthapanaNoWindow: "No Ghatasthapana window could be determined for this day and location — follow a local pandit's guidance.",
     warnChitra: 'Chitra nakshatra is active — classically advised against, not prohibited.',
     warnVaidhriti: 'Vaidhriti yoga is active — classically advised against, not prohibited.',
     kanyaPujanKicker: 'KANYA PUJAN',
@@ -1318,6 +1325,7 @@ export default {
     day9HavanText: 'Navami closes the navratri with a havan and purna ahuti. Many households also keep Kanya Pujan on this day — nine girls aged 2–10, halwa-puri-chana, and a gift.',
     vijayadashamiLabel: 'Vijayadashami / Dussehra',
     vijayadashamiText: 'Day 10 — {{date}} — is Vijayadashami / Dussehra. Durga visarjan and, in many traditions, Ravan Dahan and Shami Pujan.',
+    vijayadashamiToday: 'Vijayadashami / Dussehra also falls today.',
     saptashatiTodayLabel: "Today's Saptashati paath",
     saptashatiChapters_one: 'Chapter {{list}}',
     saptashatiChapters_other: 'Chapters {{list}}',
@@ -1333,24 +1341,27 @@ export default {
     allowedLabel: 'Allowed',
     forbiddenLabel: 'Forbidden',
     sourcesLabel: 'About this',
-    // Festivals-screen header card
-    headerKickerUpcoming: 'UPCOMING · 9-DAY GUIDE',
-    headerKickerActive: 'DAY {{day}} OF 9 · IN PROGRESS',
-    headerGhatasthapanaLine: 'Ghatasthapana · {{range}}',
-    headerAbhijitLine: 'Abhijit muhurta · {{range}}',
     // Daily push notifications
     notif: {
       dayTitle: 'Day {{day}} · {{form}}',
       day1Body: "Ghatasthapana is the morning's main rite — auspicious window {{muhurat}}. Today is {{form}}'s day.",
+      day1BodyNoMuhurat: "Ghatasthapana is the morning's main rite. Today is {{form}}'s day.",
       dayBody: "Today's colour is {{color}}; offer {{bhog}} to {{form}}.",
       dayKanyaBody: "Today is for {{form}} — colour {{color}}, bhog {{bhog}}. Kanya Pujan is kept on Ashtami or Navami.",
+      // Vijayadashami can share Day 9's civil date — one push carrying both
+      // rather than two that contradict each other.
+      day9And10Body: "Today is for {{form}} — colour {{color}}, bhog {{bhog}}. Vijayadashami / Dussehra also falls today: Durga visarjan, and Ravan Dahan and Shami Pujan in many traditions.",
       day10Title: 'Vijayadashami · Dussehra',
       day10Body: 'Durga visarjan today. Ravan Dahan and Shami Pujan in many traditions.',
-      day1MuhuratTitle: 'Ghatasthapana muhurat starts soon',
+      // One title for both bodies below — a quiet-hours shift can land this
+      // push either before or after the window opens, so the title has to stay
+      // true in both states and let the body carry the timing.
+      day1MuhuratTitle: 'Ghatasthapana muhurat',
       day1MuhuratBody: 'The auspicious window for Kalash Sthapana begins in about 30 minutes — {{range}}.',
+      // Quiet hours can hold a pre-dawn T-30 push past the window's own start.
+      day1MuhuratBodyOpen: 'The auspicious window for Kalash Sthapana is open now — until {{end}}.',
     },
     // Accessibility
-    a11yOpenGuide: 'Open the Navratri 9-day guide',
     a11ySwitchKind: 'Switch to {{name}}',
     a11yPickDay: 'Day {{day}}',
     a11yStartJaap: 'Start a jaap of this mantra',
@@ -1427,10 +1438,8 @@ export default {
   // ── Tirtha (sacred geography) ───────────────────────────────────────────
   tirtha: {
     title: 'Tirtha',
-    eyebrow: 'SACRED GEOGRAPHY',
-    intro: 'The holy places of the tradition — the Jyotirlingas of Shiva, the Shakti Peethas, the Char Dhams, the Sapta Puri, and the sacred rivers.',
     notFound: 'This place is not available.',
-    sourcesLabel: 'A note on sources',
+    sourcesLabel: 'About this',
     siteCount: '{{count}} sites',
     a11yOpenSite: 'Open {{name}}',
     jyotirlingaNumber: 'Jyotirlinga {{num}} of 12',
@@ -1449,12 +1458,10 @@ export default {
       'sacred-river': 'Sacred Rivers',
     },
     field: {
-      location: 'Location',
       shakti: 'Shakti',
       bodyPart: 'Anga (where it fell)',
       bhairava: 'Bhairava',
       direction: 'Direction',
-      jyotirlinga: 'In the stotra',
     },
   },
 
@@ -1465,16 +1472,11 @@ export default {
     presidingDeity: 'Presiding deity',
     openDeity: 'Open {{name}}',
     observeLabel: 'How it is observed',
-    sourcesLabel: 'A note on sources',
+    sourcesLabel: 'About this',
     today: 'Today',
     tomorrow: 'Tomorrow',
     inDays: 'In {{count}} days',
     onTheDay: 'On the day',
-    category: {
-      ekadashi: 'Ekadashi',
-      'tithi-vrat': 'Monthly Vrat',
-      festival: 'Festival',
-    },
     link: {
       katha: 'VRAT KATHA',
       puja: 'POOJA VIDHI',
@@ -1582,14 +1584,6 @@ export default {
       title: 'Pooja Vidhi',
       subtitle: 'Step-by-step household poojas — Satyanarayan, Lakshmi/Diwali, Ganesh, Rudrabhishek, Hanuman, Navagraha, Ghatasthapana.',
     },
-    kathas: {
-      title: 'Vrat Kathas',
-      subtitle: 'The stories recited when keeping a vrat — Satyanarayan, Karva Chauth, Vaibhav Lakshmi, Santoshi Mata, Solah Somvar, Ahoi Ashtami.',
-    },
-    scriptures: {
-      title: 'Scriptures',
-      subtitle: 'Bhagavad Geeta, Sundarkand, and the Durga Saptashati outline.',
-    },
     prayers: {
       title: 'Daily Prayers',
       subtitle: 'Nitya-karma shlokas for the day — on waking, before a bath, before a meal, and at dusk.',
@@ -1600,8 +1594,6 @@ export default {
   puja: {
     // Index screen
     indexTitle: 'Pooja Vidhi',
-    indexEyebrow: 'FEATURED POOJAS',
-    indexIntro: 'Seven of the most-performed household poojas, each on the classical Shodashopachara template — when and why, an interactive samagri checklist, numbered steps, and deep links to the aarti, chalisa, jaap, and the matching festival or muhurat.',
     notFound: 'This pooja is not available.',
     // Detail-screen section labels
     whenWhyLabel: 'When & why',
@@ -1609,10 +1601,6 @@ export default {
     samagriHint: 'Tap items as you gather them — your checks reset when you leave the page.',
     sankalpaLabel: 'Sankalpa · dedication',
     sankalpaHint: "Recite mentally; substitute your gotra, name, place, and intention where shown in brackets.",
-    preArcLabel: 'Opening steps',
-    shodashopacharaLabel: 'The sixteen upacharas',
-    shodashopacharaHint: 'The classical Shodashopachara sequence, parameterised for this pooja.',
-    postArcLabel: 'Closing steps',
     afterTheLabel: 'After the pooja',
     variantsLabel: 'Regional & traditional variants',
     sourcesLabel: 'About this',
@@ -1634,10 +1622,46 @@ export default {
     openAarti: 'Open the aarti',
     openChalisa: 'Open the chalisa',
     // Cross-link CTAs (used by Library / Festivals / Vaar / Navratri)
-    openPujaCta: 'Open the Pooja',
     openNamedPuja: 'OPEN {{name}}',
-    openDeityPuja: 'Open the {{name}}',
     // Accessibility
     a11yStartJaap: 'Start a jaap of this mantra',
+  },
+
+  // ── Sadhana streak + milestones (P14.4) — DORMANT ───────────────────────
+  // The streak mechanic was removed from the product; its code was kept
+  // deliberately as a rebuild reference (MilestoneCelebrationHost,
+  // SadhanaStreakBadge). Nothing mounts those today, so none of this renders
+  // — but they still call t() against these paths, so the keys stay with them
+  // and the reference stays complete.
+  // Restored from 7ddf8c5^ verbatim; the two leaves with no call site left
+  // (streakLabel, streakDays_*) were not brought back.
+  sadhana: {
+    dayStreakLabel_one: 'DAY SADHANA',
+    dayStreakLabel_other: 'DAYS SADHANA',
+    a11yStreakBadge_one: 'Your current sadhana streak: {{count}} day',
+    a11yStreakBadge_other: 'Your current sadhana streak: {{count}} days',
+
+    // Milestone celebration overlay
+    milestoneEyebrow: 'SADHANA MILESTONE',
+    milestoneKicker: {
+      sessions: 'सत्र · sessions',
+      repetitions: 'जप · repetitions',
+      streak: 'साधना · days of practice',
+    },
+    milestoneSub: {
+      // Plural-safe — count interpolated below the big numeral.
+      sessions_one: 'session completed',
+      sessions_other: 'sessions completed',
+      repetitions_one: 'sacred repetition',
+      repetitions_other: 'sacred repetitions',
+      streak_one: 'day of unbroken sadhana',
+      streak_other: 'days of unbroken sadhana',
+    },
+    milestoneBlessing: 'May your practice deepen.',
+    continueBtn: 'Continue',
+
+    // Opt-in evening reminder (off by default; gentle wording)
+    reminderTitle: '🪔 A quiet moment',
+    reminderBody: 'Begin your sadhana when you have a moment today.',
   },
 } as const;

@@ -43,21 +43,6 @@ export function vratTypeForFestival(festival: { name: string; type: string }): V
   );
 }
 
-/** Returns the first VratType matching any festival on the given date, or null. */
-export function vratTypeForDate(date: Date): VratType | null {
-  const yearKey = String(date.getFullYear());
-  const ymd = toYmd(date);
-  const yearData = (festivalsData as Record<string, { date: string; festivals: { name: string; type: string }[] }[]>)[yearKey];
-  if (!yearData) return null;
-  const day = yearData.find(d => d.date === ymd);
-  if (!day) return null;
-  for (const f of day.festivals) {
-    const vt = vratTypeForFestival(f);
-    if (vt) return vt;
-  }
-  return null;
-}
-
 /** Returns the festival name for a vrat on the given date, or null. Used for notification bodies. */
 export function vratFestivalNameForDate(date: Date): { name: string; vratType: VratType } | null {
   const yearKey = String(date.getFullYear());

@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, palette, spacing } from '@/config/theme';
+import { darkColors, lightColors, spacing } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
@@ -16,6 +16,7 @@ import { MotionPressable } from '@/components/common/MotionPressable';
 import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { LangToggle } from '@/components/common/LangToggle';
 import { VerseBlock } from '@/components/reader/VerseBlock';
+import { handleReaderTouchStart } from '@/components/reader/CopyableUnit';
 import { SCRIPTURE_DISCLAIMER } from '@/config/scriptures';
 import i18n, { resolveLanguage } from '@/i18n';
 import { getSuktaBySlug, titleFor, type ContentLang } from '@/services/content';
@@ -26,6 +27,10 @@ import { getSuktaBySlug, titleFor, type ContentLang } from '@/services/content';
  * `VerseBlock`s (header suppressed for single-section suktas). Carries the
  * `vedicSource` provenance line (scriptural origin = devotional content, kept)
  * and the provisional-review note when `reviewPending`.
+ *
+ * Stays a ScrollView: the longest sukta is 29 verses (Narayana Suktam; Sri
+ * Rudram is 24 one-verse sections), under the ~50-row point where the
+ * stotra / scripture / sahasranama readers switch to a FlatList.
  */
 export default function SuktaReaderScreen() {
   const { t } = useTranslation();
@@ -70,6 +75,7 @@ export default function SuktaReaderScreen() {
   const heroTitle = titleFor(sukta, lang);
   const multiSection = sukta.sections.length > 1;
   const about = sukta.about[lang]?.trim();
+  const copyLabel = t('reader.copyAction');
 
   return (
     <ScreenMount>
@@ -96,7 +102,8 @@ export default function SuktaReaderScreen() {
 
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          onTouchStart={handleReaderTouchStart}>
 
           <View style={styles.heroBlock}>
             <Text
@@ -129,7 +136,7 @@ export default function SuktaReaderScreen() {
               <View key={section.number}>
                 {multiSection && !!sectionTitle && (
                   <Kicker
-                    color={palette.gold}
+                    color={colors.accentText}
                     size={10}
                     withTrailingRule
                     ruleColor={colors.divider}
@@ -139,7 +146,16 @@ export default function SuktaReaderScreen() {
                   </Kicker>
                 )}
                 {section.verses.map((verse, i) => (
-                  <VerseBlock key={i} verse={verse} index={i + 1} lang={lang} colors={colors} t={tForLang} />
+                  <VerseBlock
+                    key={i}
+                    verse={verse}
+                    index={i + 1}
+                    lang={lang}
+                    colors={colors}
+                    t={tForLang}
+                    copyKey={`sukta-${sukta.slug}-${section.number}-${i + 1}`}
+                    copyLabel={copyLabel}
+                  />
                 ))}
               </View>
             );
@@ -147,7 +163,7 @@ export default function SuktaReaderScreen() {
 
           <View style={styles.footer}>
             {sukta.reviewPending && (
-              <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
+              <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
                 {tForLang('reader.reviewNote')}
               </Text>
             )}

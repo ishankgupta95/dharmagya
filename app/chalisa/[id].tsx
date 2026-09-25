@@ -21,6 +21,7 @@ import {
   titleFor,
   type ContentLang,
 } from '@/services/content';
+import { buildCopyText } from '@/utils/verseCopy';
 
 // Diya reader (frame 07): the chalisa is the reference text for the focus
 // reader — the current chaupai holds full weight, neighbours fade back, the
@@ -49,12 +50,24 @@ export default function ChalisaDetailScreen() {
     if (!chalisa) return [];
     const flat: FocusVerse[] = [];
     let chaupaiNum = 0;
-    for (const section of chalisaSections(chalisa, lang)) {
-      for (const text of section.verses) {
+    // Long-press copies the Devanagari verse plus the line on screen. Chalisas
+    // ship no translation, so in English mode that line is the romanised verse
+    // (the only one an English-mode reader can read) and is copied on purpose;
+    // in Hindi mode it is the Devanagari itself and deduplicates away. See
+    // `buildCopyText` for the rule across readers. Both faces come from the
+    // same sections in the same order.
+    // Indexed loops, not forEach: the compiler cannot lower `++chaupaiNum` on
+    // a variable captured by a callback.
+    const devaSections = chalisaSections(chalisa, 'hi');
+    const sections = chalisaSections(chalisa, lang);
+    for (let s = 0; s < sections.length; s++) {
+      const section = sections[s];
+      for (let v = 0; v < section.verses.length; v++) {
+        const text = section.verses[v];
         const label = section.type === 'chaupai'
           ? `${section.label} ${++chaupaiNum}`
           : section.label;
-        flat.push({ label, text });
+        flat.push({ label, text, copyText: buildCopyText([devaSections[s]?.verses[v], text]) });
       }
     }
     return flat;

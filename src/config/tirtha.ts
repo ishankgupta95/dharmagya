@@ -20,13 +20,33 @@ import {
 } from 'hindu-devotional-texts';
 
 import type { IconName } from '@/components/common/Icon';
-import { sanitizeBilingual } from '@/utils/sanitizeContent';
+import { romanize, sanitizeBilingual } from '@/utils/sanitizeContent';
 
 export type { TirthaCategory, TirthaEntry, TirthaSloka };
 export { TIRTHA_SOURCES };
 
+/**
+ * Fold the Latin half of a bilingual label to plain ASCII.
+ *
+ * A handful of library entries carry IAST in the name ("Haridwar (Māyā)",
+ * "Dwarka (Dvārāvatī)") and in the place line ("Prayagraj (Saṅgam)"), and the
+ * ṅ / ḥ / ṛ class has no glyph in either shipped face, so those words break to
+ * a per-glyph system fallback mid-word. Doing this at the config boundary
+ * rather than per render site is what stops the list, the search results and
+ * the detail hero spelling the same site three different ways.
+ */
+function romanizeLatin<T extends { en: string; hi: string }>(v: T): T {
+  return { ...v, en: romanize(v.en) };
+}
+
 function sanitizeTirtha(t: TirthaEntry): TirthaEntry {
-  return { ...t, significance: sanitizeBilingual(t.significance) };
+  return {
+    ...t,
+    name: romanizeLatin(t.name),
+    location: romanizeLatin(t.location),
+    ...(t.state ? { state: romanizeLatin(t.state) } : {}),
+    significance: sanitizeBilingual(t.significance),
+  };
 }
 
 /** All sites, sanitized, in registry order. */

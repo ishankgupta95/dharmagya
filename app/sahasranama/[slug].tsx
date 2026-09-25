@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { View, ScrollView, FlatList, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, palette, spacing, type ColorPalette } from '@/config/theme';
+import { darkColors, lightColors, spacing, type ColorPalette } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
@@ -16,6 +16,8 @@ import { MotionPressable } from '@/components/common/MotionPressable';
 import { FavoriteHeart } from '@/components/common/FavoriteHeart';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { VerseBlock } from '@/components/reader/VerseBlock';
+import { CopyableUnit, handleReaderTouchStart } from '@/components/reader/CopyableUnit';
+import { buildCopyText } from '@/utils/verseCopy';
 import { SCRIPTURE_DISCLAIMER } from '@/config/scriptures';
 import i18n, { resolveLanguage } from '@/i18n';
 import {
@@ -24,17 +26,33 @@ import {
   type ContentLang,
   type NamavaliName,
   type Sahasranama,
+  type SahasranamaSection,
 } from '@/services/content';
 
 type Mode = 'stotram' | 'namavali';
+
+type StotramVerse = SahasranamaSection['verses'][number];
+
+/**
+ * One flattened stotram row. The stotram is nested (section → verses), but a
+ * FlatList needs a flat `data` array — so section titles become rows of their
+ * own rather than a `renderSectionHeader`, which keeps both modes on the exact
+ * same list shape and props.
+ */
+type StotramRow =
+  | { kind: 'sectionTitle'; key: string; title: string }
+  | { kind: 'verse'; key: string; verse: StotramVerse; index: number };
 
 /**
  * Sahasranama reader (Vishnu / Lalita — 1000 names). A segmented toggle swaps
  * between the **Stotram** (the sectioned verse recitation — purva / dhyana /
  * stotram / phalashruti, rendered with the shared `VerseBlock`) and the
- * **1000 Names** namavali, which is virtualised in a FlatList (the
- * `app/ashtottara` NameRow treatment). Meaning language follows the in-screen
- * toggle; the provisional-review note shows when `reviewPending`.
+ * **1000 Names** namavali (the `app/ashtottara` NameRow treatment). Both modes
+ * are virtualised in a FlatList — the stotram is the landing tab and is the
+ * heavier of the two per node (lalita is 4 sections / 348 verses), so it is
+ * flattened into `sectionTitle` / `verse` rows rather than mapped inline.
+ * Meaning language follows the in-screen toggle; the provisional-review note
+ * shows when `reviewPending`.
  */
 export default function SahasranamaReaderScreen() {
   const { t } = useTranslation();
@@ -50,6 +68,23 @@ export default function SahasranamaReaderScreen() {
 
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const sahasranama = useMemo(() => (slug ? getSahasranamaBySlug(slug) : undefined), [slug]);
+
+  // Flattened once per text/language rather than on every render: the section
+  // titles are language-dependent, the verses are not.
+  const stotramRows = useMemo<StotramRow[]>(() => {
+    if (!sahasranama) return [];
+    const rows: StotramRow[] = [];
+    for (const section of sahasranama.stotram) {
+      const title = lang === 'hi'
+        ? (section.titleHindi ?? section.titleSanskrit ?? section.titleEnglish)
+        : (section.titleEnglish ?? section.titleSanskrit);
+      if (title) rows.push({ kind: 'sectionTitle', key: `${section.key}-title`, title });
+      section.verses.forEach((verse, i) => {
+        rows.push({ kind: 'verse', key: `${section.key}-${i}`, verse, index: i + 1 });
+      });
+    }
+    return rows;
+  }, [sahasranama, lang]);
 
   if (!sahasranama) {
     return (
@@ -76,6 +111,8 @@ export default function SahasranamaReaderScreen() {
 
   const favKey = `sahasranama-${sahasranama.slug}`;
   const isFavorite = favoriteIds.includes(favKey);
+  // Screen-reader chrome, so the app language (`t`), as for the back button.
+  const copyLabel = t('reader.copyAction');
 
   const Header = (
     <ReaderHead
@@ -112,8 +149,15 @@ export default function SahasranamaReaderScreen() {
           />
         </View>
 
+        {/* `key={mode}` is load-bearing now that both branches are FlatLists:
+            without it React sees the same element type either side of the
+            ternary and updates in place, so the scroll offset (and the cell
+            cache) carries over into the other mode. The toggle lives in the
+            list header, so the old ScrollView→FlatList swap always reset to
+            the top — keep that. */}
         {mode === 'namavali' ? (
           <FlatList
+            key="namavali"
             data={sahasranama.namavali}
             keyExtractor={(item) => String(item.number)}
             contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
@@ -121,40 +165,56 @@ export default function SahasranamaReaderScreen() {
             initialNumToRender={20}
             maxToRenderPerBatch={24}
             windowSize={11}
-            renderItem={({ item }) => <NameRow name={item} colors={colors} />}
+            onTouchStart={handleReaderTouchStart}
+            renderItem={({ item }) => (
+              <NameRow
+                name={item}
+                lang={lang}
+                colors={colors}
+                copyKey={`${favKey}-name-${item.number}`}
+                copyLabel={copyLabel}
+              />
+            )}
             ListHeaderComponent={Header}
             ListFooterComponent={<Footer reviewPending={sahasranama.reviewPending} lang={lang} tForLang={tForLang} colors={colors} />}
           />
         ) : (
-          <ScrollView
+          <FlatList
+            key="stotram"
+            data={stotramRows}
+            keyExtractor={(item) => item.key}
             contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-            showsVerticalScrollIndicator={false}>
-            {Header}
-            {sahasranama.stotram.map((section) => {
-              const title = lang === 'hi'
-                ? (section.titleHindi ?? section.titleSanskrit ?? section.titleEnglish)
-                : (section.titleEnglish ?? section.titleSanskrit);
-              return (
-                <View key={section.key}>
-                  {!!title && (
-                    <Kicker
-                      color={palette.gold}
-                      size={10}
-                      withTrailingRule
-                      ruleColor={colors.divider}
-                      wrapperStyle={styles.sectionKicker}
-                      style={styles.sectionKickerText}>
-                      {title}
-                    </Kicker>
-                  )}
-                  {section.verses.map((verse, i) => (
-                    <VerseBlock key={i} verse={verse} index={i + 1} lang={lang} colors={colors} t={tForLang} />
-                  ))}
-                </View>
-              );
-            })}
-            <Footer reviewPending={sahasranama.reviewPending} lang={lang} tForLang={tForLang} colors={colors} />
-          </ScrollView>
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={20}
+            maxToRenderPerBatch={24}
+            windowSize={11}
+            onTouchStart={handleReaderTouchStart}
+            renderItem={({ item }) =>
+              item.kind === 'sectionTitle' ? (
+                <Kicker
+                  color={colors.accentText}
+                  size={10}
+                  withTrailingRule
+                  ruleColor={colors.divider}
+                  wrapperStyle={styles.sectionKicker}
+                  style={styles.sectionKickerText}>
+                  {item.title}
+                </Kicker>
+              ) : (
+                <VerseBlock
+                  verse={item.verse}
+                  index={item.index}
+                  lang={lang}
+                  colors={colors}
+                  t={tForLang}
+                  copyKey={`${favKey}-${item.key}`}
+                  copyLabel={copyLabel}
+                />
+              )
+            }
+            ListHeaderComponent={Header}
+            ListFooterComponent={<Footer reviewPending={sahasranama.reviewPending} lang={lang} tForLang={tForLang} colors={colors} />}
+          />
         )}
       </SafeAreaView>
     </ScreenMount>
@@ -219,23 +279,49 @@ function ModeChip({ label, active, onPress, colors }: { label: string; active: b
   );
 }
 
-function NameRow({ name, colors }: { name: NamavaliName; colors: ColorPalette }) {
+/** One namavali name. Long-press copies the Devanagari name (plus its meaning
+ *  in the reader language, should the library ever ship one — none do at
+ *  0.8.0) and arms the row for native text selection. */
+function NameRow({
+  name, lang, colors, copyKey, copyLabel,
+}: {
+  name: NamavaliName;
+  lang: ContentLang;
+  colors: ColorPalette;
+  copyKey: string;
+  copyLabel: string;
+}) {
   return (
-    <View style={styles.nameRow}>
-      <Text variant="mono" style={[styles.nameNumber, { color: colors.textMuted }]}>
-        {name.number}
-      </Text>
-      <View style={styles.nameText}>
-        <Text variant="deva" style={[styles.nameDeva, { color: colors.textPrimary }]}>
-          {name.archana}
-        </Text>
-        {!!name.iast && (
-          <Text variant="body-italic" style={[styles.nameIast, { color: colors.textTertiary }]}>
-            {name.iast}
+    <CopyableUnit
+      copyKey={copyKey}
+      copyLabel={copyLabel}
+      getCopyText={() => buildCopyText([name.archana, name.meaning?.[lang]])}
+      style={styles.nameRow}>
+      {({ selectable, a11y }) => (
+        <>
+          <Text variant="mono" style={[styles.nameNumber, { color: colors.textMuted }]}>
+            {name.number}
           </Text>
-        )}
-      </View>
-    </View>
+          <View style={styles.nameText}>
+            <Text
+              {...a11y}
+              selectable={selectable}
+              variant="deva"
+              style={[styles.nameDeva, { color: colors.textPrimary }]}>
+              {name.archana}
+            </Text>
+            {!!name.iast && (
+              <Text
+                selectable={selectable}
+                variant="body-italic"
+                style={[styles.nameIast, { color: colors.textTertiary }]}>
+                {name.iast}
+              </Text>
+            )}
+          </View>
+        </>
+      )}
+    </CopyableUnit>
   );
 }
 
@@ -250,7 +336,7 @@ function Footer({
   return (
     <View style={styles.footer}>
       {reviewPending && (
-        <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
+        <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
           {tForLang('reader.reviewNote')}
         </Text>
       )}

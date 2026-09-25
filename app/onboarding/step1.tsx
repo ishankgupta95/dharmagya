@@ -19,9 +19,17 @@ export default function OnboardingStep1() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       {/* Onboarding always renders on the night ground */}
       <StatusBar style="light" />
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Bounded rather than absoluteFill: on Android an <Svg> root is drawn
+          into a retained full-size ARGB_8888 bitmap (~9 MiB on a 1080×2220
+          panel) and software-filled pixel by pixel, and this is the very first
+          content frame of a fresh install. The glow is centred at 38% with a
+          vertical radius of 40%, so it never reaches past y = 78% — below that
+          the bitmap was transparent. The box is cut to exactly that reach and
+          cx/cy/ry re-expressed as fractions OF THAT BOX (38/78, 40/78), which
+          leaves the ellipse pixel-identical. */}
+      <Svg style={styles.wash} pointerEvents="none">
         <Defs>
-          <SvgRadialGradient id="welcomeGlow" cx="50%" cy="38%" rx="80%" ry="40%">
+          <SvgRadialGradient id="welcomeGlow" cx="50%" cy="48.72%" rx="80%" ry="51.28%">
             <Stop offset="0" stopColor={palette.turmeric} stopOpacity={0.22} />
             <Stop offset="1" stopColor={palette.turmeric} stopOpacity={0} />
           </SvgRadialGradient>
@@ -58,6 +66,9 @@ export default function OnboardingStep1() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: onb.base },
+
+  // Height is the glow's own reach (cy 38% + ry 40%) — see the call site.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: '78%' },
 
   content: {
     flex: 1,

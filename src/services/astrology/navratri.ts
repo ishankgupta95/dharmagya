@@ -1,21 +1,25 @@
 /**
  * Navratri — date + colour + Ghatasthapana muhurat computation (Phase 14.3).
  *
- * Day-1 dates come from `src/data/static/festivals.json` (already pre-generated
- * via `npm run generate:festivals`) — `Sharad Navaratri` for Sharad,
- * `Rama Navami − 8 days` for Chaitra (Rama Navami is canonical Navratri Day 9).
- * Days 2..9 are simple `+N days` arithmetic. The only panchang-ts call left in
- * this file is the **one** `getDailyPanchang` we need for the Ghatasthapana
- * muhurat window + Chitra/Vaidhriti caption flags on Day 1.
+ * Day-1 dates come from `@/data/festivals` — the app's festival catalogue,
+ * decoded from the pre-generated `src/data/static/festivals-table.json` that
+ * `npm run generate:festivals` builds out of panchang-ts's own
+ * `buildFestivalsTable`. `Sharad Navaratri` for Sharad, `Ugadi` / `Gudi Padwa`
+ * for Chaitra — both names sit on Chaitra Shukla Pratipada, which *is* Day 1.
+ * Days 2..9 are simple `+N days` arithmetic. The only panchang-ts *compute*
+ * left in this file is the **one** `getDailyPanchang` we need for the
+ * Ghatasthapana muhurat window + Chitra/Vaidhriti caption flags on Day 1
+ * (`formatInZone` is the library's pure ISO formatter, not a computation).
  *
  * **Why no `convertHinduToGregorian` here:** the earlier draft of this service
  * computed each Day-N date via panchang-ts tithi-by-tithi (~18 sync calls,
  * ~1–2 s on the JS thread). That was wasted work — the same dates are already
- * baked into `festivals.json`. The lookup version below is O(days-in-year) and
+ * baked into the festival table. The lookup version below is O(days-in-year) and
  * runs in under a millisecond.
  */
 
 import {
+  formatInZone,
   getDailyPanchang,
   PanchangError,
   type AyanamsaType,
@@ -32,7 +36,7 @@ import {
   type NavratriKind,
   type NavadurgaForm,
 } from '@/config/navratri';
-import { FALLBACK_COORDS } from './panchangService';
+import { FALLBACK_COORDS, panchangTimezoneMinutes, type PanchangCoords } from './panchangService';
 import festivalsData from '@/data/festivals';
 
 // ─── Result types ────────────────────────────────────────────────────────────
@@ -72,14 +76,36 @@ export interface NavratriWindow {
 
 /** Ghatasthapana muhurat for Day 1 of a (Sharad/Chaitra) Navratri. */
 export interface GhatasthapanaMuhurat {
-  /** Window start (sunrise of Day 1). */
+  /** Window start — `max(sunrise, pratipadaStart)`. A true instant; schedule
+   *  against `.getTime()`, never render with `.getHours()` (see `startLocal`). */
   start: Date;
-  /** Window end — `min(firstThirdOfDay, pratipadaEnd)`. */
+  /** Window end — `min(firstThirdOfDay, pratipadaEnd)`. Same: instant, not a
+   *  wall clock. */
   end: Date;
   /**
-   * True when Pratipada wasn't active at sunrise — the classical fallback to
-   * Abhijit muhurta applies. `start`/`end` then reflect Abhijit's window.
-   * (Abhijit is `null` on Wednesdays per Smarta convention — `null` propagates.)
+   * `start` / `end` rendered in the **place's** offset — offset-carrying ISO
+   * 8601 ("2026-10-11T05:54:20.257+05:30"), the shape panchang-ts publishes as
+   * its `*Local` companions.
+   *
+   * The window is computed in the timezone of `coords` (see `resolveOpts`), so
+   * it has to be *displayed* there too. A bare `Date` carries no zone, so
+   * `formatMuhuratTime` reads these strings; feeding it `start`/`end` and
+   * calling `getHours()` would print the phone's wall clock instead — under
+   * `TZ=America/New_York` that turned Varanasi's 5:54 AM Sharad-2026 window
+   * into "8:24 PM".
+   */
+  startLocal: string;
+  endLocal: string;
+  /**
+   * True when Shukla Pratipada does not overlap the first third of the day at
+   * all, so the classical fallback to Abhijit muhurta applies. `start`/`end`
+   * then reflect Abhijit's window. In practice this is the Pratipada-kshaya
+   * case (Pratipada already over by sunrise); a Pratipada that merely starts
+   * late still yields a rule-1 window and does not land here.
+   * (Abhijit is itself `null` on Wednesdays per Smarta convention. No
+   * permissible window remains in that case, so `computeGhatasthapanaMuhurat`
+   * returns `null` rather than a record with this flag false — the sunrise
+   * window is precisely what rule 1 disallows once Pratipada has gone.)
    */
   isAbhijitFallback: boolean;
   /**
@@ -159,9 +185,13 @@ export function computeNavadurgaColors(day1Date: Date): NavratriColor[] {
 }
 
 // ─── Date computation ────────────────────────────────────────────────────────
-// Day-1 dates come from the pre-generated `festivals.json`. Days 2..9 are
-// simple `+N days` arithmetic. Vijayadashami / Day 10 also comes from
-// `festivals.json` ("Dussehra"). No panchang-ts calls for dates.
+// Day-1 dates come from the pre-generated festival table (`@/data/festivals`
+// over `src/data/static/festivals-table.json`). Days 2..9 are simple `+N days`
+// arithmetic — a deliberate simplification: in a kshaya/vriddhi year the nine
+// tithis do not land on nine distinct civil days, so Day 9 can sit a day off
+// the table's own Rama Navami. Day 1 is the load-bearing one (Ghatasthapana,
+// the active badge, the colour cycle) and is exact. Sharad's Day 10 comes from
+// the same table ("Dussehra"). No panchang-ts calls for dates.
 
 /** Strip time to local midnight. */
 function startOfLocalDay(d: Date): Date {
@@ -196,21 +226,25 @@ function festivalDateInYear(year: number, name: string): Date | null {
  * Resolve a Navratri kind to its Day-1 Gregorian date in a calendar year,
  * using the static festivals catalogue:
  *   - **sharad** → "Sharad Navaratri" entry (Day 1 of Sharad).
- *   - **chaitra** → "Rama Navami" minus 8 days (Rama Navami = Chaitra Day 9).
- *   - **magha-gupt / ashadha-gupt** → not in `festivals.json`; returns null
+ *   - **chaitra** → "Ugadi" (or "Gudi Padwa" — the table carries both names on
+ *     the same date), which is Chaitra Shukla Pratipada, i.e. Day 1 itself.
+ *   - **magha-gupt / ashadha-gupt** → not in the festival table; returns null
  *     (the UI shows these as info-card-only, with no per-day dates).
  */
 function day1ForKind(kind: NavratriKind, year: number): Date | null {
   switch (kind) {
     case 'sharad':
       return festivalDateInYear(year, 'Sharad Navaratri');
-    case 'chaitra': {
-      const ramaNavami = festivalDateInYear(year, 'Rama Navami');
-      if (!ramaNavami) return null;
-      const d = new Date(ramaNavami);
-      d.setDate(d.getDate() - 8);
-      return d;
-    }
+    case 'chaitra':
+      // Read Pratipada straight off the table, exactly as `sharad` does above.
+      // This used to derive Day 1 as `Rama Navami − 8 days`, which silently
+      // assumed nine tithis always span nine civil days. A tithi runs
+      // ~23.6–26.1 h, so one is regularly skipped (kshaya) or repeated
+      // (vriddhi) inside that span, and the arithmetic was wrong in 5 of the 8
+      // shipped years — in BOTH directions, so no constant offset fixes it.
+      // Worst case it put Day 1 (and therefore Ghatasthapana) on Amavasya or
+      // Krishna Chaturdashi, i.e. in the previous paksha entirely.
+      return festivalDateInYear(year, 'Ugadi') ?? festivalDateInYear(year, 'Gudi Padwa');
     case 'magha-gupt':
     case 'ashadha-gupt':
       return null;
@@ -218,9 +252,10 @@ function day1ForKind(kind: NavratriKind, year: number): Date | null {
 }
 
 export interface NavratriOpts {
-  /** Defaults to `FALLBACK_COORDS` (Varanasi). Used only by Ghatasthapana muhurat. */
-  coords?: { lat: number; lon: number };
-  /** Defaults to the device timezone. Used only by Ghatasthapana muhurat. */
+  /** Defaults to `FALLBACK_COORDS` (Ujjain). Used only by Ghatasthapana muhurat. */
+  coords?: PanchangCoords;
+  /** Defaults to the offset of `coords` on the day being computed. Used only by
+   *  Ghatasthapana muhurat. */
   timezone?: number;
   /** Defaults to `'lahiri'`. Used only by Ghatasthapana muhurat. */
   ayanamsa?: AyanamsaType;
@@ -228,21 +263,22 @@ export interface NavratriOpts {
   masaSystem?: MasaSystem;
 }
 
-function localTimezoneMinutes(): number {
-  return -new Date().getTimezoneOffset();
-}
-
-function resolveOpts(opts?: NavratriOpts) {
+function resolveOpts(opts: NavratriOpts | undefined, date: Date) {
+  const coords = opts?.coords ?? FALLBACK_COORDS;
   return {
-    coords: opts?.coords ?? FALLBACK_COORDS,
-    timezone: opts?.timezone ?? localTimezoneMinutes(),
+    coords,
+    // Resolved for the place and the day, not off the phone's clock right now
+    // — see `panchangTimezoneMinutes`. A Ghatasthapana window is quoted to the
+    // minute and pushed as a T-30 reminder, so rendering Varanasi's sunrise on
+    // a New York clock (or last summer's offset) is not a rounding error.
+    timezone: opts?.timezone ?? panchangTimezoneMinutes(coords, date),
     ayanamsa: opts?.ayanamsa ?? ('lahiri' as AyanamsaType),
   };
 }
 
 /**
  * Compute the 9-day window for a given Navratri kind in a given Gregorian
- * year. Reads Day-1 from `festivals.json`; Days 2..9 + Day 10 are derived.
+ * year. Reads Day-1 from the festival table; Days 2..9 + Day 10 are derived.
  *
  * Returns `null` for the Gupt Navratris (kept info-card-only — see the kind
  * toggle behaviour in `app/navratri/index.tsx`).
@@ -265,10 +301,13 @@ export function computeNavratriDates(
     dates.push(d);
   }
 
-  // Day 10 — Vijayadashami. Use the "Dussehra" entry when present, else
-  // Day 9 + 1 day (the calendar-day default; the aparahna refinement
-  // is a separate concern).
-  const dussehra = festivalDateInYear(year, 'Dussehra');
+  // Day 10. Only Sharad has a named one — Dussehra is Ashvina Shukla Dashami,
+  // so reading that entry for a Chaitra window returned a date six months away
+  // (the screen printed "Day 10 — 20 Oct 2026" under a Day 9 in March). Every
+  // other kind gets the plain Day 9 + 1, and the caller is responsible for not
+  // labelling it "Vijayadashami" (the aparahna refinement is a separate
+  // concern either way).
+  const dussehra = kind === 'sharad' ? festivalDateInYear(year, 'Dussehra') : null;
   const vijayadashami = dussehra ? startOfLocalDay(dussehra) : (() => {
     const d = new Date(dates[8]);
     d.setDate(d.getDate() + 1);
@@ -314,8 +353,18 @@ export function nextNavratri(
   const current = computeNavratriDates(kind, year, opts);
   if (current) {
     const todayStart = startOfLocalDay(today);
-    // If currently active OR upcoming this year → return this.
-    if (current.isActive || current.days[0].date.getTime() >= todayStart.getTime()) {
+    // `isActive` deliberately spans Day 1..9 only — it drives the "Day N"
+    // badge, and there is no Day 10 form/colour to name. Vijayadashami can
+    // fall a civil day (or two, in a kshaya year) after Day 9, so it needs its
+    // own test: without it, on Dussehra morning this rolled to *next year's*
+    // window, whose every date is past the reminder horizon — so the scheduler
+    // wiped the navratri namespace and destroyed the Day-10 push hours before
+    // it was due to fire.
+    if (
+      current.isActive ||
+      current.days[0].date.getTime() >= todayStart.getTime() ||
+      todayStart.getTime() <= current.vijayadashami.getTime()
+    ) {
       return current;
     }
   }
@@ -353,8 +402,12 @@ function elementRange<T extends DailyTithiInfo | DailyNakshatraInfo | DailyYogaI
  *   1. The auspicious window is the **first one-third of the day**
  *      (sunrise → sunrise + dayDuration/3), **while Pratipada prevails**.
  *   2. Not within Amavasya, not at night/afternoon.
- *   3. If Pratipada has already ended by sunrise (rare — Pratipada kshaya),
- *      use **Abhijit muhurta** as the fallback.
+ *   3. If rule 1's window is empty — Pratipada does not overlap the first third
+ *      of the day at all (in practice: Pratipada kshaya, already ended by
+ *      sunrise) — use **Abhijit muhurta** as the fallback. When Abhijit is
+ *      itself unavailable (panchang-ts returns `null` on Wednesdays), no
+ *      permissible window remains and this returns `null` — we publish no
+ *      muhurat rather than one rule 1 forbids.
  *   4. Chitra nakshatra (index 13) and Vaidhriti yoga (index 26) during the
  *      window are advised against — surfaced as warnings.
  */
@@ -362,11 +415,22 @@ export function computeGhatasthapanaMuhurat(
   date: Date,
   opts?: NavratriOpts,
 ): GhatasthapanaMuhurat | null {
-  const { coords, timezone, ayanamsa } = resolveOpts(opts);
+  const { coords, timezone, ayanamsa } = resolveOpts(opts, date);
+  // `date` is a device-local midnight (the festival table's civil date, via
+  // `startOfLocalDay`), but panchang-ts reads the instant we hand it in
+  // `timezone` to pick the Hindu day. Midnight in Auckland is still the
+  // previous afternoon in Varanasi, so passing it straight through published
+  // Day 0's muhurat — 2026-10-11 resolved to the 10th, where Pratipada has not
+  // opened and the window fell through to Abhijit. Re-anchor to *noon of the
+  // same calendar date in the place's own zone*, which lands mid-day for every
+  // device offset.
+  const at = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12) - timezone * 60_000,
+  );
   let raw: DailyPanchangResult | null;
   try {
     raw = getDailyPanchang(
-      date,
+      at,
       { latitude: coords.lat, longitude: coords.lon },
       { timezone, computeEndTimes: true, ayanamsa },
     );
@@ -389,7 +453,7 @@ export function computeGhatasthapanaMuhurat(
   }
 }
 
-function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): GhatasthapanaMuhurat {
+function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): GhatasthapanaMuhurat | null {
 
   const sunrise = raw.sun.rise;
   const sunset = raw.sun.set;
@@ -397,26 +461,40 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
   const dayDurMs = sunset.getTime() - sunrise.getTime();
   const firstThirdEnd = new Date(sunrise.getTime() + dayDurMs / 3);
 
-  // Pratipada is tithi number 1 (Shukla Pratipada).
-  const pratipada = raw.angas.tithis.find(t => t.number === 1);
+  // Shukla Pratipada is absolute tithi index 0. `number` is 1..15 *within the
+  // paksha*, so Krishna Pratipada also satisfies `number === 1` — index is the
+  // only unambiguous test.
+  const pratipada = raw.angas.tithis.find(t => t.index === 0);
   const pratipadaEnd = pratipada?.endTime ?? null;
-  const isPratipadaActiveAtSunrise = raw.angas.tithis[0]?.number === 1;
 
-  // Window candidate: [sunrise, min(firstThirdEnd, pratipadaEnd)]
+  // Rule 1's window is the intersection of Shukla Pratipada with the first
+  // third of the day. A tithi already running at sunrise carries a `startTime`
+  // on the previous civil day, so the max() collapses to sunrise in the
+  // ordinary case; when Pratipada instead *begins* after sunrise (the day opens
+  // on Amavasya) it correctly clips the start forward.
   let start = sunrise;
   let end = firstThirdEnd;
   let isAbhijitFallback = false;
-  if (pratipadaEnd && pratipadaEnd.getTime() < end.getTime()) {
-    end = pratipadaEnd;
+  if (pratipada) {
+    const pratipadaStart = pratipada.startTime ?? sunrise;
+    start = new Date(Math.max(sunrise.getTime(), pratipadaStart.getTime()));
+    end = new Date(Math.min(firstThirdEnd.getTime(), (pratipadaEnd ?? firstThirdEnd).getTime()));
   }
 
-  // Fallback to Abhijit when Pratipada isn't active at sunrise.
-  if (!isPratipadaActiveAtSunrise) {
-    if (raw.muhurtas.abhijit) {
-      start = raw.muhurtas.abhijit.start;
-      end = raw.muhurtas.abhijit.end;
-      isAbhijitFallback = true;
-    }
+  // Rule 3 — Abhijit is the fallback only when rule 1's window is *empty*.
+  // The old test was "Pratipada is not the tithi at sunrise", which is also
+  // true when Pratipada has simply not begun yet; in that case rule 1 still
+  // has a valid overlap and the fallback fired over a perfectly good window.
+  // (Sharad 2027-09-30: Amavasya holds sunrise and Pratipada runs 08:06 →
+  // next dawn, so the classical window is 08:06–09:48; the old branch
+  // published Abhijit, 11:24–12:11.) When the library has no Abhijit either —
+  // it publishes `null` on Wednesdays — there is no permissible window and we
+  // return none rather than one rule 1 forbids.
+  if (!pratipada || start.getTime() >= end.getTime()) {
+    if (!raw.muhurtas.abhijit) return null;
+    start = raw.muhurtas.abhijit.start;
+    end = raw.muhurtas.abhijit.end;
+    isAbhijitFallback = true;
   }
 
   // Warnings — Chitra nakshatra (index 13) / Vaidhriti yoga (index 26) over
@@ -440,8 +518,17 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
     }
   }
 
+  // Display companions, rendered in the offset the window was computed in.
+  // `start`/`end` are frequently *derived* (clipped against the first third of
+  // the day, or Pratipada's end), so there is no library-published `*Local` to
+  // reuse for them — `formatInZone` is the sanctioned way to localize an
+  // instant we produced ourselves.
+  const offsetMinutes = raw.timezone.offsetMinutes;
+
   return {
     start, end,
+    startLocal: formatInZone(start, offsetMinutes),
+    endLocal: formatInZone(end, offsetMinutes),
     isAbhijitFallback,
     sunrise, sunset,
     pratipadaEnd,
@@ -452,24 +539,29 @@ function computeGhatasthapanaMuhuratUnsafe(raw: DailyPanchangResult): Ghatasthap
 // ─── Formatting helpers ──────────────────────────────────────────────────────
 
 /**
- * Format a time as "HH:MM AM/PM" in the local timezone.
+ * Format one of `GhatasthapanaMuhurat`'s `*Local` strings — offset-carrying ISO
+ * 8601, "2026-10-11T05:54:20.257+05:30" — as "H:MM AM/PM".
  *
- * Reads device-local getters, which is correct because panchang-ts v5 publishes
- * true instants. (Through 4.x the same Dates were pre-shifted by the UTC offset,
- * so these getters rendered a wall clock that was off by the device offset —
- * the v5 upgrade fixes the Ghatasthapana window's displayed times.)
+ * Takes the localized string, not the `Date`, because panchang-ts v5 publishes
+ * true instants and a `Date` carries no zone: `d.getHours()` renders the
+ * *phone's* wall clock, while the muhurat is computed in the *place's* (see
+ * `resolveOpts`). Splitting the two printed Varanasi's 5:54 AM Sharad-2026
+ * window as "8:24 PM" on a New York device. Slicing a fixed-width local ISO is
+ * the same approach `formatLocal` takes in `panchangService`.
  */
-export function formatMuhuratTime(d: Date): string {
-  const hours24 = d.getHours();
-  const minutes = d.getMinutes();
+export function formatMuhuratTime(local: string): string {
+  const hours24 = Number(local.slice(11, 13));
+  if (!Number.isFinite(hours24)) return '';
+  const minutes = local.slice(14, 16);
   const meridiem = hours24 >= 12 ? 'PM' : 'AM';
-  const hours12 = hours24 === 0 ? 12 : (hours24 > 12 ? hours24 - 12 : hours24);
-  return `${hours12}:${String(minutes).padStart(2, '0')} ${meridiem}`;
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${minutes} ${meridiem}`;
 }
 
-/** Format a date range like "5:42 AM – 7:02 AM". */
-export function formatMuhuratRange(start: Date, end: Date): string {
-  return `${formatMuhuratTime(start)} – ${formatMuhuratTime(end)}`;
+/** Format a range like "5:42 AM – 7:02 AM" from a muhurat's `startLocal` /
+ *  `endLocal` (never its `start` / `end` — those are zone-less instants). */
+export function formatMuhuratRange(startLocal: string, endLocal: string): string {
+  return `${formatMuhuratTime(startLocal)} – ${formatMuhuratTime(endLocal)}`;
 }
 
 /** Format a date as "Tue, 16 Oct" — for the day card. */

@@ -136,6 +136,12 @@ export default function JaapPickerScreen() {
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           keyboardShouldPersistTaps="handled"
+          // iOS only (Android resizes the window for the keyboard): the custom
+          // mantra input below auto-focuses inside this ScrollView, and without
+          // this the keyboard slides over it and its Save button. The native
+          // scroll view grows its bottom inset by the keyboard height and
+          // scrolls the focused caret above the keyboard.
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}>
 
           {/* ── Stats card (only when there's history) ─────────────────────── */}

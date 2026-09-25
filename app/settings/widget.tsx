@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, Modal, StyleSheet } from 'react-native';
+import { View, ScrollView, Modal, Platform, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -64,7 +64,7 @@ export default function WidgetSettingsScreen() {
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}>
           <Text variant="body-italic" style={[styles.intro, { color: colors.textTertiary }]}>
-            {t('widgetSettings.intro')}
+            {`${t('widgetSettings.intro')} ${t('widgetSettings.sizesNote')}`}
           </Text>
 
           <SectionLabel style={styles.sectionLabel}>{t('widgetSettings.mainSection')}</SectionLabel>
@@ -109,8 +109,11 @@ export default function WidgetSettingsScreen() {
             />
           </View>
 
+          {/* The ↻ chip exists only on the Android widget; WidgetKit has no
+              refresh affordance — it reloads on its own timeline and after
+              every payload write (each app open). */}
           <Text variant="body-italic" style={[styles.footer, { color: colors.textMuted }]}>
-            {t('widgetSettings.footerHint')}
+            {Platform.OS === 'ios' ? t('widgetSettings.footerHintIos') : t('widgetSettings.footerHint')}
           </Text>
 
           <View style={{ height: 40 }} />
@@ -149,7 +152,7 @@ function SlotRow({ icon, slotLabel, slotDesc, fieldLabel, onPress, colors }: Slo
       accessibilityLabel={`${slotLabel} — ${fieldLabel}`}>
       <View style={styles.row}>
         <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-          <Icon name={icon} size={16} color={colors.accent} />
+          <Icon name={icon} size={16} color={colors.accentText} />
         </View>
         <View style={styles.rowText}>
           <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>
@@ -210,11 +213,11 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
                   accessibilityLabel={field.label(lang)}
                   accessibilityState={{ selected: active }}>
                   <View style={styles.sheetItemText}>
-                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accentText : colors.textPrimary }]}>
                       {field.label(lang)}
                     </Text>
                   </View>
-                  {active && <Icon name="check" size={18} color={colors.accent} />}
+                  {active && <Icon name="check" size={18} color={colors.accentText} />}
                 </MotionPressable>
               );
             })}

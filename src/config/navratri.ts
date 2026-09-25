@@ -51,6 +51,8 @@ import type {
   KanyaPujanData,
 } from 'hindu-devotional-texts';
 
+import { poojafy } from '@/utils/sanitizeContent';
+
 // ─── Shared types ────────────────────────────────────────────────────────────
 
 /** A string with English + Hindi variants. Same shape as `vaarDevata.ts`. */
@@ -179,7 +181,7 @@ export const NAVRATRI_MASAS: readonly NavratriMasaInfo[] = [
 
 /** A short informational paragraph shown on the Gupt-Navratri info card. */
 export const GUPT_NAVRATRI_INFO: Bilingual = {
-  en: 'The Gupt ("hidden") Navratris are tantra-focused observances in which the Ten Mahavidyas — Kali, Tara, Tripurasundari, Bhuvaneshvari, Bhairavi, Chinnamasta, Dhumavati, Bagalamukhi, Matangi, Kamala — are worshipped, not the Navadurga. They are kept private and are intended for serious sādhakas under a teacher\'s guidance.',
+  en: 'The Gupt ("hidden") Navratris are tantra-focused observances in which the Ten Mahavidyas — Kali, Tara, Tripurasundari, Bhuvaneshvari, Bhairavi, Chinnamasta, Dhumavati, Bagalamukhi, Matangi, Kamala — are worshipped, not the Navadurga. They are kept private and are intended for serious sadhakas under a teacher\'s guidance.',
   hi: 'गुप्त नवरात्रि तंत्र-प्रधान साधना-काल हैं — इनमें नवदुर्गा नहीं, अपितु दश-महाविद्या (काली, तारा, त्रिपुरसुंदरी, भुवनेश्वरी, भैरवी, छिन्नमस्ता, धूमावती, बगलामुखी, मातंगी, कमला) की उपासना की जाती है। ये साधना गोपनीय है तथा गुरु के मार्गदर्शन में गंभीर साधकों हेतु अभिप्रेत है।',
 };
 
@@ -215,19 +217,45 @@ export const VRAT_FOODS = navratriVratFoods;
 // ─── Kanya Pujan (sourced from hindu-devotional-texts) ───────────────────────
 
 /**
+ * Rewrite the English face of a bilingual field from the library's "Puja"
+ * spelling to the app's "Pooja" (see `poojafy`). The Devanagari `hi` face is
+ * untouched, and `poojafy` matches plain ASCII only, so an IAST-bearing string
+ * ("pūjā") passes through unchanged. Mirrors `poojafyEn` in `poojas.ts`.
+ */
+function poojafyEn<T extends Bilingual>(b: T): T {
+  return { ...b, en: poojafy(b.en) };
+}
+
+/**
  * The Kanya Pujan dataset — the Ashtami/Navami rite of honouring nine young
  * girls as the Devi: a bilingual `about`, `whenObserved`, the nine `ageNames`
  * (ages 2 → 10), the step `protocol`, the customary `offerings`, and regional
  * `notes`. Sourced from the library's `navratri/` module; surfaced on the
  * `/navratri/kanya-pujan` screen and cross-linked from the Day 8/9 card.
+ *
+ * Respelled at this config boundary: the regional `notes` gloss the rite as
+ * "Kumari Puja", and the screen renders every field below verbatim. Field-
+ * explicit and exhaustive rather than selective, so a package bump that moves
+ * the spelling into another field is still covered. Nothing here is a lookup
+ * key — the screen indexes `ageNames` by position and matches nothing on text
+ * — so respelling is display-only. The rite's own name keeps its "Pujan"
+ * spelling (पूजन is a distinct word, and `poojafy` matches whole words only).
  */
-export const KANYA_PUJAN: KanyaPujanData = kanyaPujan;
+export const KANYA_PUJAN: KanyaPujanData = {
+  ...kanyaPujan,
+  about: poojafyEn(kanyaPujan.about),
+  whenObserved: poojafyEn(kanyaPujan.whenObserved),
+  ageNames: kanyaPujan.ageNames.map(a => ({ ...a, name: poojafyEn(a.name) })),
+  protocol: kanyaPujan.protocol.map(poojafyEn),
+  offerings: kanyaPujan.offerings.map(poojafyEn),
+  notes: kanyaPujan.notes.map(poojafyEn),
+};
 
 // ─── Disclaimer ──────────────────────────────────────────────────────────────
 
 export const NAVRATRI_SOURCES: Bilingual = {
-  en: "Navratri practice varies by region, sampradaya and family tradition — this is one widely-kept form. Dates and the Ghatasthapana muhurat are computed from the panchang for your location. The nine per-day mantras use the plain `oṁ devī <form>āyai namaḥ` pattern from the Devī Māhātmya commentary lineage; other Shakta and Tantric lineages prefix bīja-syllables — `hrīṁ` (Bhuvaneshvarī-bīja), `śrīṁ` (Lakṣmī-bīja), `klīṁ` (Kāma-bīja), `aiṁ` (Vāgbhava-bīja) — and a guru or family pandit would teach the form belonging to that initiation. For any major observance, follow a pandit's guidance.",
-  hi: 'नवरात्रि साधना क्षेत्र, सम्प्रदाय एवं पारिवारिक परंपरा के अनुसार भिन्न होती है — यह एक प्रचलित रूप है। तिथियाँ एवं घटस्थापना मुहूर्त आपके स्थान के पंचांग से गणित हैं। नौ दैनिक मन्त्र देवी-माहात्म्य टीका परंपरा के सरल `ॐ देवी <स्वरूप>ायै नमः` स्वरूप में हैं; अन्य शाक्त एवं तान्त्रिक परंपराओं में बीज-अक्षर — `ह्रीं` (भुवनेश्वरी-बीज), `श्रीं` (लक्ष्मी-बीज), `क्लीं` (काम-बीज), `ऐं` (वाग्भव-बीज) — पूर्व में जोड़े जाते हैं, तथा गुरु अथवा कुल-पंडित अपनी दीक्षा-अनुसार स्वरूप सिखाते हैं। किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
+  en: "Navratri practice varies by region, sampradaya and family tradition — this is one widely-kept form. Dates and the Ghatasthapana muhurat are computed from the panchang for your location. The nine per-day mantras use the plain 'om devi …ayai namah' pattern from the Devi Mahatmya commentary lineage, with that day's form of the goddess named in the middle; other Shakta and Tantric lineages prefix a bija-syllable — hreem (Bhuvaneshvari-bija), shreem (Lakshmi-bija), kleem (Kama-bija), aim (Vagbhava-bija) — and a guru or family pandit would teach the form belonging to that initiation. For any major observance, follow a pandit's guidance.",
+  hi: 'नवरात्रि साधना क्षेत्र, सम्प्रदाय एवं पारिवारिक परंपरा के अनुसार भिन्न होती है — यह एक प्रचलित रूप है। तिथियाँ एवं घटस्थापना मुहूर्त आपके स्थान के पंचांग से गणित हैं। नौ दैनिक मन्त्र देवी-माहात्म्य टीका परंपरा के सरल "ॐ देवी …ायै नमः" स्वरूप में हैं, जिनमें बीच में उस दिन की देवी का नाम आता है; अन्य शाक्त एवं तान्त्रिक परंपराओं में बीज-अक्षर — ह्रीं (भुवनेश्वरी-बीज), श्रीं (लक्ष्मी-बीज), क्लीं (काम-बीज), ऐं (वाग्भव-बीज) — पूर्व में जोड़े जाते हैं, तथा गुरु अथवा कुल-पंडित अपनी दीक्षा-अनुसार स्वरूप सिखाते हैं। किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
 };
 
 // ─── Lookup helpers ──────────────────────────────────────────────────────────

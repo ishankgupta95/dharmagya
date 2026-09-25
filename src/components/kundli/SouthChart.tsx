@@ -26,6 +26,15 @@ interface SouthChartProps {
   size: number;
   /** Optional center caption (e.g. user name + lagna rashi). */
   centerCaption?: string;
+  /**
+   * Print the whole-sign house number before the rashi label. False when the
+   * chart was cast under `equal` / `placidus-kp`, where `ChartCell.house` is
+   * only a placement index and the planet tables next to the chart print the
+   * chart's real cuspal house — two different numbers for the same planet on
+   * one screen. Defaults to true (whole-sign is the shipped default, and it is
+   * the only way to read houses off a South Indian chart).
+   */
+  showHouseNumber?: boolean;
 }
 
 const RASHI_TO_GRID: { rashi: number; col: number; row: number }[] = [
@@ -43,7 +52,7 @@ const RASHI_TO_GRID: { rashi: number; col: number; row: number }[] = [
   { rashi: 11, col: 0, row: 0 }, // Meena
 ];
 
-export const SouthChart = memo(function SouthChart({ cells, size, centerCaption }: SouthChartProps) {
+export const SouthChart = memo(function SouthChart({ cells, size, centerCaption, showHouseNumber = true }: SouthChartProps) {
   const isDark = useStore((s) => s.isDarkMode);
   const stroke = isDark ? 'rgba(243,229,200,0.55)' : palette.ink;
   const accent = isDark ? palette.goldLeaf : palette.sindoor;
@@ -107,7 +116,7 @@ export const SouthChart = memo(function SouthChart({ cells, size, centerCaption 
                 fontSize={rashiFontSize}
                 fill={cell.isLagna ? accent : muted}
                 fontStyle="italic">
-                {`${cell.house} · ${cell.rashiName}`}
+                {showHouseNumber ? `${cell.house} · ${cell.rashiName}` : cell.rashiName}
               </SvgText>
 
               {/* Planets stacked at the cell center */}

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, spacing } from '@/config/theme';
 import { AppText as Text } from '@/components/common/AppText';
 import { AdBanner } from '@/components/common/AdBanner';
 import { Icon } from '@/components/common/Icon';
@@ -84,7 +84,7 @@ export default function ScriptureIndexScreen() {
           {groups.map((g) => (
             <View key={g.key}>
               <Kicker
-                color={palette.gold}
+                color={colors.accentText}
                 size={9}
                 withTrailingRule
                 ruleColor={colors.divider}

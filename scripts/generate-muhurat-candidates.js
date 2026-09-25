@@ -32,10 +32,48 @@ const {
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Version of the panchang-ts that is actually INSTALLED (and therefore the one
+ * that computed this artifact). Read by walking up from the resolved entry
+ * point to the package root rather than by depth arithmetic, so it does not
+ * silently read the wrong package.json if the entry ever moves.
+ *
+ * The lockfile is deliberately NOT the source here: stamping the locked version
+ * while computing with node_modules lets a regenerate-before-`npm install` write
+ * an artifact under one engine and certify it as another —
+ * scripts/check-generated-data.js compares the stamp against the lockfile, so
+ * it would be comparing the lockfile to itself. (`require('panchang-ts/package.json')`
+ * throws: the package blocks `./package.json` in its exports map.)
+ */
+function installedPanchangVersion() {
+  let dir = path.dirname(require.resolve('panchang-ts'));
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, 'package.json');
+    if (fs.existsSync(candidate)) {
+      const pkg = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      if (pkg.name === 'panchang-ts') return pkg.version;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error('Cannot resolve the installed panchang-ts version');
+}
+
+const LIB_VERSION = installedPanchangVersion();
+
 // ─── Lookahead window ────────────────────────────────────────────────────────
-// 2 years from "today" gives the runtime an 18-month staleness gate plus a
-// 6-month buffer for in-flight users between releases.
+// The runtime scans a 365-day window, so the fast path is only sound while the
+// file still covers `today + 364`. The staleness budget it gets is therefore
+// LOOKAHEAD_DAYS - 365, i.e. one year with the current 730 — NOT the whole
+// lookahead. (The runtime derives its gate from `lookaheadDays` for exactly
+// this reason; a hardcoded 540 here once claimed 18 months of budget and let
+// the fast path run against a list that stopped short of the scan window.)
 const LOOKAHEAD_DAYS = 365 * 2;
+
+// The candidates are scored under the default ayanamsa, so the runtime only
+// takes this fast path for a Lahiri user — the list is not a superset of the
+// passing days under any other sidereal convention.
 
 // ─── Reference longitudes ────────────────────────────────────────────────────
 // 5 points bracketing India end-to-end. The east-west sweep is what matters;
@@ -90,6 +128,15 @@ function generate() {
     const cursor = new Date(today);
     cursor.setDate(cursor.getDate() + dayIdx);
     const dayKey = ymd(cursor);
+    // Score NOON IST of the civil date, not the machine's local midnight:
+    // panchang-ts reads the calendar day off the instant in the offset it is
+    // given, so a local midnight on a machine east of IST (e.g. Sydney) is
+    // still the PREVIOUS IST day and every emitted YYYY-MM-DD would be keyed
+    // to the wrong scored day. Noon IST of the civil date is zone-independent
+    // and matches `noonAtPlace` in src/services/astrology/panchangService.ts.
+    const at = new Date(
+      Date.UTC(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 12) - TIMEZONE * 60_000,
+    );
 
     if (dayIdx % 30 === 0) {
       process.stdout.write(`  day ${dayIdx + 1}/${LOOKAHEAD_DAYS} (${dayKey})\r`);
@@ -105,7 +152,7 @@ function generate() {
         const ref = REFERENCES[r];
         try {
           const result = scoreMuhurta(
-            cursor,
+            at,
             { latitude: ref.latitude, longitude: ref.longitude },
             rule,
             { timezone: TIMEZONE },
@@ -135,6 +182,10 @@ function generate() {
     lookaheadDays: LOOKAHEAD_DAYS,
     references: REFERENCES.map(r => r.name),
     ruleSource: 'panchang-ts STOCK_MUHURTA_RULES',
+    // Which build of those rules. `ruleSource` alone can't tell a stale file
+    // from a fresh one, and scoreMuhurta's output moves with the engine — so
+    // scripts/check-generated-data.js gates this against the locked version.
+    panchangTsVersion: LIB_VERSION,
     candidates,
   };
 }

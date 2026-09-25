@@ -14,14 +14,20 @@ import { Icon, type IconName } from '@/components/common/Icon';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { MotionPressable } from '@/components/common/MotionPressable';
 import { DEITY_BY_ID } from '@/config/deities';
-import { getFestivalContentById, getFestivalContentForName, FESTIVAL_SOURCES } from '@/config/festivalContent';
+import {
+  getFestivalContentById,
+  getFestivalContentForName,
+  namesFestivalContent,
+  FESTIVAL_SOURCES,
+} from '@/config/festivalContent';
 import { getKathaBySlug } from '@/config/kathas';
 import { getPujaBySlug } from '@/config/poojas';
 import { getScriptureBySlug } from '@/config/scriptures';
 import { getMantraBySlug, getStotraBySlug, getSuktaBySlug, titleFor, type ContentLang } from '@/services/content';
-import { fetchPanchang } from '@/services/astrology/panchangService';
+import { fetchPanchang, FALLBACK_COORDS } from '@/services/astrology/panchangService';
 import festivalsByYear from '@/data/festivals';
 import { localizeTithi } from '@/i18n/panchangNames';
+import { poojafy, romanize } from '@/utils/sanitizeContent';
 import type { IPanchangDay } from '@/types';
 
 interface CrossLink {
@@ -65,18 +71,20 @@ export default function FestivalDetailScreen() {
 
   // Next dated occurrence — reverse match against the bundled panchang-ts
   // festival table (engine-free rows; the calendar remains the source of
-  // truth). Scans from today across this year and the next.
+  // truth). Scans from today across this year and the next — first for a row
+  // that names this content directly, then for any row that resolves to it.
+  // The first pass is what keeps Holi on Rangwali Holi: since panchang-ts 5.4
+  // the Holika Dahan eve, a day earlier, opens the same content.
   const occurrence = useMemo(() => {
     if (!festival) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
-      for (const row of festivalsByYear[String(year)] ?? []) {
-        const d = parseYmd(row.date);
-        if (!d || d.getTime() < today.getTime()) continue;
-        for (const f of row.festivals) {
-          const matched = getFestivalContentForName(f.name, f.description);
-          if (matched?.id === festival.id) {
+    const scan = (matches: (f: { name: string; description?: string }) => boolean) => {
+      for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
+        for (const row of festivalsByYear[String(year)] ?? []) {
+          const d = parseYmd(row.date);
+          if (!d || d.getTime() < today.getTime()) continue;
+          if (row.festivals.some(matches)) {
             return {
               date: d,
               daysAway: Math.round((d.getTime() - today.getTime()) / 86_400_000),
@@ -84,8 +92,13 @@ export default function FestivalDetailScreen() {
           }
         }
       }
-    }
-    return null;
+      return null;
+    };
+    const resolves = (f: { name: string; description?: string }) =>
+      getFestivalContentForName(f.name, f.description)?.id === festival.id;
+    return (
+      scan((f) => resolves(f) && namesFestivalContent(f.name, f.description, festival.id)) ?? scan(resolves)
+    );
   }, [festival]);
 
   // Times on the day — computed for the user's location. They appear; no
@@ -94,7 +107,7 @@ export default function FestivalDetailScreen() {
   useEffect(() => {
     if (!occurrence) return;
     let alive = true;
-    fetchPanchang(occurrence.date, userLocation, false).then((p) => {
+    fetchPanchang(occurrence.date, userLocation ?? FALLBACK_COORDS, false).then((p) => {
       if (alive) setDayTimes(p);
     });
     return () => {
@@ -175,8 +188,8 @@ export default function FestivalDetailScreen() {
 
   const timeRows: { label: string; value: string }[] = [];
   if (dayTimes) {
-    timeRows.push({ label: titleCase(t('panchang.sunrise')), value: dayTimes.sunrise });
-    timeRows.push({ label: titleCase(t('panchang.sunset')), value: dayTimes.sunset });
+    timeRows.push({ label: titleCase(t('home.sunrise')), value: dayTimes.sunrise });
+    timeRows.push({ label: titleCase(t('home.sunset')), value: dayTimes.sunset });
     if (dayTimes.brahmaMuhurtaStart && dayTimes.brahmaMuhurtaEnd) {
       timeRows.push({ label: titleCase(t('panchang.brahmaMuhurta')), value: `${dayTimes.brahmaMuhurtaStart} – ${dayTimes.brahmaMuhurtaEnd}` });
     }
@@ -223,11 +236,18 @@ export default function FestivalDetailScreen() {
               </Text>
             </View>
           )}
-          <Text variant="deva-bold" style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            {festival.name[lang]}
-          </Text>
-          <Text variant="display" style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            {lang === 'hi' ? festival.name.en : (festival.nameSanskrit ?? festival.name.hi)}
+          {/*
+            One title in the app language — a screen title is chrome, so the
+            opposite-script name never stacks under it. The Latin name is still
+            folded to plain ASCII: hindu-devotional-texts 0.8.0 ships plain-ASCII
+            English (0.7.0 romanised 60 of 63 entries in IAST, whose glyphs the
+            app's faces don't carry), so `romanize` is now a no-op kept as a
+            guard against a future regression.
+          */}
+          <Text
+            variant={lang === 'hi' ? 'deva-bold' : 'display'}
+            style={[styles.heroTitle, { color: colors.textPrimary }]}>
+            {lang === 'hi' ? festival.name.hi : poojafy(romanize(festival.name.en))}
           </Text>
           {dateLabel && (
             <Text variant="mono" style={[styles.heroDate, { color: colors.textTertiary }]}>
@@ -355,7 +375,7 @@ export default function FestivalDetailScreen() {
 
           <View style={styles.disclaimerBlock}>
             {festival.reviewPending && (
-              <Text variant="body-small" style={[styles.reviewNote, { color: colors.textMuted }]}>
+              <Text variant="body-small" style={[styles.reviewNote, { color: colors.textSecondary }]}>
                 {t('reader.reviewNote')}
               </Text>
             )}
@@ -405,7 +425,6 @@ const styles = StyleSheet.create({
   },
   countChipText: { fontSize: 10 },
   heroTitle: { fontSize: 38, lineHeight: 50, marginTop: 16 },
-  heroSubtitle: { fontSize: 24, lineHeight: 30, marginTop: 2 },
   heroDate: { fontSize: 14, lineHeight: 20, marginTop: 12 },
 
   timesCard: {

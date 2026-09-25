@@ -91,6 +91,22 @@ export default function SearchScreen() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // The settled query drives everything below the search bar — results,
+  // highlighting and the prompt / no-results choice — so they only move
+  // together once the debounce lands, never per keystroke. Clearing the
+  // field resets at once rather than waiting out the debounce. The live
+  // `query` still drives the input chrome (border, icon, clear button).
+  const activeQuery = query.trim().length > 0 ? debouncedQuery : '';
+
+  // An empty field also drops the settled query right away. Otherwise a
+  // keystroke within 300 ms of clearing would cancel the pending reset and
+  // bring back the old query's results under the new text until the
+  // debounce lands.
+  const handleQueryChange = (text: string) => {
+    setQuery(text);
+    if (text.trim().length === 0) setDebouncedQuery('');
+  };
+
   // All searchable items. Texts across the eight collections, the deity
   // roster, and the tirtha atlas — rebuilt when the language changes so
   // localized names join the filter target.
@@ -153,9 +169,9 @@ export default function SearchScreen() {
   }, [t]);
 
   const results = useMemo<SearchResult[]>(() => {
-    if (!debouncedQuery) return [];
-    const q = debouncedQuery.toLowerCase();
-    const qRaw = debouncedQuery;
+    if (!activeQuery) return [];
+    const q = activeQuery.toLowerCase();
+    const qRaw = activeQuery;
     const matched = corpus.filter(item => {
       if (item.titleEnglish.toLowerCase().includes(q) || item.titleHindi.includes(qRaw)) return true;
       if (item.kind === 'text' || item.kind === 'deity') {
@@ -177,7 +193,7 @@ export default function SearchScreen() {
       matched.sort((a, b) => (isPreferred(a) ? 0 : 1) - (isPreferred(b) ? 0 : 1));
     }
     return matched;
-  }, [corpus, debouncedQuery, selectedDeities, t]);
+  }, [corpus, activeQuery, selectedDeities, t]);
 
   const sections: ResultSection[] = useMemo(() => {
     const texts = results.filter(r => r.kind === 'text');
@@ -193,17 +209,19 @@ export default function SearchScreen() {
   const hasQuery = query.trim().length > 0;
   const hasResults = results.length > 0;
 
+  // Keyed on the settled query, not the live one, so typing does not hand
+  // the SectionList a new renderItem (and re-render every mounted row) on
+  // each keystroke while the result set is unchanged.
   const renderItem = useCallback(({ item, index, section }: { item: SearchResult; index: number; section: SectionListData<SearchResult> }) => (
     <ResultRow
       item={item}
-      query={query}
+      query={activeQuery}
       colors={colors}
       isHi={isHi}
       first={index === 0}
       last={index === section.data.length - 1}
-      onPress={() => router.push(item.href)}
     />
-  ), [query, colors, isHi]);
+  ), [activeQuery, colors, isHi]);
 
   return (
     <ScreenMount>
@@ -223,7 +241,7 @@ export default function SearchScreen() {
           <TextInput
             ref={inputRef}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={handleQueryChange}
             placeholder={t('search.placeholder')}
             placeholderTextColor={colors.textMuted}
             style={[styles.input, { color: colors.textPrimary, fontFamily: 'Geist_400Regular' }]}
@@ -233,7 +251,7 @@ export default function SearchScreen() {
           />
           {hasQuery && (
             <MotionPressable
-              onPress={() => setQuery('')}
+              onPress={() => handleQueryChange('')}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.clearSearch')}>
@@ -253,10 +271,10 @@ export default function SearchScreen() {
       </View>
 
       {/* ── Results / States ─────────────────────────────────────────── */}
-      {!hasQuery ? (
+      {!activeQuery ? (
         <EmptyPrompt colors={colors} />
       ) : !hasResults ? (
-        <NoResults query={query} colors={colors} />
+        <NoResults query={activeQuery} colors={colors} />
       ) : (
         <SectionList
           sections={sections}
@@ -300,11 +318,13 @@ interface ResultRowProps {
   isHi: boolean;
   first: boolean;
   last: boolean;
-  onPress: () => void;
 }
 
-const ResultRow = memo(function ResultRow({ item, query, colors, isHi, first, last, onPress }: ResultRowProps) {
+// Navigates itself (router is a module import) instead of taking an onPress
+// closure from renderItem, so the memo holds across parent re-renders.
+const ResultRow = memo(function ResultRow({ item, query, colors, isHi, first, last }: ResultRowProps) {
   const { t } = useTranslation();
+  const onPress = () => router.push(item.href);
 
   const title = isHi ? item.titleHindi : item.titleEnglish;
   let caption: string;
