@@ -1,25 +1,41 @@
 import { useState, useMemo } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   FlatList,
   TextInput,
   Keyboard,
+  PixelRatio,
   ListRenderItemInfo,
 } from 'react-native';
-import { AppText as Text } from '@/components/common/AppText';
+import { AppText as Text, FONT_SCALE } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/common/Icon';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { StatusBar } from 'expo-status-bar';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
 import { INDIAN_CITIES, cityTimezone, type City } from '@/config/cities';
-import { DEFAULT_BIRTH_TIMEZONE } from '@/utils/time';
+import { deviceTimezone } from '@/utils/time';
 import { Ornament } from '@/components/common/Ornament';
+
+/**
+ * Fixed height for a city row, so `getItemLayout` can skip measurement across
+ * all 693 rows. It is derived rather than hard-coded because a constant that
+ * disagrees with the rendered row by even a fraction of a dp accumulates into
+ * a visible offset drift (and a jumping scrollbar) over that many rows: the
+ * row's text grows with BOTH the app's own font-size setting and the OS
+ * accessibility scale, so the same expression has to feed the style and
+ * `getItemLayout`. 26 = styles.cityRow's old paddingVertical × 2; 20 =
+ * styles.cityName's lineHeight, the tallest thing in the row.
+ */
+function cityRowHeight(scale: number) {
+  return 26 + Math.ceil(20 * scale);
+}
 
 /**
  * Birth Place picker — same visual pattern as the app-wide location picker
@@ -34,7 +50,10 @@ export default function BirthPlacePickerScreen() {
   const setUserBirthPlace = useStore(s => s.setUserBirthPlace);
   const userLocation = useStore(s => s.userLocation);
   const locationName = useStore(s => s.locationName);
+  const appFontSize = useStore(s => s.fontSize);
   const colors = isDarkMode ? darkColors : lightColors;
+
+  const rowHeight = cityRowHeight(FONT_SCALE[appFontSize] * PixelRatio.getFontScale());
 
   const [query, setQuery] = useState('');
 
@@ -63,7 +82,11 @@ export default function BirthPlacePickerScreen() {
       lat: userLocation.lat,
       lon: userLocation.lon,
       name: locationName ?? `${userLocation.lat.toFixed(2)}, ${userLocation.lon.toFixed(2)}`,
-      timezone: DEFAULT_BIRTH_TIMEZONE,
+      // A saved location carries its own zone when it was picked off the city
+      // list; a GPS fix does not, and there the device is standing at those
+      // coordinates. Stamping Asia/Kolkata on arbitrary coordinates read the
+      // birth wall clock in IST and moved the Moon by the offset difference.
+      timezone: userLocation.timezone ?? deviceTimezone(),
     });
     router.back();
   }
@@ -77,40 +100,46 @@ export default function BirthPlacePickerScreen() {
     const label = `${item.name}, ${item.state}`;
     const isActive = userBirthPlace?.name === label;
     return (
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => handleSelectCity(item)}
-        activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ selected: isActive }}
         style={[
           styles.cityRow,
-          { borderBottomColor: colors.divider },
+          { height: rowHeight, borderBottomColor: colors.divider },
           isActive && { backgroundColor: colors.accent + '14' },
         ]}>
+        {/* Single-line is what makes the row's fixed `height` safe: at the
+            Large font setting stacked on a raised OS text size the longest
+            city+state pair can exceed the row width, and a wrapped second line
+            would be clipped by the fixed height instead of growing the row. */}
         <View style={styles.cityInfo}>
-          <Text variant="body" style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
-          <Text variant="body-italic" style={[styles.cityState, { color: colors.textTertiary }]}>{item.state}</Text>
+          <Text variant="body" numberOfLines={1} style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
+          <Text variant="body-italic" numberOfLines={1} style={[styles.cityState, { color: colors.textTertiary }]}>{item.state}</Text>
         </View>
         {isActive && <Icon name="check-circle" size={18} color={colors.accent} />}
-      </TouchableOpacity>
+      </MotionPressable>
     );
   }
 
   return (
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+      {/* Reachable from the onboarding birth step, which pins a light status
+          bar on its own dark ground; nothing restores it, so state it here. */}
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('settings.birthPlacePickerTitle')}
         </Text>
@@ -131,29 +160,29 @@ export default function BirthPlacePickerScreen() {
       {/* ── Quick actions ─────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: spacing.screenH, paddingTop: 14, paddingBottom: 8, gap: 10 }}>
         {userLocation && (
-          <TouchableOpacity
+          <MotionPressable
             onPress={handleUseCurrentLocation}
-            activeOpacity={0.85}
-            style={[styles.primaryBtn, { backgroundColor: palette.sindoor }]}
+            pressedScale={0.97}
+            style={[styles.primaryBtn, { backgroundColor: palette.turmeric }]}
             accessibilityRole="button"
             accessibilityLabel={t('settings.birthPlaceUseCurrent')}>
-            <Icon name="navigate" size={16} color={palette.parchmentBright} />
+            <Icon name="navigate" size={16} color={palette.night} />
             <Text variant="mono-caps" style={styles.primaryBtnText}>
               {t('settings.birthPlaceUseCurrent')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         )}
         {userBirthPlace && (
-          <TouchableOpacity
+          <MotionPressable
             onPress={handleClear}
-            activeOpacity={0.85}
+            pressedScale={0.97}
             style={[styles.secondaryBtn, { borderColor: colors.border }]}
             accessibilityRole="button"
             accessibilityLabel={t('settings.birthPlaceClear')}>
             <Text variant="mono-caps" style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>
               {t('settings.birthPlaceClear')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         )}
       </View>
 
@@ -170,7 +199,7 @@ export default function BirthPlacePickerScreen() {
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Geist_400Regular' }]}
             placeholder={t('locationPermission.searchPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             value={query}
@@ -180,13 +209,13 @@ export default function BirthPlacePickerScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           )}
         </View>
       </View>
@@ -196,6 +225,16 @@ export default function BirthPlacePickerScreen() {
         data={filtered}
         keyExtractor={(item) => `${item.name}-${item.state}`}
         renderItem={renderCity}
+        // 693 cities: the default windowSize={21} realizes ~315 of them around
+        // a ~46 dp row. 9 keeps roughly four screens' worth mounted, which is
+        // still ahead of any flick, and getItemLayout means the rest cost
+        // nothing to place.
+        windowSize={9}
+        getItemLayout={(_, index) => ({
+          length: rowHeight,
+          offset: rowHeight * index,
+          index,
+        })}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 32 }}
         ListEmptyComponent={
@@ -249,7 +288,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: borderRadius.button,
   },
-  primaryBtnText: { fontSize: 11, color: palette.parchmentBright },
+  primaryBtnText: { fontSize: 11, color: palette.night },
 
   secondaryBtn: {
     paddingVertical: 12,
@@ -280,13 +319,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 13,
+    // Vertical padding is folded into the `height` the row is rendered with
+    // (see cityRowHeight) — `alignItems: center` centres the label in it, so
+    // the row looks identical while staying exactly the height getItemLayout
+    // promises.
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderRadius: 6,
   },
-  cityInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  cityName: { fontSize: 15, lineHeight: 20 },
+  // flexShrink lets the label give way to the check icon rather than overflow;
+  // without it `numberOfLines` has no constrained width to ellipsize against.
+  cityInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 },
+  cityName: { fontSize: 15, lineHeight: 20, flexShrink: 1 },
   cityState: { fontSize: 12, lineHeight: 16 },
 
   emptyText: { fontSize: 14, textAlign: 'center', paddingTop: 32 },

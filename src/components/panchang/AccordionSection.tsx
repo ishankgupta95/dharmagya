@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, type ReactNode } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/common/AppText';
@@ -7,6 +7,7 @@ import { Icon } from '@/components/common/Icon';
 import { durations, easings } from '@/config/motion';
 import { type ColorPalette } from '@/config/theme';
 import { pAccordionMount } from '@/utils/perfProfile';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 interface AccordionSectionProps {
   /** Stable slug used as the persisted-state key on the store. */
@@ -79,11 +80,29 @@ export const AccordionSection = memo(function AccordionSection({
 
   return (
     <View style={styles.root}>
-      <TouchableOpacity
-        activeOpacity={0.65}
+      {/* `header`, not `button`. A node carries ONE `accessibilityRole`, and
+          with `button` there was no heading anywhere in the app — Panchang's
+          17 sections sit below ~44 focusable nodes with nothing for TalkBack's
+          Headings control to land on (WCAG 2.4.6). Nothing is lost by the
+          swap, because on Android the two roles touch different fields of
+          `AccessibilityNodeInfo` and only one of them is exclusive:
+            · `header` sets `isHeading = true` (ReactAccessibilityDelegate.kt
+              `AccessibilityRole.HEADER`), which is what the rotor reads;
+            · `button` only sets `className = android.widget.Button` plus
+              `isClickable`, and this IS a real clickable View, so `super`
+              populates `isClickable` and ACTION_CLICK from the view itself;
+            · `accessibilityState.expanded` is handled in
+              `onInitializeAccessibilityNodeInfo` BEFORE `setRole` runs and is
+              independent of it, so ACTION_EXPAND / ACTION_COLLAPSE survive.
+          Net: the announcement drops the word "button" and keeps "double tap
+          to expand/collapse", which is the more specific hint anyway. The
+          alternative — a second reader-only heading node — would speak every
+          section title twice. Android-only app (PLAN §11); on iOS this would
+          trade the button trait for the header trait with no expand action. */}
+      <MotionPressable
         onPress={onToggle}
         style={styles.header}
-        accessibilityRole="button"
+        accessibilityRole="header"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={title}>
         {accentColor && (
@@ -107,7 +126,7 @@ export const AccordionSection = memo(function AccordionSection({
         <Animated.View style={chevronStyle}>
           <Icon name="chevron-down" size={16} color={accentColor ?? colors.textTertiary} />
         </Animated.View>
-      </TouchableOpacity>
+      </MotionPressable>
 
       {open && (
         <View style={styles.body}>

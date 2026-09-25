@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { View, ScrollView, Modal, Platform, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -10,6 +10,7 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   WIDGET_FIELD_IDS,
   getWidgetField,
@@ -45,14 +46,14 @@ export default function WidgetSettingsScreen() {
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             hitSlop={12}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
             {t('widgetSettings.title')}
           </Text>
@@ -63,7 +64,7 @@ export default function WidgetSettingsScreen() {
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           showsVerticalScrollIndicator={false}>
           <Text variant="body-italic" style={[styles.intro, { color: colors.textTertiary }]}>
-            {t('widgetSettings.intro')}
+            {`${t('widgetSettings.intro')} ${t('widgetSettings.sizesNote')}`}
           </Text>
 
           <SectionLabel style={styles.sectionLabel}>{t('widgetSettings.mainSection')}</SectionLabel>
@@ -108,8 +109,11 @@ export default function WidgetSettingsScreen() {
             />
           </View>
 
+          {/* The ↻ chip exists only on the Android widget; WidgetKit has no
+              refresh affordance — it reloads on its own timeline and after
+              every payload write (each app open). */}
           <Text variant="body-italic" style={[styles.footer, { color: colors.textMuted }]}>
-            {t('widgetSettings.footerHint')}
+            {Platform.OS === 'ios' ? t('widgetSettings.footerHintIos') : t('widgetSettings.footerHint')}
           </Text>
 
           <View style={{ height: 40 }} />
@@ -142,14 +146,13 @@ interface SlotRowProps {
 
 function SlotRow({ icon, slotLabel, slotDesc, fieldLabel, onPress, colors }: SlotRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${slotLabel} — ${fieldLabel}`}>
       <View style={styles.row}>
         <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-          <Icon name={icon} size={16} color={colors.accent} />
+          <Icon name={icon} size={16} color={colors.accentText} />
         </View>
         <View style={styles.rowText}>
           <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>
@@ -167,7 +170,7 @@ function SlotRow({ icon, slotLabel, slotDesc, fieldLabel, onPress, colors }: Slo
         </Text>
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -186,7 +189,8 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
           <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
             {title}
           </Text>
@@ -197,9 +201,8 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
               const active = id === value;
               const last = i === WIDGET_FIELD_IDS.length - 1;
               return (
-                <TouchableOpacity
+                <MotionPressable
                   key={id}
-                  activeOpacity={0.7}
                   onPress={() => onChange(id)}
                   style={[
                     styles.sheetItem,
@@ -210,24 +213,24 @@ function FieldPickerSheet({ visible, onClose, title, value, onChange, colors, la
                   accessibilityLabel={field.label(lang)}
                   accessibilityState={{ selected: active }}>
                   <View style={styles.sheetItemText}>
-                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accent : colors.textPrimary }]}>
+                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accentText : colors.textPrimary }]}>
                       {field.label(lang)}
                     </Text>
                   </View>
-                  {active && <Icon name="check" size={18} color={colors.accent} />}
-                </TouchableOpacity>
+                  {active && <Icon name="check" size={18} color={colors.accentText} />}
+                </MotionPressable>
               );
             })}
           </ScrollView>
-          <TouchableOpacity
+          <MotionPressable
             onPress={onClose}
-            style={[styles.pickerDoneBtn, { backgroundColor: palette.sindoor, marginTop: 16 }]}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 16 }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.done')}>
-            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.parchmentBright }]}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
               {t('common.done')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </View>
     </Modal>
@@ -299,11 +302,14 @@ const styles = StyleSheet.create({
   },
   sheet: {
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 12,
     paddingBottom: 28,
-    borderTopLeftRadius: borderRadius.card,
-    borderTopRightRadius: borderRadius.card,
+    borderTopLeftRadius: borderRadius.sheet,
+    borderTopRightRadius: borderRadius.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
   },
+  sheetGrabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, marginBottom: 14 },
   sheetTitle: { fontSize: 20, marginBottom: 8 },
   sheetList: { maxHeight: 360, marginTop: 4 },
   sheetItem: {

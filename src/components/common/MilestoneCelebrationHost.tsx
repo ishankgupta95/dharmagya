@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { Modal, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -13,7 +14,6 @@ import Animated, {
 import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from './AppText';
-import { Icon } from './Icon';
 import { Kicker } from './Kicker';
 import { Ornament } from './Ornament';
 import { CornerBrackets } from './CornerBrackets';
@@ -21,7 +21,6 @@ import { MandalaWatermark } from './MandalaWatermark';
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, palette, spacing, borderRadius } from '@/config/theme';
 import { useMilestoneCelebration } from '@/store/useMilestoneCelebration';
-import { useShareSheet } from '@/store/useShareSheet';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { durations, easings, loop } from '@/config/motion';
 
@@ -36,9 +35,8 @@ const MANDALA_OPACITY = 0.12;
  *
  * Style — transform + opacity only, per the Phase 7 rules. A faint mandala
  * watermark and corner brackets keep the screen feeling "Sacred Editorial,"
- * not "gamified loot box." Two pills: Share (hands the milestone to
- * `<ShareCardHost />` as a 5th ShareCardSpec kind) and Continue. Tap outside
- * or hardware-back dismisses. Honors reduced motion.
+ * not "gamified loot box." A single Continue pill dismisses; tapping outside
+ * or hardware-back also dismisses. Honors reduced motion.
  *
  * Cultural framing (hard rule from PLAN.md §8 P14.4): no scoreboards, no
  * "achievement unlocked" loot-box copy — the headline reads as recognition of
@@ -50,7 +48,6 @@ export function MilestoneCelebrationHost() {
   const dismiss = useMilestoneCelebration((s) => s.dismiss);
   const isDarkMode = useStore((s) => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
-  const openShare = useShareSheet((s) => s.open);
   const { reduced } = useReducedMotion();
 
   const breathSV = useSharedValue(0);
@@ -93,18 +90,6 @@ export function MilestoneCelebrationHost() {
       subEn: t(subKey, { count: event.threshold }),
     };
   }, [event, t]);
-
-  function handleShare() {
-    if (!event) return;
-    openShare({
-      kind: 'milestone',
-      milestoneKind: event.kind,
-      threshold: event.threshold,
-      deityId: event.deityId,
-    });
-    // Don't dismiss the celebration — the share sheet sits over it, and the
-    // user might want to see the unlock again after closing the share sheet.
-  }
 
   if (!event) return null;
 
@@ -160,27 +145,16 @@ export function MilestoneCelebrationHost() {
             </Text>
 
             <View style={styles.actions}>
-              <TouchableOpacity
+              <MotionPressable
                 onPress={dismiss}
-                activeOpacity={0.85}
+                pressedScale={0.97}
                 style={[styles.btn, styles.btnSecondary, { borderColor: colors.border }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('sadhana.continueBtn')}>
                 <Text variant="mono-caps" style={[styles.btnText, { color: colors.textSecondary }]}>
                   {t('sadhana.continueBtn')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleShare}
-                activeOpacity={0.85}
-                style={[styles.btn, styles.btnPrimary, { backgroundColor: colors.accent }]}
-                accessibilityRole="button"
-                accessibilityLabel={t('sadhana.shareBtn')}>
-                <Icon name="share" size={14} color={palette.parchmentBright} />
-                <Text variant="mono-caps" style={[styles.btnText, { color: palette.parchmentBright }]}>
-                  {t('sadhana.shareBtn')}
-                </Text>
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
           </TouchableOpacity>
@@ -222,7 +196,7 @@ const styles = StyleSheet.create({
   headlineWrap: { alignItems: 'center' },
   kindLine: { fontSize: 14, lineHeight: 18, textAlign: 'center' },
   bigNumber: {
-    fontFamily: 'Fraunces_400Regular_Italic',
+    fontFamily: 'Geist_400Regular',
     fontStyle: 'italic',
     fontSize: 72,
     lineHeight: 82,
@@ -243,6 +217,5 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
   },
   btnSecondary: { borderWidth: 1 },
-  btnPrimary: {},
   btnText: { fontSize: 10 },
 });

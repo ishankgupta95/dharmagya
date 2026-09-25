@@ -113,7 +113,10 @@ const CHOGHADIYA: Record<string, string> = {
 };
 
 // Rashi (zodiac sign) names — emitted by panchang-ts on chandraRashi /
-// suryaRashi when the lib is queried with language='en'.
+// suryaRashi when the lib is queried with language='en'. Sagittarius carries
+// both spellings: panchang-ts says "Dhanus", every app-local RASHI_NAMES_EN
+// array (kundli screens, panchangService) says "Dhanu", and a miss here would
+// leave that one sign in Latin while the other eleven render in Devanagari.
 const RASHI: Record<string, string> = {
   Mesha: 'मेष',
   Vrishabha: 'वृषभ',
@@ -124,6 +127,7 @@ const RASHI: Record<string, string> = {
   Tula: 'तुला',
   Vrischika: 'वृश्चिक',
   Dhanus: 'धनु',
+  Dhanu: 'धनु',
   Makara: 'मकर',
   Kumbha: 'कुम्भ',
   Meena: 'मीन',

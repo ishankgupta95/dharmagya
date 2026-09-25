@@ -6,6 +6,8 @@ import {
   getSiderealMoonLongitude,
   getUpcomingSolarEclipse,
   getUpcomingLunarEclipse,
+  isEclipseVisibleAnyPhase,
+  formatInZone,
   GRAHA_ABBR,
   PanchangError,
   type AyanamsaType,
@@ -17,6 +19,7 @@ import {
   type FestivalRegion,
   type GrahaName,
   type Language,
+  type TimePeriod,
 } from 'panchang-ts';
 
 import type {
@@ -34,9 +37,44 @@ import type {
   FestivalType,
 } from '@/types';
 import { pmark, ptime } from '@/utils/perfProfile';
-import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
+import { DEFAULT_BIRTH_TIMEZONE, offsetMinutesForZone, wallclockInZoneToUtc } from '@/utils/time';
 
-export const FALLBACK_COORDS = { lat: 25.3176, lon: 83.0103 }; // Varanasi (Kashi)
+/**
+ * A place the panchang can be computed for. `timezone` is the IANA zone the
+ * coordinates actually sit in — set it whenever the place is *chosen* rather
+ * than sensed (a curated city, or the Ujjain fallback), because the device
+ * may be nowhere near it. Leave it undefined for a live GPS fix: the device is
+ * by definition standing at those coordinates, so its own offset is correct.
+ * See `timezoneMinutesFor` for why this matters.
+ */
+export interface PanchangCoords {
+  lat: number;
+  lon: number;
+  timezone?: string;
+}
+
+// Ujjain (Avanti). Carries its zone: a user who skips the location step is shown
+// an Ujjain panchang, and an Ujjain panchang has to be rendered in IST no matter
+// where the phone is.
+//
+// Chosen for coverage, not for sanctity. Measured over 2026 against each city's
+// own sunrise, Ujjain names the wrong tithi for the day on 1.51 percent of days
+// for a population-weighted top-50 urban user, against 2.40 percent from the
+// previous Varanasi default — India's urban mass sits west of the IST meridian.
+// It is NOT the better pick for a rural-weighted base (2.30 vs 2.16 percent),
+// and it sits ~29 min of sunrise west of the Rashtriya Panchang's Central
+// Station where Varanasi was ~2 min east, so this moves the no-location default
+// away from India's national reference. Deliberate, owner's call.
+//
+// A note on the folklore, since it will come up: Ujjayini IS the classical
+// madhya-rekha (Surya Siddhanta i.62), but that is a prime MERIDIAN — a frame
+// the desantara correction moves the answer *off* (SS i.60-61: "the result is
+// the planet's mean position at the given place"), not a place a panchang is
+// cast for. This constant is not more traditional than any other; it is a guess
+// for a user we could not locate. `src/data/static/festivals-table.json` is
+// generated at the same point so the Festivals and Panchang screens cannot
+// disagree for these users.
+export const FALLBACK_COORDS: PanchangCoords = { lat: 23.1765, lon: 75.7885, timezone: DEFAULT_BIRTH_TIMEZONE };
 
 // Re-exported for diagnostic UI; everything else uses the canonical `IGrahaPosition.planetEn`.
 export { GRAHA_ABBR };
@@ -136,14 +174,107 @@ const GRAHA_NAMES: Record<Language, Record<GrahaName, string>> = {
 //   preferred over `computeVimshottariDasha` because we always have a birth
 //   moment.
 
-// Dates from panchang-ts are offset-adjusted local display dates — read via getUTC*.
-function formatTime(date: Date | null | undefined): string | undefined {
-  if (!date) return undefined;
-  const h = date.getUTCHours();
-  const m = date.getUTCMinutes();
+// Every `Date` panchang-ts publishes is a TRUE instant since v5 — `getUTC*` on
+// one reads UTC, not the wall clock. Display comes from the `*Local` companion
+// instead: offset-carrying ISO 8601 in the requested timezone, e.g.
+// "2025-01-14T07:09:44.172+05:30", so the wall clock is a fixed-width slice.
+function formatLocal(iso: string | null | undefined): string | undefined {
+  if (!iso) return undefined;
+  const h = Number(iso.slice(11, 13));
+  if (!Number.isFinite(h)) return undefined;
+  const m = iso.slice(14, 16);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  return `${h12}:${m} ${ampm}`;
+}
+
+/**
+ * The UTC offset in minutes east that panchang-ts is handed as `timezone` for
+ * a given place and day. Two things it must get right, both of which the old
+ * "read `-new Date().getTimezoneOffset()`" shortcut got wrong:
+ *
+ *  1. It must belong to the *coordinates*, not to the phone. `timezone` is what
+ *     brackets the sunrise-to-next-sunrise Hindu day and what every `*Local`
+ *     string is rendered in, so pairing Varanasi coordinates with a New York
+ *     offset publishes the next Hindu day and prints "sunrise 7:48 PM".
+ *  2. It must belong to the *date being viewed*, not to right now. In a
+ *     DST-observing zone the two disagree by an hour for half the year, which
+ *     shifts every rendered time and can land the compute on the wrong day.
+ *
+ * Resolved at local noon of the target day so a spring-forward morning does not
+ * hand the pre-transition offset to the whole day. panchang-ts resolves an IANA
+ * name once per call the same way, so this is as precise as the library allows.
+ */
+function timezoneMinutesFor(coords: PanchangCoords, date: Date): number {
+  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+  if (coords.timezone) {
+    const off = offsetMinutesForZone(coords.timezone, noon);
+    if (off !== null) return off;
+  }
+  return -noon.getTimezoneOffset();
+}
+
+/** `timezoneMinutesFor` for callers outside this module. */
+export function panchangTimezoneMinutes(coords: PanchangCoords, date: Date): number {
+  return timezoneMinutesFor(coords, date);
+}
+
+/**
+ * The instant to hand panchang-ts for a civil date: noon of that date in the
+ * PLACE's zone (`timezoneMinutes` is what `timezoneMinutesFor` resolved for
+ * the same `date`).
+ *
+ * Every day-shaped entry point here receives the day as a device-local `Date`
+ * — a tapped grid cell's local midnight, `new Date()` on Home, a festival
+ * table's YYYY-MM-DD parsed in local terms — and the civil date the caller
+ * means is its device-local year/month/day. But the library does not read the
+ * day off the device: `getDailyPanchang` (and `scoreMuhurta`, which wraps it)
+ * takes the calendar day the instant falls on in `timezone`, the place's
+ * offset. Passing the device-local instant straight through therefore names the
+ * right day only while the device sits in the place's zone. Local midnight in
+ * Sydney is 19:30 IST the evening before, so a device east of +05:30 viewing
+ * Ujjain got the previous Hindu day for every tapped cell (and cached it under
+ * the tapped ymd, so it stuck); local noon in Los Angeles is 00:30 IST the next
+ * day, so a device at or west of −06:30 scored muhurats a day late. Noon of the
+ * civil date *in the place's zone* lands mid-day for every device offset, and
+ * for a device already in that zone it is the same instant `date` would have
+ * resolved to, so the common Indian case is a no-op. `navratri.ts` anchors its
+ * one `getDailyPanchang` the same way.
+ *
+ * Callers keep their original `date` for cache keys, `IPanchangDay.date` and
+ * `MuhuratMatch.date`; only the instant given to the library changes.
+ */
+export function noonAtPlace(date: Date, timezoneMinutes: number): Date {
+  return new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12) - timezoneMinutes * 60_000,
+  );
+}
+
+/**
+ * Render an instant as a wall clock ("6:12 AM") in the place's own offset at
+ * that instant — the same formatting `IPanchangDay` uses, for callers holding a
+ * raw `Date` (e.g. a sunrise computed outside `getDailyPanchang`).
+ */
+export function formatInstantForPlace(date: Date, coords: PanchangCoords): string | undefined {
+  return formatInstant(date, timezoneMinutesFor(coords, date));
+}
+
+/**
+ * Same rendering for an instant the library did not localize for us — the
+ * upcoming-eclipse helpers take no timezone, so there is no `*Local` on their
+ * result and we render the instant in the device's offset ourselves.
+ */
+function formatInstant(date: Date | null | undefined, offsetMinutes: number): string | undefined {
+  if (!date) return undefined;
+  return formatLocal(formatInZone(date, offsetMinutes));
+}
+
+/** `{ start, end }` of any v5 window, rendered for display. */
+function toWindow(p: {
+  startLocal?: string | null;
+  endLocal?: string | null;
+}): { start: string; end: string } {
+  return { start: formatLocal(p.startLocal) ?? '', end: formatLocal(p.endLocal) ?? '' };
 }
 
 /** Coerce the lib's locale-specific paksha string into our typed union. */
@@ -158,12 +289,12 @@ function normalizePaksha(p: string | undefined | null): 'Shukla' | 'Krishna' | n
 function toTithiElements(items: DailyTithiInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     paksha: normalizePaksha(item.paksha),
     tithiNumber: item.number,
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
@@ -171,11 +302,11 @@ function toTithiElements(items: DailyTithiInfo[]): IPanchangElement[] {
 function toNakshatraElements(items: DailyNakshatraInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     pada: item.pada,
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
@@ -183,10 +314,10 @@ function toNakshatraElements(items: DailyNakshatraInfo[]): IPanchangElement[] {
 function toYogaElements(items: DailyYogaInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
@@ -194,21 +325,19 @@ function toYogaElements(items: DailyYogaInfo[]): IPanchangElement[] {
 function toKaranaElements(items: DailyKaranaInfo[]): IPanchangElement[] {
   return items.map(item => ({
     name: item.name,
-    endTime: formatTime(item.endTime),
+    endTime: formatLocal(item.endTimeLocal),
     endTimeMs: item.endTime?.getTime(),
     karanaType: item.type,
     completionPercentage: item.completionPercentage,
-    startTime: formatTime(item.startTime),
+    startTime: formatLocal(item.startTimeLocal),
     isActiveAtSunrise: item.isActiveAtSunrise,
   }));
 }
 
-interface RawQualitySlot {
+interface RawQualitySlot extends TimePeriod {
   name: string;
   quality: IQualitySlot['quality'];
   qualityName: string;
-  start: Date;
-  end: Date;
 }
 
 function toQualitySlots(slots: readonly RawQualitySlot[]): IQualitySlot[] {
@@ -216,26 +345,14 @@ function toQualitySlots(slots: readonly RawQualitySlot[]): IQualitySlot[] {
     name: s.name,
     quality: s.quality,
     qualityName: s.qualityName,
-    start: formatTime(s.start) ?? '',
-    end: formatTime(s.end) ?? '',
+    ...toWindow(s),
   }));
 }
 
 function toHoraSlots(
-  slots: DailyPanchangResult['hora']['day'],
+  slots: DailyPanchangResult['periods']['hora']['day'],
 ): IHoraSlot[] {
-  return slots.map(s => ({
-    planet: s.planet,
-    start: formatTime(s.start) ?? '',
-    end: formatTime(s.end) ?? '',
-  }));
-}
-
-function ymdOf(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return slots.map(s => ({ planet: s.planet, planetIndex: s.planetIndex, ...toWindow(s) }));
 }
 
 function mapFestivals(list: DailyPanchangResult['festivals']): IFestival[] {
@@ -250,33 +367,50 @@ function mapFestivals(list: DailyPanchangResult['festivals']): IFestival[] {
       name: f.name,
       type: f.type as FestivalType,
       description: f.description,
-      deferralDate: f.deferralDate ? ymdOf(f.deferralDate) : undefined,
     }));
 }
 
-function mapEclipse(e: DailyPanchangResult['eclipse']): IEclipse | null {
+function mapEclipse(
+  e: DailyPanchangResult['eclipse'],
+  loc: DailyPanchangResult['location'],
+): IEclipse | null {
   if (!e) return null;
   return {
     kind: e.kind,
     subtype: e.subtype,
-    peak: formatTime(e.peak) ?? '',
-    start: formatTime(e.start) ?? '',
-    end: formatTime(e.end) ?? '',
-    sutakStart: formatTime(e.sutakStart) ?? '',
-    sutakEnd: formatTime(e.sutakEnd) ?? '',
-    visibleFromLocation: e.visibleFromLocation,
-    magnitude: e.magnitude,
+    peak: formatLocal(e.peakLocal) ?? '',
+    start: formatLocal(e.startLocal) ?? '',
+    end: formatLocal(e.endLocal) ?? '',
+    // v5 publishes both sutak instants as null for a penumbral lunar eclipse —
+    // no sutak applies to one. Keep the null rather than collapsing it to '',
+    // so the render site can tell "no sutak" from "time unknown" instead of
+    // printing an empty range.
+    sutakStart: formatLocal(e.sutakStartLocal) ?? null,
+    sutakEnd: formatLocal(e.sutakEndLocal) ?? null,
+    // `EclipseInfo.visibleFromLocation` is the narrow at-*peak* test, so it
+    // reads false for an eclipse that is plainly observable either side of
+    // peak — e.g. a total lunar eclipse the Moon rises into. The UI states
+    // "not visible from your location" as fact, so answer the question the
+    // user is actually asking with the any-phase helper. "Not visible" still
+    // legitimately appears (a lunar eclipse is never filtered by location);
+    // only the false negatives go. Note the library's own `description` string
+    // still hard-codes the at-peak wording, so it must not be rendered as-is.
+    visibleFromLocation: isEclipseVisibleAnyPhase(e, loc),
+    peakVisible: e.visibleFromLocation,
+    // v5 renamed the [0,1] disc-*area* fraction we render as a percentage to
+    // `obscuration`; the new `magnitude` is the disc-*diameter* fraction that
+    // catalogues publish, which exceeds 1 when total and goes negative for a
+    // penumbral lunar eclipse. Keep publishing the area fraction — but note it
+    // is the UMBRAL area, so a penumbral lunar eclipse legitimately reads
+    // exactly 0. That is "no umbral coverage", not a failed computation.
+    obscuration: e.obscuration,
     description: e.description,
   };
 }
 
-function mapBhadra(b: DailyPanchangResult['bhadra']): IBhadra | null {
+function mapBhadra(b: DailyPanchangResult['inauspicious']['bhadra']): IBhadra | null {
   if (!b) return null;
-  return {
-    start: formatTime(b.start) ?? '',
-    end: formatTime(b.end) ?? '',
-    location: b.location,
-  };
+  return { ...toWindow(b), location: b.location };
 }
 
 function mapChandraBalam(cb: DailyPanchangResult['chandraBalam']): IChandraBalam | null {
@@ -290,90 +424,94 @@ function mapChandraBalam(cb: DailyPanchangResult['chandraBalam']): IChandraBalam
 }
 
 export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
+  const { sun, moon, angas, calendar, muhurtas, inauspicious, periods } = result;
   return {
     date: result.date,
-    tithis: toTithiElements(result.tithis),
-    nakshatras: toNakshatraElements(result.nakshatras),
-    yogas: toYogaElements(result.yogas),
-    karanas: toKaranaElements(result.karanas),
-    sunrise: formatTime(result.sunrise) ?? '—',
-    sunset: formatTime(result.sunset) ?? '—',
-    nextSunrise: formatTime(result.nextSunrise),
+    tithis: toTithiElements(angas.tithis),
+    nakshatras: toNakshatraElements(angas.nakshatras),
+    yogas: toYogaElements(angas.yogas),
+    karanas: toKaranaElements(angas.karanas),
+    sunrise: formatLocal(sun.riseLocal) ?? '—',
+    sunset: formatLocal(sun.setLocal) ?? '—',
+    nextSunrise: formatLocal(sun.nextRiseLocal),
     ayanamsa: result.ayanamsa,
-    rahuKalamStart: formatTime(result.rahuKalam.start),
-    rahuKalamEnd: formatTime(result.rahuKalam.end),
-    yamagandaStart: formatTime(result.yamaganda.start),
-    yamagandaEnd: formatTime(result.yamaganda.end),
-    gulikaKalamStart: formatTime(result.gulikaKalam.start),
-    gulikaKalamEnd: formatTime(result.gulikaKalam.end),
-    abhijitMuhurtaStart: formatTime(result.abhijitMuhurta?.start),
-    abhijitMuhurtaEnd: formatTime(result.abhijitMuhurta?.end),
-    durMuhurta: result.durMuhurta.map(dm => ({
-      start: formatTime(dm.start) ?? '',
-      end: formatTime(dm.end) ?? '',
-    })),
-    vara: result.vara.name,
-    hinduMonth: result.chandramasa.purnimantaName,
-    hinduMonthAmanta: result.chandramasa.name,
-    hinduMonthPurnimanta: result.chandramasa.purnimantaName,
-    isAdhikaMasa: result.chandramasa.isAdhika,
-    masa: result.masa.name,
-    vikramSamvat: result.samvat.vikramSamvat,
-    shakaSamvat: result.samvat.shakaSamvat,
-    chandraRashi: result.chandraRashi.name,
-    suryaNakshatra: result.suryaNakshatra.name,
-    moonrise: formatTime(result.moonrise),
-    moonset: formatTime(result.moonset),
-    brahmaMuhurtaStart: formatTime(result.brahmaMuhurta.start),
-    brahmaMuhurtaEnd: formatTime(result.brahmaMuhurta.end),
-    vijayaMuhurtaStart: formatTime(result.vijayaMuhurta.start),
-    vijayaMuhurtaEnd: formatTime(result.vijayaMuhurta.end),
-    godhuliMuhurtaStart: formatTime(result.godhuliMuhurta.start),
-    godhuliMuhurtaEnd: formatTime(result.godhuliMuhurta.end),
-    nishitaMuhurtaStart: formatTime(result.nishitaMuhurta.start),
-    nishitaMuhurtaEnd: formatTime(result.nishitaMuhurta.end),
-    amritKalaStart: result.amritKala ? formatTime(result.amritKala.start) : undefined,
-    amritKalaEnd: result.amritKala ? formatTime(result.amritKala.end) : undefined,
-    madhyahnaStart: formatTime(result.madhyahna.start),
-    madhyahnaEnd: formatTime(result.madhyahna.end),
-    pratahSandhyaStart: formatTime(result.pratahSandhya.start),
-    pratahSandhyaEnd: formatTime(result.pratahSandhya.end),
-    sayahnaSandhyaStart: formatTime(result.sayahnaSandhya.start),
-    sayahnaSandhyaEnd: formatTime(result.sayahnaSandhya.end),
-    varjyamStart: result.varjyam ? formatTime(result.varjyam.start) : undefined,
-    varjyamEnd: result.varjyam ? formatTime(result.varjyam.end) : undefined,
-    gandaMula: result.gandaMula.active
-      ? { nakshatraName: result.gandaMula.nakshatraName, severity: result.gandaMula.severity }
+    rahuKalamStart: formatLocal(inauspicious.rahuKalam.startLocal),
+    rahuKalamEnd: formatLocal(inauspicious.rahuKalam.endLocal),
+    yamagandaStart: formatLocal(inauspicious.yamaganda.startLocal),
+    yamagandaEnd: formatLocal(inauspicious.yamaganda.endLocal),
+    gulikaKalamStart: formatLocal(inauspicious.gulikaKalam.startLocal),
+    gulikaKalamEnd: formatLocal(inauspicious.gulikaKalam.endLocal),
+    abhijitMuhurtaStart: formatLocal(muhurtas.abhijit?.startLocal),
+    abhijitMuhurtaEnd: formatLocal(muhurtas.abhijit?.endLocal),
+    durMuhurta: inauspicious.durMuhurta.map(toWindow),
+    vara: angas.vara.name,
+    hinduMonth: calendar.chandramasa.purnimantaName,
+    // `chandramasa.name`/`.index` follow whichever `masaSystem` was requested,
+    // and this service deliberately never passes one — so `.name` is always the
+    // purnimanta name and reading it here made the Amanta setting a no-op.
+    // The two absolute fields are system-independent; always read those.
+    hinduMonthAmanta: calendar.chandramasa.amantaName,
+    hinduMonthPurnimanta: calendar.chandramasa.purnimantaName,
+    isAdhikaMasa: calendar.chandramasa.isAdhika,
+    masa: calendar.masa.name,
+    vikramSamvat: calendar.samvat.vikramSamvat,
+    shakaSamvat: calendar.samvat.shakaSamvat,
+    chandraRashi: moon.rashi.name,
+    suryaNakshatra: sun.nakshatra.name,
+    moonrise: formatLocal(moon.riseLocal),
+    moonset: formatLocal(moon.setLocal),
+    brahmaMuhurtaStart: formatLocal(muhurtas.brahma.startLocal),
+    brahmaMuhurtaEnd: formatLocal(muhurtas.brahma.endLocal),
+    vijayaMuhurtaStart: formatLocal(muhurtas.vijaya.startLocal),
+    vijayaMuhurtaEnd: formatLocal(muhurtas.vijaya.endLocal),
+    godhuliMuhurtaStart: formatLocal(muhurtas.godhuli.startLocal),
+    godhuliMuhurtaEnd: formatLocal(muhurtas.godhuli.endLocal),
+    nishitaMuhurtaStart: formatLocal(muhurtas.nishita.startLocal),
+    nishitaMuhurtaEnd: formatLocal(muhurtas.nishita.endLocal),
+    // v5: Amrit Kala and Varjyam are both nakshatra-anchored collections —
+    // 0–2 windows a day, not the single window 4.x published. A transition
+    // day genuinely carries two, and dropping the second is what 4.x got
+    // wrong, so both are surfaced.
+    amritKala: muhurtas.amritKala.map(toWindow),
+    madhyahnaStart: formatLocal(muhurtas.madhyahna.startLocal),
+    madhyahnaEnd: formatLocal(muhurtas.madhyahna.endLocal),
+    pratahSandhyaStart: formatLocal(muhurtas.pratahSandhya.startLocal),
+    pratahSandhyaEnd: formatLocal(muhurtas.pratahSandhya.endLocal),
+    sayahnaSandhyaStart: formatLocal(muhurtas.sayahnaSandhya.startLocal),
+    sayahnaSandhyaEnd: formatLocal(muhurtas.sayahnaSandhya.endLocal),
+    varjyam: inauspicious.varjyam.map(toWindow),
+    gandaMula: inauspicious.gandaMula.active
+      ? {
+          nakshatraName: inauspicious.gandaMula.nakshatraName,
+          severity: inauspicious.gandaMula.severity,
+        }
       : null,
     anandadiYoga: { name: result.anandadiYoga.name, quality: result.anandadiYoga.quality },
     tarabala: result.tarabala
       ? { name: result.tarabala.name, englishName: result.tarabala.englishName, quality: result.tarabala.quality }
       : null,
     chandraBalam: mapChandraBalam(result.chandraBalam),
-    bhadra: mapBhadra(result.bhadra),
-    eclipse: mapEclipse(result.eclipse),
-    panchaka: result.panchaka,
-    panchakaRahita: result.panchakaRahita.map(p => ({
-      start: formatTime(p.start) ?? '',
-      end: formatTime(p.end) ?? '',
-    })),
-    dayDurationMinutes: result.dayDurationMinutes,
-    nightDurationMinutes: result.nightDurationMinutes,
+    bhadra: mapBhadra(inauspicious.bhadra),
+    eclipse: mapEclipse(result.eclipse, result.location),
+    panchaka: inauspicious.panchaka,
+    panchakaRahita: inauspicious.panchakaRahita.map(toWindow),
+    dayDurationMinutes: sun.dayDurationMinutes,
+    nightDurationMinutes: sun.nightDurationMinutes,
     choghadiya: {
-      day: toQualitySlots(result.choghadiya.day),
-      night: toQualitySlots(result.choghadiya.night),
+      day: toQualitySlots(periods.choghadiya.day),
+      night: toQualitySlots(periods.choghadiya.night),
     },
     gowriPanchangam: {
-      day: toQualitySlots(result.gowriPanchangam.day),
-      night: toQualitySlots(result.gowriPanchangam.night),
+      day: toQualitySlots(periods.gowri.day),
+      night: toQualitySlots(periods.gowri.night),
     },
     doGhatiMuhurta: {
-      day: toQualitySlots(result.doGhatiMuhurta.day),
-      night: toQualitySlots(result.doGhatiMuhurta.night),
+      day: toQualitySlots(muhurtas.doGhati.day),
+      night: toQualitySlots(muhurtas.doGhati.night),
     },
     hora: {
-      day: toHoraSlots(result.hora.day),
-      night: toHoraSlots(result.hora.night),
+      day: toHoraSlots(periods.hora.day),
+      night: toHoraSlots(periods.hora.night),
     },
     specialYogas: result.specialYogas.map(y => ({ name: y.name, type: y.type })),
     festivals: mapFestivals(result.festivals),
@@ -388,9 +526,6 @@ export function mapToPanchangDay(result: DailyPanchangResult): IPanchangDay {
 interface CachedDay { day: IPanchangDay; full: boolean }
 const DAY_CACHE = new Map<string, CachedDay>();
 const DAY_CACHE_MAX = 60;
-const GRAHA_CACHE = new Map<string, IGrahaPosition[]>();
-const GRAHA_CACHE_MAX = 30;
-
 function ymdLocal(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
@@ -399,6 +534,7 @@ function dayCacheKey(
   date: Date,
   lat: number,
   lon: number,
+  timezoneMinutes: number,
   language: Language,
   region: FestivalRegion,
   janmaNakshatra: number | undefined,
@@ -407,7 +543,17 @@ function dayCacheKey(
 ): string {
   const j = janmaNakshatra ?? '_';
   const r = janmaRashi ?? '_';
-  return `${ymdLocal(date)}|${lat.toFixed(4)}|${lon.toFixed(4)}|${language}|${region}|${j}|${r}|${ayanamsa}`;
+  // `timezoneMinutes` is part of the key because it decides which Hindu day is
+  // published and which wall clock every time renders in — two entries for the
+  // same ymd on either side of a DST change (or a flight) are different days.
+  //
+  // `region` scopes `IPanchangDay.festivals` only, which no screen renders today
+  // (the calendar grid, the festivals list and the reminder scheduler all read
+  // the bundled table in `src/data/festivals.ts` instead, scoped there by
+  // `festivalAllowedInRegion`). It stays in the key regardless: it does change
+  // the cached object's contents, so serving one region's entry to another
+  // would hand the first reader of that field the wrong festivals.
+  return `${ymdLocal(date)}|${lat.toFixed(4)}|${lon.toFixed(4)}|${timezoneMinutes}|${language}|${region}|${j}|${r}|${ayanamsa}`;
 }
 
 function lruSet<K, V>(map: Map<K, V>, key: K, value: V, max: number) {
@@ -428,12 +574,58 @@ function lruHit<K, V>(map: Map<K, V>, key: K): V | undefined {
 }
 
 /**
+ * Attach `planetaryPositions` to a mapped day as a memoised lazy accessor.
+ *
+ * Two constraints pull against each other here. Graha positions are an
+ * *instant* computation and the Moon moves ~0.55°/h, so they have to be probed
+ * at the same moment the rest of the day's limbs are read — sunrise. Probing at
+ * whatever instant happened to ask first (screen-mount time, or a tapped cell's
+ * local midnight) put the Moon tile in a different rashi from the Chandra Rashi
+ * row on the same screen. But they also cost about as much as everything else
+ * in the day put together (measured on Node 24: 0.41 ms against 0.51 ms for the
+ * whole `getDailyPanchang`), and only the Panchang screen's Planetary Positions
+ * card ever reads them — Home's launch-screen fetch and the widget refresh
+ * render no graha at all.
+ *
+ * So the sunrise instant is captured here, at map time, and the computation is
+ * deferred to the first read. The same-instant pairing with `chandraRashi` is
+ * structural — both are `raw.sun.rise`, no matter which screen asks or when —
+ * while the cost lands only on the surface that renders the card. The value is
+ * memoised on the cached day, so re-renders and later cache hits are free.
+ */
+function defineLazyGrahaPositions(
+  day: IPanchangDay,
+  sunrise: Date,
+  language: Language,
+  ayanamsa: AyanamsaType,
+): void {
+  let positions: IGrahaPosition[] | undefined;
+  let computed = false;
+  Object.defineProperty(day, 'planetaryPositions', {
+    enumerable: true,
+    configurable: true,
+    get(): IGrahaPosition[] | undefined {
+      if (computed) return positions;
+      computed = true;
+      const endGraha = ptime('panchang:grahaPositions');
+      try {
+        positions = fetchGrahaPositions(sunrise, language, ayanamsa);
+      } catch {
+        /* non-critical — the Planetary Positions card simply does not render */
+      }
+      endGraha();
+      return positions;
+    },
+  });
+}
+
+/**
  * Cached panchang-for-a-day. A full-pass result (`computeEndTimes: true`) also
  * satisfies later fast-pass requests — cache is upgrade-only.
  */
 export function getCachedPanchangDay(
   date: Date,
-  coords: { lat: number; lon: number },
+  coords: PanchangCoords,
   opts: {
     computeEndTimes: boolean;
     language: Language;
@@ -444,7 +636,8 @@ export function getCachedPanchangDay(
   },
 ): IPanchangDay | null {
   const ayanamsa = opts.ayanamsa ?? 'lahiri';
-  const key = dayCacheKey(date, coords.lat, coords.lon, opts.language, opts.region, opts.janmaNakshatra, opts.janmaRashi, ayanamsa);
+  const timezone = timezoneMinutesFor(coords, date);
+  const key = dayCacheKey(date, coords.lat, coords.lon, timezone, opts.language, opts.region, opts.janmaNakshatra, opts.janmaRashi, ayanamsa);
   const hit = lruHit(DAY_CACHE, key);
   if (hit && (hit.full || !opts.computeEndTimes)) {
     pmark('panchang:cache:hit', `endTimes=${opts.computeEndTimes} ${ymdLocal(date)}`);
@@ -453,9 +646,11 @@ export function getCachedPanchangDay(
 
   pmark('panchang:cache:miss', `endTimes=${opts.computeEndTimes} ${ymdLocal(date)}`);
   const endLib = ptime(`panchang:getDailyPanchang endTimes=${opts.computeEndTimes}`);
-  const timezone = -new Date().getTimezoneOffset();
+  // The library reads the day off the instant in `timezone`, not off the
+  // device — see `noonAtPlace`. The cache key above stays on the caller's
+  // device-local ymd, which is the civil date this instant is anchored to.
   const raw = getDailyPanchang(
-    date,
+    noonAtPlace(date, timezone),
     { latitude: coords.lat, longitude: coords.lon },
     {
       timezone,
@@ -471,22 +666,14 @@ export function getCachedPanchangDay(
   if (!raw) return null;
   const endMap = ptime('panchang:mapToPanchangDay');
   const mapped = mapToPanchangDay(raw);
+  // The library echoes the instant it was given as `result.date`; hand the
+  // caller back the `Date` it asked with, as this always did.
+  mapped.date = date;
   endMap();
+  // Pinned to sunrise, computed on first read — see `defineLazyGrahaPositions`.
+  defineLazyGrahaPositions(mapped, raw.sun.rise, opts.language, ayanamsa);
   lruSet(DAY_CACHE, key, { day: mapped, full: opts.computeEndTimes }, DAY_CACHE_MAX);
   return mapped;
-}
-
-export function getCachedGrahaPositions(
-  date: Date,
-  language: Language = 'en',
-  ayanamsa: AyanamsaType = 'lahiri',
-): IGrahaPosition[] {
-  const key = `${ymdLocal(date)}|${language}|${ayanamsa}`;
-  const hit = lruHit(GRAHA_CACHE, key);
-  if (hit) return hit;
-  const result = fetchGrahaPositions(date, language, ayanamsa);
-  lruSet(GRAHA_CACHE, key, result, GRAHA_CACHE_MAX);
-  return result;
 }
 
 export function fetchGrahaPositions(
@@ -530,13 +717,15 @@ export function fetchGrahaPositions(
 
 // Only checks existing permission — never shows a dialog.
 // Permission is requested explicitly from the location-permission screen.
-async function getCoords(): Promise<{ lat: number; lon: number }> {
+async function getCoords(): Promise<PanchangCoords> {
   try {
     const { status } = await Location.getForegroundPermissionsAsync();
     if (status === 'granted') {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      // No `timezone`: a live fix means the device is standing at these
+      // coordinates, so its own per-date offset is the right one.
       return { lat: loc.coords.latitude, lon: loc.coords.longitude };
     }
   } catch (e) {
@@ -549,7 +738,7 @@ async function getCoords(): Promise<{ lat: number; lon: number }> {
 
 export async function fetchPanchang(
   date: Date,
-  savedCoords?: { lat: number; lon: number } | null,
+  savedCoords?: PanchangCoords | null,
   computeEndTimes = true,
   language: Language = 'en',
   region: FestivalRegion = 'all',
@@ -559,14 +748,19 @@ export async function fetchPanchang(
 ): Promise<IPanchangDay | null> {
   try {
     const coords = savedCoords ?? (await getCoords());
-    const timezone = -new Date().getTimezoneOffset();
+    const timezone = timezoneMinutesFor(coords, date);
+    // Anchored to the place, not the device — see `noonAtPlace`.
     const result = getDailyPanchang(
-      date,
+      noonAtPlace(date, timezone),
       { latitude: coords.lat, longitude: coords.lon },
       { timezone, computeEndTimes, language, region, janmaNakshatra, janmaRashi, ayanamsa },
     );
     if (!result) return null;
-    return mapToPanchangDay(result);
+    const mapped = mapToPanchangDay(result);
+    // `result.date` echoes the anchored instant; callers get their own `Date`
+    // back, as this always did.
+    mapped.date = date;
+    return mapped;
   } catch (e) {
     if (e instanceof PanchangError) {
       console.warn('[panchang]', e.code, e.message);
@@ -576,7 +770,7 @@ export async function fetchPanchang(
 }
 
 export async function fetchPanchangForToday(
-  savedCoords?: { lat: number; lon: number } | null,
+  savedCoords?: PanchangCoords | null,
   language: Language = 'en',
   region: FestivalRegion = 'all',
   ayanamsa: AyanamsaType = 'lahiri',
@@ -602,7 +796,7 @@ export async function fetchPanchangForToday(
  */
 export function fetchInstantPanchang(
   now: Date,
-  coords: { lat: number; lon: number },
+  coords: PanchangCoords,
   language: Language = 'en',
   ayanamsa: AyanamsaType = 'lahiri',
 ): IInstantPanchang | null {
@@ -614,10 +808,10 @@ export function fetchInstantPanchang(
     );
     if (!raw) return null;
     return {
-      tithi: raw.tithi.name,
-      nakshatra: raw.nakshatra.name,
-      yoga: raw.yoga.name,
-      karana: raw.karana.name,
+      tithi: raw.angas.tithi.name,
+      nakshatra: raw.angas.nakshatra.name,
+      yoga: raw.angas.yoga.name,
+      karana: raw.angas.karana.name,
     };
   } catch (e) {
     if (e instanceof PanchangError) {
@@ -638,29 +832,37 @@ const ECLIPSE_CACHE_MAX = 8;
 const ECLIPSE_LOOK_AHEAD_DAYS = 365;
 
 function eclipseDateOf(d: Date): string {
-  // Eclipses come from panchang-ts as UTC Date objects; convert to local YMD.
-  const local = new Date(d);
-  const y = local.getFullYear();
-  const m = String(local.getMonth() + 1).padStart(2, '0');
-  const day = String(local.getDate()).padStart(2, '0');
+  // v5 publishes true instants, so the device-local calendar date of the peak
+  // is what these getters read.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
-function summarizeEclipse(e: ReturnType<typeof getUpcomingSolarEclipse>): IEclipseSummary | null {
+function summarizeEclipse(
+  e: ReturnType<typeof getUpcomingSolarEclipse>,
+  coords: PanchangCoords,
+): IEclipseSummary | null {
   if (!e) return null;
   return {
     kind: e.kind,
     subtype: e.subtype,
     date: eclipseDateOf(e.peak),
-    peak: formatTime(e.peak) ?? '',
-    visibleFromLocation: e.visibleFromLocation,
+    // The upcoming-eclipse helpers take no timezone, so their result carries no
+    // `*Local` strings — render the instant ourselves, in the place's offset at
+    // the moment of the peak (an eclipse can be up to a year out, so "now" is
+    // the wrong side of a DST boundary as often as not).
+    peak: formatInstant(e.peak, timezoneMinutesFor(coords, e.peak)) ?? '',
+    // Same at-peak-vs-any-phase correction as `mapEclipse`.
+    visibleFromLocation: isEclipseVisibleAnyPhase(e, { latitude: coords.lat, longitude: coords.lon }),
     description: e.description,
   };
 }
 
 export function fetchUpcomingEclipses(
   fromDate: Date,
-  coords: { lat: number; lon: number },
+  coords: PanchangCoords,
 ): EclipseCacheEntry {
   const key = `${eclipseDateOf(fromDate)}|${coords.lat.toFixed(2)}|${coords.lon.toFixed(2)}`;
   const hit = lruHit(ECLIPSE_CACHE, key);
@@ -669,12 +871,12 @@ export function fetchUpcomingEclipses(
   let solar: IEclipseSummary | null = null;
   let lunar: IEclipseSummary | null = null;
   try {
-    solar = summarizeEclipse(getUpcomingSolarEclipse(fromDate, loc, ECLIPSE_LOOK_AHEAD_DAYS));
+    solar = summarizeEclipse(getUpcomingSolarEclipse(fromDate, loc, ECLIPSE_LOOK_AHEAD_DAYS), coords);
   } catch (e) {
     if (e instanceof PanchangError) console.warn('[panchang]', e.code, e.message);
   }
   try {
-    lunar = summarizeEclipse(getUpcomingLunarEclipse(fromDate, loc, ECLIPSE_LOOK_AHEAD_DAYS));
+    lunar = summarizeEclipse(getUpcomingLunarEclipse(fromDate, loc, ECLIPSE_LOOK_AHEAD_DAYS), coords);
   } catch (e) {
     if (e instanceof PanchangError) console.warn('[panchang]', e.code, e.message);
   }

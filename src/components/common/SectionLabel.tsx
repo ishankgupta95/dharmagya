@@ -27,6 +27,12 @@ import { useStore } from '@/store/useStore';
  * and scaleX 0.96 → 1 over 500ms on first mount. Reserved for major section
  * titles on hero screens (home "Your Deities" / featured kickers). Chip- or
  * row-style usages keep the default (no animation) to avoid layout drama.
+ *
+ * Every call site titles the card group that follows it, so the text carries
+ * `accessibilityRole="header"` unconditionally — that is what puts the Kundli
+ * and Settings screens on TalkBack's Headings rotor. The role sits on the text
+ * and not on the row, so the leading rule stays a decoration and nothing that
+ * was silent before becomes a focus stop.
  */
 interface SectionLabelProps {
   children: ReactNode;
@@ -58,7 +64,10 @@ export const SectionLabel = memo(function SectionLabel({
   const rowContent = (
     <>
       <View style={[styles.rule, { width: ruleLength, backgroundColor: resolvedRule }]} />
-      <AppText variant="mono-caps" style={[styles.label, { color: resolvedText }]}>
+      <AppText
+        variant="mono-caps"
+        accessibilityRole="header"
+        style={[styles.label, { color: resolvedText }]}>
         {children}
       </AppText>
     </>

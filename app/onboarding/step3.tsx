@@ -1,327 +1,231 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Icon, type IconName } from '@/components/common/Icon';
+import * as Location from 'expo-location';
+import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
-import { SectionLabel } from '@/components/common/SectionLabel';
+import { palette, borderRadius, controlHeight, spacing } from '@/config/theme';
+import { Icon } from '@/components/common/Icon';
+import { MotionPressable } from '@/components/common/MotionPressable';
+import { INDIAN_CITIES, type City } from '@/config/cities';
+import { regionFromStateCode } from '@/utils/regionFromLocation';
+import { onb, PrimaryCta, ProgressHeader } from '@/components/onboarding/OnboardingChrome';
 
-type LocationChoice = 'gps' | 'default';
+/** Find the nearest city within ~30 km of given coordinates. */
+function findNearestCity(lat: number, lon: number): City | null {
+  const MAX_DEG = 0.3; // ~30 km rough threshold
+  let best: City | null = null;
+  let bestDist = Infinity;
+  for (const city of INDIAN_CITIES) {
+    const dLat = city.lat - lat;
+    const dLon = city.lon - lon;
+    const dist = dLat * dLat + dLon * dLon;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = city;
+    }
+  }
+  return best && bestDist < MAX_DEG * MAX_DEG ? best : null;
+}
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
+// Onboarding 4/5 · Location (Diya) — the reason is given before the system
+// dialog appears, and "Choose a city" is offered at equal weight: denying
+// location must not dead-end the app (Skip keeps the Ujjain default).
 export default function OnboardingStep3() {
   const { t } = useTranslation();
-  const { isDarkMode, setThemeMode, setHasOnboarded } = useStore();
-  const colors = isDarkMode ? darkColors : lightColors;
+  const { setUserLocation, locationName } = useStore();
+  const region = useStore((s) => s.region);
+  const setRegion = useStore((s) => s.setRegion);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
-  const [locationChoice, setLocationChoice] = useState<LocationChoice>('default');
+  function maybeAutoSetRegion(city: City) {
+    if (region !== 'all') return;
+    const derived = regionFromStateCode(city.state);
+    if (derived) setRegion(derived);
+  }
 
-  function handleFinish() {
-    setHasOnboarded();
-    // Dismiss all onboarding screens from the stack before navigating,
-    // so the user can't swipe back into the onboarding flow.
-    router.dismissAll();
-    if (locationChoice === 'gps') {
-      router.replace('/(tabs)');
-      router.push('/location-permission');
-    } else {
-      router.replace('/(tabs)');
+  async function handleUseGPS() {
+    setGpsLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const { latitude, longitude } = loc.coords;
+        const match = findNearestCity(latitude, longitude);
+        const name = match ? `${match.name}, ${match.state}` : t('common.gpsLabel');
+        // No timezone: the device is standing at these coordinates, so its own
+        // per-date offset is the correct one to render the panchang in.
+        setUserLocation({ lat: latitude, lon: longitude }, name);
+        if (match) maybeAutoSetRegion(match);
+        router.push('/onboarding/birth');
+      } else {
+        // Denied is fine — the two alternatives stay on screen.
+        Alert.alert(t('locationPermission.gpsDenied'), t('locationPermission.gpsDeniedDesc'));
+      }
+    } catch {
+      // A rejection here is not a permission problem — location services off,
+      // the system "turn on location" dialog dismissed, or no fix obtainable.
+      // Unhandled it just stopped the spinner and left the step looking dead.
+      Alert.alert(
+        t('locationPermission.gpsFailed', { defaultValue: "Couldn't get your location" }),
+        t('locationPermission.gpsFailedDesc', {
+          defaultValue: 'Try again, or choose your city below.',
+        }),
+      );
+    } finally {
+      setGpsLoading(false);
     }
   }
 
-  function handleThemeSelect(dark: boolean) {
-    setThemeMode(dark ? 'dark' : 'light');
-  }
-
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      {/* Onboarding always renders on the night ground */}
+      <StatusBar style="light" />
+      {/* Bounded rather than absoluteFill — same reason as step 1: an <Svg>
+          root costs a retained full-size ARGB_8888 bitmap plus a software fill
+          over every pixel of it. This glow is centred at 32% with a vertical
+          radius of 34%, so it never reaches past y = 66%; the box is cut to
+          that and cy/ry re-expressed as fractions OF THAT BOX (32/66, 34/66),
+          which leaves the ellipse pixel-identical. */}
+      <Svg style={styles.wash} pointerEvents="none">
+        <Defs>
+          <SvgRadialGradient id="locGlow" cx="50%" cy="48.48%" rx="70%" ry="51.52%">
+            <Stop offset="0" stopColor={palette.turmeric} stopOpacity={0.16} />
+            <Stop offset="1" stopColor={palette.turmeric} stopOpacity={0} />
+          </SvgRadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#locGlow)" />
+      </Svg>
 
-      {/* ── Header ────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          accessibilityRole="button"
-          accessibilityLabel={t('a11y.back')}>
-          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <Text variant="mono-caps" style={[styles.headerStep, { color: colors.textMuted }]}>
-          {t('onboarding.step3of3')}
+      <View style={[styles.content, { paddingHorizontal: spacing.screenH + 4 }]}>
+        <ProgressHeader step={4} skipTo="/onboarding/birth" />
+
+        <View style={styles.iconBadge}>
+          <Icon name="location" size={32} color={onb.accent} />
+        </View>
+        <Text variant="display" style={styles.title}>
+          {t('onboarding.locTitle')}
         </Text>
-        <View style={[styles.backPill, { borderWidth: 0 }]} />
+        <Text variant="body" style={styles.body}>
+          {t('onboarding.locBody')}
+        </Text>
+
+        {locationName ? (
+          <View style={styles.setPill}>
+            <Icon name="check-circle" size={15} color={onb.accent} />
+            <Text variant="body" style={styles.setPillText} numberOfLines={1}>
+              {t('onboarding.locationSetTo', { name: locationName })}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
-        showsVerticalScrollIndicator={false}>
-
-        {/* ── Title ─────────────────────────────────────────────────── */}
-        <Text variant="display-italic" style={[styles.title, { color: colors.textPrimary }]}>
-          {t('onboarding.preferences')}
-        </Text>
-
-        {/* ── Theme Section ─────────────────────────────────────────── */}
-        <SectionLabel style={styles.sectionLabelSpacing}>
-          {t('settings.appearance')}
-        </SectionLabel>
-        <View style={styles.themeRow}>
-          <ThemeCard
-            dark
-            isSelected={isDarkMode}
-            onPress={() => handleThemeSelect(true)}
-          />
-          <ThemeCard
-            dark={false}
-            isSelected={!isDarkMode}
-            onPress={() => handleThemeSelect(false)}
-          />
-        </View>
-
-        {/* ── Location Section ──────────────────────────────────────── */}
-        <SectionLabel style={styles.sectionLabelSpacing}>
-          {t('settings.location')}
-        </SectionLabel>
-        <View style={[styles.radioGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-
-          <RadioRow
-            label={t('onboarding.useGpsLocation')}
-            sublabel={t('onboarding.gpsDesc')}
-            icon="location"
-            selected={locationChoice === 'gps'}
-            onPress={() => setLocationChoice('gps')}
-            colors={colors}
-          />
-
-          <View style={[styles.radioDivider, { backgroundColor: colors.divider }]} />
-
-          <RadioRow
-            label={t('onboarding.usePuneDefault')}
-            sublabel={t('onboarding.puneDesc')}
-            icon="map"
-            selected={locationChoice === 'default'}
-            onPress={() => setLocationChoice('default')}
-            colors={colors}
-          />
-
-        </View>
-
-        <View style={{ height: 16 }} />
-      </ScrollView>
-
-      {/* ── Bottom ────────────────────────────────────────────────────── */}
-      <View style={[styles.bottom, { paddingHorizontal: spacing.screenH, borderTopColor: colors.divider }]}>
-        <TouchableOpacity
-          onPress={handleFinish}
-          activeOpacity={0.85}
-          style={[styles.cta, { backgroundColor: palette.sindoor }]}
+      <View style={[styles.bottom, { paddingHorizontal: spacing.screenH }]}>
+        {locationName ? (
+          <PrimaryCta label={t('common.continue')} onPress={() => router.push('/onboarding/birth')} />
+        ) : (
+          <MotionPressable
+            onPress={handleUseGPS}
+            disabled={gpsLoading}
+            pressedScale={0.97}
+            style={styles.gpsBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('onboarding.useMyLocation')}>
+            {gpsLoading ? (
+              <ActivityIndicator color={palette.night} />
+            ) : (
+              <>
+                <Icon name="navigate" size={18} color={palette.night} />
+                <Text variant="button" style={styles.gpsBtnText}>{t('onboarding.useMyLocation')}</Text>
+              </>
+            )}
+          </MotionPressable>
+        )}
+        <MotionPressable
+          onPress={() => router.push('/location-permission')}
+          pressedScale={0.97}
+          style={styles.cityBtn}
           accessibilityRole="button"
-          accessibilityLabel={t('onboarding.startExploring')}>
-          <Text variant="mono-caps" style={styles.ctaText}>
-            {t('onboarding.startExploring')}
-          </Text>
-        </TouchableOpacity>
+          accessibilityLabel={t('onboarding.chooseCity')}>
+          <Text variant="title" style={styles.cityBtnText}>{t('onboarding.chooseCity')}</Text>
+        </MotionPressable>
       </View>
-
     </SafeAreaView>
   );
 }
 
-// ─── Theme Card ───────────────────────────────────────────────────────────────
-
-interface ThemeCardProps {
-  dark: boolean;
-  isSelected: boolean;
-  onPress: () => void;
-}
-
-function ThemeCard({ dark, isSelected, onPress }: ThemeCardProps) {
-  const { t } = useTranslation();
-  // Preview chrome colours match the P6 editorial palette — parchment vs.
-  // night-plinth so the preview reads as what the user is about to choose.
-  const bg = dark ? palette.nightPlinth : palette.parchment;
-  const surface = dark ? palette.nightPlinthDeep : palette.parchmentBright;
-  const textPrimary = dark ? palette.boneWhite : palette.ink;
-  const textMuted = dark ? 'rgba(243,229,200,0.45)' : palette.inkMuted;
-  const accent = dark ? palette.goldLeaf : palette.sindoor;
-  const borderColor = isSelected ? palette.sindoor : dark ? 'rgba(243,229,200,0.12)' : palette.paperEdge;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[
-        styles.themeCard,
-        { backgroundColor: bg, borderColor, borderWidth: isSelected ? 2 : 1 },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={dark ? t('onboarding.dark') : t('onboarding.light')}
-      accessibilityState={{ selected: isSelected }}>
-
-      {/* Mini UI preview */}
-      <View style={[styles.miniCard, { backgroundColor: surface }]}>
-        <View style={[styles.miniBar, { backgroundColor: accent, width: '60%' }]} />
-        <View style={[styles.miniBar, { backgroundColor: textMuted, opacity: 0.6, width: '80%', height: 4 }]} />
-        <View style={[styles.miniBar, { backgroundColor: textMuted, opacity: 0.4, width: '50%', height: 4 }]} />
-      </View>
-
-      <Text variant="display-italic" style={[styles.themeLabel, { color: textPrimary }]}>
-        {dark ? t('onboarding.dark') : t('onboarding.light')}
-      </Text>
-
-      {isSelected && (
-        <View style={[styles.themeCheck, { backgroundColor: palette.sindoor }]}>
-          <Icon name="check" size={12} color={palette.parchmentBright} />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-// ─── Radio Row ────────────────────────────────────────────────────────────────
-
-interface RadioRowProps {
-  label: string;
-  sublabel: string;
-  icon: IconName;
-  selected: boolean;
-  onPress: () => void;
-  colors: ColorPalette;
-}
-
-function RadioRow({ label, sublabel, icon, selected, onPress, colors }: RadioRowProps) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={onPress}
-      style={styles.radioRow}
-      accessibilityRole="radio"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}>
-      <View style={[styles.radioIconWrap, { backgroundColor: colors.surfaceRecessed }]}>
-        <Icon name={icon} size={16} color={palette.sindoor} />
-      </View>
-      <View style={styles.radioText}>
-        <Text variant="body" style={[styles.radioLabel, { color: colors.textPrimary }]}>{label}</Text>
-        <Text variant="body-italic" style={[styles.radioSublabel, { color: colors.textTertiary }]}>{sublabel}</Text>
-      </View>
-      <View style={[styles.radioCircle, { borderColor: selected ? palette.sindoor : colors.border }]}>
-        {selected && <View style={[styles.radioFill, { backgroundColor: palette.sindoor }]} />}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: onb.base },
 
-  header: {
+  // Height is the glow's own reach (cy 32% + ry 34%) — see the call site.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: '66%' },
+
+  content: { flex: 1, paddingTop: 20 },
+  iconBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: 'rgba(216,163,26,0.13)',
+    borderWidth: 1,
+    borderColor: 'rgba(216,163,26,0.30)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 22,
+  },
+  title: { fontSize: 30, lineHeight: 38, color: onb.text, marginTop: 28 },
+  body: {
+    fontSize: 15,
+    lineHeight: 26,
+    color: onb.textSoft,
+    marginTop: 16,
+    maxWidth: 300,
+  },
+  setPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    gap: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(216,163,26,0.10)',
     borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: 'rgba(216,163,26,0.35)',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginTop: 24,
+    maxWidth: '100%',
   },
-  headerStep: { fontSize: 10 },
+  setPillText: { fontSize: 13.5, color: onb.text, flexShrink: 1 },
 
-  scroll: { paddingTop: 16, paddingBottom: 16 },
-
-  title: { fontSize: 30, lineHeight: 36, marginTop: 8, marginBottom: 4 },
-
-  sectionLabelSpacing: { marginTop: 24, marginBottom: 12, marginLeft: 2 },
-
-  // Theme cards
-  themeRow: { flexDirection: 'row', gap: 12 },
-  themeCard: {
-    flex: 1,
-    borderRadius: borderRadius.card,
-    padding: 14,
-    alignItems: 'center',
-    gap: 12,
-    position: 'relative',
-  },
-  miniCard: {
-    width: '100%',
-    borderRadius: 8,
-    padding: 10,
-    gap: 6,
-  },
-  miniBar: { height: 6, borderRadius: 3 },
-  themeLabel: { fontSize: 18, lineHeight: 22 },
-  themeCheck: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Radio group
-  radioGroup: {
-    borderRadius: borderRadius.card,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  radioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  radioIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioText: { flex: 1 },
-  radioLabel: { fontSize: 15, lineHeight: 20 },
-  radioSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioFill: { width: 10, height: 10, borderRadius: 5 },
-  radioDivider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
-
-  // Bottom
-  bottom: {
-    paddingTop: 14,
-    paddingBottom: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 14,
-    alignItems: 'center',
-  },
-  cta: {
-    width: '100%',
-    paddingVertical: 16,
+  bottom: { paddingBottom: 10, gap: 11 },
+  gpsBtn: {
+    height: controlHeight.button,
     borderRadius: borderRadius.button,
+    backgroundColor: palette.turmeric,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    shadowColor: palette.turmeric,
+    shadowOpacity: 0.3,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  ctaText: { fontSize: 12, color: palette.parchmentBright },
+  gpsBtnText: { fontSize: 16, color: palette.night },
+  cityBtn: {
+    height: controlHeight.button,
+    borderRadius: borderRadius.button,
+    borderWidth: 1,
+    borderColor: 'rgba(237,232,240,0.20)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cityBtnText: { fontSize: 16, color: onb.text },
 });

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   TouchableOpacity,
@@ -13,7 +14,8 @@ import {
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation, useRoute } from 'expo-router';
+import { usePreventRemoveContext } from 'expo-router/react-navigation';
 import { useTranslation } from 'react-i18next';
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Haptics from 'expo-haptics';
@@ -29,22 +31,17 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useStore } from '@/store/useStore';
+import { useLocaleFormatters } from '@/utils/format';
 import { darkColors, lightColors, MONO_FONT, palette, spacing, borderRadius } from '@/config/theme';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { resolveLanguage } from '@/i18n';
-import { useShareSheet } from '@/store/useShareSheet';
-import { useMilestoneCelebration } from '@/store/useMilestoneCelebration';
 import {
   CUSTOM_MANTRA_SLUG,
-  getJaapStats,
   insertJaapSession,
 } from '@/services/jaapSessions';
-import { recordSessionForSadhana } from '@/services/sadhanaRecorder';
-import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import {
   getMantraBySlug,
   type ContentLang,
@@ -60,12 +57,11 @@ const DEFAULT_MALA_SIZE: MalaSize = 108;
 const CUSTOM_MIN = 1;
 const CUSTOM_MAX = 100000;
 
-// Ring shrunk to 180dp to free up vertical space for a more readable mantra
-// block — the user is reading + tapping simultaneously, so the Devanagari
-// body is the focal element, not the ring. 180dp still comfortably holds the
-// 56pt count number with the kicker + "x of y" stacked inside.
-const RING_SIZE = 180;
-const RING_STROKE = 5;
+// Diya frame 05 — the ring is the centrepiece again (210dp, hairline 3dp
+// stroke) with the hero count inside. The mantra block above stays readable;
+// the only decoration is the warm glow behind the count.
+const RING_SIZE = 210;
+const RING_STROKE = 3;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
@@ -142,15 +138,6 @@ export default function JaapCounterScreen() {
   const colors = isDarkMode ? darkColors : lightColors;
   const lang: ContentLang = resolveLanguage(appLanguage);
   const db = useSQLiteContext();
-  const openShare = useShareSheet(s => s.open);
-  const unlockMilestone = useMilestoneCelebration(s => s.unlock);
-  const sadhana = useStore(s => s.sadhana);
-  const setSadhanaState = useStore(s => s.setSadhanaState);
-  const sadhanaReminderEnabled = useStore(s => s.sadhanaReminderEnabled);
-  const sadhanaReminderTime = useStore(s => s.sadhanaReminderTime);
-  const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
-  const quietHoursStart = useStore(s => s.quietHoursStart);
-  const quietHoursEnd = useStore(s => s.quietHoursEnd);
 
   const resolved = useMemo<ResolvedMantra | null>(() => {
     if (slug === CUSTOM_MANTRA_SLUG) {
@@ -160,10 +147,6 @@ export default function JaapCounterScreen() {
     const m = getMantraBySlug(slug);
     return m ? buildResolved(m, lang, t) : null;
   }, [slug, customText, lang, t]);
-  const mantraDeity = useMemo(
-    () => (slug === CUSTOM_MANTRA_SLUG ? undefined : getMantraBySlug(slug)?.deity),
-    [slug],
-  );
 
   // Adaptive type scale — Gayatri is 4 lines, Mahamrityunjaya is 2, most are
   // 1. The mantra is the focal element so short mantras get a generous size;
@@ -182,6 +165,8 @@ export default function JaapCounterScreen() {
     return { body: 22, bodyLh: 33, iast: 13, iastLh: 19 };
   }, [resolved?.bodyDevanagari]);
 
+  const { digits } = useLocaleFormatters();
+
   // ── Counter state ──────────────────────────────────────────────────────
   const [count, setCount] = useState(0); // current within-mala count [0..malaSize-1]
   const [malaCount, setMalaCount] = useState(0); // completed malas
@@ -190,7 +175,10 @@ export default function JaapCounterScreen() {
   );
   const [customSizeModalVisible, setCustomSizeModalVisible] = useState(false);
   const [customSizeDraft, setCustomSizeDraft] = useState('');
-  const startedAtRef = useRef<number>(Date.now());
+  // Stamped by the effect below — which also runs on mount, before any tap
+  // can read it — rather than at render time: `Date.now()` in render is an
+  // impure read the React Compiler refuses to memoise around.
+  const startedAtRef = useRef<number>(0);
 
   // Reset starts-at when mantra resolved (covers re-mount)
   useEffect(() => {
@@ -214,11 +202,19 @@ export default function JaapCounterScreen() {
   }, [progressFraction, ringProgressSV]);
 
   // ── Tap handlers ───────────────────────────────────────────────────────
-  // Rendering reads `count` + `malaCount`; the closures here use those values
-  // via the deps below. React batches both setState calls on a tap, so the
-  // re-render sees both updates together (one commit, one ring-progress
-  // animation kick-off). Keeping side effects (haptics + animation) outside
-  // the setter avoids the React 18 strict-mode double-invoke footgun.
+  // Rendering reads `count` + `malaCount`; the closures here capture those
+  // values from the render they were created in. React batches both setState
+  // calls on a tap, so the re-render sees both updates together (one commit,
+  // one ring-progress animation kick-off). Keeping side effects (haptics +
+  // animation) outside the setter avoids the React 18 strict-mode
+  // double-invoke footgun.
+  //
+  // `handleTap` is deliberately a plain function expression, NOT a
+  // useCallback: a dep array holding the shared values `scaleSV` /
+  // `completionSV` (which the body mutates) trips the React Compiler's
+  // immutability check and makes it bail out of memoizing this whole screen.
+  // Its only consumer is the tap-zone Pressable, where identity is
+  // irrelevant.
   //
   // Haptic intensity: `impactAsync(Heavy)` — earlier `selectionAsync()` was
   // unmistakably too weak (user feedback), and Medium is borderline on
@@ -227,7 +223,7 @@ export default function JaapCounterScreen() {
   // the user is often eyes-closed or chanting and needs confirmation without
   // looking. If 108-rep wrist fatigue becomes a real complaint we can dial
   // back to Medium.
-  const handleTap = useCallback(() => {
+  const handleTap = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 
     scaleSV.value = withSequence(
@@ -267,9 +263,15 @@ export default function JaapCounterScreen() {
       setMalaCount((mc) => mc + 1);
       setCount(0);
     } else {
+      // Quarter-mala beads (27 / 54 / 81 on a 108 mala) get a Medium pulse on
+      // top of the per-tap cue so progress registers without looking
+      // (design_handoff_diya MOTION.md).
+      if (malaSize === 108 && (next === 27 || next === 54 || next === 81)) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      }
       setCount(next);
     }
-  }, [count, malaSize, scaleSV, completionSV]);
+  };
 
   const handleDecrement = useCallback(() => {
     if (count === 0 && malaCount === 0) return;
@@ -304,84 +306,72 @@ export default function JaapCounterScreen() {
   }, [hasCounted, totalCount, t]);
 
   // ── Save / exit flow ───────────────────────────────────────────────────
-  // Persist the session AND advance the sadhana streak / scan milestones in
-  // one call. We deliberately keep the SQLite write and the orchestrator
-  // synchronous so that:
-  //   - the celebration overlay opens before `router.back()` resolves,
-  //     which puts it cleanly on top of the picker
-  //   - the at-risk reminder cancellation runs from a known-true state
-  //     (today is now a qualifying day) rather than racing on next focus.
+  // Persist the jaap session synchronously (`runSync`) so the SQLite write
+  // has committed before any exit — `router.back()` or the iOS guard's
+  // re-dispatch of the blocked action — is even issued.
   const persistSession = useCallback(() => {
     if (!resolved || !hasCounted) return;
-    const nowMs = Date.now();
     insertJaapSession(db, {
       startedAt: startedAtRef.current,
-      endedAt: nowMs,
+      endedAt: Date.now(),
       mantraSlug: resolved.slug,
       mantraLabel: resolved.label,
       malaSize,
       malaCount,
       totalCount,
     });
+  }, [db, resolved, hasCounted, malaSize, malaCount, totalCount]);
 
-    // Re-read lifetime totals AFTER the insert — milestone scan needs the
-    // post-write counts to detect crossings.
-    const statsAfter = getJaapStats(db);
-    const { nextState, celebration } = recordSessionForSadhana({
-      db,
-      prevState: sadhana,
-      statsAfter,
-      nowMs,
-      deityId: mantraDeity,
-    });
-    if (nextState !== sadhana) setSadhanaState(nextState);
-    if (celebration) unlockMilestone(celebration);
-
-    // The user practised today — kill today's at-risk reminder and roll the
-    // 14-day horizon forward so tomorrow's still fires (if enabled).
-    if (sadhanaReminderEnabled) {
-      void rescheduleSadhanaReminder({
-        enabled: true,
-        timeHHmm: sadhanaReminderTime,
-        sadhana: nextState,
-        quietHours: quietHoursEnabled
-          ? { enabled: true, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }
-          : undefined,
-      });
-    }
-  }, [
-    db, resolved, hasCounted, malaSize, malaCount, totalCount,
-    sadhana, setSadhanaState, unlockMilestone, mantraDeity,
-    sadhanaReminderEnabled, sadhanaReminderTime,
-    quietHoursEnabled, quietHoursStart, quietHoursEnd,
-  ]);
+  // Exit for the screen's own controls (back pill, check pill, Android
+  // hardware back) once the prompt has run (or was skipped because nothing
+  // was counted). The flag marks the pop as ours so the (iOS-only)
+  // `beforeRemove` guard below lets it through; `router.back()` only queues
+  // the action, so the flag has to stay set until that guard consumes it.
+  const exitingRef = useRef(false);
+  const leave = useCallback(() => {
+    exitingRef.current = true;
+    router.back();
+  }, []);
 
   const handleSaveExit = useCallback(() => {
     persistSession();
-    router.back();
-  }, [persistSession]);
+    leave();
+  }, [persistSession, leave]);
 
-  const confirmAndExit = useCallback(() => {
-    if (!hasCounted) {
-      router.back();
-      return;
-    }
-    Alert.alert(
-      t('jaap.saveBeforeExit'),
-      t('jaap.saveBeforeExitDesc', { count: totalCount }),
-      [
-        {
-          text: t('jaap.saveNo'),
-          style: 'destructive',
-          onPress: () => router.back(),
-        },
-        {
-          text: t('jaap.saveYes'),
-          onPress: handleSaveExit,
-        },
-      ],
-    );
-  }, [hasCounted, totalCount, handleSaveExit, t]);
+  // The save-before-exit prompt, parameterised on how to actually go: `leave`
+  // for the screen's own controls, or "continue the blocked action" for the
+  // iOS guard. Save persists first (synchronously), then exits.
+  const promptThenExit = useCallback(
+    (exit: () => void) => {
+      if (!hasCounted) {
+        exit();
+        return;
+      }
+      Alert.alert(
+        t('jaap.saveBeforeExit'),
+        t('jaap.saveBeforeExitDesc', { count: totalCount }),
+        [
+          {
+            text: t('jaap.saveNo'),
+            style: 'destructive',
+            onPress: exit,
+          },
+          {
+            text: t('jaap.saveYes'),
+            onPress: () => {
+              persistSession();
+              exit();
+            },
+          },
+        ],
+      );
+    },
+    [hasCounted, totalCount, persistSession, t],
+  );
+
+  // A zero-arg wrapper, not `promptThenExit` itself: this is handed straight
+  // to `onPress`, which would otherwise pass its press event in as `exit`.
+  const confirmAndExit = useCallback(() => promptThenExit(leave), [promptThenExit, leave]);
 
   // Hardware back on Android — same prompt as the nav-back button.
   useEffect(() => {
@@ -391,6 +381,63 @@ export default function JaapCounterScreen() {
     });
     return () => sub.remove();
   }, [confirmAndExit]);
+
+  // iOS — the native-stack swipe-back pops the screen without touching the
+  // back pill (audit L-04). Two halves, the same shape as react-navigation's
+  // `usePreventRemove` minus its unconditional preventDefault, which would
+  // also block the back pill's post-prompt `router.back()` (a fresh action):
+  //  1. While a session is in progress, register the route as prevented.
+  //     native-stack forwards that to react-native-screens as
+  //     `preventNativeDismiss`, so the interactive pop is cancelled natively
+  //     (the screen never leaves) and the stack dispatches a POP instead,
+  //     which arrives at `beforeRemove`.
+  //  2. On `beforeRemove`, unless the removal is ours, prevent it, run the
+  //     same prompt as the back pill, then CONTINUE THE BLOCKED ACTION
+  //     (`e.data.action`) rather than `router.back()`. For a swipe that is
+  //     the same single pop; for a multi-screen removal passing through a
+  //     counting jaap screen (a `dismissTo` / `popTo` issued from a screen
+  //     above it) it lands where that action was headed, where
+  //     `router.back()` would only have popped the top screen and left the
+  //     jaap screen up with its guard disarmed.
+  //     The re-dispatch is not re-intercepted: react-navigation stamps each
+  //     screen it has already emitted `beforeRemove` to onto the action and
+  //     skips it on re-dispatch, and `navigation.dispatch` emits
+  //     synchronously, so `exitingRef` — set around the call and cleared
+  //     straight after — covers it too without leaking into a later
+  //     removal if something else ends up blocking this one.
+  // Both halves are iOS-only (early return inside each effect, so the hook
+  // order stays unconditional). Android's classic stack ignores
+  // `preventNativeDismiss` and hardware back there is the BackHandler above,
+  // so on Android the guard would only catch non-back removals — e.g. the
+  // widget's /refresh-widget `dismissTo('/panchang')`, which must still pass
+  // straight through — and every `setPreventRemove` would re-render the root
+  // stack for a prop Android never reads. On Android `exitingRef` is set by
+  // `leave()` but never read, which is harmless.
+  const navigation = useNavigation();
+  const { key: routeKey } = useRoute();
+  const { setPreventRemove } = usePreventRemoveContext();
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !hasCounted) return;
+    setPreventRemove(routeKey, routeKey, true);
+    return () => setPreventRemove(routeKey, routeKey, false);
+  }, [setPreventRemove, routeKey, hasCounted]);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    return navigation.addListener('beforeRemove', (e) => {
+      if (exitingRef.current) {
+        exitingRef.current = false;
+        return;
+      }
+      if (!hasCounted) return;
+      e.preventDefault();
+      const blockedAction = e.data.action;
+      promptThenExit(() => {
+        exitingRef.current = true;
+        navigation.dispatch(blockedAction);
+        exitingRef.current = false;
+      });
+    });
+  }, [navigation, hasCounted, promptThenExit]);
 
   // ── Animated styles ────────────────────────────────────────────────────
   const tapScaleStyle = useAnimatedStyle(() => ({
@@ -411,7 +458,7 @@ export default function JaapCounterScreen() {
           <Text variant="body-italic" style={[styles.notFoundText, { color: colors.textMuted }]}>
             {t('jaap.title')}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.notFoundBtn, { borderColor: colors.accent }]}
             accessibilityRole="button"
@@ -419,13 +466,13 @@ export default function JaapCounterScreen() {
             <Text variant="mono-caps" style={[styles.notFoundBtnText, { color: colors.accent }]}>
               {t('common.back')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </SafeAreaView>
     );
   }
 
-  const ringTrackColor = isDarkMode ? 'rgba(243,229,200,0.10)' : 'rgba(27,20,10,0.12)';
+  const ringTrackColor = isDarkMode ? 'rgba(237,232,240,0.09)' : 'rgba(34,27,36,0.10)';
   const ringFillColor = colors.accent;
 
   // Preserve the user's progress across size changes — the user has been
@@ -472,18 +519,18 @@ export default function JaapCounterScreen() {
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         {/* ── Header (outside the tap zone) ───────────────────────────────── */}
         <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={confirmAndExit}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="body-italic" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {resolved.label}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={handleSaveExit}
             disabled={!hasCounted}
             style={[
@@ -498,15 +545,29 @@ export default function JaapCounterScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('jaap.saveSession')}>
             <Icon name="check" size={16} color={hasCounted ? colors.accent : colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         {/* ── Whole-screen tap zone ───────────────────────────────────────── */}
+        {/*
+          Accessibility: no `accessibilityLabel`. A Pressable is an
+          accessibility element, so a label replaces the child <Text> nodes
+          instead of adding to them — "Tap to count one repetition" was the
+          *only* thing announced, which put the mantra and the live count both
+          out of reach. Unlabelled, the mantra, the count and the mala/total
+          summary all speak; the action wording moves to the hint. The count
+          also rides on `accessibilityValue`, deliberately with only the
+          numeric min/now/max: RN folds a `text` member into the view's
+          contentDescription, which would swallow the children all over again.
+          No live region either — an unmanaged one on a counter that ticks
+          every tap is worse than silence.
+        */}
         <Pressable
           style={styles.tapZone}
           onPress={handleTap}
           accessibilityRole="button"
-          accessibilityLabel={t('a11y.tapToCount')}>
+          accessibilityHint={t('a11y.tapToCount')}
+          accessibilityValue={{ min: 0, now: count, max: malaSize }}>
 
           {/* ── Mantra reading area (always visible) ──────────────────────── */}
           <View style={[styles.mantraSection, { paddingHorizontal: spacing.screenH }]}>
@@ -516,7 +577,7 @@ export default function JaapCounterScreen() {
             <Text variant="deva-bold" style={[styles.mantraTitle, { color: colors.textPrimary }]} numberOfLines={1}>
               {resolved.titleHi}
             </Text>
-            <Ornament variant="double-rule" style={styles.mantraRule} />
+            <View style={styles.mantraRule} />
             <Text
               variant="deva"
               style={[
@@ -548,16 +609,16 @@ export default function JaapCounterScreen() {
                 active={size === malaSize}
                 onPress={() => handleMalaSizeChange(size)}
                 inactiveBg={colors.surface}
-                activeBg={palette.ink}
+                activeBg={colors.accent}
                 inactiveBorder={colors.border}
-                activeBorder={palette.ink}
+                activeBorder={colors.accent}
                 style={styles.malaSizeChip}
                 accessibilityLabel={t('jaap.malaSize', { count: size })}>
                 <Text
                   variant="mono"
                   style={[
                     styles.malaSizeChipText,
-                    { color: size === malaSize ? palette.parchmentBright : colors.textSecondary },
+                    { color: size === malaSize ? palette.night : colors.textSecondary },
                   ]}>
                   {size}
                 </Text>
@@ -567,16 +628,16 @@ export default function JaapCounterScreen() {
               active={isCustomSize}
               onPress={openCustomSizeModal}
               inactiveBg={colors.surface}
-              activeBg={palette.ink}
+              activeBg={colors.accent}
               inactiveBorder={colors.border}
-              activeBorder={palette.ink}
+              activeBorder={colors.accent}
               style={styles.malaSizeChip}
               accessibilityLabel={t('jaap.customMalaSize')}>
               <Text
                 variant="mono"
                 style={[
                   styles.malaSizeChipText,
-                  { color: isCustomSize ? palette.parchmentBright : colors.textSecondary },
+                  { color: isCustomSize ? palette.night : colors.textSecondary },
                 ]}>
                 {isCustomSize ? malaSize : '+'}
               </Text>
@@ -625,7 +686,7 @@ export default function JaapCounterScreen() {
                   {t('jaap.countLabel')}
                 </Text>
                 <Text style={[styles.counterValue, { color: colors.textPrimary }]}>
-                  {count}
+                  {digits(String(count))}
                 </Text>
                 <Text variant="body-italic" style={[styles.counterTotal, { color: colors.textTertiary }]}>
                   {t('jaap.progressOf', { current: count, total: malaSize })}
@@ -641,18 +702,18 @@ export default function JaapCounterScreen() {
                 {t('jaap.malaLabel', { count: malaCount })}
               </Text>
               <Text style={[styles.summaryInlineValue, { color: colors.textPrimary }]}>
-                {malaCount}
+                {digits(String(malaCount))}
               </Text>
               <View style={[styles.summaryInlineDivider, { backgroundColor: colors.divider }]} />
               <Text variant="mono-caps" style={[styles.summaryInlineKicker, { color: colors.accent }]}>
                 {t('jaap.countLabel')}
               </Text>
               <Text style={[styles.summaryInlineValue, { color: colors.textPrimary }]}>
-                {totalCount}
+                {digits(String(totalCount))}
               </Text>
             </View>
             <View style={styles.actionRow}>
-              <TouchableOpacity
+              <MotionPressable
                 onPress={handleDecrement}
                 disabled={!hasCounted}
                 style={[
@@ -665,8 +726,8 @@ export default function JaapCounterScreen() {
                 <Text variant="mono-caps" style={[styles.actionBtnText, { color: colors.textSecondary }]}>
                   {t('jaap.decrement')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </MotionPressable>
+              <MotionPressable
                 onPress={handleReset}
                 disabled={!hasCounted}
                 style={[
@@ -679,26 +740,7 @@ export default function JaapCounterScreen() {
                 <Text variant="mono-caps" style={[styles.actionBtnText, { color: colors.textSecondary }]}>
                   {t('jaap.reset')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => openShare({
-                  kind: 'jaap-completion',
-                  count: totalCount,
-                  mantraHi: resolved.bodyDevanagari,
-                  mantraTranslit: resolved.bodyIast,
-                  mantraTitleEn: resolved.titleEn,
-                  deityId: mantraDeity,
-                })}
-                disabled={!hasCounted}
-                style={[
-                  styles.actionBtn,
-                  { borderColor: hasCounted ? colors.borderAccent : colors.border, opacity: hasCounted ? 1 : 0.4 },
-                ]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('share.a11yShare')}>
-                <Icon name="share" size={13} color={hasCounted ? colors.accent : colors.textSecondary} />
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
         </Pressable>
@@ -721,7 +763,9 @@ export default function JaapCounterScreen() {
               accessible={false}
               style={[
                 styles.customSizeSheet,
-                { backgroundColor: colors.surface, borderColor: colors.border },
+                // Floating card — needs the OPAQUE raised surface, not the
+                // translucent card tint (which lets the screen bleed through).
+                { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
               ]}>
               <Text variant="display-italic" style={[styles.customSizeTitle, { color: colors.textPrimary }]}>
                 {t('jaap.customMalaSizeTitle')}
@@ -745,15 +789,15 @@ export default function JaapCounterScreen() {
                 ]}
               />
               <View style={styles.customSizeActions}>
-                <TouchableOpacity
+                <MotionPressable
                   onPress={() => setCustomSizeModalVisible(false)}
                   style={[styles.customSizeBtn, { borderColor: colors.border }]}
                   accessibilityRole="button">
                   <Text variant="mono-caps" style={[styles.customSizeBtnText, { color: colors.textSecondary }]}>
                     {t('common.cancel')}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </MotionPressable>
+                <MotionPressable
                   onPress={handleCustomSizeSubmit}
                   disabled={!isValidCustomDraft(customSizeDraft)}
                   style={[
@@ -767,7 +811,7 @@ export default function JaapCounterScreen() {
                   <Text variant="mono-caps" style={[styles.customSizeBtnText, { color: colors.accent }]}>
                     {t('common.done')}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -911,13 +955,13 @@ const styles = StyleSheet.create({
   },
   counterKicker: { fontSize: 9.5, marginBottom: 4 },
   counterValue: {
-    fontFamily: MONO_FONT,
-    fontWeight: '500',
-    fontSize: 56,
-    lineHeight: 60,
-    letterSpacing: -1,
+    fontFamily: 'Geist_200ExtraLight',
+    fontVariant: ['tabular-nums'],
+    fontSize: 68,
+    lineHeight: 72,
+    letterSpacing: -2.5,
   },
-  counterTotal: { fontSize: 12, marginTop: 4 },
+  counterTotal: { fontSize: 10.5, letterSpacing: 1.8, textTransform: 'uppercase', marginTop: 8 },
 
   // Bottom bar — summary + decrement/reset, fixed at the bottom of the tap
   // zone. Background-less so the parchment continues; just a subtle hairline

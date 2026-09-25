@@ -15,30 +15,45 @@ export const FONT_SCALE: Record<FontSize, number> = {
 const fontSizeSelector = (s: { fontSize: FontSize }) => s.fontSize;
 
 /**
- * Sacred Editorial text variants (P6.2). Opt-in — passing `variant="display"`
- * applies the matching `typeScale` token as a base style, which the caller's
- * `style` prop can still override. Omitting `variant` preserves legacy behavior
- * for screens that haven't been ported yet.
+ * Diya text variants. Opt-in — passing `variant="display"` applies the
+ * matching `typeScale` token as a base style, which the caller's `style` prop
+ * can still override. Omitting `variant` preserves legacy behavior for screens
+ * that haven't been ported yet.
+ *
+ * The italic variants are kept as names only — the Diya design language has no
+ * italics, so they resolve to the upright faces.
  */
 export type AppTextVariant =
   | 'display'
   | 'display-italic'
+  | 'title'
   | 'body'
   | 'body-italic'
+  | 'body-small'
+  | 'button'
+  | 'kicker'
+  | 'kicker-small'
   | 'deva'
   | 'deva-bold'
+  | 'deva-verse'
   | 'mono'
   | 'mono-caps';
 
 const VARIANT_TO_TOKEN: Record<AppTextVariant, TextStyle> = {
-  display: typeScale.displaySerif,
-  'display-italic': typeScale.displayItalic,
-  body: typeScale.bodySerif,
-  'body-italic': typeScale.bodyItalic,
+  display: typeScale.display,
+  'display-italic': typeScale.display,
+  title: typeScale.title,
+  body: typeScale.body,
+  'body-italic': typeScale.body,
+  'body-small': typeScale.bodySmall,
+  button: typeScale.button,
+  kicker: typeScale.kicker,
+  'kicker-small': typeScale.kickerSmall,
   deva: typeScale.deva,
   'deva-bold': typeScale.devaBold,
+  'deva-verse': typeScale.devaVerse,
   mono: typeScale.mono,
-  'mono-caps': typeScale.monoCaps,
+  'mono-caps': typeScale.kicker,
 };
 
 interface AppTextProps extends TextProps {
@@ -61,7 +76,12 @@ export const AppText = memo(function AppText({ style, variant, ...props }: AppTe
   }, [variant, style]);
 
   if (scale === 1) {
-    return <Text style={mergedStyle} {...props} />;
+    // Android defaults to BREAK_STRATEGY_HIGH_QUALITY, which runs an optimal
+    // (whole-paragraph) line breaker. Almost everything here is a short label
+    // or a body paragraph where the greedy breaker is visually identical, so
+    // "simple" is the right default. Placed BEFORE the spread so a call site
+    // that genuinely wants balanced breaking can still pass its own value.
+    return <Text textBreakStrategy="simple" style={mergedStyle} {...props} />;
   }
 
   const flat = StyleSheet.flatten(mergedStyle) ?? {};
@@ -77,5 +97,5 @@ export const AppText = memo(function AppText({ style, variant, ...props }: AppTe
     ...(scaledLineHeight !== undefined ? { lineHeight: scaledLineHeight } : {}),
   };
 
-  return <Text style={scaledStyle} {...props} />;
+  return <Text textBreakStrategy="simple" style={scaledStyle} {...props} />;
 });

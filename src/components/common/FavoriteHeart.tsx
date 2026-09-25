@@ -69,8 +69,14 @@ export function FavoriteHeart({
     fill: interpolateColor(progress.value, [0, 1], [inactiveColor, activeColor]),
   }));
 
-  const wrapStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
+  // Declared BEFORE `useAnimatedStyle`, not after. The React Compiler freezes
+  // `scale` at the point it is captured by the worklet passed to
+  // `useAnimatedStyle`; a write that appears after that freeze point is
+  // reported as react-hooks/immutability ("`scale` cannot be modified") and the
+  // compiler then bails out of memoizing this component entirely. Writing
+  // before the capture keeps the value mutable — same ordering as
+  // MotionPressable. The handler has exactly one consumer — the Pressable's
+  // onPress below — so referential identity is irrelevant.
   function handlePress() {
     // Light haptic on every tap — favourite toggle is a confirmation whether
     // the user is adding or removing (used on the favourites list too).
@@ -81,6 +87,8 @@ export function FavoriteHeart({
     );
     onPress();
   }
+
+  const wrapStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <Pressable

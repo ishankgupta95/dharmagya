@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, ScrollView, Switch, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   useStore,
   type TithiReminderKey,
@@ -15,8 +16,8 @@ import { darkColors, lightColors, borderRadius, spacing, type ColorPalette } fro
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { rescheduleReminders, cancelAllReminders, hasAnyReminderEnabled } from '@/services/reminderScheduler';
-import { rescheduleSadhanaReminder } from '@/services/sadhanaReminders';
 import { TimePickerModal } from '@/components/common/TimePickerModal';
+import { useNotificationPermissionGate } from '@/components/common/NotificationPermissionPrompt';
 import { useLocaleFormatters } from '@/utils/format';
 
 const TITHI_KEYS: TithiReminderKey[] = ['ekadashi', 'pradosha', 'purnima', 'amavasya', 'sankashti', 'shivaratri'];
@@ -52,49 +53,34 @@ export default function RemindersScreen() {
   const setFestivalReminderTime = useStore(s => s.setFestivalReminderTime);
   const { formatTime: formatDisplayTime } = useLocaleFormatters();
 
-  // Sadhana practice reminder (P14.4) — opt-in evening nudge if the user
-  // hasn't begun their sadhana yet today.
-  const sadhana = useStore(s => s.sadhana);
-  const sadhanaReminderEnabled = useStore(s => s.sadhanaReminderEnabled);
-  const setSadhanaReminderEnabled = useStore(s => s.setSadhanaReminderEnabled);
-  const sadhanaReminderTime = useStore(s => s.sadhanaReminderTime);
-  const setSadhanaReminderTime = useStore(s => s.setSadhanaReminderTime);
+  // Quiet hours are edited in Settings, but this screen re-schedules the whole
+  // reminder horizon on mount and after every toggle — so it has to apply the
+  // same shift the root layout does, or a visit here silently rewrites the
+  // schedule with the quiet window dropped.
   const quietHoursEnabled = useStore(s => s.quietHoursEnabled);
   const quietHoursStart = useStore(s => s.quietHoursStart);
   const quietHoursEnd = useStore(s => s.quietHoursEnd);
+  const quietHours = useMemo(
+    () => ({ enabled: quietHoursEnabled, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }),
+    [quietHoursEnabled, quietHoursStart, quietHoursEnd],
+  );
 
   const [tithiTimePickerOpen, setTithiTimePickerOpen] = useState(false);
   const [festivalTimePickerOpen, setFestivalTimePickerOpen] = useState(false);
-  const [sadhanaTimePickerOpen, setSadhanaTimePickerOpen] = useState(false);
 
-  // Re-schedule the sadhana horizon when the toggle / time changes. Same
-  // debounce semantics as the tithi/festival reminders above, but a separate
-  // effect so the two namespaces don't interfere.
-  const sadhanaDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (sadhanaDebounceRef.current) clearTimeout(sadhanaDebounceRef.current);
-    sadhanaDebounceRef.current = setTimeout(() => {
-      void rescheduleSadhanaReminder({
-        enabled: sadhanaReminderEnabled,
-        timeHHmm: sadhanaReminderTime,
-        sadhana,
-        quietHours: quietHoursEnabled
-          ? { enabled: true, startHHmm: quietHoursStart, endHHmm: quietHoursEnd }
-          : undefined,
-      });
-    }, 300);
-    return () => {
-      if (sadhanaDebounceRef.current) clearTimeout(sadhanaDebounceRef.current);
-    };
-  }, [sadhanaReminderEnabled, sadhanaReminderTime, sadhana, quietHoursEnabled, quietHoursStart, quietHoursEnd]);
-
-  async function handleSadhanaToggle(val: boolean) {
-    if (val && !sadhanaReminderEnabled) {
-      const ok = await ensurePermission(t);
-      if (!ok) return;
-    }
-    setSadhanaReminderEnabled(val);
-  }
+  // Permission: every OFF → ON flip goes through the gate unless the last
+  // known state is already "granted" — not just the first reminder. It used to
+  // be checked only while no reminder was on, so once notifications had been
+  // switched off in the system Settings, turning on a second reminder
+  // "worked" here while nothing could ever fire. The gate shows the editorial
+  // pre-prompt and the OS dialog while the OS can still ask, and an "Open
+  // Settings" alert once it can't (iOS never asks twice). The toggle only
+  // commits on a grant, so a refusal leaves the switch off.
+  const {
+    granted: notificationsGranted,
+    ensurePermission,
+    prompt: permissionPrompt,
+  } = useNotificationPermissionGate();
 
   // Navratri context — `prefs.festival.major` triggers the 9-day Navratri
   // sequence, which needs panchang-compute inputs.
@@ -112,7 +98,7 @@ export default function RemindersScreen() {
         void rescheduleReminders(
           prefs,
           { tithi: tithiReminderTime, festival: festivalReminderTime },
-          undefined,
+          quietHours,
           { coords: userLocation, ayanamsa, masaSystem },
         );
       } else {
@@ -122,21 +108,15 @@ export default function RemindersScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [prefs, tithiReminderTime, festivalReminderTime, userLocation, ayanamsa, masaSystem]);
+  }, [prefs, tithiReminderTime, festivalReminderTime, quietHours, userLocation, ayanamsa, masaSystem]);
 
   async function handleTithiToggle(key: TithiReminderKey, val: boolean) {
-    if (val && !hasAnyReminderEnabled(prefs)) {
-      const ok = await ensurePermission(t);
-      if (!ok) return;
-    }
+    if (val && !notificationsGranted && !(await ensurePermission('tithi'))) return;
     setTithi(key, val);
   }
 
   async function handleFestivalToggle(key: FestivalReminderKey, val: boolean) {
-    if (val && !hasAnyReminderEnabled(prefs)) {
-      const ok = await ensurePermission(t);
-      if (!ok) return;
-    }
+    if (val && !notificationsGranted && !(await ensurePermission('festival'))) return;
     setFestival(key, val);
   }
 
@@ -144,19 +124,17 @@ export default function RemindersScreen() {
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
+        <MotionPressable
           onPress={() => router.back()}
           hitSlop={12}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
-          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          <Icon name="chevron-left" size={22} color={colors.textSecondary} />
+        </MotionPressable>
+        <Text variant="display" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('reminders.title')}
         </Text>
-        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
       <ScrollView
@@ -166,29 +144,6 @@ export default function RemindersScreen() {
         <Text variant="body-italic" style={[styles.intro, { color: colors.textTertiary }]}>
           {t('reminders.intro')}
         </Text>
-
-        {/* ── Sadhana practice (P14.4) ────────────────────────────────── */}
-        <SectionLabel style={styles.sectionLabelSpacing}>{t('reminders.sadhanaSection')}</SectionLabel>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ToggleRow
-            icon="flame"
-            label={t('reminders.sadhanaLabel')}
-            sublabel={t('reminders.sadhanaSublabel')}
-            value={sadhanaReminderEnabled}
-            onChange={handleSadhanaToggle}
-            colors={colors}
-            showDivider={sadhanaReminderEnabled}
-          />
-          {sadhanaReminderEnabled && (
-            <TimeRow
-              icon="clock"
-              label={t('reminders.sadhanaTimeLabel')}
-              value={formatDisplayTime(sadhanaReminderTime)}
-              onPress={() => setSadhanaTimePickerOpen(true)}
-              colors={colors}
-            />
-          )}
-        </View>
 
         {/* ── Tithi Reminders ─────────────────────────────────────────── */}
         <SectionLabel style={styles.sectionLabelSpacing}>{t('reminders.tithiSection')}</SectionLabel>
@@ -261,13 +216,7 @@ export default function RemindersScreen() {
         title={t('reminders.festivalTimePickerTitle')}
       />
 
-      <TimePickerModal
-        visible={sadhanaTimePickerOpen}
-        onClose={() => setSadhanaTimePickerOpen(false)}
-        value={sadhanaReminderTime}
-        onPick={setSadhanaReminderTime}
-        title={t('reminders.sadhanaTimePickerTitle')}
-      />
+      {permissionPrompt}
     </SafeAreaView>
     </ScreenMount>
   );
@@ -283,8 +232,7 @@ interface TimeRowProps {
 
 function TimeRow({ icon, label, value, onPress, colors }: TimeRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}>
@@ -300,19 +248,8 @@ function TimeRow({ icon, label, value, onPress, colors }: TimeRowProps) {
         </Text>
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function ensurePermission(t: (k: string) => string): Promise<boolean> {
-  const { requestNotificationPermission } = await import('@/services/notifications');
-  const granted = await requestNotificationPermission();
-  if (!granted) {
-    Alert.alert(t('settings.permissionRequired'), t('settings.permissionRequiredDesc'));
-  }
-  return granted;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -359,21 +296,12 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingTop: 6,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 22 },
+  headerTitle: { flex: 1, fontSize: 30, lineHeight: 40 },
 
   scroll: { paddingTop: 14, paddingBottom: 32 },
 

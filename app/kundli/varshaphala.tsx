@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   ALL_SAHAM_NAMES,
   GRAHA_ABBR,
@@ -15,6 +16,7 @@ import {
 } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
+import { grahaLabel } from '@/utils/grahaLabel';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
@@ -43,6 +45,18 @@ import {
 import { useStore } from '@/store/useStore';
 import { useLocaleFormatters } from '@/utils/format';
 
+/**
+ * Settings-facing label for a house system. `BhavaChart.system` is the raw
+ * union ('whole-sign' | 'equal' | 'placidus-kp'), and interpolating it into
+ * the cusps caption printed a lowercase code identifier — an English fragment
+ * inside a Devanagari sentence in Hindi.
+ */
+function houseSystemLabel(system: string, t: (k: string) => string): string {
+  if (system === 'equal') return t('settings.houseSystem.equal');
+  if (system === 'placidus-kp') return t('settings.houseSystem.placidusKp');
+  return t('settings.houseSystem.wholeSign');
+}
+
 type Mode = 'varshaphala' | 'tithiPravesha';
 
 const RASHI_NAMES_EN = [
@@ -54,6 +68,17 @@ const RASHI_NAMES_EN = [
 // 1-indexed yearAge that's currently in effect from `userBirthDate` so
 // the picker opens on a sensible default for most users.
 const SOLAR_YEAR_MS = 365.25636 * 86_400_000;
+
+// The longest realistic life span; matches the Vimshottari cap.
+const MAX_YEAR_AGE = 120;
+// panchang-ts validates every chart instant against a 1900-2100 astronomical
+// window, and both annual returns cast at an instant `yearAge` years after
+// birth — so the last castable return is bounded by the birth year, not just
+// by life span. Overshooting throws INVALID_DATE, which the cached helpers
+// swallow into `null` and the body then misreports as bad birth details.
+// The -1 keeps late-December births clear of the return instant rolling the
+// UTC year over.
+const LIB_MAX_YEAR = 2100;
 
 function deriveCurrentYearAge(birthIso: string | null): number {
   if (!birthIso) return 1;
@@ -106,22 +131,38 @@ export default function VarshaphalaScreen() {
     [userBirthDate, userBirthTime, userBirthPlace, ayanamsa, lang, houseSystem],
   );
 
+  // Highest return the library will actually cast for this birth date.
+  const maxYearAge = useMemo(
+    () =>
+      inputs
+        ? Math.max(1, Math.min(MAX_YEAR_AGE, LIB_MAX_YEAR - inputs.date.getUTCFullYear() - 1))
+        : MAX_YEAR_AGE,
+    [inputs],
+  );
+  // The derived default can never overflow (birth year + current age = this
+  // year), but a stored value from a wider bound would — clamp before use.
+  const effectiveYearAge = Math.min(yearAge, maxYearAge);
+
   // Both computes are gated on the same inputs + yearAge — only the active
   // mode pays the cost on render, but we let the cache hold the inactive
   // result so toggling stays instant on the second flip.
   const varsha = useMemo(
     () =>
-      mode === 'varshaphala' && inputs ? computeVarshaphalaCached(inputs, yearAge) : null,
-    [mode, inputs, yearAge],
+      mode === 'varshaphala' && inputs
+        ? computeVarshaphalaCached(inputs, effectiveYearAge)
+        : null,
+    [mode, inputs, effectiveYearAge],
   );
   const pravesha = useMemo(
     () =>
-      mode === 'tithiPravesha' && inputs ? computeTithiPraveshaCached(inputs, yearAge) : null,
-    [mode, inputs, yearAge],
+      mode === 'tithiPravesha' && inputs
+        ? computeTithiPraveshaCached(inputs, effectiveYearAge)
+        : null,
+    [mode, inputs, effectiveYearAge],
   );
 
   const headerTitle = t('kundli.varshaphala.headerTitle');
-  const accent = isDarkMode ? palette.goldLeaf : palette.sindoor;
+  const accent = colors.accent;
 
   if (!userBirthDate || !userBirthPlace) {
     return (
@@ -132,8 +173,8 @@ export default function VarshaphalaScreen() {
             <Text variant="body-italic" style={[styles.emptyText, { color: colors.textMuted }]}>
               {t('kundli.varshaphala.noBirthDetails')}
             </Text>
-            <TouchableOpacity
-              activeOpacity={0.85}
+            <MotionPressable
+              pressedScale={0.97}
               onPress={() => router.push('/settings')}
               style={[styles.emptyCta, { borderColor: colors.borderAccent }]}
               accessibilityRole="button"
@@ -142,7 +183,7 @@ export default function VarshaphalaScreen() {
               <Text variant="mono-caps" style={[styles.emptyCtaText, { color: colors.accent }]}>
                 {t('kundli.openSettings')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
         </SafeAreaView>
       </ScreenMount>
@@ -175,7 +216,7 @@ export default function VarshaphalaScreen() {
                   {
                     color:
                       mode === 'varshaphala'
-                        ? palette.parchmentBright
+                        ? palette.night
                         : colors.textSecondary,
                   },
                 ]}>
@@ -198,7 +239,7 @@ export default function VarshaphalaScreen() {
                   {
                     color:
                       mode === 'tithiPravesha'
-                        ? palette.parchmentBright
+                        ? palette.night
                         : colors.textSecondary,
                   },
                 ]}>
@@ -209,7 +250,8 @@ export default function VarshaphalaScreen() {
 
           {/* ── Year/age picker ────────────────────────────────────────── */}
           <YearAgePicker
-            value={yearAge}
+            value={effectiveYearAge}
+            max={maxYearAge}
             onChange={setYearAge}
             colors={colors}
             digits={digits}
@@ -220,7 +262,7 @@ export default function VarshaphalaScreen() {
           {mode === 'varshaphala' ? (
             <VarshaphalaBody
               data={varsha}
-              yearAge={yearAge}
+              yearAge={effectiveYearAge}
               rashiNames={rashiNames}
               colors={colors}
               plinth={plinth}
@@ -276,7 +318,7 @@ function Header({ title, colors, t }: HeaderProps) {
         styles.header,
         { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider },
       ]}>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.back()}
         hitSlop={12}
         style={[
@@ -286,7 +328,7 @@ function Header({ title, colors, t }: HeaderProps) {
         accessibilityRole="button"
         accessibilityLabel={t('a11y.back')}>
         <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </MotionPressable>
       <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
         {title}
       </Text>
@@ -297,17 +339,20 @@ function Header({ title, colors, t }: HeaderProps) {
 
 interface YearAgePickerProps {
   value: number;
+  /** Highest castable return for this birth date — see `maxYearAge`. */
+  max: number;
   onChange: (next: number) => void;
   colors: ColorPalette;
   digits: (s: string) => string;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function YearAgePicker({ value, onChange, colors, digits, t }: YearAgePickerProps) {
-  // Bound the picker at 1 (first solar return — yearAge is 1-indexed) and
-  // 120 (the longest realistic life span; matches the Vimshottari cap).
+function YearAgePicker({ value, max, onChange, colors, digits, t }: YearAgePickerProps) {
+  // Bound the picker at 1 (first solar return — yearAge is 1-indexed) and at
+  // `max`, the last return the library can still cast inside its 1900-2100
+  // window (never above the 120-year life-span cap).
   const dec = () => onChange(Math.max(1, value - 1));
-  const inc = () => onChange(Math.min(120, value + 1));
+  const inc = () => onChange(Math.min(max, value + 1));
   return (
     <View style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={{ flex: 1 }}>
@@ -318,7 +363,7 @@ function YearAgePicker({ value, onChange, colors, digits, t }: YearAgePickerProp
           {t('kundli.varshaphala.ageN', { n: digits(String(value)) })}
         </Text>
       </View>
-      <TouchableOpacity
+      <MotionPressable
         onPress={dec}
         disabled={value <= 1}
         hitSlop={10}
@@ -333,23 +378,23 @@ function YearAgePicker({ value, onChange, colors, digits, t }: YearAgePickerProp
         accessibilityRole="button"
         accessibilityLabel={t('kundli.varshaphala.decAge')}>
         <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
-      <TouchableOpacity
+      </MotionPressable>
+      <MotionPressable
         onPress={inc}
-        disabled={value >= 120}
+        disabled={value >= max}
         hitSlop={10}
         style={[
           styles.pickerBtn,
           {
             backgroundColor: colors.surfaceRecessed,
             borderColor: colors.border,
-            opacity: value >= 120 ? 0.4 : 1,
+            opacity: value >= max ? 0.4 : 1,
           },
         ]}
         accessibilityRole="button"
         accessibilityLabel={t('kundli.varshaphala.incAge')}>
         <Icon name="chevron-right" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </MotionPressable>
     </View>
   );
 }
@@ -403,7 +448,10 @@ function VarshaphalaBody({
     <>
       {/* ── Varsha Lagna + Year Lord NightCard ───────────────────────── */}
       <View style={styles.heroWrap}>
-        <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+        {/* mandalaSize 110, not 180: at 2.75 density a 180dp mandala rasterises
+            to a 495×495 ARGB_8888 software bitmap (~980KB) for a mark drawn at
+            8% opacity. 110dp is a 2.7× bitmap cut with no perceptible change. */}
+        <NightCard padding={20} mandalaSize={110} mandalaOpacity={0.08}>
           <Kicker color={plinth.accent} size={10}>
             {t('kundli.varshaphala.varshaLagnaLabel')}
           </Kicker>
@@ -421,7 +469,7 @@ function VarshaphalaBody({
             {t('kundli.varshaphala.yearLordLabel')}
           </Kicker>
           <Text variant="display-italic" style={[styles.heroYearLord, { color: plinth.text }]}>
-            {data.yearLord}
+            {grahaLabel(data.yearLord, t)}
           </Text>
           <Text variant="body-italic" style={[styles.heroYearLordMeta, { color: plinth.textMuted }]}>
             {t('kundli.varshaphala.yearLordBasis')}
@@ -451,7 +499,7 @@ function VarshaphalaBody({
         <View style={[styles.munthaDivider, { backgroundColor: colors.divider }]} />
         <MunthaRow
           label={t('kundli.varshaphala.munthaLord')}
-          value={data.muntha.lord}
+          value={grahaLabel(data.muntha.lord, t)}
           colors={colors}
         />
         <View style={[styles.munthaDivider, { backgroundColor: colors.divider }]} />
@@ -594,6 +642,10 @@ function TithiPraveshaBody({
       lang,
     );
   }, [data, lang]);
+  // Read the system the library actually applied, not the store setting — the
+  // two can differ (KP cusps force their own), and this is what decides whether
+  // the chart's whole-sign digit matches the tables below it.
+  const wholeSignHouses = data?.bhava.system === 'whole-sign';
 
   if (!data) {
     return (
@@ -604,8 +656,11 @@ function TithiPraveshaBody({
   }
 
   const lagnaRashiName = rashiNames[data.varshaLagna.rashi.index];
-  const tithiNum = (data.praveshTithi % 15) + 1;
-  const isShukla = data.praveshTithi < 15;
+  // The hero is labelled NATAL tithi, so read the natal field. The two agree
+  // except for a birth within ~1e-4° of a tithi boundary (panchang-ts 5.4
+  // documents it), where the return's own tithi is the neighbouring one.
+  const tithiNum = (data.natalTithi % 15) + 1;
+  const isShukla = data.natalTithi < 15;
   const returnDate = formatDateTime(data.praveshInstant);
   const returnDateLong = data.praveshInstant.toLocaleDateString(
     lang === 'hi' ? 'hi-IN' : 'en-IN',
@@ -616,7 +671,8 @@ function TithiPraveshaBody({
     <>
       {/* ── Pravesha Lagna NightCard ─────────────────────────────────── */}
       <View style={styles.heroWrap}>
-        <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+        {/* mandalaSize 110 for the same bitmap reason as the Varshaphala hero. */}
+        <NightCard padding={20} mandalaSize={110} mandalaOpacity={0.08}>
           <Kicker color={plinth.accent} size={10}>
             {t('kundli.tithiPravesha.praveshaLagnaLabel')}
           </Kicker>
@@ -670,7 +726,7 @@ function TithiPraveshaBody({
               styles.chartStyleChipText,
               {
                 color:
-                  chartStyle === 'north' ? palette.parchmentBright : colors.textSecondary,
+                  chartStyle === 'north' ? palette.night : colors.textSecondary,
               },
             ]}>
             {t('kundli.chartNorth')}
@@ -691,7 +747,7 @@ function TithiPraveshaBody({
               styles.chartStyleChipText,
               {
                 color:
-                  chartStyle === 'south' ? palette.parchmentBright : colors.textSecondary,
+                  chartStyle === 'south' ? palette.night : colors.textSecondary,
               },
             ]}>
             {t('kundli.chartSouth')}
@@ -701,10 +757,13 @@ function TithiPraveshaBody({
 
       {/* ── Chart ────────────────────────────────────────────────────── */}
       <View style={styles.chartWrap}>
+        {/* The digit is the whole-sign placement index; suppress it when the
+            chart was cast under another house system, or it contradicts the
+            cuspal house the table below prints for the same planet. */}
         {chartStyle === 'north' ? (
-          <NorthChart cells={cells} size={chartSize} />
+          <NorthChart cells={cells} size={chartSize} showHouseNumber={wholeSignHouses} />
         ) : (
-          <SouthChart cells={cells} size={chartSize} />
+          <SouthChart cells={cells} size={chartSize} showHouseNumber={wholeSignHouses} />
         )}
       </View>
 
@@ -733,7 +792,7 @@ function TithiPraveshaBody({
         ))}
       </View>
       <Text variant="body-italic" style={[styles.cuspsHint, { color: colors.textMuted }]}>
-        {t('kundli.tithiPravesha.cuspsHint', { system: data.bhava.system })}
+        {t('kundli.tithiPravesha.cuspsHint', { system: houseSystemLabel(data.bhava.system, t) })}
       </Text>
 
       {/* ── Planet placements ────────────────────────────────────────── */}
@@ -753,7 +812,7 @@ function TithiPraveshaBody({
             </Text>
             <View style={{ flex: 1 }}>
               <Text variant="body" style={[styles.planetName, { color: colors.textPrimary }]}>
-                {p.planet}
+                {grahaLabel(p.planet, t)}
                 {p.isRetrograde && p.planet !== 'Sun' && p.planet !== 'Moon' && (
                   <Text variant="mono-caps" style={[styles.planetRetro, { color: colors.accent }]}>
                     {'  '}· R

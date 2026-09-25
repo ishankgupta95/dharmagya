@@ -1,8 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, useWindowDimensions } from 'react-native';
+import {
+  AccessibilityInfo,
+  View,
+  TouchableWithoutFeedback,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -18,6 +25,9 @@ import { CornerBrackets } from './CornerBrackets';
 
 const PADDING = 6;
 const TOOLTIP_GAP = 16;
+// Android refuses accessibility focus on a fully transparent view, and the card
+// arrives behind a 300ms FadeIn. Ask for focus just after it has settled.
+const A11Y_FOCUS_DELAY_MS = 350;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -136,10 +146,41 @@ export function WalkthroughSpotlight({
   const tooltipReady = effectivePosition === 'below' || tooltipHeight > 0;
   const overlayReady = containerOffset !== null;
 
-  // Tooltip card: always on parchment-bright with paperEdge border + gold
-  // corner brackets. Editorial motif reads the same on either app theme —
-  // the walkthrough is a temporary overlay, so its surface doesn't need to
-  // match the underlying screen's palette.
+  // ── Screen-reader entry ──────────────────────────────────────────────────
+  // The overlay is the last sibling of its host screen, so left alone TalkBack
+  // would walk the whole dimmed screen before ever reaching this tooltip, with
+  // nothing to say that the walkthrough had opened. Pull accessibility focus
+  // onto the instruction as soon as the card is up; landing on it is itself the
+  // announcement, so there is no separate `announceForAccessibility` to avoid
+  // speaking the copy twice. The announce call is only the fallback for the
+  // case where the node never mounted.
+  const a11yTooltipLabel = `${title}. ${description}`;
+  const tooltipVisible = overlayReady && tooltipReady;
+  const tooltipCopyRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (!tooltipVisible) return;
+    const timer = setTimeout(() => {
+      const node = tooltipCopyRef.current;
+      if (node) {
+        // Fabric-safe focus move. `setAccessibilityFocus(reactTag)` is the
+        // pre-Fabric path and does not resolve a New-Architecture node.
+        AccessibilityInfo.sendAccessibilityEvent(node, 'focus');
+      } else {
+        AccessibilityInfo.announceForAccessibility(a11yTooltipLabel);
+      }
+    }, A11Y_FOCUS_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [tooltipVisible, a11yTooltipLabel]);
+
+  // Tooltip card: always on parchment-bright with paperEdge border +
+  // turmericInk corner brackets. Editorial motif reads the same on either app
+  // theme — the walkthrough is a temporary overlay, so its surface doesn't need
+  // to match the underlying screen's palette.
+  //
+  // Because the plinth is a hardcoded white, every mark on it is measured
+  // against white and never against the app theme: the accent has to be the
+  // turmericInk step (6.45:1), not turmeric (2.29:1).
   const cardBg = palette.parchmentBright;
   const cardBorder = palette.paperEdge;
   const cardTitleColor = palette.ink;
@@ -152,6 +193,13 @@ export function WalkthroughSpotlight({
       style={styles.root}
       pointerEvents="box-none"
       onLayout={measureSelf}
+      // Declares the overlay modal to the screen reader. RN 0.85 wires this on
+      // iOS only — there is no view-level Android equivalent — so on Android
+      // the screen behind stays reachable by swiping backwards out of the
+      // tooltip. Sealing it there needs `importantForAccessibility=
+      // "no-hide-descendants"` on the host screen's other children while the
+      // walkthrough is up; the focus move below is what fixes the entry point.
+      accessibilityViewIsModal
     >
     <Animated.View
       entering={FadeIn.duration(300)}
@@ -184,8 +232,19 @@ export function WalkthroughSpotlight({
         ]}
       />
 
-      {/* ── Touchable area over the spotlight ── */}
-      <TouchableWithoutFeedback onPress={onSpotlightTap ?? (() => {})}>
+      {/* ── Touchable area over the spotlight ──
+          On the step that advances by tapping the highlight, this is the only
+          way forward, so it has to stay reachable — labelled with the same
+          "Tap to continue" wording the card prints. The Next-driven steps pass
+          no handler and this layer exists only to swallow taps on the element
+          underneath; there it is an unlabelled dead end, so hide it instead. */}
+      <TouchableWithoutFeedback
+        onPress={onSpotlightTap ?? (() => {})}
+        accessible={onSpotlightTap != null}
+        accessibilityRole={onSpotlightTap ? 'button' : undefined}
+        accessibilityLabel={onSpotlightTap ? t('walkthrough.tapHighlighted') : undefined}
+        accessibilityElementsHidden={onSpotlightTap == null}
+        importantForAccessibility={onSpotlightTap ? 'yes' : 'no-hide-descendants'}>
         <View
           style={{
             position: 'absolute',
@@ -197,7 +256,7 @@ export function WalkthroughSpotlight({
         />
       </TouchableWithoutFeedback>
 
-      {/* ── Tooltip card — parchment-bright plinth with gold brackets ── */}
+      {/* ── Tooltip card — parchment-bright plinth with accent brackets ── */}
       <View
         style={[
           styles.tooltip,
@@ -217,7 +276,10 @@ export function WalkthroughSpotlight({
         }}
         pointerEvents="box-none"
       >
-        <CornerBrackets color={palette.goldLeaf} inset={8} length={14} />
+        {/* Override the component default (turmeric): that value is tuned for
+            the dark NightCards this motif normally sits on, and only reaches
+            2.29:1 on this white plinth — an ornament too faint to see. */}
+        <CornerBrackets color={palette.turmericInk} inset={8} length={14} />
 
         {/* Arrow pointing to spotlight */}
         {effectivePosition === 'below' && (
@@ -226,17 +288,23 @@ export function WalkthroughSpotlight({
           />
         )}
 
-        {/* Gold kicker — "Step 1 · of 4" */}
-        <Text variant="mono-caps" style={[styles.kicker, { color: palette.goldLeaf }]}>
+        {/* Step counter — "Step 1 · of 4" */}
+        <Text variant="mono-caps" style={[styles.kicker, { color: palette.turmericInk }]}>
           {t('walkthrough.stepCounter', { current: stepIndex + 1, total: totalSteps })}
         </Text>
 
-        <Text variant="display-italic" style={[styles.title, { color: cardTitleColor }]}>
-          {title}
-        </Text>
-        <Text variant="body-italic" style={[styles.desc, { color: cardBodyColor }]}>
-          {description}
-        </Text>
+        {/* Title + description are grouped into one accessibility node so the
+            focus move above lands on the whole instruction in a single stop.
+            Layout is untouched — a bare column View around two block children.
+            Skip / Next stay separate, individually focusable controls. */}
+        <View ref={tooltipCopyRef} accessible accessibilityLabel={a11yTooltipLabel}>
+          <Text variant="display-italic" style={[styles.title, { color: cardTitleColor }]}>
+            {title}
+          </Text>
+          <Text variant="body-italic" style={[styles.desc, { color: cardBodyColor }]}>
+            {description}
+          </Text>
+        </View>
 
         {/* Step dots */}
         <View style={styles.dotsRow}>
@@ -254,7 +322,7 @@ export function WalkthroughSpotlight({
 
         {/* Action row */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={onSkip}
             hitSlop={10}
             accessibilityRole="button"
@@ -262,13 +330,13 @@ export function WalkthroughSpotlight({
             <Text variant="mono-caps" style={[styles.skipText, { color: palette.inkQuiet }]}>
               {t('walkthrough.skip')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
 
           {onNext ? (
-            <TouchableOpacity
+            <MotionPressable
               onPress={onNext}
               style={[styles.nextBtn, { backgroundColor: palette.sindoor }]}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               accessibilityRole="button"
               accessibilityLabel={nextLabel ?? t('walkthrough.next')}
             >
@@ -276,7 +344,7 @@ export function WalkthroughSpotlight({
                 {nextLabel ?? t('walkthrough.next')}
               </Text>
               <Icon name="arrow-right" size={14} color={palette.parchmentBright} />
-            </TouchableOpacity>
+            </MotionPressable>
           ) : (
             <View style={[styles.tapHint, { borderColor: palette.sindoor }]}>
               <Icon name="hand" size={12} color={palette.sindoor} />

@@ -1,25 +1,27 @@
 import { useState, useMemo } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   FlatList,
   TextInput,
   Keyboard,
+  PixelRatio,
   ListRenderItemInfo,
   Alert,
 } from 'react-native';
-import { AppText as Text } from '@/components/common/AppText';
+import { AppText as Text, FONT_SCALE } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { Icon } from '@/components/common/Icon';
+import { StatusBar } from 'expo-status-bar';
 
 import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
-import { INDIAN_CITIES, type City } from '@/config/cities';
+import { INDIAN_CITIES, cityTimezone, type City } from '@/config/cities';
 import { MandalaWatermark } from '@/components/common/MandalaWatermark';
 import { Ornament } from '@/components/common/Ornament';
 import { regionFromStateCode } from '@/utils/regionFromLocation';
@@ -41,6 +43,20 @@ function findNearestCity(lat: number, lon: number): City | null {
   return best && bestDist < MAX_DEG * MAX_DEG ? best : null;
 }
 
+/**
+ * Fixed height for a city row, so `getItemLayout` can skip measurement across
+ * all 693 rows. It is derived rather than hard-coded because a constant that
+ * disagrees with the rendered row by even a fraction of a dp accumulates into
+ * a visible offset drift (and a jumping scrollbar) over that many rows: the
+ * row's text grows with BOTH the app's own font-size setting and the OS
+ * accessibility scale, so the same expression has to feed the style and
+ * `getItemLayout`. 26 = styles.cityRow's old paddingVertical × 2; 20 =
+ * styles.cityName's lineHeight, the tallest thing in the row.
+ */
+function cityRowHeight(scale: number) {
+  return 26 + Math.ceil(20 * scale);
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LocationPickerScreen() {
@@ -48,7 +64,10 @@ export default function LocationPickerScreen() {
   const { isDarkMode, setUserLocation, userLocation, locationName } = useStore();
   const region = useStore(s => s.region);
   const setRegion = useStore(s => s.setRegion);
+  const appFontSize = useStore(s => s.fontSize);
   const colors = isDarkMode ? darkColors : lightColors;
+
+  const rowHeight = cityRowHeight(FONT_SCALE[appFontSize] * PixelRatio.getFontScale());
 
   /** Auto-set the user's Region from a matched city's state code — but only
    *  when they haven't made a deliberate Settings choice yet (region === 'all').
@@ -82,12 +101,26 @@ export default function LocationPickerScreen() {
         const { latitude, longitude } = loc.coords;
         const match = findNearestCity(latitude, longitude);
         const name = match ? `${match.name}, ${match.state}` : t('common.gpsLabel');
+        // No timezone: the device is standing at these coordinates, so its own
+        // per-date offset is the correct one to render the panchang in.
         setUserLocation({ lat: latitude, lon: longitude }, name);
         if (match) maybeAutoSetRegion(match);
         router.back();
       } else {
         Alert.alert(t('locationPermission.gpsDenied'), t('locationPermission.gpsDeniedDesc'));
       }
+    } catch {
+      // `getCurrentPositionAsync` rejects for reasons that have nothing to do
+      // with permission — location services switched off, the Play-services
+      // "turn on location" dialog dismissed, or simply no fix obtainable
+      // indoors. Without this the promise rejected unhandled, the spinner
+      // stopped and the screen's primary action appeared to do nothing at all.
+      Alert.alert(
+        t('locationPermission.gpsFailed', { defaultValue: "Couldn't get your location" }),
+        t('locationPermission.gpsFailedDesc', {
+          defaultValue: 'Try again, or choose your city below.',
+        }),
+      );
     } finally {
       setGpsLoading(false);
     }
@@ -95,7 +128,12 @@ export default function LocationPickerScreen() {
 
   function handleSelectCity(city: City) {
     Keyboard.dismiss();
-    setUserLocation({ lat: city.lat, lon: city.lon }, `${city.name}, ${city.state}`);
+    // A chosen city is a place the user may be nowhere near, so it has to carry
+    // its own zone — otherwise its panchang renders on the phone's clock.
+    setUserLocation(
+      { lat: city.lat, lon: city.lon, timezone: cityTimezone(city) },
+      `${city.name}, ${city.state}`,
+    );
     maybeAutoSetRegion(city);
     router.back();
   }
@@ -108,23 +146,26 @@ export default function LocationPickerScreen() {
         Math.abs(userLocation.lon - item.lon) < 0.01);
 
     return (
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => handleSelectCity(item)}
-        activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.state}`}
         accessibilityState={{ selected: !!isActive }}
         style={[
           styles.cityRow,
-          { borderBottomColor: colors.divider },
+          { height: rowHeight, borderBottomColor: colors.divider },
           isActive && { backgroundColor: colors.accent + '14' },
         ]}>
+        {/* Single-line is what makes the row's fixed `height` safe: at the
+            Large font setting stacked on a raised OS text size the longest
+            city+state pair can exceed the row width, and a wrapped second line
+            would be clipped by the fixed height instead of growing the row. */}
         <View style={styles.cityInfo}>
-          <Text variant="body" style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
-          <Text variant="body-italic" style={[styles.cityState, { color: colors.textTertiary }]}>{item.state}</Text>
+          <Text variant="body" numberOfLines={1} style={[styles.cityName, { color: colors.textPrimary }]}>{item.name}</Text>
+          <Text variant="body-italic" numberOfLines={1} style={[styles.cityState, { color: colors.textTertiary }]}>{item.state}</Text>
         </View>
         {isActive && <Icon name="check-circle" size={18} color={colors.accent} />}
-      </TouchableOpacity>
+      </MotionPressable>
     );
   }
 
@@ -132,6 +173,10 @@ export default function LocationPickerScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+      {/* This screen is pushed from onboarding, which pins a light status bar
+          on its own dark ground. Nothing restores it on the way in, so state
+          it explicitly or the clock/battery vanish on a light-themed phone. */}
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Editorial mandala watermark behind the GPS + search block */}
       <View style={styles.watermarkWrap} pointerEvents="none">
@@ -146,14 +191,14 @@ export default function LocationPickerScreen() {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={() => router.back()}
           style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
           <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </MotionPressable>
         <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
           {t('locationPermission.title')}
         </Text>
@@ -171,9 +216,9 @@ export default function LocationPickerScreen() {
 
       {/* ── GPS Button ────────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: spacing.screenH, paddingTop: 14, paddingBottom: 8 }}>
-        <TouchableOpacity
+        <MotionPressable
           onPress={handleUseGPS}
-          activeOpacity={0.85}
+          pressedScale={0.97}
           disabled={gpsLoading}
           style={[styles.gpsBtn, { backgroundColor: palette.sindoor, opacity: gpsLoading ? 0.7 : 1 }]}
           accessibilityRole="button"
@@ -189,7 +234,7 @@ export default function LocationPickerScreen() {
               </Text>
             </>
           )}
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
 
       {/* ── Divider with lotus ornament ───────────────────────────────── */}
@@ -205,7 +250,7 @@ export default function LocationPickerScreen() {
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Fraunces_400Regular_Italic' }]}
+            style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Geist_400Regular' }]}
             placeholder={t('locationPermission.searchPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             value={query}
@@ -215,13 +260,13 @@ export default function LocationPickerScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={t('a11y.clearSearch')}>
               <Icon name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           )}
         </View>
       </View>
@@ -231,6 +276,16 @@ export default function LocationPickerScreen() {
         data={filtered}
         keyExtractor={(item) => item.name}
         renderItem={renderCity}
+        // 693 cities: the default windowSize={21} realizes ~315 of them around
+        // a ~46 dp row. 9 keeps roughly four screens' worth mounted, which is
+        // still ahead of any flick, and getItemLayout means the rest cost
+        // nothing to place.
+        windowSize={9}
+        getItemLayout={(_, index) => ({
+          length: rowHeight,
+          offset: rowHeight * index,
+          index,
+        })}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 32 }}
         ListEmptyComponent={
@@ -315,13 +370,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 13,
+    // Vertical padding is folded into the `height` the row is rendered with
+    // (see cityRowHeight) — `alignItems: center` centres the label in it, so
+    // the row looks identical while staying exactly the height getItemLayout
+    // promises.
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderRadius: 6,
   },
-  cityInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  cityName: { fontSize: 15, lineHeight: 20 },
+  // flexShrink lets the label give way to the check icon rather than overflow;
+  // without it `numberOfLines` has no constrained width to ellipsize against.
+  cityInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 },
+  cityName: { fontSize: 15, lineHeight: 20, flexShrink: 1 },
   cityState: { fontSize: 12, lineHeight: 16 },
 
   // Empty

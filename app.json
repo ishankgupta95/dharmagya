@@ -2,30 +2,87 @@
   "expo": {
     "name": "dharmagya",
     "slug": "dharmSetu",
-    "version": "1.9.1",
+    "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/dharmagya_logo_small.png",
+    "icon": "./assets/images/dharmagya_logo.png",
     "scheme": "dharmagya",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.ishank1995.dharmagya"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ishank1995.dharmagya",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "appleTeamId": "UXDRZS84TX",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.ishank1995.dharmagya"
+        ]
+      },
+      "icon": "./assets/images/ios-icon.png",
+      "infoPlist": {
+        "CFBundleDisplayName": "Dharmagya",
+        "CFBundleAllowMixedLocalizations": true
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1",
+              "1C8F.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "35F9.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "E174.1"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/dharmagya_logo_small.png"
+        "backgroundColor": "#171220",
+        "foregroundImage": "./assets/images/dharmagya_logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.ishank1995.dharmagya",
-      "versionCode": 13
+      "versionCode": 14,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/dharmagya_logo_small.png"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "sitemap": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -39,9 +96,9 @@
           "image": "./assets/images/dharmagya_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#F8F4F2",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#171220"
           }
         }
       ],
@@ -50,16 +107,119 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3308993640799405~9721445524",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "skAdNetworkItems": [
+            "cstr6suwn9.skadnetwork",
+            "4fzdc2evr5.skadnetwork",
+            "2fnua5tdw4.skadnetwork",
+            "ydx93a7ass.skadnetwork",
+            "p78axxw29g.skadnetwork",
+            "v72qych5uu.skadnetwork",
+            "ludvb6z3bs.skadnetwork",
+            "cp8zw746q7.skadnetwork",
+            "3sh42y64q3.skadnetwork",
+            "c6k4g5qg8m.skadnetwork",
+            "s39g8k73mm.skadnetwork",
+            "wg4vff78zm.skadnetwork",
+            "3qy4746246.skadnetwork",
+            "f38h382jlk.skadnetwork",
+            "hs6bdukanm.skadnetwork",
+            "mlmmfzh3r3.skadnetwork",
+            "v4nxqhlyqp.skadnetwork",
+            "wzmmz9fp6w.skadnetwork",
+            "su67r6k2v3.skadnetwork",
+            "yclnxrl5pm.skadnetwork",
+            "t38b2kh725.skadnetwork",
+            "7ug5zh24hu.skadnetwork",
+            "gta9lk7p23.skadnetwork",
+            "vutu7akeur.skadnetwork",
+            "y5ghdn5j9k.skadnetwork",
+            "v9wttpbfk9.skadnetwork",
+            "n38lu8286q.skadnetwork",
+            "47vhws6wlr.skadnetwork",
+            "kbd757ywx3.skadnetwork",
+            "9t245vhmpl.skadnetwork",
+            "a2p9lx4jpn.skadnetwork",
+            "22mmun2rn5.skadnetwork",
+            "44jx6755aq.skadnetwork",
+            "k674qkevps.skadnetwork",
+            "4468km3ulz.skadnetwork",
+            "2u9pt9hc89.skadnetwork",
+            "8s468mfl3y.skadnetwork",
+            "klf5c3l5u5.skadnetwork",
+            "ppxm28t8ap.skadnetwork",
+            "kbmxgpxpgc.skadnetwork",
+            "uw77j35x4d.skadnetwork",
+            "578prtvx9j.skadnetwork",
+            "4dzt52r2t5.skadnetwork",
+            "tl55sbb4fm.skadnetwork",
+            "c3frkrj4fj.skadnetwork",
+            "e5fvkxwrpn.skadnetwork",
+            "8c4e2ghe7u.skadnetwork",
+            "3rd42ekr43.skadnetwork",
+            "97r2b46745.skadnetwork",
+            "3qcr597p9d.skadnetwork"
+          ]
         }
       ],
-      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Dharmagya uses your location only to calculate sunrise, sunset and today's panchang timings for where you are. It stays on your device — you can also choose your city manually.",
+          "locationAlwaysAndWhenInUsePermission": "Dharmagya uses your location only while you use the app, to calculate sunrise, sunset and panchang timings for where you are.",
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "hi"
+            ],
+            "android": [
+              "en",
+              "hi"
+            ]
+          }
+        }
+      ],
       "react-native-edge-to-edge",
       "@react-native-community/datetimepicker",
       "./plugins/withTodayPanchangWidget",
-      "expo-font",
-      "expo-sharing",
-      "expo-status-bar"
+      "./plugins/withWidgetDeviceFamily",
+      "@bacons/apple-targets",
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              "node_modules/@expo-google-fonts/geist/200ExtraLight/Geist_200ExtraLight.ttf",
+              "node_modules/@expo-google-fonts/geist/300Light/Geist_300Light.ttf",
+              "node_modules/@expo-google-fonts/geist/400Regular/Geist_400Regular.ttf",
+              "node_modules/@expo-google-fonts/geist/500Medium/Geist_500Medium.ttf",
+              "node_modules/@expo-google-fonts/geist/600SemiBold/Geist_600SemiBold.ttf",
+              "node_modules/@expo-google-fonts/noto-serif-devanagari/500Medium/NotoSerifDevanagari_500Medium.ttf",
+              "node_modules/@expo-google-fonts/noto-serif-devanagari/600SemiBold/NotoSerifDevanagari_600SemiBold.ttf"
+            ]
+          }
+        }
+      ],
+      "expo-status-bar",
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "extraProguardRules": "# The local Expo module and the widget provider are both resolved by\n# NAME rather than by a direct reference — expo-modules-core\n# instantiates modules reflectively, and the AppWidgetProvider is only\n# named in AndroidManifest.xml. R8 breakage in either surfaces as a\n# runtime crash, not a build failure.\n-keep class expo.modules.widgetdata.** { *; }\n-keep class com.ishank1995.dharmagya.widget.** { *; }\n\n# Mirrors the generated proguard-rules.pro, which prebuild rewrites.\n-keep class com.swmansion.reanimated.** { *; }\n-keep class com.facebook.react.turbomodule.** { *; }"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -69,8 +229,14 @@
       "router": {},
       "eas": {
         "projectId": "d52dbe9d-4258-446f-a902-32e801d580a9"
+      },
+      "releaseNotes": {
+        "iosTablet": "v1 is iPhone-only (supportsTablet: false -> TARGETED_DEVICE_FAMILY=1): no tablet layouts exist, iPad multitasking/landscape is untested, and 13-inch iPad screenshots would become mandatory in App Store Connect. iPad still installs in iPhone-compatibility mode."
       }
     },
-    "owner": "ishank1995"
+    "owner": "ishank1995",
+    "locales": {
+      "hi": "./locales/ios-hi.json"
+    }
   }
 }

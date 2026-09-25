@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { GRAHA_ABBR, type BirthChart, type GrahaName, type Language } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
+import { grahaLabel } from '@/utils/grahaLabel';
 import { Icon } from '@/components/common/Icon';
 import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
@@ -17,6 +18,7 @@ import { TimePickerModal } from '@/components/common/TimePickerModal';
 import { NorthChart } from '@/components/kundli/NorthChart';
 import { SouthChart } from '@/components/kundli/SouthChart';
 import { cellsFromLagnaPlanets } from '@/components/kundli/chartCells';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   borderRadius,
   darkColors,
@@ -31,6 +33,18 @@ import { computePrashnaChartCached } from '@/services/astrology/kundliService';
 import { useStore } from '@/store/useStore';
 import { useLocaleFormatters } from '@/utils/format';
 import { ymd } from '@/utils/calendar';
+
+/**
+ * Settings-facing label for a house system. `BhavaChart.system` is the raw
+ * union ('whole-sign' | 'equal' | 'placidus-kp'), and interpolating it into
+ * the cusps caption printed a lowercase code identifier — an English fragment
+ * inside a Devanagari sentence in Hindi.
+ */
+function houseSystemLabel(system: string, t: (k: string) => string): string {
+  if (system === 'equal') return t('settings.houseSystem.equal');
+  if (system === 'placidus-kp') return t('settings.houseSystem.placidusKp');
+  return t('settings.houseSystem.wholeSign');
+}
 
 const RASHI_NAMES_EN = [
   'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
@@ -106,7 +120,7 @@ export default function PrashnaScreen() {
   }, [queryDateIso]);
 
   const headerTitle = t('kundli.prashna.headerTitle');
-  const accent = isDarkMode ? palette.goldLeaf : palette.sindoor;
+  const accent = colors.accent;
   const canCast = !!queryLocation;
 
   const onCast = () => {
@@ -186,8 +200,8 @@ export default function PrashnaScreen() {
           </View>
 
           {/* ── Cast button ──────────────────────────────────────────────── */}
-          <TouchableOpacity
-            activeOpacity={0.85}
+          <MotionPressable
+            pressedScale={0.97}
             onPress={onCast}
             disabled={!canCast}
             style={[
@@ -203,17 +217,17 @@ export default function PrashnaScreen() {
             <Icon
               name="compass"
               size={18}
-              color={canCast ? palette.parchmentBright : colors.textMuted}
+              color={canCast ? palette.night : colors.textMuted}
             />
             <Text
               variant="mono-caps"
               style={[
                 styles.castBtnText,
-                { color: canCast ? palette.parchmentBright : colors.textMuted },
+                { color: canCast ? palette.night : colors.textMuted },
               ]}>
               {t('kundli.prashna.castCta')}
             </Text>
-          </TouchableOpacity>
+          </MotionPressable>
 
           {/* ── Result body ──────────────────────────────────────────────── */}
           {chart ? (
@@ -282,7 +296,7 @@ function Header({ title, colors, t }: HeaderProps) {
         styles.header,
         { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider },
       ]}>
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.back()}
         hitSlop={12}
         style={[
@@ -292,7 +306,7 @@ function Header({ title, colors, t }: HeaderProps) {
         accessibilityRole="button"
         accessibilityLabel={t('a11y.back')}>
         <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </MotionPressable>
       <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
         {title}
       </Text>
@@ -311,8 +325,7 @@ interface FormFieldRowProps {
 
 function FormFieldRow({ icon, label, value, onPress, colors }: FormFieldRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <MotionPressable
       onPress={onPress}
       style={styles.formRow}
       accessibilityRole="button"
@@ -329,7 +342,7 @@ function FormFieldRow({ icon, label, value, onPress, colors }: FormFieldRowProps
         </Text>
       </View>
       <Icon name="chevron-right" size={14} color={colors.textMuted} />
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -364,13 +377,20 @@ function PrashnaResult({
     () => cellsFromLagnaPlanets(chart.lagna.rashi.index, chart.planets, lang),
     [chart, lang],
   );
+  // Read the system the library actually applied, not the store setting — the
+  // two can differ (KP cusps force their own), and this is what decides whether
+  // the chart's whole-sign digit matches the tables below it.
+  const wholeSignHouses = chart.bhava.system === 'whole-sign';
   const lagnaRashiName = rashiNames[chart.lagna.rashi.index];
 
   return (
     <>
       {/* ── Prashna Lagna NightCard ────────────────────────────────────── */}
       <View style={styles.heroWrap}>
-        <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
+        {/* mandalaSize 110, not 180: at 2.75 density a 180dp mandala rasterises
+            to a 495×495 ARGB_8888 software bitmap (~980KB) for a mark drawn at
+            8% opacity. 110dp is a 2.7× bitmap cut with no perceptible change. */}
+        <NightCard padding={20} mandalaSize={110} mandalaOpacity={0.08}>
           <Kicker color={plinth.accent} size={10}>
             {t('kundli.prashna.prashnaLagnaLabel')}
           </Kicker>
@@ -399,7 +419,7 @@ function PrashnaResult({
             variant="mono-caps"
             style={[
               styles.chartStyleChipText,
-              { color: chartStyle === 'north' ? palette.parchmentBright : colors.textSecondary },
+              { color: chartStyle === 'north' ? palette.night : colors.textSecondary },
             ]}>
             {t('kundli.chartNorth')}
           </Text>
@@ -417,7 +437,7 @@ function PrashnaResult({
             variant="mono-caps"
             style={[
               styles.chartStyleChipText,
-              { color: chartStyle === 'south' ? palette.parchmentBright : colors.textSecondary },
+              { color: chartStyle === 'south' ? palette.night : colors.textSecondary },
             ]}>
             {t('kundli.chartSouth')}
           </Text>
@@ -426,10 +446,13 @@ function PrashnaResult({
 
       {/* ── Chart ──────────────────────────────────────────────────────── */}
       <View style={styles.chartWrap}>
+        {/* The digit is the whole-sign placement index; suppress it when the
+            chart was cast under another house system, or it contradicts the
+            cuspal house the table below prints for the same planet. */}
         {chartStyle === 'north' ? (
-          <NorthChart cells={cells} size={chartSize} />
+          <NorthChart cells={cells} size={chartSize} showHouseNumber={wholeSignHouses} />
         ) : (
-          <SouthChart cells={cells} size={chartSize} />
+          <SouthChart cells={cells} size={chartSize} showHouseNumber={wholeSignHouses} />
         )}
       </View>
 
@@ -458,7 +481,7 @@ function PrashnaResult({
         ))}
       </View>
       <Text variant="body-italic" style={[styles.cuspsHint, { color: colors.textMuted }]}>
-        {t('kundli.prashna.cuspsHint', { system: chart.bhava.system })}
+        {t('kundli.prashna.cuspsHint', { system: houseSystemLabel(chart.bhava.system, t) })}
       </Text>
 
       {/* ── Planets at the query moment ─────────────────────────────────── */}
@@ -478,7 +501,7 @@ function PrashnaResult({
             </Text>
             <View style={{ flex: 1 }}>
               <Text variant="body" style={[styles.planetName, { color: colors.textPrimary }]}>
-                {p.planet}
+                {grahaLabel(p.planet, t)}
                 {p.isRetrograde && p.planet !== 'Sun' && p.planet !== 'Moon' && (
                   <Text variant="mono-caps" style={[styles.planetRetro, { color: colors.accent }]}>
                     {'  '}· R

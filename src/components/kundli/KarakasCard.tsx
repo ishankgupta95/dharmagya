@@ -10,8 +10,8 @@ import {
 } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
+import { grahaLabel } from '@/utils/grahaLabel';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
-import { useStore } from '@/store/useStore';
 import { borderRadius, palette, type ColorPalette } from '@/config/theme';
 
 interface KarakasCardProps {
@@ -59,14 +59,13 @@ export const KarakasCard = memo(function KarakasCard({
   colors,
 }: KarakasCardProps) {
   const { t } = useTranslation();
-  const isDarkMode = useStore((s) => s.isDarkMode);
   // Default to the Parashara 7-variant — matches the historical pre-4.1
   // surface, and most users have no tradition preference. The 8-variant is
   // surfaced for users (Sanjay Rath / Komilla Sutton / Sarvatobhadra
   // traditions) who do.
   const [variant, setVariant] = useState<Variant>('7-parashara');
 
-  const activeBg = isDarkMode ? palette.goldLeaf : palette.sindoor;
+  const activeBg = colors.accent;
   const order = variant === '8-jaimini' ? KARAKA_ORDER_8 : KARAKA_ORDER_7;
   const data: Record<string, string> = variant === '8-jaimini' ? karakas8 : karakas;
 
@@ -88,7 +87,7 @@ export const KarakasCard = memo(function KarakasCard({
               styles.toggleChipText,
               {
                 color:
-                  variant === '7-parashara' ? palette.parchmentBright : colors.textSecondary,
+                  variant === '7-parashara' ? palette.night : colors.textSecondary,
               },
             ]}>
             {t('kundli.karakas.variant7')}
@@ -109,7 +108,7 @@ export const KarakasCard = memo(function KarakasCard({
               styles.toggleChipText,
               {
                 color:
-                  variant === '8-jaimini' ? palette.parchmentBright : colors.textSecondary,
+                  variant === '8-jaimini' ? palette.night : colors.textSecondary,
               },
             ]}>
             {t('kundli.karakas.variant8')}
@@ -130,7 +129,7 @@ export const KarakasCard = memo(function KarakasCard({
               <View style={{ flex: 1 }}>
                 <Text
                   variant="mono-caps"
-                  style={[styles.role, { color: isAtmakaraka ? colors.accent : colors.textTertiary }]}>
+                  style={[styles.role, { color: isAtmakaraka ? colors.accentText : colors.textTertiary }]}>
                   {role}
                 </Text>
                 <Text variant="body-italic" style={[styles.roleSub, { color: colors.textMuted }]}>
@@ -139,7 +138,7 @@ export const KarakasCard = memo(function KarakasCard({
               </View>
               <View style={styles.grahaCol}>
                 <Text variant="body" style={[styles.grahaName, { color: colors.textPrimary }]}>
-                  {graha}
+                  {grahaLabel(graha, t)}
                 </Text>
                 <Text variant="mono-caps" style={[styles.grahaAbbr, { color: colors.textTertiary }]}>
                   {GRAHA_ABBR[graha]}

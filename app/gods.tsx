@@ -1,0 +1,377 @@
+import { useState, useCallback, useMemo, memo } from 'react';
+import {
+  View,
+  FlatList,
+  TextInput,
+  StyleSheet,
+  type ListRenderItemInfo,
+} from 'react-native';
+import { MotionPressable } from '@/components/common/MotionPressable';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AppText as Text } from '@/components/common/AppText';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Icon } from '@/components/common/Icon';
+import { useTranslation } from 'react-i18next';
+
+import { useStore } from '@/store/useStore';
+import {
+  darkColors,
+  lightColors,
+  palette,
+  spacing,
+  typeScale,
+  type ColorPalette,
+} from '@/config/theme';
+import { Ornament } from '@/components/common/Ornament';
+import { ScreenMount } from '@/components/common/ScreenMount';
+import { AdBanner } from '@/components/common/AdBanner';
+import { ALL_DEITIES, type DeityMeta } from '@/config/deities';
+import { getDeityImageSmall } from '@/config/deityImages';
+import { getAllAppAartis, getAllAppChalisas } from '@/services/content';
+
+/**
+ * Gods — the 19-deity grid, on its own pushed screen (P16.5 follow-up). It was
+ * folded inline into the Library tab, but that made the tab very long to scroll;
+ * the Library now links here from a single "All Gods" row.
+ */
+
+// ─── Content counts (computed once at module load) ──────────────────────────
+const COUNTS: Record<string, { aartis: number; chalisas: number }> = (() => {
+  const acc: Record<string, { aartis: number; chalisas: number }> = {};
+  for (const a of getAllAppAartis()) {
+    const c = (acc[a.deity] ??= { aartis: 0, chalisas: 0 });
+    c.aartis += 1;
+  }
+  for (const c of getAllAppChalisas()) {
+    const e = (acc[c.deity] ??= { aartis: 0, chalisas: 0 });
+    e.chalisas += 1;
+  }
+  return acc;
+})();
+
+const COLUMN_GAP = 10;
+
+export default function GodsScreen() {
+  const isDarkMode = useStore(s => s.isDarkMode);
+  const colors = isDarkMode ? darkColors : lightColors;
+  const { t } = useTranslation();
+
+  const [query, setQuery] = useState('');
+
+  const filteredDeities = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return ALL_DEITIES;
+    return ALL_DEITIES.filter(d => {
+      const tagline = (t(`deities.${d.id}.description`) as string).toLowerCase();
+      const display = (t(`deities.${d.id}.displayName`) as string).toLowerCase();
+      return (
+        d.name.toLowerCase().includes(q) ||
+        d.nameHindi.includes(q) ||
+        display.includes(q) ||
+        tagline.includes(q)
+      );
+    });
+  }, [query, t]);
+
+  const renderDeity = useCallback(
+    ({ item }: ListRenderItemInfo<DeityMeta>) => (
+      <View style={styles.cardCell}>
+        <DeityCard deity={item} colors={colors} />
+      </View>
+    ),
+    [colors]
+  );
+
+  return (
+    <ScreenMount>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
+        <MotionPressable
+          onPress={() => router.back()}
+          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
+        </MotionPressable>
+        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          {t('tabs.gods')}
+        </Text>
+        <View style={[styles.backPill, { borderWidth: 0 }]} />
+      </View>
+
+      <FlatList
+        data={filteredDeities}
+        keyExtractor={(item) => item.id}
+        renderItem={renderDeity}
+        numColumns={2}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.screenH }]}
+        columnWrapperStyle={styles.columnWrapper}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View
+            style={[
+              styles.searchBar,
+              { backgroundColor: colors.surface, borderColor: colors.borderAccent },
+            ]}>
+            <Icon name="search" size={16} color={colors.textTertiary} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('library.searchPlaceholder') as string}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.searchInput, { color: colors.textPrimary, ...typeScale.bodyItalic }]}
+              returnKeyType="search"
+              autoCorrect={false}
+            />
+            {query.length > 0 && (
+              <MotionPressable
+                onPress={() => setQuery('')}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.clearSearch')}>
+                <Icon name="close-circle" size={16} color={colors.textMuted} />
+              </MotionPressable>
+            )}
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <View style={styles.emptyOrnament}>
+              <Ornament variant="lotus" color={colors.emphasis} size={14} />
+            </View>
+            <Text variant="body-italic" style={[styles.emptyText, { color: colors.textTertiary }]}>
+              {t('library.emptyForQuery', { query: query.trim() })}
+            </Text>
+          </View>
+        }
+      />
+
+      <AdBanner colors={colors} placement="libraryGodsInline" />
+    </SafeAreaView>
+    </ScreenMount>
+  );
+}
+
+// ─── Deity card ─────────────────────────────────────────────────────────────
+
+interface DeityCardProps {
+  deity: DeityMeta;
+  colors: ColorPalette;
+}
+
+const DeityCard = memo(function DeityCard({ deity, colors }: DeityCardProps) {
+  const { t, i18n } = useTranslation();
+  const counts = COUNTS[deity.id] ?? { aartis: 0, chalisas: 0 };
+  const image = getDeityImageSmall(deity.id);
+
+  const gradientColors = useMemo(
+    () =>
+      image
+        ? [`${deity.color}00`, `${deity.color}66`] as const
+        : [`${deity.color}E6`, `${deity.color}55`] as const,
+    [deity.color, image]
+  );
+
+  const pillText = useMemo(() => {
+    const parts: string[] = [];
+    if (counts.aartis > 0) parts.push(t('library.countAartis', { count: counts.aartis }));
+    if (counts.chalisas > 0) parts.push(t('library.countChalisas', { count: counts.chalisas }));
+    if (parts.length === 0) parts.push(t('library.countNone') as string);
+    return parts.join(' · ');
+  }, [counts.aartis, counts.chalisas, t]);
+
+  const tagline = t(`deities.${deity.id}.description`) as string;
+  const isHindi = i18n.language?.startsWith('hi');
+
+  return (
+    <MotionPressable
+      pressedScale={0.97}
+      onPress={() => router.push(`/god/${deity.id}`)}
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.borderAccent },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={t('a11y.openDeity', { name: t(`deities.${deity.id}.displayName`) })}>
+
+      <View style={[styles.portrait, !image && { backgroundColor: deity.color + '22' }]}>
+        {image && (
+          <Image
+            source={image}
+            style={styles.portraitImage}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+          />
+        )}
+        <LinearGradient
+          colors={gradientColors}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <View style={styles.haloOuter} pointerEvents="none" />
+        <View style={styles.haloInner} pointerEvents="none" />
+        {!image && (
+          <Text variant="deva-bold" style={styles.portraitInitial}>
+            {deity.initial}
+          </Text>
+        )}
+      </View>
+
+      <View style={styles.info}>
+        <Text style={[styles.name, { color: colors.textPrimary }]} numberOfLines={1}>
+          {t(`deities.${deity.id}.displayName`)}
+        </Text>
+        <Text
+          variant={isHindi ? 'deva' : 'body-italic'}
+          style={[styles.tagline, { color: colors.textTertiary }]}
+          numberOfLines={2}>
+          {tagline}
+        </Text>
+        <Text
+          variant="mono-caps"
+          style={[styles.pill, { color: colors.accentText }]}
+          numberOfLines={1}>
+          {pillText}
+        </Text>
+      </View>
+    </MotionPressable>
+  );
+});
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { flex: 1, fontSize: 22, lineHeight: 28, textAlign: 'center' },
+
+  listContent: { paddingTop: 14, paddingBottom: 32 },
+  columnWrapper: { gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
+
+  // Search
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    padding: 0,
+  },
+
+  // Cards
+  cardCell: { flex: 1, maxWidth: '50%' },
+  card: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  portrait: {
+    height: 132,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  portraitImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  haloInner: {
+    position: 'absolute',
+    top: 8,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 1,
+    borderColor: 'rgba(251,243,222,0.40)',
+  },
+  haloOuter: {
+    position: 'absolute',
+    top: 4,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(251,243,222,0.28)',
+  },
+  portraitInitial: {
+    fontSize: 38,
+    lineHeight: 44,
+    color: palette.parchmentBright,
+    textShadowColor: 'rgba(20,10,4,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+  },
+
+  info: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 4,
+  },
+  name: {
+    ...typeScale.bodySerif,
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  tagline: {
+    fontSize: 11.5,
+    lineHeight: 15,
+  },
+  pill: {
+    fontSize: 8.5,
+    marginTop: 4,
+  },
+
+  emptyState: {
+    paddingTop: 36,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 14,
+  },
+  emptyOrnament: { width: 120 },
+  emptyText: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+});

@@ -11,6 +11,7 @@ import {
 } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
+import { grahaLabel } from '@/utils/grahaLabel';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { borderRadius, palette, type ColorPalette } from '@/config/theme';
 import { useLocaleFormatters } from '@/utils/format';
@@ -36,7 +37,6 @@ interface AdvancedPointsCardProps {
   /** Cached `computeSpecialLagnasCached` output, or null on compute failure. */
   specialLagnas: SpecialLagnas | null;
   colors: ColorPalette;
-  isDarkMode: boolean;
 }
 
 // 7 upagrahas in classical order (Gulika first per the BPHS / Phaladeepika
@@ -66,13 +66,12 @@ export const AdvancedPointsCard = memo(function AdvancedPointsCard({
   upagrahas,
   specialLagnas,
   colors,
-  isDarkMode,
 }: AdvancedPointsCardProps) {
   const { t } = useTranslation();
   const { formatNumber, digits } = useLocaleFormatters();
   const language = useStore((s) => s.language);
   const lang = resolveLanguage(language);
-  const accent = isDarkMode ? palette.goldLeaf : palette.sindoor;
+  const accent = colors.accent;
 
   return (
     <View>
@@ -103,7 +102,7 @@ export const AdvancedPointsCard = memo(function AdvancedPointsCard({
                   variant="mono-caps"
                   style={[
                     styles.padaBadgeText,
-                    { color: isAL ? palette.parchmentBright : colors.textTertiary },
+                    { color: isAL ? palette.night : colors.textTertiary },
                   ]}>
                   {label}
                 </Text>
@@ -113,7 +112,7 @@ export const AdvancedPointsCard = memo(function AdvancedPointsCard({
                   {a.arudhaRashiName}
                 </Text>
                 <Text variant="mono" style={[styles.tableMeta, { color: colors.textMuted }]}>
-                  {t('kundli.advancedPoints.arudhaLordPrefix')} · {a.arudhaLord}
+                  {t('kundli.advancedPoints.arudhaLordPrefix')} · {grahaLabel(a.arudhaLord, t)}
                 </Text>
               </View>
             </View>

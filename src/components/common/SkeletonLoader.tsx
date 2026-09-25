@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -15,6 +15,18 @@ import { easings } from '@/config/motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 // ─── Base shimmer block ───────────────────────────────────────────────────────
+
+/** Width of the moving highlight band, and how long one pass takes. Shared by
+ *  the per-block shimmer and the card-wide sweep so both read identically. */
+const SWEEP_WIDTH = 200;
+const SWEEP_MS = 1400;
+
+const sweep = StyleSheet.create({
+  band: { width: SWEEP_WIDTH, height: '100%' },
+  // Clips the travelling band to the card bounds. Overflow-only, so the
+  // skeleton's measured layout is unchanged.
+  clip: { overflow: 'hidden' },
+});
 
 interface SkeletonBlockProps {
   width: number | `${number}%`;
@@ -39,19 +51,22 @@ export function SkeletonBlock({
   shimmerColor = 'rgba(255,255,255,0.07)',
 }: SkeletonBlockProps) {
   const [blockWidth, setBlockWidth] = useState(0);
-  const shimmerX = useSharedValue(-300);
+  const shimmerX = useSharedValue(-SWEEP_WIDTH);
+  // OS "remove animations" must silence the shimmer too — an infinitely
+  // repeating sweep is exactly what that setting is asking us to stop.
+  const { reduced } = useReducedMotion();
 
   useEffect(() => {
-    if (blockWidth <= 0) return;
+    if (blockWidth <= 0 || reduced) return;
     cancelAnimation(shimmerX);
-    shimmerX.value = -(blockWidth + 200);
+    shimmerX.value = -(blockWidth + SWEEP_WIDTH);
     shimmerX.value = withRepeat(
-      withTiming(blockWidth + 200, { duration: 1400, easing: Easing.linear }),
+      withTiming(blockWidth + SWEEP_WIDTH, { duration: SWEEP_MS, easing: Easing.linear }),
       -1,
       false
     );
     return () => cancelAnimation(shimmerX);
-  }, [blockWidth, shimmerX]);
+  }, [blockWidth, reduced, shimmerX]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shimmerX.value }],
@@ -60,18 +75,24 @@ export function SkeletonBlock({
   return (
     <View
       style={{ width: width as number, height, borderRadius, backgroundColor: baseColor ?? colors.surfaceRecessed, overflow: 'hidden' }}
+      // Measured even when `reduced` is true: the flag arrives asynchronously
+      // and can flip back off mid-skeleton, and onLayout does not re-fire on an
+      // already-laid-out view just because the handler was re-attached — so
+      // dropping it would leave the shimmer permanently dead at width 0.
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
         if (w > 0 && w !== blockWidth) setBlockWidth(w);
       }}>
-      <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
-        <LinearGradient
-          colors={['transparent', shimmerColor, 'transparent']}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={{ width: 200, height: '100%' }}
-        />
-      </Animated.View>
+      {!reduced && (
+        <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
+          <LinearGradient
+            colors={['transparent', shimmerColor, 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={sweep.band}
+          />
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -81,6 +102,28 @@ export function SkeletonBlock({
 // panchang card. Lives on a NightCard plinth, so it takes its own base /
 // shimmer tones rather than the screen's surfaceRecessed (which blends into
 // the dark plinth bg).
+//
+// This is the FIRST thing the launch screen mounts (`panchangLoading` starts
+// true), so it deliberately does NOT use SkeletonBlock: 18 blocks × (clip view
+// + Animated.View + LinearGradient) is 54 native views, 18 onLayout→setState
+// round trips and 18 infinite withRepeat loops competing with the panchang
+// compute. Instead the 18 rectangles are inert fills and ONE card-wide
+// gradient sweeps across all of them.
+
+/** Inert skeleton rectangle — the sweep lives on the parent, not here. */
+function SkeletonFill({
+  width,
+  height,
+  borderRadius = 8,
+  color,
+}: {
+  width: number;
+  height: number;
+  borderRadius?: number;
+  color: string;
+}) {
+  return <View style={{ width, height, borderRadius, backgroundColor: color }} />;
+}
 
 interface HomePanchangSkeletonProps {
   colors: ColorPalette;
@@ -97,19 +140,47 @@ export function HomePanchangSkeleton({
   shimmerColor,
   dividerColor,
 }: HomePanchangSkeletonProps) {
-  const blockProps = { colors, baseColor, shimmerColor };
+  const fill = baseColor ?? colors.surfaceRecessed;
   const divider = dividerColor ?? colors.divider;
+
+  const [cardWidth, setCardWidth] = useState(0);
+  const sweepX = useSharedValue(-SWEEP_WIDTH);
+  const { reduced } = useReducedMotion();
+
+  useEffect(() => {
+    if (cardWidth <= 0 || reduced) return;
+    cancelAnimation(sweepX);
+    sweepX.value = -SWEEP_WIDTH;
+    sweepX.value = withRepeat(
+      withTiming(cardWidth, { duration: SWEEP_MS, easing: Easing.linear }),
+      -1,
+      false
+    );
+    return () => cancelAnimation(sweepX);
+  }, [cardWidth, reduced, sweepX]);
+
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: sweepX.value }],
+  }));
+
   return (
-    <View>
+    <View
+      style={sweep.clip}
+      // Measured unconditionally — see SkeletonBlock: a handler re-attached
+      // after `reduced` flips off never fires on an already-laid-out view.
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && w !== cardWidth) setCardWidth(w);
+      }}>
       {/* 4 limb rows — tithi / nakshatra / yoga / karana */}
       <View style={home.rows}>
         {[120, 140, 110, 130].map((valW, i) => (
           <View key={i} style={[home.row, i < 3 && { borderBottomColor: divider, borderBottomWidth: StyleSheet.hairlineWidth }]}>
-            <SkeletonBlock width={56} height={9} borderRadius={4} {...blockProps} />
+            <SkeletonFill width={56} height={9} borderRadius={4} color={fill} />
             <View style={home.rowMid}>
-              <SkeletonBlock width={valW} height={14} borderRadius={4} {...blockProps} />
+              <SkeletonFill width={valW} height={14} borderRadius={4} color={fill} />
             </View>
-            <SkeletonBlock width={42} height={10} borderRadius={4} {...blockProps} />
+            <SkeletonFill width={42} height={10} borderRadius={4} color={fill} />
           </View>
         ))}
       </View>
@@ -120,21 +191,33 @@ export function HomePanchangSkeleton({
       {/* Sunrise / sunset row */}
       <View style={home.sunRow}>
         <View style={home.sunItem}>
-          <SkeletonBlock width={26} height={26} borderRadius={13} {...blockProps} />
+          <SkeletonFill width={26} height={26} borderRadius={13} color={fill} />
           <View style={home.sunStack}>
-            <SkeletonBlock width={50} height={9} borderRadius={4} {...blockProps} />
-            <SkeletonBlock width={70} height={12} borderRadius={4} {...blockProps} />
+            <SkeletonFill width={50} height={9} borderRadius={4} color={fill} />
+            <SkeletonFill width={70} height={12} borderRadius={4} color={fill} />
           </View>
         </View>
         <View style={[home.sunSep, { backgroundColor: divider }]} />
         <View style={home.sunItem}>
-          <SkeletonBlock width={26} height={26} borderRadius={13} {...blockProps} />
+          <SkeletonFill width={26} height={26} borderRadius={13} color={fill} />
           <View style={home.sunStack}>
-            <SkeletonBlock width={50} height={9} borderRadius={4} {...blockProps} />
-            <SkeletonBlock width={70} height={12} borderRadius={4} {...blockProps} />
+            <SkeletonFill width={50} height={9} borderRadius={4} color={fill} />
+            <SkeletonFill width={70} height={12} borderRadius={4} color={fill} />
           </View>
         </View>
       </View>
+
+      {/* The single sweep, painted over every fill above. */}
+      {!reduced && cardWidth > 0 && (
+        <Animated.View style={[StyleSheet.absoluteFill, sweepStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={['transparent', shimmerColor ?? 'rgba(255,255,255,0.07)', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={sweep.band}
+          />
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -154,44 +237,6 @@ const home = StyleSheet.create({
   sunStack: { gap: 4 },
   sunSep: { width: StyleSheet.hairlineWidth, height: 28, marginHorizontal: 12 },
 });
-
-// ─── Full panchang screen skeleton ────────────────────────────────────────────
-// Mirrors the date header area + Pancha Anga card with 5 limb rows.
-
-export function PanchangSkeleton({ colors }: { colors: ColorPalette }) {
-  return (
-    <View style={{ gap: 16, paddingTop: 8 }}>
-
-      {/* Pancha Anga card — 5 limb rows */}
-      <View style={full.card}>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <View key={i} style={full.limbRow}>
-            <View style={full.limbLeft}>
-              <SkeletonBlock width={120} height={10} borderRadius={4} colors={colors} />
-              <SkeletonBlock width={160} height={18} borderRadius={5} colors={colors} />
-            </View>
-            <SkeletonBlock width={60} height={12} borderRadius={4} colors={colors} />
-          </View>
-        ))}
-      </View>
-
-      {/* Sunrise / sunset row */}
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={full.sunCard}>
-          <SkeletonBlock width={24} height={24} borderRadius={12} colors={colors} />
-          <SkeletonBlock width={60} height={10} borderRadius={4} colors={colors} />
-          <SkeletonBlock width={80} height={18} borderRadius={5} colors={colors} />
-        </View>
-        <View style={full.sunCard}>
-          <SkeletonBlock width={24} height={24} borderRadius={12} colors={colors} />
-          <SkeletonBlock width={60} height={10} borderRadius={4} colors={colors} />
-          <SkeletonBlock width={80} height={18} borderRadius={5} colors={colors} />
-        </View>
-      </View>
-
-    </View>
-  );
-}
 
 // ─── Calendar grid skeleton (panchang tab) ────────────────────────────────────
 // Roughly mirrors the vertical footprint of the real calendar so layout
@@ -274,10 +319,30 @@ export function SkeletonCrossfade({ ready, skeleton, children, style }: Skeleton
   // Keep the skeleton mounted during the outbound fade so both layers animate
   // in parallel. Drops out after the transition completes.
   const [showSkeleton, setShowSkeleton] = useState(!ready);
+  // Every `ready` flip (either direction) re-mounts the skeleton for the
+  // upcoming fade. Done during render against the last-seen value — React's
+  // "adjust state when a prop changes" pattern — so the skeleton lands in the
+  // very same commit that adds / removes the content layer, not one effect
+  // round-trip later; the effect below then only drives the shared value and
+  // the drop-out timer.
+  const [prevReady, setPrevReady] = useState(ready);
+  if (ready !== prevReady) {
+    setPrevReady(ready);
+    setShowSkeleton(true);
+  }
+  const firstRun = useRef(true);
 
   useEffect(() => {
+    // Already-ready at mount: there is nothing to fade from, and running the
+    // outbound branch would burn a no-op 300ms timing from progress=1 to
+    // progress=1. The ref is CONSUMED on that first run rather than kept as a
+    // permanent "was ready at mount" flag — a later true→false→true cycle
+    // must still cross-fade normally.
+    if (firstRun.current) {
+      firstRun.current = false;
+      if (ready) return;
+    }
     if (ready) {
-      setShowSkeleton(true);
       progress.value = withTiming(1, {
         duration: dur(CROSSFADE_MS),
         easing: easings.standard,
@@ -288,7 +353,6 @@ export function SkeletonCrossfade({ ready, skeleton, children, style }: Skeleton
         cancelAnimation(progress);
       };
     }
-    setShowSkeleton(true);
     progress.value = withTiming(0, {
       duration: dur(CROSSFADE_MS),
       easing: easings.standard,
@@ -312,28 +376,3 @@ export function SkeletonCrossfade({ ready, skeleton, children, style }: Skeleton
     </View>
   );
 }
-
-const full = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    gap: 16,
-    paddingVertical: 4,
-  },
-  limbRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    gap: 12,
-  },
-  limbLeft: { gap: 6, flex: 1 },
-  sunCard: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-});

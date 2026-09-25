@@ -1,0 +1,266 @@
+Switch the app's hindu-devotional-texts imports from the package root to the
+0.9.0 per-module subpaths (value imports -> /<module>, type-only -> /types).
+Requires hindu-devotional-texts@0.9.0 installed first; against 0.8.0 the
+subpaths do not exist and tsc/Metro will fail to resolve them.
+
+Apply from the repo root:  git apply docs/release-2.0/hdt-0.9.0-subpath-imports.patch
+
+--- a/src/config/deities.ts
++++ b/src/config/deities.ts
+@@ -1,4 +1,4 @@
+-import type { Deity } from 'hindu-devotional-texts';
++import type { Deity } from 'hindu-devotional-texts/types';
+ 
+ import { deityColors } from './theme';
+ 
+--- a/src/config/deityImages.ts
++++ b/src/config/deityImages.ts
+@@ -1,6 +1,6 @@
+ import { ImageSourcePropType } from 'react-native';
+ 
+-import type { Deity } from 'hindu-devotional-texts';
++import type { Deity } from 'hindu-devotional-texts/types';
+ 
+ // Full-resolution portraits (704×384 where available) — used only for the
+ // god-detail hero, where the image fills the screen width.
+--- a/src/config/festivalContent.ts
++++ b/src/config/festivalContent.ts
+@@ -22,9 +22,8 @@
+   getFestivalsByCategory,
+   getFestivalsForDeity,
+   FESTIVAL_SOURCES,
+-  type FestivalEntry,
+-  type FestivalCategory,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/festivals';
++import type { FestivalEntry, FestivalCategory } from 'hindu-devotional-texts/types';
+ 
+ import { sanitizeBilingual } from '@/utils/sanitizeContent';
+ 
+--- a/src/config/kathas.ts
++++ b/src/config/kathas.ts
+@@ -19,15 +19,15 @@
+  * and never stacks them. Still English-only upstream: the `about` summaries
+  * (empty on all six kathas), the samagri intro, and most samagri item names.
+  */
+-import {
+-  getAllKathas,
+-  type Katha,
+-  type KathaParagraph,
+-  type KathaChapter,
+-  type SamagriItem,
+-  type KathaSlug,
+-  type Bilingual,
+-} from 'hindu-devotional-texts';
++import { getAllKathas } from 'hindu-devotional-texts/kathas';
++import type {
++  Katha,
++  KathaParagraph,
++  KathaChapter,
++  SamagriItem,
++  KathaSlug,
++  Bilingual,
++} from 'hindu-devotional-texts/types';
+ import { poojafy } from '@/utils/sanitizeContent';
+ 
+ export type { Katha, KathaParagraph, KathaChapter, SamagriItem, KathaSlug, Bilingual };
+--- a/src/config/navratri.ts
++++ b/src/config/navratri.ts
+@@ -45,11 +45,11 @@
+   navratriVratFoods,
+   saptashatiOutline,
+   kanyaPujan,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/navratri';
+ import type {
+   NavadurgaForm,
+   KanyaPujanData,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/types';
+ 
+ import { poojafy } from '@/utils/sanitizeContent';
+ 
+--- a/src/config/poojas.ts
++++ b/src/config/poojas.ts
+@@ -19,15 +19,14 @@
+  * per-claim citations in its own module docs; see the library README's
+  * "Content review debt" section.
+  */
+-import {
+-  getAllPujas,
+-  PUJA_DISCLAIMER as LIB_PUJA_DISCLAIMER,
+-  type ArcStep,
+-  type Bilingual,
+-  type Puja,
+-  type PujaSamagriItem,
+-  type Upachara,
+-} from 'hindu-devotional-texts';
++import { getAllPujas, PUJA_DISCLAIMER as LIB_PUJA_DISCLAIMER } from 'hindu-devotional-texts/puja';
++import type {
++  ArcStep,
++  Bilingual,
++  Puja,
++  PujaSamagriItem,
++  Upachara,
++} from 'hindu-devotional-texts/types';
+ import { poojafy } from '@/utils/sanitizeContent';
+ 
+ // ─── Types (sourced from the library) ────────────────────────────────────────
+@@ -43,7 +42,7 @@
+   PostPujaLink,
+   StotraKathaRef,
+   FestivalMatch,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/types';
+ 
+ /** The app's historical name for the library's `Puja`. */
+ export type PujaContent = Puja;
+--- a/src/config/scriptures.ts
++++ b/src/config/scriptures.ts
+@@ -13,14 +13,14 @@
+  * `@/config/scriptures`, never the package directly — so the underlying
+  * storage can evolve without churn in the UI.
+  */
+-import {
+-  getAllScriptures,
+-  type Scripture,
+-  type ScriptureSlug,
+-  type ScriptureVerse,
+-  type Chapter,
+-  type Bilingual,
+-} from 'hindu-devotional-texts';
++import { getAllScriptures } from 'hindu-devotional-texts/scriptures';
++import type {
++  Scripture,
++  ScriptureSlug,
++  ScriptureVerse,
++  Chapter,
++  Bilingual,
++} from 'hindu-devotional-texts/types';
+ 
+ import { sanitizeBilingual } from '@/utils/sanitizeContent';
+ 
+--- a/src/config/tirtha.ts
++++ b/src/config/tirtha.ts
+@@ -14,10 +14,8 @@
+   DVADASHA_JYOTIRLINGA_STOTRA,
+   SAPTA_PURI_SLOKA,
+   SAPTA_NADI_SLOKA,
+-  type TirthaCategory,
+-  type TirthaEntry,
+-  type TirthaSloka,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/tirtha';
++import type { TirthaCategory, TirthaEntry, TirthaSloka } from 'hindu-devotional-texts/types';
+ 
+ import type { IconName } from '@/components/common/Icon';
+ import { romanize, sanitizeBilingual } from '@/utils/sanitizeContent';
+--- a/src/config/vaarDevata.ts
++++ b/src/config/vaarDevata.ts
+@@ -19,12 +19,8 @@
+  * Mirrors the pattern already used by [pujas](./poojas.ts), [kathas](./kathas.ts),
+  * [navratri](./navratri.ts), and [scriptures](./scriptures.ts).
+  */
+-import {
+-  VAAR_DEVATA as LIB_VAAR_DEVATA,
+-  type Bilingual,
+-  type GrahaKey,
+-  type VaarDevata,
+-} from 'hindu-devotional-texts';
++import { VAAR_DEVATA as LIB_VAAR_DEVATA } from 'hindu-devotional-texts/vaar';
++import type { Bilingual, GrahaKey, VaarDevata } from 'hindu-devotional-texts/types';
+ import { poojafy } from '@/utils/sanitizeContent';
+ 
+ export type {
+@@ -33,13 +29,13 @@
+   VaarMantra,
+   VaarVariantNote,
+   VaarOffering,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/types';
+ 
+ export type { Bilingual, GrahaKey, VaarDevata };
+ 
+ // `vaarRosterIds` / `vaarDeityNames` are pure functions over a `VaarDevata` the
+ // caller already holds, so they operate on the respelled objects as-is.
+-export { VAAR_SOURCES, vaarRosterIds, vaarDeityNames } from 'hindu-devotional-texts';
++export { VAAR_SOURCES, vaarRosterIds, vaarDeityNames } from 'hindu-devotional-texts/vaar';
+ 
+ // ─── "Pooja" spelling shim ───────────────────────────────────────────────────
+ 
+--- a/src/services/content.ts
++++ b/src/services/content.ts
+@@ -1,39 +1,51 @@
+ import {
+   getAarti as pkgGetAarti,
+-  getChalisa as pkgGetChalisa,
+   getAllAartis as pkgGetAllAartis,
++} from 'hindu-devotional-texts/aartis';
++import {
++  getChalisa as pkgGetChalisa,
+   getAllChalisas as pkgGetAllChalisas,
++} from 'hindu-devotional-texts/chalisas';
++import {
+   getAllMantras as pkgGetAllMantras,
+   getMantra as pkgGetMantra,
+-  getAshtottara as pkgGetAshtottara,
+-  getAllPrayers as pkgGetAllPrayers,
++} from 'hindu-devotional-texts/mantras';
++import { getAshtottara as pkgGetAshtottara } from 'hindu-devotional-texts/ashtottara';
++import { getAllPrayers as pkgGetAllPrayers } from 'hindu-devotional-texts/prayers';
++import {
+   getAllStotras as pkgGetAllStotras,
+   getStotra as pkgGetStotra,
+   getStotrasForDeity as pkgGetStotrasForDeity,
++} from 'hindu-devotional-texts/stotras';
++import {
+   getAllSuktas as pkgGetAllSuktas,
+   getSukta as pkgGetSukta,
+   getSuktasForDeity as pkgGetSuktasForDeity,
++} from 'hindu-devotional-texts/suktas';
++import {
+   getAllSahasranamas as pkgGetAllSahasranamas,
+   getSahasranama as pkgGetSahasranama,
+-  type Deity,
+-  type Recitation,
+-  type Chalisa,
+-  type RecitationVerse,
+-  type Mantra,
+-  type MantraSlug,
+-  type Ashtottara,
+-  type AshtottaraName,
+-  type NamavaliName,
+-  type Prayer,
+-  type PrayerOccasion,
+-  type Stotra,
+-  type StotraSlug,
+-  type Sukta,
+-  type SuktaSlug,
+-  type SuktaSection,
+-  type Sahasranama,
+-  type SahasranamaSection,
+-} from 'hindu-devotional-texts';
++} from 'hindu-devotional-texts/sahasranama';
++import type {
++  Deity,
++  Recitation,
++  Chalisa,
++  RecitationVerse,
++  Mantra,
++  MantraSlug,
++  Ashtottara,
++  AshtottaraName,
++  NamavaliName,
++  Prayer,
++  PrayerOccasion,
++  Stotra,
++  StotraSlug,
++  Sukta,
++  SuktaSlug,
++  SuktaSection,
++  Sahasranama,
++  SahasranamaSection,
++} from 'hindu-devotional-texts/types';
+ 
+ import i18n from '@/i18n';
+ import { ALL_DEITIES } from '@/config/deities';

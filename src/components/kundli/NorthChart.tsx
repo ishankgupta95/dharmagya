@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Polygon, G, Text as SvgText, Line } from 'react-native-svg';
 
 import type { ChartCell } from './chartCells';
@@ -20,6 +20,15 @@ interface NorthChartProps {
   cells: ChartCell[];
   /** Side length in pixels. Defaults to fill its container width. */
   size: number;
+  /**
+   * Print the whole-sign house number before the rashi label. False when the
+   * chart was cast under `equal` / `placidus-kp`, where `ChartCell.house` is
+   * only a placement index and the planet tables next to the chart print the
+   * chart's real cuspal house — two different numbers for the same planet on
+   * one screen. Defaults to true (whole-sign is the shipped default, and it is
+   * the only way to read houses off a South Indian chart).
+   */
+  showHouseNumber?: boolean;
 }
 
 interface CellGeometry {
@@ -84,7 +93,7 @@ function buildGeometry(s: number): CellGeometry[] {
   ];
 }
 
-export const NorthChart = memo(function NorthChart({ cells, size }: NorthChartProps) {
+export const NorthChart = memo(function NorthChart({ cells, size, showHouseNumber = true }: NorthChartProps) {
   const isDark = useStore((s) => s.isDarkMode);
   const stroke = isDark ? 'rgba(243,229,200,0.55)' : palette.ink;
   const accent = isDark ? palette.goldLeaf : palette.sindoor;
@@ -148,7 +157,7 @@ export const NorthChart = memo(function NorthChart({ cells, size }: NorthChartPr
                 fill={cell.isLagna ? accent : muted}
                 textAnchor="middle"
                 fontStyle="italic">
-                {`${cell.house} · ${cell.rashiName}`}
+                {showHouseNumber ? `${cell.house} · ${cell.rashiName}` : cell.rashiName}
               </SvgText>
             </G>
           );
@@ -157,5 +166,3 @@ export const NorthChart = memo(function NorthChart({ cells, size }: NorthChartPr
     </View>
   );
 });
-
-export const _styles = StyleSheet.create({});

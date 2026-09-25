@@ -1,8 +1,8 @@
 import type { VratType } from '@/types';
-import festivalsData from '@/data/static/festivals.json';
+import festivalsData from '@/data/festivals';
 
 // ─── Festival → VratType mapping ────────────────────────────────────────────
-// Maps festival names from festivals.json to a VratType. Currently used by the
+// Maps festival names from the panchang-ts festival table to a VratType. Used by the
 // notification scheduler to label vrat-day reminders with the matching tithi
 // observance (e.g. "Ekadashi" instead of just the festival name).
 const FESTIVAL_NAME_TO_VRAT: Record<string, VratType> = {
@@ -41,21 +41,6 @@ export function vratTypeForFestival(festival: { name: string; type: string }): V
     FESTIVAL_TYPE_TO_VRAT[festival.type] ??
     null
   );
-}
-
-/** Returns the first VratType matching any festival on the given date, or null. */
-export function vratTypeForDate(date: Date): VratType | null {
-  const yearKey = String(date.getFullYear());
-  const ymd = toYmd(date);
-  const yearData = (festivalsData as Record<string, { date: string; festivals: { name: string; type: string }[] }[]>)[yearKey];
-  if (!yearData) return null;
-  const day = yearData.find(d => d.date === ymd);
-  if (!day) return null;
-  for (const f of day.festivals) {
-    const vt = vratTypeForFestival(f);
-    if (vt) return vt;
-  }
-  return null;
 }
 
 /** Returns the festival name for a vrat on the given date, or null. Used for notification bodies. */

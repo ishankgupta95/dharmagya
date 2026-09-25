@@ -26,7 +26,12 @@ export type IChoghadiyaSlot = IQualitySlot;
 
 /** Planetary hour slot. */
 export interface IHoraSlot {
+  /** Localized ruling-graha name — Devanagari under the Hindi locale. */
   planet: string;
+  /** 0-6 in Chaldean order: Sun, Venus, Mercury, Moon, Saturn, Jupiter, Mars.
+   *  Language-stable, so anything keyed on the graha (colour coding, icons)
+   *  must key on this and not on `planet`. */
+  planetIndex: number;
   start: string;
   end: string;
 }
@@ -54,8 +59,6 @@ export interface IFestival {
   type: FestivalType;
   /** Classical/specific name, e.g. "Saphala Ekadashi" for a generic Ekadashi. */
   description?: string;
-  /** Smarta-only: when Ekadashi is Dashami-viddha, the Dwadashi fast day (ISO yyyy-mm-dd). */
-  deferralDate?: string;
 }
 
 /** Lightweight summary of an upcoming eclipse — used for forecasting cards. */
@@ -86,10 +89,32 @@ export interface IEclipse {
   peak: string;
   start: string;
   end: string;
-  sutakStart: string;
-  sutakEnd: string;
+  /**
+   * Sutak (impurity) window, formatted like the others. Both instants are
+   * `null` for a penumbral lunar eclipse, which carries no sutak at all — a
+   * render site must skip the row rather than print an empty range.
+   */
+  sutakStart: string | null;
+  sutakEnd: string | null;
   visibleFromLocation: boolean;
-  magnitude: number;
+  /**
+   * Whether the PEAK itself is above the horizon — the engine's own narrow
+   * test, where `visibleFromLocation` asks about any phase. Since panchang-ts
+   * 5.4 a solar eclipse whose peak is below the horizon takes its `subtype`
+   * from the deepest phase that IS seen, while `obscuration` stays the peak's,
+   * so the two only describe the same moment when this is true.
+   */
+  peakVisible: boolean;
+  /**
+   * Fraction of the disc's *area* covered at peak, [0, 1] — render as a
+   * percentage. Published by panchang-ts as `magnitude` through 4.x and
+   * renamed in v5, where `magnitude` became the disc-*diameter* fraction that
+   * eclipse catalogues publish (>1 when total, negative when penumbral).
+   *
+   * It is the *umbral* area, so a penumbral lunar eclipse legitimately reads
+   * exactly 0 — that is "no umbral coverage", not a failed computation.
+   */
+  obscuration: number;
   description: string;
 }
 
@@ -192,7 +217,7 @@ export interface IPanchangDay {
   gulikaKalamEnd?: string;
   abhijitMuhurtaStart?: string;
   abhijitMuhurtaEnd?: string;
-  durMuhurta: Array<{ start: string; end: string }>;
+  durMuhurta: { start: string; end: string }[];
   vara?: string;
   hinduMonth?: string;
   hinduMonthAmanta?: string;
@@ -212,16 +237,16 @@ export interface IPanchangDay {
   godhuliMuhurtaEnd?: string;
   nishitaMuhurtaStart?: string;
   nishitaMuhurtaEnd?: string;
-  amritKalaStart?: string;
-  amritKalaEnd?: string;
+  /** 0–2 nakshatra-anchored windows; transition days carry two. */
+  amritKala: { start: string; end: string }[];
   madhyahnaStart?: string;
   madhyahnaEnd?: string;
   pratahSandhyaStart?: string;
   pratahSandhyaEnd?: string;
   sayahnaSandhyaStart?: string;
   sayahnaSandhyaEnd?: string;
-  varjyamStart?: string;
-  varjyamEnd?: string;
+  /** 0–2 nakshatra-anchored windows; transition days carry two. */
+  varjyam: { start: string; end: string }[];
   gandaMula?: IGandaMula | null;
   anandadiYoga?: IAnandadiYoga;
   tarabala?: ITarabala | null;

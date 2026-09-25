@@ -33,13 +33,20 @@ export function SadhanaOpenRecorder() {
   const unlockMilestone = useMilestoneCelebration((s) => s.unlock);
 
   // Latest values via refs so the AppState listener (long-lived) always reads
-  // the current state without re-subscribing on every render.
+  // the current state without re-subscribing on every render. Written in an
+  // effect, never during render: `tick` only ever fires from the mount effect
+  // below (which runs after this one — effects flush in declaration order,
+  // and on mount the refs already hold the initial values) or from an
+  // AppState transition, i.e. always after a commit, so it sees the values
+  // the last commit published either way.
   const sadhanaRef = useRef(sadhana);
-  sadhanaRef.current = sadhana;
   const setSadhanaStateRef = useRef(setSadhanaState);
-  setSadhanaStateRef.current = setSadhanaState;
   const unlockRef = useRef(unlockMilestone);
-  unlockRef.current = unlockMilestone;
+  useEffect(() => {
+    sadhanaRef.current = sadhana;
+    setSadhanaStateRef.current = setSadhanaState;
+    unlockRef.current = unlockMilestone;
+  });
 
   useEffect(() => {
     function tick() {

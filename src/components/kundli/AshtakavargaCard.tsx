@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { GRAHA_ABBR, type AshtakavargaResult, type GrahaName } from 'panchang-ts';
 
 import { AppText as Text } from '@/components/common/AppText';
+import { grahaLabel } from '@/utils/grahaLabel';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
-import { borderRadius, palette, type ColorPalette } from '@/config/theme';
+import { borderRadius, type ColorPalette } from '@/config/theme';
 import { localizeRashi } from '@/i18n/panchangNames';
 import { resolveLanguage } from '@/i18n';
 import { useStore } from '@/store/useStore';
@@ -37,6 +38,7 @@ export const AshtakavargaCard = memo(function AshtakavargaCard({
 }: AshtakavargaCardProps) {
   const { t } = useTranslation();
   const language = useStore((s) => s.language);
+  const isDark = useStore((s) => s.isDarkMode);
   const lang = resolveLanguage(language);
   const [mode, setMode] = useState<Mode>('sarvashtaka');
 
@@ -107,7 +109,7 @@ export const AshtakavargaCard = memo(function AshtakavargaCard({
               style={[
                 styles.cell,
                 {
-                  backgroundColor: heatBg(intensity),
+                  backgroundColor: heatBg(intensity, isDark),
                   borderColor: colors.border,
                 },
               ]}>
@@ -119,7 +121,7 @@ export const AshtakavargaCard = memo(function AshtakavargaCard({
               </Text>
               <Text
                 variant="display"
-                style={[styles.cellValue, { color: heatFg(intensity, colors.textPrimary) }]}>
+                style={[styles.cellValue, { color: heatFg(intensity, colors) }]}>
                 {value}
               </Text>
             </View>
@@ -130,25 +132,31 @@ export const AshtakavargaCard = memo(function AshtakavargaCard({
       <Text variant="body-italic" style={[styles.footnote, { color: colors.textMuted }]}>
         {mode === 'sarvashtaka'
           ? t('kundli.ashtakavarga.sarvaFootnote', { sum: cellSum })
-          : t('kundli.ashtakavarga.bhinnaFootnote', { graha: mode, sum: cellSum })}
+          : t('kundli.ashtakavarga.bhinnaFootnote', { graha: grahaLabel(mode, t), sum: cellSum })}
       </Text>
     </View>
   );
 });
 
-// Background tint scales with the bindu count — emptier rashis read
-// fainter, stronger rashis read warmer. Stays within the parchment palette.
-function heatBg(intensity: number): string {
-  // Clamp 0..1; alpha 0.04..0.32 keeps the deepest cell readable in dark mode
-  // without forcing white text.
+// Background tint scales with the bindu count — emptier rashis read fainter,
+// stronger rashis read warmer. The wash is the turmeric accent at low alpha.
+function heatBg(intensity: number, isDark: boolean): string {
   const a = Math.max(0, Math.min(1, intensity));
-  return `rgba(201, 155, 58, ${0.04 + a * 0.28})`;
+  // Dark tops out lower than light. Every step of turmeric wash lifts the
+  // ground toward the accent itself, eating the headroom the value needs: on
+  // the old 0.32 ceiling the emphasised value fell to 3.83:1 over this card's
+  // surface. 0.22 holds it at 4.76:1 and still reads as a ramp.
+  const alpha = isDark ? 0.05 + a * 0.17 : 0.04 + a * 0.28;
+  return `rgba(216, 163, 26, ${alpha})`;
 }
 
-function heatFg(intensity: number, base: string): string {
-  // Brighten the value at high intensity so it stays prominent on the
-  // warm tint. At zero intensity, falls back to the base text colour.
-  return intensity > 0.65 ? palette.gold : base;
+function heatFg(intensity: number, colors: ColorPalette): string {
+  // Lift the value into the accent at high intensity so the strongest rashis
+  // read as emphasised; below that it stays the base text colour. `accentText`
+  // rather than `accent` because this is 18px of a 300-weight face: the token
+  // resolves to turmeric on dark and turmericInk on light, where raw turmeric
+  // would be 2.09:1.
+  return intensity > 0.65 ? colors.accentText : colors.textPrimary;
 }
 
 const styles = StyleSheet.create({

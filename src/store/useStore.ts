@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import AsyncStorage from 'expo-sqlite/kv-store';
 import type { AyanamsaType } from 'panchang-ts';
 
+import { INDIAN_CITIES } from '@/config/cities';
 import type { AppLanguage } from '@/i18n';
 import {
   DEFAULT_WIDGET_SLOTS,
@@ -19,6 +20,12 @@ export type Ayanamsa = AyanamsaType;
 export type ChartStyle = 'north' | 'south';
 export type HouseSystem = 'whole-sign' | 'equal' | 'placidus-kp';
 export type Sex = 'male' | 'female';
+
+/** What the user came to the app for (P16.6 onboarding keystone). Multi-select;
+ *  the first entry is the "primary" intent that drives Home hero order, the
+ *  Home primary-action button, and the Kundli default view. Re-editable in
+ *  Settings — never a one-way persona trap. Defaults to ['worship']. */
+export type IntentKey = 'worship' | 'panchang' | 'kundli';
 
 /** Scopes region-specific festival variants (Pongal, Vishu, Baisakhi, Gudi
  *  Padwa, Lohri, Bonalu, …). Mirrors panchang-ts v2.1 FestivalRegion —
@@ -92,8 +99,7 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
  *  0  = completed / skipped
  *  1  = Home → highlight panchang card (tap → go to Panchang)
  *  2  = Panchang → explain the screen (tap Next → go to Library)
- *  3  = Library → explain the screen (tap Next → go to Home)
- *  4  = Home → highlight settings gear (tap → finish)
+ *  3  = Library → explain the screen (tap Next → finish)
  */
 interface AppStore {
   // Persisted
@@ -103,9 +109,22 @@ interface AppStore {
    *  _layout.tsx; persisted so first paint matches the last known value. */
   isDarkMode: boolean;
   favoriteIds: string[]; // Stores both aarti and chalisa IDs (prefixed: "aarti-*", "chalisa-*")
+  /** Diya reader — last focused verse per text (key: "chalisa-hanuman"), so
+   *  returning to a reader lands on the saved verse. */
+  readingPositions: Record<string, number>;
+  /** Most recently read text — drives the Library "Continue" card. */
+  lastReadKey: string | null;
   hasOnboarded: boolean;
+  /** Onboarding intent (P16.6). Multi-select; [0] is primary. Defaults to
+   *  ['worship']. Drives Home hero order + primary action + Kundli default. */
+  primaryIntent: IntentKey[];
   selectedDeities: string[];
-  userLocation: { lat: number; lon: number } | null;
+  /** Where the panchang is computed for. `timezone` is set only when the place
+   *  was *chosen* (a curated city, or the Ujjain default) — a live GPS fix
+   *  omits it, because the device is standing at those coordinates and its own
+   *  offset is the correct one. Entries persisted before this field existed
+   *  have no timezone and keep the device-offset behaviour. */
+  userLocation: { lat: number; lon: number; timezone?: string } | null;
   locationName: string | null; // e.g. "Mumbai, MH" or "GPS"
   fontSize: FontSize;
   language: AppLanguage;
@@ -177,7 +196,7 @@ interface AppStore {
    *  the persistence + reactive surface. */
   sadhana: SadhanaState;
   /** Opt-in evening at-risk reminder. Off by default — gentle nudge, not a
-   *  loss threat. See [`src/services/sadhanaReminders.ts`](../services/sadhanaReminders.ts). */
+   *  loss threat. */
   sadhanaReminderEnabled: boolean;
   /** HH:mm 24h — evening time the at-risk reminder fires when enabled. */
   sadhanaReminderTime: string;
@@ -187,8 +206,10 @@ interface AppStore {
   /** Internal: called by _layout.tsx whenever themeMode or system scheme changes. */
   setResolvedDarkMode: (val: boolean) => void;
   toggleFavorite: (id: string) => void;
-  setUserLocation: (loc: { lat: number; lon: number }, name?: string) => void;
+  setReadingPosition: (key: string, index: number) => void;
+  setUserLocation: (loc: { lat: number; lon: number; timezone?: string }, name?: string) => void;
   setHasOnboarded: () => void;
+  setPrimaryIntent: (intents: IntentKey[]) => void;
   setSelectedDeities: (deities: string[]) => void;
   setFontSize: (size: FontSize) => void;
   setLanguage: (lang: AppLanguage) => void;
@@ -228,13 +249,164 @@ interface AppStore {
   setSadhanaReminderTime: (timeHHmm: string) => void;
 }
 
+// ─── Persistence: hydration gate ─────────────────────────────────────────────
+//
+// THE RACE. zustand's persist middleware serialises `partialize(get())` to
+// storage on EVERY `set`: the wrapped `set` and `api.setState` both call
+// `setItem()` unconditionally (node_modules/zustand/esm/middleware.mjs,
+// `persistImpl`). `hydrate()` reads storage asynchronously, applies the result
+// with the RAW `set`, and only writes back when a migration ran. Between store
+// creation and the kv-store SELECT resolving, the store therefore holds the
+// DEFAULTS, and any `set` in that window overwrites the user's real blob on
+// disk with the default slice — hasOnboarded false, no birth details, no
+// favourites. The late hydrate then restores MEMORY from the value it read a
+// moment earlier, so the session looks fine; but disk stays at defaults until
+// the next write, and if none happens that session the next launch is a fresh
+// install. The confirmed trigger was RootLayout's theme effect on its first
+// commit: on a light-scheme device with themeMode 'system' the default
+// `isDarkMode: true` differs, `setResolvedDarkMode(false)` fires, and that is
+// enough. (Reproduced with zustand 5.0.15 + a FIFO async storage: disk after
+// launch == defaults.)
+//
+// THE GATE. `setItem` on the storage handed to persist is a no-op until the
+// cold-start hydrate has SETTLED — success OR failure — which the callback
+// returned from `onRehydrateStorage` reports (zustand v5 calls it with
+// `(state)` on success and `(undefined, error)` on rejection; see `hydrate()`
+// in the file above). Reads are untouched. What this buys:
+//   · No write can reach disk before the read has been applied: the callback
+//     fires after `set(stateFromStorage, true)`, in the same tick.
+//   · Writes re-open on a REJECTED hydrate too (corrupt JSON, a storage
+//     fault). A fresh install with broken storage must still be able to
+//     persist onboarding, and defaults beat a permanent splash.
+//   · A dropped write is not lost. Every persist write is the FULL slice, so
+//     the next `set` after settle re-writes everything. One write does fall
+//     in the closed window legitimately — the migration write-back, which
+//     `hydrate()` issues before the callback — so if anything was dropped the
+//     callback re-flushes the settled state once. Without that a bumped
+//     `version` would only reach disk on the next unrelated write, and every
+//     launch until then would re-run the migration.
+//
+// RootLayout also gates its theme effect on hydration, so in practice the gate
+// should never have to drop anything (it warns once in __DEV__ if it does).
+// The gate is the belt; the layout gate is the braces.
+//
+// Cold-start only: `persist.rehydrate()` and `persist.clearStorage()` are not
+// used in this app. A manual rehydrate after settle would run gate-open.
+
+export type StoreHydrationOutcome = { ok: true } | { ok: false; error: unknown };
+
+let hydrationOutcome: StoreHydrationOutcome | null = null;
+let droppedWriteBeforeSettle = false;
+let warnedDroppedWrite = false;
+const hydrationListeners = new Set<() => void>();
+
+/** Cold-start hydration status as a `useSyncExternalStore`-shaped external
+ *  store (same pattern as `useAdsReady`). `outcome()` is `null` until the
+ *  hydrate has settled, then one stable object — never rebuilt, so it is safe
+ *  as a snapshot. RootLayout uses it to tell "failed" (proceed on defaults
+ *  now) from "still reading" (keep the splash up). Unlike
+ *  `persist.onFinishHydration`, which fires on success only, this settles on
+ *  rejection as well. */
+export const storeHydration = {
+  outcome: (): StoreHydrationOutcome | null => hydrationOutcome,
+  subscribe: (listener: () => void): (() => void) => {
+    hydrationListeners.add(listener);
+    return () => {
+      hydrationListeners.delete(listener);
+    };
+  },
+};
+
+const STORE_NAME = 'dharmagya-store';
+/** Bump together with a new `if (version < N)` step in `migrate` below. */
+const STORE_VERSION = 17;
+
+const gatedStorage: StateStorage = {
+  getItem: (name) => AsyncStorage.getItem(name),
+  setItem: (name, value) => {
+    if (hydrationOutcome === null) {
+      droppedWriteBeforeSettle = true;
+      if (__DEV__ && !warnedDroppedWrite) {
+        warnedDroppedWrite = true;
+        console.warn(
+          '[store] write before hydration settled was dropped; disk is re-flushed once the read lands',
+        );
+      }
+      return Promise.resolve();
+    }
+    return AsyncStorage.setItem(name, value);
+  },
+  removeItem: (name) => AsyncStorage.removeItem(name),
+};
+
+// Explicit allow-list of everything that is persisted today. Behaviour is
+// identical to the previous no-`partialize` default (JSON.stringify was
+// already dropping the action closures) — it just stops the serialiser
+// walking the whole store object on every write. NOTHING may be dropped
+// from this list without a migration: an omitted key silently stops
+// persisting and the user loses it on next launch. When you add a field
+// to AppStore's persisted section, add it here too.
+const persistedSlice = (s: AppStore) => ({
+  themeMode: s.themeMode,
+  isDarkMode: s.isDarkMode,
+  favoriteIds: s.favoriteIds,
+  readingPositions: s.readingPositions,
+  lastReadKey: s.lastReadKey,
+  hasOnboarded: s.hasOnboarded,
+  primaryIntent: s.primaryIntent,
+  selectedDeities: s.selectedDeities,
+  userLocation: s.userLocation,
+  locationName: s.locationName,
+  fontSize: s.fontSize,
+  language: s.language,
+  masaSystem: s.masaSystem,
+  region: s.region,
+  ayanamsa: s.ayanamsa,
+  chartStyle: s.chartStyle,
+  houseSystem: s.houseSystem,
+  dailyReminderEnabled: s.dailyReminderEnabled,
+  dailyReminderTime: s.dailyReminderTime,
+  sunriseAlertEnabled: s.sunriseAlertEnabled,
+  sunriseAlertOffsetMin: s.sunriseAlertOffsetMin,
+  reminderPrefs: s.reminderPrefs,
+  tithiReminderTime: s.tithiReminderTime,
+  festivalReminderTime: s.festivalReminderTime,
+  useDevanagariNumerals: s.useDevanagariNumerals,
+  timeFormat: s.timeFormat,
+  quietHoursEnabled: s.quietHoursEnabled,
+  quietHoursStart: s.quietHoursStart,
+  quietHoursEnd: s.quietHoursEnd,
+  showVikramSamvat: s.showVikramSamvat,
+  panchangLayout: s.panchangLayout,
+  panchangCategoriesOpen: s.panchangCategoriesOpen,
+  userBirthDate: s.userBirthDate,
+  userBirthTime: s.userBirthTime,
+  userBirthPlace: s.userBirthPlace,
+  userSex: s.userSex,
+  userName: s.userName,
+  walkthroughStep: s.walkthroughStep,
+  firstOpenTimestamp: s.firstOpenTimestamp,
+  widgetSlots: s.widgetSlots,
+  sadhana: s.sadhana,
+  sadhanaReminderEnabled: s.sadhanaReminderEnabled,
+  sadhanaReminderTime: s.sadhanaReminderTime,
+});
+type PersistedSlice = ReturnType<typeof persistedSlice>;
+
+// Kept in a const so the post-hydration flush below writes through the SAME
+// serialiser and `{ state, version }` envelope persist itself uses.
+const jsonStorage = createJSONStorage<PersistedSlice>(() => gatedStorage);
+
 export const useStore = create<AppStore>()(
   persist(
     (set, get) => ({
       themeMode: 'system' as ThemeMode,
       isDarkMode: true,
       favoriteIds: [],
+      readingPositions: {},
+      lastReadKey: null,
       hasOnboarded: false,
+      primaryIntent: ['worship'] as IntentKey[],
       selectedDeities: [],
       userLocation: null,
       locationName: null,
@@ -273,15 +445,31 @@ export const useStore = create<AppStore>()(
       sadhanaReminderTime: '20:30',
 
       setThemeMode: (mode) => set({ themeMode: mode }),
-      setResolvedDarkMode: (val) => set((s) => (s.isDarkMode === val ? {} : { isDarkMode: val })),
+      // The no-op guards below bail out BEFORE `set` rather than returning `{}`
+      // from it: an empty patch still allocates a new state object, notifies
+      // every subscriber and triggers a full persist write.
+      setResolvedDarkMode: (val) => {
+        if (get().isDarkMode === val) return;
+        set({ isDarkMode: val });
+      },
       toggleFavorite: (id) =>
         set((s) => ({
           favoriteIds: s.favoriteIds.includes(id)
             ? s.favoriteIds.filter((fId) => fId !== id)
             : [...s.favoriteIds, id],
         })),
+      setReadingPosition: (key, index) => {
+        const s = get();
+        if (s.readingPositions[key] === index && s.lastReadKey === key) return;
+        set({
+          readingPositions: { ...s.readingPositions, [key]: index },
+          lastReadKey: key,
+        });
+      },
       setUserLocation: (loc, name) => set({ userLocation: loc, locationName: name ?? null }),
       setHasOnboarded: () => set({ hasOnboarded: true }),
+      setPrimaryIntent: (intents) =>
+        set({ primaryIntent: intents.length > 0 ? intents : (['worship'] as IntentKey[]) }),
       setSelectedDeities: (deities) => set({ selectedDeities: deities }),
       setFontSize: (size) => set({ fontSize: size }),
       setLanguage: (lang) => set({ language: lang }),
@@ -332,7 +520,10 @@ export const useStore = create<AppStore>()(
         set({ userName: trimmed.length > 0 ? trimmed : null });
       },
       setWalkthroughStep: (step) => set({ walkthroughStep: step }),
-      initFirstOpen: () => set((s) => s.firstOpenTimestamp ? {} : { firstOpenTimestamp: Date.now() }),
+      initFirstOpen: () => {
+        if (get().firstOpenTimestamp) return;
+        set({ firstOpenTimestamp: Date.now() });
+      },
       setWidgetSlot: (index, fieldId) =>
         set((s) => {
           const next = [...s.widgetSlots] as [
@@ -346,9 +537,33 @@ export const useStore = create<AppStore>()(
       setSadhanaReminderTime: (timeHHmm) => set({ sadhanaReminderTime: timeHHmm }),
     }),
     {
-      name: 'dharmagya-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 15,
+      name: STORE_NAME,
+      storage: jsonStorage,
+      version: STORE_VERSION,
+      partialize: persistedSlice,
+      // Opens the storage gate (see "Persistence: hydration gate" above) and
+      // reports the outcome to `storeHydration` subscribers. zustand v5 calls
+      // this with `(get(), undefined)` on success and `(undefined, error)` on
+      // rejection; `state` is the discriminator so a thrown `undefined` still
+      // classifies as a failure.
+      onRehydrateStorage: () => (state, error) => {
+        hydrationOutcome = state !== undefined ? { ok: true } : { ok: false, error };
+        if (state !== undefined && droppedWriteBeforeSettle) {
+          // Something was written while the gate was closed — in the normal
+          // upgrade path that is the migration write-back. Re-flush the
+          // settled state once so disk matches memory (and carries the new
+          // version) without waiting for an unrelated `set`. Not on the error
+          // path: the store holds defaults there, and the first genuine `set`
+          // will write them anyway.
+          Promise.resolve(
+            jsonStorage?.setItem(STORE_NAME, {
+              state: persistedSlice(state),
+              version: STORE_VERSION,
+            }),
+          ).catch((e: unknown) => console.warn('[store] post-hydration flush failed', e));
+        }
+        hydrationListeners.forEach((listener) => listener());
+      },
       migrate: (persistedState, version) => {
         const state = persistedState as (Partial<AppStore> & Record<string, unknown>) | null;
         if (!state) return persistedState as AppStore;
@@ -554,6 +769,59 @@ export const useStore = create<AppStore>()(
           }
           if (state.sadhanaReminderTime === undefined) {
             state.sadhanaReminderTime = '20:30';
+          }
+        }
+
+        // v15 → v16: P16.6 onboarding intent. Existing users never picked one,
+        // so seed the safe default ('worship') — the same fallback the skip
+        // path uses. It's re-editable in Settings, so this is non-binding.
+        if (version < 16) {
+          const pi = state.primaryIntent as unknown;
+          if (!Array.isArray(pi) || pi.length === 0) {
+            state.primaryIntent = ['worship'];
+          }
+        }
+
+        // v16 → v17: backfill `userLocation.timezone` for chosen Indian
+        // cities. The field itself shipped with v16, but this backfill was
+        // first written inside the `< 16` block while `version` was already
+        // 16 — so zustand never called `migrate` for any install at v16,
+        // which is every production user it was meant for. It has to be its
+        // own step.
+        //
+        // Why it matters: an upgrader who had picked a city kept it framed in
+        // the PHONE's offset. In the Americas that names the wrong Hindu day
+        // outright (the sunrise-active tithi differs on nearly every date),
+        // and east of UTC+00 it renders times like "Sunrise 1:09 AM". A fresh
+        // install picking the same city got the right answer, so two users
+        // with identical settings diverged by install path.
+        //
+        // Provenance is NOT recoverable from `locationName`: the GPS path
+        // also stores a reverse-geocoded city name. The coordinates identify
+        // a chosen city exactly: the picker stores `city.lat`/`city.lon`
+        // verbatim from `INDIAN_CITIES` (whose rows have never been edited
+        // and none of which carries a `timezone`), and its own active-row
+        // test is this same 0.01° match. So an exact hit is a chosen Indian
+        // city and IST is what the picker would have stored -> backfill it.
+        // Any other fix is GPS — in India, or across the border in Nepal
+        // (+5:45), Bangladesh/Bhutan (+6:00), Pakistan (+5:00), Myanmar
+        // (+6:30) — which deliberately stores NO timezone so the device
+        // offset applies; leave it unset. A bounding box cannot draw this
+        // line: the earlier 6..37.5°N / 68..97.5°E test stamped IST onto
+        // Kathmandu, Dhaka, Lahore, Thimphu and Yangon fixes.
+        if (version < 17) {
+          const loc = state.userLocation as
+            | { lat: number; lon: number; timezone?: string }
+            | null
+            | undefined;
+          if (
+            loc &&
+            !loc.timezone &&
+            INDIAN_CITIES.some(
+              (c) => Math.abs(c.lat - loc.lat) < 0.01 && Math.abs(c.lon - loc.lon) < 0.01,
+            )
+          ) {
+            state.userLocation = { ...loc, timezone: 'Asia/Kolkata' };
           }
         }
 

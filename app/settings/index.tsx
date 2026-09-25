@@ -1,0 +1,1739 @@
+import { useState, useEffect, useMemo } from 'react';
+import { View, Text as RNText, ScrollView, Switch, Modal, StyleSheet, Alert, Linking, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { MotionPressable } from '@/components/common/MotionPressable';
+import Constants from 'expo-constants';
+import { AppText as Text } from '@/components/common/AppText';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Icon, type IconName } from '@/components/common/Icon';
+import { useTranslation } from 'react-i18next';
+
+import { useStore, type Ayanamsa, type ChartStyle, type FontSize, type HouseSystem, type IntentKey, type MasaSystem, type Region, type Sex, type ThemeMode, type TimeFormat } from '@/store/useStore';
+import { requestRating, shareApp } from '@/utils/share';
+import { darkColors, lightColors, borderRadius, palette, spacing, type ColorPalette } from '@/config/theme';
+import { SectionLabel } from '@/components/common/SectionLabel';
+import { ScreenMount } from '@/components/common/ScreenMount';
+import { LANGUAGE_OPTIONS, resolveLanguage, changeLanguage, type AppLanguage } from '@/i18n';
+import {
+  scheduleDailyReminder,
+  cancelDailyReminder,
+  scheduleSunriseAlert,
+  cancelSunriseAlert,
+  ensureNotificationPermission,
+  type QuietHours,
+} from '@/services/notifications';
+import {
+  deriveJanmaIndicesFromStore,
+  fetchPanchangForToday,
+  FALLBACK_COORDS,
+} from '@/services/astrology/panchangService';
+import { DatePickerModal } from '@/components/common/DatePickerModal';
+import { TimePickerModal } from '@/components/common/TimePickerModal';
+import { useLocaleFormatters } from '@/utils/format';
+import { ymd } from '@/utils/calendar';
+import { showAdPrivacyOptions, useAdsReady } from '@/services/adsConsent';
+import { isWidgetBridgeAvailable } from '../../modules/widget-data';
+
+const SUNRISE_OFFSET_OPTIONS: { key: string; min: number }[] = [
+  { key: '0', min: 0 },
+  { key: '5', min: 5 },
+  { key: '10', min: 10 },
+  { key: '15', min: 15 },
+  { key: '30', min: 30 },
+];
+
+// Onboarding intent — re-editable here so it's never a one-way persona trap
+// (P16.6). Order matters: [0] is the primary intent driving the Home heroes.
+const INTENT_OPTIONS: IntentKey[] = ['worship', 'panchang', 'kundli'];
+const INTENT_ICON: Record<IntentKey, IconName> = {
+  worship: 'flame',
+  panchang: 'calendar',
+  kundli: 'compass',
+};
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+export default function SettingsScreen() {
+  const {
+    isDarkMode,
+    themeMode,
+    setThemeMode,
+    userLocation,
+    locationName,
+    fontSize,
+    setFontSize,
+    language,
+    setLanguage,
+    ayanamsa,
+    setAyanamsa,
+    chartStyle,
+    setChartStyle,
+    houseSystem,
+    setHouseSystem,
+    dailyReminderEnabled,
+    setDailyReminderEnabled,
+    dailyReminderTime,
+    setDailyReminderTime,
+    sunriseAlertEnabled,
+    setSunriseAlertEnabled,
+    sunriseAlertOffsetMin,
+    setSunriseAlertOffsetMin,
+    useDevanagariNumerals,
+    setUseDevanagariNumerals,
+    timeFormat,
+    setTimeFormat,
+    quietHoursEnabled,
+    setQuietHoursEnabled,
+    quietHoursStart,
+    setQuietHoursStart,
+    quietHoursEnd,
+    setQuietHoursEnd,
+    showVikramSamvat,
+    setShowVikramSamvat,
+    masaSystem,
+    setMasaSystem,
+    panchangLayout,
+    setPanchangLayout,
+    region,
+    setRegion,
+    userBirthDate,
+    setUserBirthDate,
+    userBirthTime,
+    setUserBirthTime,
+    userBirthPlace,
+    userSex,
+    setUserSex,
+    userName,
+    setUserName,
+    setWalkthroughStep,
+    primaryIntent,
+    setPrimaryIntent,
+  } = useStore();
+  const colors = isDarkMode ? darkColors : lightColors;
+  const { t, i18n } = useTranslation();
+  const { formatTime: formatDisplayTime } = useLocaleFormatters();
+  // UMP says whether this user must be able to revisit their ad-consent
+  // choices; the "Ad privacy options" row exists only when it does.
+  const { privacyOptionsRequired } = useAdsReady();
+
+  function handleLanguageChange(lang: AppLanguage) {
+    setLanguage(lang);
+    changeLanguage(resolveLanguage(lang));
+  }
+
+  const [sunriseTime, setSunriseTime] = useState<string | null>(null);
+  const [dobPickerOpen, setDobPickerOpen] = useState(false);
+  const [fontSheetOpen, setFontSheetOpen] = useState(false);
+  const [langSheetOpen, setLangSheetOpen] = useState(false);
+  const [masaSheetOpen, setMasaSheetOpen] = useState(false);
+  const [layoutSheetOpen, setLayoutSheetOpen] = useState(false);
+  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
+  const [dailyTimePickerOpen, setDailyTimePickerOpen] = useState(false);
+  const [sunriseOffsetSheetOpen, setSunriseOffsetSheetOpen] = useState(false);
+  const [birthTimePickerOpen, setBirthTimePickerOpen] = useState(false);
+  const [timeFormatSheetOpen, setTimeFormatSheetOpen] = useState(false);
+  const [quietStartPickerOpen, setQuietStartPickerOpen] = useState(false);
+  const [quietEndPickerOpen, setQuietEndPickerOpen] = useState(false);
+  const [nameSheetOpen, setNameSheetOpen] = useState(false);
+
+  const timeFormatOptions: OptionSheetItem<TimeFormat>[] = [
+    { key: 'auto', label: t('settings.timeFormatAuto'), desc: t('settings.timeFormatAutoDesc') },
+    { key: '12h', label: t('settings.timeFormat12h') },
+    { key: '24h', label: t('settings.timeFormat24h') },
+  ];
+
+  const fontSizeLabel = t(`settings.fontSize${fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}` as any);
+  const languageLabel =
+    LANGUAGE_OPTIONS.find(o => o.key === language)?.nativeLabel ?? t('settings.systemDefault');
+  const masaLabel = t(`panchang.${masaSystem}`);
+
+  const languageOptions: OptionSheetItem<AppLanguage>[] = LANGUAGE_OPTIONS.map(o => ({
+    key: o.key,
+    label: o.key === 'system' ? t('settings.systemDefault') : o.nativeLabel,
+  }));
+
+  const masaOptions: OptionSheetItem<MasaSystem>[] = [
+    { key: 'purnimanta', label: t('panchang.purnimanta'), desc: t('settings.masaSystemPurnimantaDesc') },
+    { key: 'amanta', label: t('panchang.amanta'), desc: t('settings.masaSystemAmantaDesc') },
+  ];
+
+  const layoutOptions: OptionSheetItem<'compact' | 'dense'>[] = [
+    { key: 'compact', label: t('panchang.layoutCompact') },
+    { key: 'dense', label: t('panchang.layoutDense') },
+  ];
+  const layoutLabel = t(`panchang.layout${panchangLayout.charAt(0).toUpperCase() + panchangLayout.slice(1)}` as 'panchang.layoutCompact' | 'panchang.layoutDense');
+
+  const ayanamsaOptions: OptionSheetItem<Ayanamsa>[] = [
+    { key: 'lahiri', label: t('settings.ayanamsa.lahiri'), desc: t('settings.ayanamsa.lahiriDesc') },
+    { key: 'raman', label: t('settings.ayanamsa.raman') },
+    { key: 'krishnamurti', label: t('settings.ayanamsa.kp') },
+    { key: 'true-chitra', label: t('settings.ayanamsa.trueChitra') },
+    { key: 'thirukanitham', label: t('settings.ayanamsa.thirukanitham') },
+  ];
+  const ayanamsaLabel =
+    ayanamsa === 'raman'
+      ? t('settings.ayanamsa.raman')
+      : ayanamsa === 'krishnamurti'
+        ? t('settings.ayanamsa.kp')
+        : ayanamsa === 'true-chitra'
+          ? t('settings.ayanamsa.trueChitra')
+          : ayanamsa === 'thirukanitham'
+            ? t('settings.ayanamsa.thirukanitham')
+            : t('settings.ayanamsa.lahiri');
+  const [ayanamsaSheetOpen, setAyanamsaSheetOpen] = useState(false);
+
+  const chartStyleOptions: OptionSheetItem<ChartStyle>[] = [
+    { key: 'north', label: t('settings.chartStyle.north'), desc: t('settings.chartStyle.northDesc') },
+    { key: 'south', label: t('settings.chartStyle.south'), desc: t('settings.chartStyle.southDesc') },
+  ];
+  const chartStyleLabel =
+    chartStyle === 'south' ? t('settings.chartStyle.south') : t('settings.chartStyle.north');
+  const [chartStyleSheetOpen, setChartStyleSheetOpen] = useState(false);
+
+  const sexOptions: OptionSheetItem<Sex>[] = [
+    { key: 'male', label: t('settings.sex.male') },
+    { key: 'female', label: t('settings.sex.female') },
+  ];
+  const sexLabel =
+    userSex === 'male'
+      ? t('settings.sex.male')
+      : userSex === 'female'
+        ? t('settings.sex.female')
+        : t('settings.sex.notSet');
+  const [sexSheetOpen, setSexSheetOpen] = useState(false);
+
+  const houseSystemOptions: OptionSheetItem<HouseSystem>[] = [
+    { key: 'whole-sign', label: t('settings.houseSystem.wholeSign'), desc: t('settings.houseSystem.wholeSignDesc') },
+    { key: 'equal', label: t('settings.houseSystem.equal') },
+    { key: 'placidus-kp', label: t('settings.houseSystem.placidusKp') },
+  ];
+  const houseSystemLabel =
+    houseSystem === 'equal'
+      ? t('settings.houseSystem.equal')
+      : houseSystem === 'placidus-kp'
+        ? t('settings.houseSystem.placidusKp')
+        : t('settings.houseSystem.wholeSign');
+  const [houseSystemSheetOpen, setHouseSystemSheetOpen] = useState(false);
+
+  const themeOptions: OptionSheetItem<ThemeMode>[] = [
+    { key: 'system', label: t('settings.themeSystem'), desc: t('settings.themeSystemDesc') },
+    { key: 'light', label: t('settings.themeLight') },
+    { key: 'dark', label: t('settings.themeDark') },
+  ];
+  const themeLabel =
+    themeMode === 'light'
+      ? t('settings.themeLight')
+      : themeMode === 'dark'
+        ? t('settings.themeDark')
+        : t('settings.themeSystem');
+
+  // Fetch today's sunrise once (needed to schedule the sunrise alert)
+  // Also captures the numeric ayanamsa value for the diagnostic row.
+  const [ayanamsaValue, setAyanamsaValue] = useState<number | null>(null);
+  useEffect(() => {
+    const { janmaNakshatra, janmaRashi } = deriveJanmaIndicesFromStore({
+      userBirthDate, userBirthTime, userBirthPlace,
+    });
+    fetchPanchangForToday(
+      userLocation ?? FALLBACK_COORDS, resolveLanguage(language), region, ayanamsa, janmaNakshatra, janmaRashi,
+    ).then((p) => {
+      if (p?.sunrise && p.sunrise !== '—') setSunriseTime(p.sunrise);
+      if (typeof p?.ayanamsa === 'number') setAyanamsaValue(p.ayanamsa);
+    });
+  }, [userLocation, language, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace]);
+
+  const locationText = locationName
+    ? locationName
+    : userLocation
+      ? `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`
+      : t('settings.usingDefault');
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  // Every reschedule triggered from this screen has to carry quiet hours, the
+  // same way `app/_layout.tsx` does on cold start and on resume. Without it a
+  // reminder set here is written at its raw clock time and fires inside the
+  // user's quiet window until the next cold start silently re-shifts it.
+  const quietHours: QuietHours = {
+    enabled: quietHoursEnabled,
+    startHHmm: quietHoursStart,
+    endHHmm: quietHoursEnd,
+  };
+
+  async function handleDailyReminderToggle(val: boolean) {
+    if (val) {
+      // canAskAgain-aware: shows the OS dialog while it can still appear, and
+      // a Cancel / Open Settings alert once iOS (or Android 13+) stops asking.
+      if (!(await ensureNotificationPermission({ promptSettings: true }))) return;
+      const ok = await scheduleDailyReminder(dailyReminderTime, quietHours);
+      if (!ok) return;
+    } else {
+      await cancelDailyReminder();
+    }
+    setDailyReminderEnabled(val);
+  }
+
+  async function handleDailyReminderTimeChange(timeHHmm: string) {
+    setDailyReminderTime(timeHHmm);
+    if (dailyReminderEnabled) {
+      await scheduleDailyReminder(timeHHmm, quietHours);
+    }
+  }
+
+  async function handleSunriseOffsetChange(min: number) {
+    setSunriseAlertOffsetMin(min);
+    if (sunriseAlertEnabled) {
+      await scheduleSunriseAlert(userLocation ?? FALLBACK_COORDS, min);
+    }
+  }
+
+  function handleDobPick(date: Date) {
+    setUserBirthDate(ymd(date));
+  }
+
+  function handleDobClear() {
+    setUserBirthDate(null);
+  }
+
+  // Memoised on the ISO string: the date picker is bound to this Date, and a
+  // fresh identity on every render would read as a new value while it is open.
+  const userBirthDateObj = useMemo(
+    () => (userBirthDate ? new Date(userBirthDate + 'T12:00:00') : null),
+    [userBirthDate],
+  );
+  const birthDateLabel = userBirthDateObj
+    ? userBirthDateObj.toLocaleDateString(i18n.language === 'hi' ? 'hi-IN' : 'en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : t('settings.birthDateNotSet');
+
+  async function handleSunriseAlertToggle(val: boolean) {
+    if (val) {
+      if (!sunriseTime) {
+        Alert.alert(t('settings.sunriseUnavailable'), t('settings.sunriseUnavailableDesc'));
+        return;
+      }
+      if (!(await ensureNotificationPermission({ promptSettings: true }))) return;
+      const ok = await scheduleSunriseAlert(userLocation ?? FALLBACK_COORDS, sunriseAlertOffsetMin);
+      if (!ok) return;
+    } else {
+      await cancelSunriseAlert();
+    }
+    setSunriseAlertEnabled(val);
+  }
+
+  return (
+    <ScreenMount>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
+
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      {/* Settings is a pushed stack screen reached from the Home gear — a
+          hidden NativeTabs trigger can't be focused, so it must NOT live in
+          the (tabs) group. Back pops to wherever the user came from. */}
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
+        <MotionPressable
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.back')}>
+          <Icon name="chevron-left" size={22} color={colors.textSecondary} />
+        </MotionPressable>
+        <Text variant="display" style={[styles.headerTitle, { color: colors.textPrimary, textAlign: 'left' }]}>
+          {t('settings.title')}
+        </Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
+        showsVerticalScrollIndicator={false}>
+
+        {/* ── Location ──────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.location')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <MotionPressable
+            pressedScale={0.97}
+            onPress={() => router.push('/location-permission')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.myLocation')}>
+            <SettingRow
+              icon="location"
+              label={t('settings.gpsLocation')}
+              sublabel={locationText}
+              colors={colors}
+              right={
+                <View style={styles.locationRight}>
+                  <View style={[styles.statusDot, { backgroundColor: userLocation ? '#5DCAA5' : colors.textMuted }]} />
+                  <Icon name="chevron-right" size={14} color={colors.textMuted} />
+                </View>
+              }
+            />
+          </MotionPressable>
+          <Divider colors={colors} />
+          <RegionRow region={region} onChange={setRegion} colors={colors} />
+        </View>
+
+
+        {/* ── Calendar ─────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.calendar')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <PickerRow
+            icon="apps"
+            label={t('panchang.layoutSettingLabel')}
+            value={layoutLabel}
+            onPress={() => setLayoutSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <PickerRow
+            icon="calendar"
+            label={t('settings.masaSystem')}
+            value={masaLabel}
+            onPress={() => setMasaSheetOpen(true)}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <PickerRow
+            icon="compass"
+            label={t('settings.ayanamsa.label')}
+            value={ayanamsaLabel}
+            onPress={() => setAyanamsaSheetOpen(true)}
+            colors={colors}
+          />
+        </View>
+
+        {/* ── Language ──────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.language')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <PickerRow
+            icon="globe"
+            label={t('settings.appLanguage')}
+            value={languageLabel}
+            onPress={() => setLangSheetOpen(true)}
+            colors={colors}
+          />
+        </View>
+
+        {/* ── Appearance ────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.appearance')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+          <PickerRow
+            icon="moon"
+            label={t('settings.theme')}
+            value={themeLabel}
+            onPress={() => setThemeSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="text"
+            label={t('settings.fontSize')}
+            value={fontSizeLabel}
+            onPress={() => setFontSheetOpen(true)}
+            colors={colors}
+          />
+
+        </View>
+
+        {/* ── What brings you here? (intent — re-editable, P16.6) ──────── */}
+        <SectionHeader label={t('settings.intentSection')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {INTENT_OPTIONS.map((key, i) => {
+            const checked = primaryIntent.includes(key);
+            return (
+              <View key={key}>
+                {i > 0 && <Divider colors={colors} />}
+                <MotionPressable
+                  onPress={() => {
+                    const next = checked
+                      ? primaryIntent.filter((k) => k !== key)
+                      : [...primaryIntent, key];
+                    setPrimaryIntent(next);
+                  }}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                  accessibilityLabel={t(`onboarding.intent_${key}`)}>
+                  <SettingRow
+                    icon={INTENT_ICON[key]}
+                    label={t(`onboarding.intent_${key}`)}
+                    colors={colors}
+                    right={
+                      <View
+                        style={[
+                          styles.intentCheck,
+                          {
+                            borderColor: checked ? colors.accent : colors.border,
+                            backgroundColor: checked ? colors.accent : 'transparent',
+                          },
+                        ]}>
+                        {checked && <Icon name="check" size={12} color={palette.night} />}
+                      </View>
+                    }
+                  />
+                </MotionPressable>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* ── Display ───────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.display')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+          <PickerRow
+            icon="clock"
+            label={t('settings.timeFormat')}
+            value={
+              timeFormat === '12h' ? t('settings.timeFormat12h')
+                : timeFormat === '24h' ? t('settings.timeFormat24h')
+                  : t('settings.timeFormatAuto')
+            }
+            onPress={() => setTimeFormatSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="text"
+            label={t('settings.devanagariNumerals')}
+            sublabel={t('settings.devanagariNumeralsDesc')}
+            colors={colors}
+            right={
+              <Switch
+                value={useDevanagariNumerals}
+                onValueChange={setUseDevanagariNumerals}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={useDevanagariNumerals ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="calendar"
+            label={t('settings.showVikramSamvat')}
+            sublabel={t('settings.showVikramSamvatDesc')}
+            colors={colors}
+            right={
+              <Switch
+                value={showVikramSamvat}
+                onValueChange={setShowVikramSamvat}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={showVikramSamvat ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+        </View>
+
+        {/* ── Home Screen Widget ──────────────────────────────────────── */}
+        {/* The native WidgetData bridge exists only on Android until the
+            WidgetKit pass lands, so on iOS the whole section disappears rather
+            than offering a row that leads to a widget that cannot be placed. */}
+        {isWidgetBridgeAvailable && (
+          <>
+            <SectionHeader label={t('settings.widgetSection')} colors={colors} />
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <MotionPressable
+                onPress={() => router.push('/settings/widget')}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.widgetCustomize')}>
+                <SettingRow
+                  icon="apps"
+                  label={t('settings.widgetCustomize')}
+                  sublabel={t('settings.widgetCustomizeDesc')}
+                  colors={colors}
+                  right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+                />
+              </MotionPressable>
+            </View>
+          </>
+        )}
+
+        {/* Deities + Mantra Jaap moved to the Library tab's "Your Practice"
+            bucket in P16.5 (/settings/deities + /jaap stay routable). */}
+
+        {/* ── Horoscope ─────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.horoscope')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <PickerRow
+            icon="person"
+            label={t('settings.name')}
+            value={userName ?? t('settings.nameNotSet')}
+            onPress={() => setNameSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="person"
+            label={t('settings.sex.label')}
+            value={sexLabel}
+            onPress={() => setSexSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <MotionPressable
+            onPress={() => setDobPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.birthDate')}>
+            <SettingRow
+              icon="gift"
+              label={t('settings.birthDate')}
+              sublabel={birthDateLabel}
+              colors={colors}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="clock"
+            label={t('settings.birthTime')}
+            value={userBirthTime ? formatDisplayTime(userBirthTime) : t('settings.birthTimeNotSet')}
+            onPress={() => setBirthTimePickerOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="location"
+            label={t('settings.birthPlace')}
+            value={userBirthPlace?.name ?? t('settings.birthPlaceNotSet')}
+            onPress={() => router.push('/settings/birth-place')}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="diamond"
+            label={t('settings.chartStyle.label')}
+            value={chartStyleLabel}
+            onPress={() => setChartStyleSheetOpen(true)}
+            colors={colors}
+          />
+
+          <Divider colors={colors} />
+
+          <PickerRow
+            icon="apps"
+            label={t('settings.houseSystem.label')}
+            value={houseSystemLabel}
+            onPress={() => setHouseSystemSheetOpen(true)}
+            colors={colors}
+          />
+        </View>
+
+        {/* ── Notifications ─────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.notifications')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+          <SettingRow
+            icon="bell"
+            label={t('settings.dailyReminder')}
+            sublabel={t('settings.dailyReminderAt', { time: formatDisplayTime(dailyReminderTime) })}
+            colors={colors}
+            right={
+              <Switch
+                value={dailyReminderEnabled}
+                onValueChange={handleDailyReminderToggle}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={dailyReminderEnabled ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+          {dailyReminderEnabled && (
+            <>
+              <Divider colors={colors} />
+              <PickerRow
+                icon="clock"
+                label={t('settings.dailyReminderTime')}
+                value={formatDisplayTime(dailyReminderTime)}
+                onPress={() => setDailyTimePickerOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="sun"
+            label={t('settings.sunriseAlert')}
+            sublabel={sunriseTime ? t('settings.sunriseAlertAt', { time: sunriseTime }) : t('settings.sunriseAlertGeneric')}
+            colors={colors}
+            right={
+              <Switch
+                value={sunriseAlertEnabled}
+                onValueChange={handleSunriseAlertToggle}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={sunriseAlertEnabled ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+          {sunriseAlertEnabled && (
+            <>
+              <Divider colors={colors} />
+              <PickerRow
+                icon="alarm"
+                label={t('settings.sunriseOffset')}
+                value={
+                  sunriseAlertOffsetMin === 0
+                    ? t('settings.sunriseOffsetAtSunrise')
+                    : t('settings.sunriseOffsetMinBefore', { min: sunriseAlertOffsetMin })
+                }
+                onPress={() => setSunriseOffsetSheetOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
+
+          <Divider colors={colors} />
+
+          <MotionPressable
+            onPress={() => router.push('/settings/reminders')}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.festivalTithiReminders')}>
+            <SettingRow
+              icon="alarm"
+              label={t('settings.festivalTithiReminders')}
+              sublabel={t('settings.festivalTithiRemindersDesc')}
+              colors={colors}
+              right={<Icon name="chevron-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="moon"
+            label={t('settings.quietHours')}
+            sublabel={
+              quietHoursEnabled
+                ? t('settings.quietHoursActive', {
+                    start: formatDisplayTime(quietHoursStart),
+                    end: formatDisplayTime(quietHoursEnd),
+                  })
+                : t('settings.quietHoursDesc')
+            }
+            colors={colors}
+            right={
+              <Switch
+                value={quietHoursEnabled}
+                onValueChange={setQuietHoursEnabled}
+                trackColor={{ false: colors.border, true: colors.accent + '60' }}
+                thumbColor={quietHoursEnabled ? colors.accent : colors.textDisabled}
+              />
+            }
+          />
+
+          {quietHoursEnabled && (
+            <>
+              <Divider colors={colors} />
+              <PickerRow
+                icon="clock"
+                label={t('settings.quietHoursStart')}
+                value={formatDisplayTime(quietHoursStart)}
+                onPress={() => setQuietStartPickerOpen(true)}
+                colors={colors}
+              />
+              <Divider colors={colors} />
+              <PickerRow
+                icon="clock"
+                label={t('settings.quietHoursEnd')}
+                value={formatDisplayTime(quietHoursEnd)}
+                onPress={() => setQuietEndPickerOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
+
+        </View>
+
+        {/* ── About ─────────────────────────────────────────────────── */}
+        <SectionHeader label={t('settings.about')} colors={colors} />
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+          <MotionPressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.replayWalkthrough')}
+            onPress={() => {
+              setWalkthroughStep(1);
+              // `dismissTo`, not `navigate`: Settings is a pushed sibling of
+              // the `(tabs)` group, so a NAVIGATE stacks a SECOND tab
+              // navigator on top of it instead of popping back to the live
+              // one — leaving Settings on the back stack and two tab trees
+              // mounted for the rest of the session.
+              router.dismissTo('/');
+            }}>
+            <SettingRow
+              icon="walk"
+              label={t('settings.replayWalkthrough')}
+              sublabel={t('settings.replayWalkthroughDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          <Divider colors={colors} />
+
+          <MotionPressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.rateApp')}
+            onPress={() => { void requestRating(); }}>
+            <SettingRow
+              icon="heart"
+              label={t('settings.rateApp')}
+              sublabel={t('settings.rateAppDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          <Divider colors={colors} />
+
+          <MotionPressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.shareApp')}
+            onPress={() => { void shareApp(t('settings.shareAppMessage')); }}>
+            <SettingRow
+              icon="share"
+              label={t('settings.shareApp')}
+              sublabel={t('settings.shareAppDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          <Divider colors={colors} />
+
+          <MotionPressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.sendFeedback')}
+            onPress={() => { void Linking.openURL('mailto:ishank1995dev@gmail.com?subject=Dharmagya%20Feedback').catch(() => {}); }}>
+            <SettingRow
+              icon="chat"
+              label={t('settings.sendFeedback')}
+              sublabel={t('settings.sendFeedbackDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          <Divider colors={colors} />
+
+          <MotionPressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.privacyPolicy')}
+            onPress={() => { void Linking.openURL('https://dharmagya.app/privacy').catch(() => {}); }}>
+            <SettingRow
+              icon="shield"
+              label={t('settings.privacyPolicy')}
+              sublabel={t('settings.privacyPolicyDesc')}
+              colors={colors}
+              right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+            />
+          </MotionPressable>
+
+          {/* UMP privacy-options form — the "withdraw later" half of the
+              consent promise in the privacy policy. Rendered only where UMP
+              requires it (regulated regions), so no dead row elsewhere. */}
+          {privacyOptionsRequired && (
+            <>
+              <Divider colors={colors} />
+
+              <MotionPressable
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.adPrivacyOptions')}
+                onPress={() => { void showAdPrivacyOptions(); }}>
+                <SettingRow
+                  icon="shield"
+                  label={t('settings.adPrivacyOptions')}
+                  sublabel={t('settings.adPrivacyOptionsDesc')}
+                  colors={colors}
+                  right={<Icon name="arrow-right" size={14} color={colors.textMuted} />}
+                />
+              </MotionPressable>
+            </>
+          )}
+
+          <Divider colors={colors} />
+
+          <SettingRow
+            icon="apps"
+            label={t('settings.appVersion')}
+            sublabel={t('common.appNameHindi')}
+            colors={colors}
+            right={<Text variant="mono" style={[styles.versionText, { color: colors.textMuted }]}>v{Constants.expoConfig?.version ?? '—'}</Text>}
+          />
+
+          {ayanamsaValue !== null && (
+            <>
+              <Divider colors={colors} />
+              <SettingRow
+                icon="compass"
+                label={t('settings.ayanamsa.label')}
+                sublabel={ayanamsaLabel}
+                colors={colors}
+                right={
+                  <Text variant="mono" style={[styles.versionText, { color: colors.textMuted }]}>
+                    {t('settings.ayanamsa.value', { degrees: ayanamsaValue.toFixed(2) })}
+                  </Text>
+                }
+              />
+            </>
+          )}
+
+        </View>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      <DatePickerModal
+        visible={dobPickerOpen}
+        onClose={() => setDobPickerOpen(false)}
+        value={userBirthDateObj}
+        onPick={handleDobPick}
+        onClear={handleDobClear}
+        minYear={1900}
+        maxYear={new Date().getFullYear()}
+        maxDate={new Date()}
+        colors={colors}
+        title={t('settings.birthDatePickerTitle')}
+      />
+
+      <FontSizeSheet
+        visible={fontSheetOpen}
+        onClose={() => setFontSheetOpen(false)}
+        value={fontSize}
+        onChange={setFontSize}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={langSheetOpen}
+        onClose={() => setLangSheetOpen(false)}
+        title={t('settings.languagePickerTitle')}
+        options={languageOptions}
+        value={language}
+        onChange={(next) => handleLanguageChange(next as AppLanguage)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={masaSheetOpen}
+        onClose={() => setMasaSheetOpen(false)}
+        title={t('settings.masaSystemPickerTitle')}
+        options={masaOptions}
+        value={masaSystem}
+        onChange={(next) => setMasaSystem(next as MasaSystem)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={layoutSheetOpen}
+        onClose={() => setLayoutSheetOpen(false)}
+        title={t('panchang.layoutSettingLabel')}
+        options={layoutOptions}
+        value={panchangLayout}
+        onChange={(next) => setPanchangLayout(next as 'compact' | 'dense')}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={ayanamsaSheetOpen}
+        onClose={() => setAyanamsaSheetOpen(false)}
+        title={t('settings.ayanamsa.pickerTitle')}
+        options={ayanamsaOptions}
+        value={ayanamsa}
+        onChange={(next) => setAyanamsa(next as Ayanamsa)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={chartStyleSheetOpen}
+        onClose={() => setChartStyleSheetOpen(false)}
+        title={t('settings.chartStyle.pickerTitle')}
+        options={chartStyleOptions}
+        value={chartStyle}
+        onChange={(next) => setChartStyle(next as ChartStyle)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={houseSystemSheetOpen}
+        onClose={() => setHouseSystemSheetOpen(false)}
+        title={t('settings.houseSystem.pickerTitle')}
+        options={houseSystemOptions}
+        value={houseSystem}
+        onChange={(next) => setHouseSystem(next as HouseSystem)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={sexSheetOpen}
+        onClose={() => setSexSheetOpen(false)}
+        title={t('settings.sex.pickerTitle')}
+        options={sexOptions}
+        value={userSex ?? 'male'}
+        onChange={(next) => setUserSex(next as Sex)}
+        colors={colors}
+      />
+
+      <OptionSheet
+        visible={themeSheetOpen}
+        onClose={() => setThemeSheetOpen(false)}
+        title={t('settings.themePickerTitle')}
+        options={themeOptions}
+        value={themeMode}
+        onChange={(next) => setThemeMode(next as ThemeMode)}
+        colors={colors}
+      />
+
+      <TimePickerModal
+        visible={dailyTimePickerOpen}
+        onClose={() => setDailyTimePickerOpen(false)}
+        value={dailyReminderTime}
+        onPick={handleDailyReminderTimeChange}
+        title={t('settings.dailyReminderTimePickerTitle')}
+      />
+
+      <OptionSheet
+        visible={sunriseOffsetSheetOpen}
+        onClose={() => setSunriseOffsetSheetOpen(false)}
+        title={t('settings.sunriseOffsetPickerTitle')}
+        options={SUNRISE_OFFSET_OPTIONS.map(o => ({
+          key: o.key,
+          label: o.min === 0
+            ? t('settings.sunriseOffsetAtSunrise')
+            : t('settings.sunriseOffsetMinBefore', { min: o.min }),
+        }))}
+        value={String(sunriseAlertOffsetMin)}
+        onChange={(next) => handleSunriseOffsetChange(parseInt(next, 10))}
+        colors={colors}
+      />
+
+      <TimePickerModal
+        visible={birthTimePickerOpen}
+        onClose={() => setBirthTimePickerOpen(false)}
+        value={userBirthTime ?? '12:00'}
+        onPick={setUserBirthTime}
+        title={t('settings.birthTimePickerTitle')}
+      />
+
+      <OptionSheet
+        visible={timeFormatSheetOpen}
+        onClose={() => setTimeFormatSheetOpen(false)}
+        title={t('settings.timeFormatPickerTitle')}
+        options={timeFormatOptions}
+        value={timeFormat}
+        onChange={(next) => setTimeFormat(next as TimeFormat)}
+        colors={colors}
+      />
+
+      <TimePickerModal
+        visible={quietStartPickerOpen}
+        onClose={() => setQuietStartPickerOpen(false)}
+        value={quietHoursStart}
+        onPick={setQuietHoursStart}
+        title={t('settings.quietHoursStartPickerTitle')}
+      />
+
+      <TimePickerModal
+        visible={quietEndPickerOpen}
+        onClose={() => setQuietEndPickerOpen(false)}
+        value={quietHoursEnd}
+        onPick={setQuietHoursEnd}
+        title={t('settings.quietHoursEndPickerTitle')}
+      />
+
+      <NameSheet
+        visible={nameSheetOpen}
+        onClose={() => setNameSheetOpen(false)}
+        value={userName ?? ''}
+        onSave={(next) => {
+          setUserName(next);
+          setNameSheetOpen(false);
+        }}
+        colors={colors}
+      />
+
+    </SafeAreaView>
+    </ScreenMount>
+  );
+}
+
+// ─── Sheet bottom padding (safe area) ───────────────────────────────────────
+
+// Every bottom sheet here lives in a transparent Modal, which draws to the
+// physical screen bottom: under the 34pt home indicator on iOS, and under the
+// navigation bar on Android (edge-to-edge is on, so RN makes the modal's
+// dialog window edge-to-edge too). 36 is the sheets' original bottom padding;
+// the inset only takes over where the system area plus a 12pt gap exceeds it
+// — a home-indicator iPhone (34 → 46) or Android 3-button nav (48dp → 60,
+// where 36 left the bottom of the Done/Close button under the bar). Android
+// gesture nav (≤24dp) and home-button iPhones (0) keep exactly 36.
+const SHEET_BOTTOM_PAD = 36;
+
+function useSheetBottomPad(): number {
+  const { bottom } = useSafeAreaInsets();
+  return Math.max(SHEET_BOTTOM_PAD, bottom + 12);
+}
+
+// ─── Name Sheet (free-text input) ───────────────────────────────────────────
+
+interface NameSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  value: string;
+  onSave: (next: string) => void;
+  colors: ColorPalette;
+}
+
+function NameSheet({ visible, onClose, value, onSave, colors }: NameSheetProps) {
+  const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
+  const [draft, setDraft] = useState(value);
+
+  // Re-sync the draft each time the sheet opens, so re-opens show the latest
+  // saved value rather than a stale one. Local edits stay local until Save.
+  // Done as a render-time "prop changed" adjustment (React docs: storing
+  // information from previous renders) rather than a setState-in-effect: the
+  // same trigger set — any change of (visible, value) while visible — but the
+  // TextInput never paints one frame of the stale draft first.
+  const [seen, setSeen] = useState({ visible, value });
+  if (seen.visible !== visible || seen.value !== value) {
+    setSeen({ visible, value });
+    if (visible) setDraft(value);
+  }
+
+  // The autoFocus input opens the keyboard with the sheet, and on iOS the
+  // keyboard would cover the input and its Save/Close buttons. The overlay
+  // itself is the KeyboardAvoidingView, so the dim backdrop grows with the
+  // keyboard padding instead of leaving an undimmed band behind the
+  // translucent keyboard. Android keeps a plain overlay (behavior undefined
+  // renders a bare View with the same style): unchanged there.
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.sheetOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
+          <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {t('settings.namePickerTitle')}
+          </Text>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={t('settings.namePlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            autoFocus
+            returnKeyType="done"
+            maxLength={40}
+            onSubmitEditing={() => onSave(draft)}
+            style={[styles.nameInput, { color: colors.textPrimary, backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}
+            accessibilityLabel={t('settings.name')}
+          />
+          <MotionPressable
+            onPress={() => onSave(draft)}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 16 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.save')}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
+              {t('common.save')}
+            </Text>
+          </MotionPressable>
+          <MotionPressable
+            onPress={onClose}
+            style={styles.nameCancel}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}>
+            <Text variant="mono-caps" style={[styles.nameCancelText, { color: colors.textMuted }]}>
+              {t('common.close')}
+            </Text>
+          </MotionPressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Generic Option Sheet ───────────────────────────────────────────────────
+
+interface OptionSheetItem<T extends string> {
+  key: T;
+  label: string;
+  desc?: string;
+}
+
+interface OptionSheetProps<T extends string> {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  options: OptionSheetItem<T>[];
+  value: T;
+  onChange: (next: T) => void;
+  colors: ColorPalette;
+}
+
+function OptionSheet<T extends string>({
+  visible, onClose, title, options, value, onChange, colors,
+}: OptionSheetProps<T>) {
+  const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
+          <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {title}
+          </Text>
+          <View style={{ marginTop: 4 }}>
+            {options.map((opt, i) => {
+              const active = opt.key === value;
+              return (
+                <MotionPressable
+                  key={opt.key}
+                        onPress={() => onChange(opt.key)}
+                  style={[
+                    styles.sheetItem,
+                    i < options.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+                    active && { backgroundColor: colors.accent + '18' },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={opt.label}
+                  accessibilityState={{ selected: active }}>
+                  <View style={styles.sheetItemText}>
+                    <Text variant="body" style={[styles.sheetItemLabel, { color: active ? colors.accentText : colors.textPrimary }]}>
+                      {opt.label}
+                    </Text>
+                    {opt.desc && (
+                      <Text variant="body-italic" style={[styles.sheetItemDesc, { color: colors.textTertiary }]}>
+                        {opt.desc}
+                      </Text>
+                    )}
+                  </View>
+                  {active && <Icon name="check" size={18} color={colors.accentText} />}
+                </MotionPressable>
+              );
+            })}
+          </View>
+          <MotionPressable
+            onPress={onClose}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 16 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.done')}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
+              {t('common.done')}
+            </Text>
+          </MotionPressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Picker Row (current-value + chevron, opens a sheet) ────────────────────
+
+interface PickerRowProps {
+  icon: IconName;
+  label: string;
+  value: string;
+  onPress: () => void;
+  colors: ColorPalette;
+  a11yLabel?: string;
+}
+
+function PickerRow({ icon, label, value, onPress, colors, a11yLabel }: PickerRowProps) {
+  return (
+    <MotionPressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel ?? label}>
+      <SettingRow
+        icon={icon}
+        label={label}
+        colors={colors}
+        right={
+          <View style={styles.regionRight}>
+            <Text
+              variant="body-italic"
+              style={[styles.regionValue, { color: colors.textPrimary }]}
+              numberOfLines={1}>
+              {value}
+            </Text>
+            <Icon name="chevron-right" size={14} color={colors.textMuted} />
+          </View>
+        }
+      />
+    </MotionPressable>
+  );
+}
+
+// ─── Font Size Sheet (preview + segmented steps) ────────────────────────────
+
+interface FontSizeSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  value: FontSize;
+  onChange: (size: FontSize) => void;
+  colors: ColorPalette;
+}
+
+const FONT_SIZE_STEPS: { key: FontSize; tKey: string; sample: number }[] = [
+  { key: 'small',  tKey: 'settings.fontSizeSmall',  sample: 11 },
+  { key: 'normal', tKey: 'settings.fontSizeNormal', sample: 13 },
+  { key: 'medium', tKey: 'settings.fontSizeMedium', sample: 15 },
+  { key: 'large',  tKey: 'settings.fontSizeLarge',  sample: 17 },
+];
+
+function FontSizeSheet({ visible, onClose, value, onChange, colors }: FontSizeSheetProps) {
+  const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
+  const activeStep = FONT_SIZE_STEPS.find(s => s.key === value);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
+          <Text variant="display-italic" style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {t('settings.fontSizePickerTitle')}
+          </Text>
+
+          {/* Live preview — uses AppText so it scales with the store */}
+          <View style={[styles.previewWrap, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+            <Text variant="body" style={[styles.previewBody, { color: colors.textPrimary }]}>
+              {t('settings.fontSizePreview')}
+            </Text>
+          </View>
+
+          {/* Segmented Aa steps */}
+          <View style={[styles.segmentRow, { backgroundColor: colors.surfaceRecessed, borderColor: colors.border }]}>
+            {FONT_SIZE_STEPS.map((step, i) => {
+              const active = step.key === value;
+              return (
+                <MotionPressable
+                  key={step.key}
+                  onPress={() => onChange(step.key)}
+                  style={[
+                    styles.segmentBtn,
+                    i < FONT_SIZE_STEPS.length - 1 && {
+                      borderRightWidth: StyleSheet.hairlineWidth,
+                      borderRightColor: colors.border,
+                    },
+                    active && { backgroundColor: colors.accent },
+                  ]}
+                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(step.tKey)}
+                  accessibilityState={{ selected: active }}>
+                  <RNText style={[styles.segmentGlyph, {
+                    fontSize: step.sample,
+                    // Text ON a turmeric fill is `palette.night`; white is
+                    // 2.29:1 here, so the selected step was the least legible
+                    // glyph in an accessibility control.
+                    color: active ? palette.night : colors.textSecondary,
+                  }]}>
+                    A
+                  </RNText>
+                </MotionPressable>
+              );
+            })}
+          </View>
+
+          {/* Current step name */}
+          <Text variant="mono-caps" style={[styles.segmentCaption, { color: colors.textMuted }]}>
+            {activeStep ? t(activeStep.tKey) : ''}
+          </Text>
+
+          <MotionPressable
+            onPress={onClose}
+            style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 18 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.done')}>
+            <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
+              {t('common.done')}
+            </Text>
+          </MotionPressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Region Row ─────────────────────────────────────────────────────────────
+
+interface RegionGroup {
+  key: 'south' | 'east' | 'west' | 'north' | 'international';
+  regions: Region[];
+}
+
+// "All India" is a standalone top entry; the other 21 states are grouped by
+// cardinal direction following the FestivalRegion ordering in panchang-ts v2.1.
+const REGION_GROUPS: RegionGroup[] = [
+  { key: 'south', regions: ['tamil-nadu', 'kerala', 'karnataka', 'andhra-pradesh', 'telangana'] },
+  { key: 'east', regions: ['west-bengal', 'odisha', 'assam', 'bihar', 'jharkhand'] },
+  { key: 'west', regions: ['gujarat', 'maharashtra', 'goa', 'rajasthan'] },
+  { key: 'north', regions: ['punjab', 'haryana', 'himachal-pradesh', 'uttarakhand', 'uttar-pradesh', 'madhya-pradesh'] },
+  { key: 'international', regions: ['nepal'] },
+];
+
+function RegionRow({
+  region, onChange, colors,
+}: { region: Region; onChange: (r: Region) => void; colors: ColorPalette }) {
+  const { t } = useTranslation();
+  const bottomPad = useSheetBottomPad();
+  const [open, setOpen] = useState(false);
+
+  function tr(r: Region): string {
+    return t(`settings.regionOptions.${r}`);
+  }
+
+  function renderRegionItem(r: Region) {
+    const active = r === region;
+    return (
+      <MotionPressable
+        key={r}
+          onPress={() => { onChange(r); setOpen(false); }}
+        style={[
+          styles.regionItem,
+          { borderBottomColor: colors.divider },
+          active && { backgroundColor: colors.accent + '18' },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={tr(r)}
+        accessibilityState={{ selected: active }}>
+        <Text variant="body" style={[styles.regionItemLabel, { color: active ? colors.accentText : colors.textPrimary }]}>
+          {tr(r)}
+        </Text>
+        {active && <Icon name="check" size={18} color={colors.accentText} />}
+      </MotionPressable>
+    );
+  }
+
+  return (
+    <>
+      <MotionPressable
+          onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings.region')}>
+        <SettingRow
+          icon="compass"
+          label={t('settings.region')}
+          colors={colors}
+          right={
+            <View style={styles.regionRight}>
+              <Text variant="body-italic" style={[styles.regionValue, { color: colors.textPrimary }]}>{tr(region)}</Text>
+              <Icon name="chevron-right" size={14} color={colors.textMuted} />
+            </View>
+          }
+        />
+      </MotionPressable>
+
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={styles.regionOverlay}>
+          <View style={[styles.regionSheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.border, paddingBottom: bottomPad }]}>
+            <View style={[styles.sheetGrabber, { backgroundColor: colors.textDisabled }]} />
+            <Text variant="display-italic" style={[styles.regionSheetTitle, { color: colors.textPrimary }]}>
+              {t('settings.regionPickerTitle')}
+            </Text>
+            <ScrollView
+              style={styles.regionScroll}
+              contentContainerStyle={{ paddingBottom: 8 }}
+              showsVerticalScrollIndicator={false}>
+              {/* "All India" stays at the top, ungrouped. */}
+              {renderRegionItem('all')}
+
+              {REGION_GROUPS.map(group => (
+                <View key={group.key}>
+                  <Text variant="mono-caps" style={[styles.regionGroupHeader, { color: colors.textMuted }]}>
+                    {t(`settings.regionGroup.${group.key}`)}
+                  </Text>
+                  {group.regions.map(renderRegionItem)}
+                </View>
+              ))}
+            </ScrollView>
+            <MotionPressable
+              onPress={() => setOpen(false)}
+              style={[styles.pickerDoneBtn, { backgroundColor: palette.turmeric, marginTop: 12 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}>
+              <Text variant="mono-caps" style={[styles.pickerDoneText, { color: palette.night }]}>
+                {t('common.done')}
+              </Text>
+            </MotionPressable>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface SectionHeaderProps {
+  label: string;
+  colors: ColorPalette;
+}
+
+function SectionHeader({ label }: SectionHeaderProps) {
+  return <SectionLabel style={styles.sectionHeader}>{label}</SectionLabel>;
+}
+
+interface SettingRowProps {
+  icon: IconName;
+  label: string;
+  sublabel?: string;
+  colors: ColorPalette;
+  right?: React.ReactNode;
+}
+
+function SettingRow({ icon, label, sublabel, colors, right }: SettingRowProps) {
+  // Two opposing layouts share this component, so shrink direction is
+  // conditional on whether a sublabel is present:
+  //   - With sublabel (toggle / nav rows): the long content is in the LEFT
+  //     column (sublabel) and the right is a fixed widget (Switch / chevron).
+  //     rowText must shrink so the sublabel truncates; rowRight must NOT
+  //     shrink or the Switch gets clipped.
+  //   - Without sublabel (PickerRow style): the long content is in the RIGHT
+  //     column (value text) and rowText only holds the label. rowRight must
+  //     shrink so the value truncates; rowText must NOT shrink or the label
+  //     wraps character-per-line.
+  const hasSublabel = !!sublabel;
+  return (
+    <View style={styles.row}>
+      <View style={[styles.iconWrap, { backgroundColor: colors.surfaceRecessed }]}>
+        <Icon name={icon} size={16} color={colors.accentText} />
+      </View>
+      <View style={[styles.rowText, hasSublabel && styles.rowTextShrinkable]}>
+        <Text variant="body" style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
+        {sublabel && (
+          <Text variant="body-italic" style={[styles.rowSublabel, { color: colors.textTertiary }]} numberOfLines={1}>
+            {sublabel}
+          </Text>
+        )}
+      </View>
+      {right && (
+        <View style={[styles.rowRight, hasSublabel && styles.rowRightFixed]}>
+          {right}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Divider({ colors }: { colors: ColorPalette }) {
+  return <View style={[styles.divider, { backgroundColor: colors.divider }]} />;
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+
+  // Header
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 22 },
+
+  // Scroll
+  scroll: { paddingTop: 8, paddingBottom: 32 },
+
+  // Section label
+  sectionHeader: {
+    marginTop: 24,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+
+  intentCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Card
+  card: {
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+
+  // Row
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.iconContainer,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // flexGrow:1 (NOT flex:1) so flexBasis stays 'auto'. SettingRow toggles
+  // rowTextShrinkable / rowRightFixed below depending on which column is
+  // expected to carry the long content — see the comment in SettingRow.
+  rowText: { flexGrow: 1, minWidth: 0 },
+  rowTextShrinkable: { flexShrink: 1 },
+  rowLabel: { fontSize: 15, lineHeight: 20 },
+  rowSublabel: { fontSize: 12, lineHeight: 16, marginTop: 2 },
+  rowRight: { alignItems: 'flex-end', flexShrink: 1, minWidth: 0 },
+  rowRightFixed: { flexShrink: 0 },
+
+  divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
+
+  // Status dot
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  locationRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // Region picker
+  regionRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
+  regionValue: { fontSize: 13, flexShrink: 1 },
+  regionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  regionSheet: {
+    borderTopLeftRadius: borderRadius.sheet,
+    borderTopRightRadius: borderRadius.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
+    paddingTop: 12,
+    // paddingBottom is inline: useSheetBottomPad() (safe-area aware).
+    maxHeight: '75%',
+  },
+  regionSheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
+  regionScroll: { flexShrink: 1 },
+  regionGroupHeader: {
+    fontSize: 10,
+    marginTop: 16,
+    marginBottom: 4,
+    marginLeft: 14,
+  },
+  regionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+  },
+  regionItemLabel: { fontSize: 15 },
+  pickerDoneBtn: { borderRadius: borderRadius.button, paddingVertical: 14, alignItems: 'center' },
+  pickerDoneText: { fontSize: 11 },
+
+  // Version text
+  versionText: { fontSize: 12 },
+
+  // Generic picker sheet (reused by language + masa system)
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  // Sheets sit ON TOP of the screen, so they need the OPAQUE raised surface —
+  // `colors.surface` is a translucent card tint and lets the page bleed through.
+  sheet: {
+    borderTopLeftRadius: borderRadius.sheet,
+    borderTopRightRadius: borderRadius.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
+    paddingTop: 12,
+    // paddingBottom is inline: useSheetBottomPad() (safe-area aware).
+  },
+  sheetGrabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, marginBottom: 14 },
+  sheetTitle: { fontSize: 20, marginBottom: 14, textAlign: 'center' },
+  sheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 8,
+    gap: 12,
+  },
+  sheetItemText: { flex: 1 },
+  sheetItemLabel: { fontSize: 15 },
+  sheetItemDesc: { fontSize: 12, marginTop: 2 },
+
+  // Name sheet
+  nameInput: {
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: borderRadius.button,
+    borderWidth: 1,
+    fontSize: 15,
+    fontFamily: 'Geist_400Regular',
+  },
+  nameCancel: { alignItems: 'center', marginTop: 10, paddingVertical: 6 },
+  nameCancelText: { fontSize: 10 },
+
+  // Font size sheet
+  previewWrap: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 18,
+    minHeight: 88,
+    justifyContent: 'center',
+  },
+  previewBody: { fontSize: 15, lineHeight: 22 },
+
+  segmentRow: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  segmentBtn: {
+    flex: 1,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  segmentGlyph: {
+    fontFamily: 'Geist_500Medium',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  segmentCaption: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 10,
+    letterSpacing: 1,
+  },
+});

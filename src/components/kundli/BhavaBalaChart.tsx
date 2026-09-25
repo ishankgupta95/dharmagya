@@ -30,18 +30,31 @@ export const BhavaBalaChart = memo(function BhavaBalaChart({
   const { t } = useTranslation();
   const isDark = useStore((s) => s.isDarkMode);
 
+  // Four rungs on a stacked 8px bar (and a 10px legend swatch) — too little
+  // area to judge lightness alone, so both grounds put the two warm rungs at
+  // the ends and the two neutrals between them, split by a wide luminance gap.
+  // Ratios below are sRGB contrast, each translucent value composited over the
+  // track, over `colors.surface`, over the ground:
+  //   dark  — neighbours 2.62 / 3.88 / 2.23:1; every rung ≥ 2.13:1 on the
+  //           track, so a rung still reads as filled where the bar ends.
+  //   light — neighbours 2.36 / 6.15 / 9.95:1.
+  // Light mode already spends both accent tokens on the end rungs — and
+  // `turmericInk` is only 2.82:1 from `turmeric`, wide enough for two rungs
+  // but not for a third step cut between them — so `drik` is ink. Its pale
+  // `sthana` is 1.45:1 on the track and separates by chroma, not lightness;
+  // the same is true of the two widest-hue dark pairs (1.48 / 1.50:1).
   const palettePerComponent: Record<Component, string> = isDark
     ? {
-        bhavadhipati: palette.goldLeaf,
-        dik: 'rgba(232,225,210,0.55)',
-        drik: 'rgba(180,150,90,0.85)',
-        sthana: 'rgba(232,225,210,0.30)',
+        bhavadhipati: palette.turmeric,
+        dik: 'rgba(232,225,210,0.28)',
+        drik: 'rgba(232,225,210,0.90)',
+        sthana: 'rgba(180,150,90,0.85)',
       }
     : {
-        bhavadhipati: palette.gold,
+        bhavadhipati: palette.turmericInk,
         dik: 'rgba(46,33,23,0.40)',
-        drik: palette.sindoor,
-        sthana: 'rgba(46,33,23,0.18)',
+        drik: palette.ink,
+        sthana: 'rgba(216,163,26,0.55)',
       };
 
   const trackColor = isDark ? 'rgba(232,225,210,0.10)' : 'rgba(46,33,23,0.08)';

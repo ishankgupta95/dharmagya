@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -7,12 +7,14 @@ import { Icon } from '@/components/common/Icon';
 import { useTranslation } from 'react-i18next';
 
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, borderRadius, palette, spacing } from '@/config/theme';
+import { darkColors, lightColors, borderRadius, controlHeight, palette, spacing } from '@/config/theme';
 import { DeitySelectionGrid } from '@/components/common/DeitySelectionGrid';
 import { ScreenMount } from '@/components/common/ScreenMount';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
+/** Ishta-devata picker (frame 32) — portrait grid + one "N selected · Save" pill. */
 export default function ManageDeitiesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isDarkMode = useStore(s => s.isDarkMode);
   const selectedDeities = useStore(s => s.selectedDeities);
   const setSelectedDeities = useStore(s => s.setSelectedDeities);
@@ -29,46 +31,44 @@ export default function ManageDeitiesScreen() {
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
 
-      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity
+      <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH }]}>
+        <MotionPressable
           onPress={() => router.back()}
-          style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.back')}>
-          <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          <Icon name="chevron-left" size={22} color={colors.textSecondary} />
+        </MotionPressable>
+        <Text
+          variant={i18n.language === 'hi' ? 'deva-bold' : 'display'}
+          style={[styles.headerTitle, { color: colors.textPrimary }]}
+          numberOfLines={1}>
           {t('settings.manageDeitiesTitle')}
         </Text>
-        <View style={[styles.backPill, { borderWidth: 0 }]} />
       </View>
 
-      <View style={[styles.intro, { paddingHorizontal: spacing.screenH }]}>
-        <Text variant="body-italic" style={[styles.introText, { color: colors.textTertiary }]}>
-          {t('settings.manageDeitiesDesc')}
-        </Text>
-      </View>
+      <Text variant="body-small" style={[styles.introText, { color: colors.textTertiary, paddingHorizontal: spacing.screenH }]}>
+        {t('settings.manageDeitiesDesc')}
+      </Text>
 
       <DeitySelectionGrid
         value={local}
         onChange={setLocal}
         colors={colors}
-        contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.screenH, paddingTop: 14, paddingBottom: 100 }}
       />
 
-      <View style={[styles.footer, { paddingHorizontal: spacing.screenH, backgroundColor: colors.base, borderTopColor: colors.divider }]}>
-        <Text variant="mono-caps" style={[styles.countLabel, { color: colors.textMuted }]}>
-          {t('onboarding.selectedCount', { count: local.length })}
-        </Text>
-        <TouchableOpacity
+      <View style={[styles.footer, { paddingHorizontal: spacing.screenH }]}>
+        <MotionPressable
           onPress={handleSave}
-          activeOpacity={0.85}
-          style={[styles.saveBtn, { backgroundColor: palette.sindoor }]}
+          pressedScale={0.97}
+          style={styles.saveBtn}
           accessibilityRole="button"
           accessibilityLabel={t('common.save')}>
-          <Text variant="mono-caps" style={styles.saveText}>{t('common.save')}</Text>
-        </TouchableOpacity>
+          <Text variant="button" style={styles.saveText}>
+            {t('onboarding.selectedCount', { count: local.length })} · {t('common.save')}
+          </Text>
+        </MotionPressable>
       </View>
 
     </SafeAreaView>
@@ -81,38 +81,30 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingTop: 6,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 22, flex: 1, textAlign: 'center' },
+  headerTitle: { flex: 1, fontSize: 27, lineHeight: 36 },
 
-  intro: { paddingTop: 14, paddingBottom: 14 },
-  introText: { fontSize: 14, lineHeight: 20 },
+  introText: { fontSize: 13, lineHeight: 19, paddingBottom: 2 },
 
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
-  countLabel: { flex: 1, fontSize: 10 },
   saveBtn: {
-    paddingHorizontal: 26,
-    paddingVertical: 12,
+    height: controlHeight.button,
     borderRadius: borderRadius.button,
+    backgroundColor: palette.turmeric,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: palette.turmeric,
+    shadowOpacity: 0.3,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  saveText: { fontSize: 11, color: palette.parchmentBright },
+  saveText: { fontSize: 15, color: palette.night },
 });

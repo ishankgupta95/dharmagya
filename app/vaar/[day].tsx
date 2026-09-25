@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,6 +15,7 @@ import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import i18n, { resolveLanguage } from '@/i18n';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   getVaarDevataByKey,
   VAAR_DEVATA,
@@ -22,7 +23,7 @@ import {
   type VaarDeity,
   type VaarDevata,
 } from '@/config/vaarDevata';
-import { getPujasForDeity, type PujaContent } from '@/config/pujas';
+import { getPujasForDeity, type PujaContent } from '@/config/poojas';
 
 type Lang = ContentLang;
 
@@ -54,10 +55,14 @@ export default function VaarDevataScreen() {
 
   // Keep the local selection in sync if the route param itself changes while
   // the screen is already mounted (e.g. a remedy-nudge tap from underneath).
-  useEffect(() => {
+  // Adjusted during render, guarded by the previous param, so the new day
+  // lands in the same commit as the new param rather than one effect later.
+  const [prevRouteDay, setPrevRouteDay] = useState(routeDay);
+  if (routeDay !== prevRouteDay) {
+    setPrevRouteDay(routeDay);
     const k = getVaarDevataByKey(routeDay)?.dayKey;
     if (k) setDayKey(k);
-  }, [routeDay]);
+  }
 
   // `dayKey` is only ever set from a valid lookup, so the fallback is defensive.
   const vaar: VaarDevata = getVaarDevataByKey(dayKey) ?? VAAR_DEVATA[0];
@@ -87,14 +92,14 @@ export default function VaarDevataScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {tForLang('vaar.detailTitle', { day: vaar.dayName[lang] })}
           </Text>
@@ -115,7 +120,7 @@ export default function VaarDevataScreen() {
                   active={active}
                   onPress={() => setDayKey(v.dayKey)}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.dayChip}
@@ -123,7 +128,7 @@ export default function VaarDevataScreen() {
                   <Text
                     variant="mono-caps"
                     numberOfLines={1}
-                    style={[styles.dayChipText, { color: active ? palette.parchmentBright : colors.textSecondary }]}>
+                    style={[styles.dayChipText, { color: active ? palette.night : colors.textSecondary }]}>
                     {v.dayShort[lang]}
                   </Text>
                 </SegmentedChip>
@@ -179,16 +184,16 @@ export default function VaarDevataScreen() {
             <Text variant="body-italic" style={[styles.mantraVariantNote, { color: colors.textTertiary }]}>
               {vaar.mantra.variantNote[lang]}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => startJaap(vaar)}
-              activeOpacity={0.85}
-              style={[styles.jaapBtn, { backgroundColor: isDarkMode ? palette.goldLeaf : palette.sindoor }]}
+              pressedScale={0.97}
+              style={[styles.jaapBtn, { backgroundColor: colors.accent }]}
               accessibilityRole="button"
               accessibilityLabel={t('vaar.a11yStartJaap')}>
-              <Icon name="flower" size={14} color={palette.parchmentBright} />
+              <Icon name="flower" size={14} color={palette.night} />
               <Text variant="mono-caps" style={styles.jaapBtnText}>{tForLang('vaar.startJaap')}</Text>
-            </TouchableOpacity>
-            <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textMuted }]}>
+            </MotionPressable>
+            <Text variant="body-italic" style={[styles.reviewNote, { color: colors.textSecondary }]}>
               {tForLang('vaar.mantraReviewNote')}
             </Text>
           </View>
@@ -197,10 +202,10 @@ export default function VaarDevataScreen() {
           {linkedPujas.length > 0 && (
             <SectionCard title={tForLang('vaar.linkedPujaLabel')} colors={colors}>
               {linkedPujas.map((p) => (
-                <TouchableOpacity
+                <MotionPressable
                   key={p.slug}
-                  onPress={() => router.push({ pathname: '/puja/[slug]', params: { slug: p.slug } })}
-                  activeOpacity={0.85}
+                  onPress={() => router.push({ pathname: '/pooja/[slug]', params: { slug: p.slug } })}
+                  pressedScale={0.97}
                   style={[styles.linkedPujaRow, { borderColor: colors.borderAccent, backgroundColor: colors.surfaceRecessed }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('puja.openNamedPuja', { name: p.name[lang] })}>
@@ -214,7 +219,7 @@ export default function VaarDevataScreen() {
                     </Text>
                   </View>
                   <Icon name="chevron-right" size={14} color={colors.textMuted} />
-                </TouchableOpacity>
+                </MotionPressable>
               ))}
             </SectionCard>
           )}
@@ -332,15 +337,15 @@ function DeityRow({
 
   if (deity.rosterId) {
     return (
-      <TouchableOpacity
+      <MotionPressable
         onPress={() => router.push(`/god/${deity.rosterId}`)}
-        activeOpacity={0.85}
+        pressedScale={0.97}
         style={[styles.deityRow, divider]}
         accessibilityRole="button"
         accessibilityLabel={t('vaar.openInLibrary', { name: deity.name[lang] })}>
         <DeityRowInner deity={deity} lang={lang} colors={colors} />
         <Icon name="chevron-right" size={14} color={colors.textMuted} />
-      </TouchableOpacity>
+      </MotionPressable>
     );
   }
   return (
@@ -429,7 +434,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     marginTop: 16,
   },
-  jaapBtnText: { fontSize: 11, color: palette.parchmentBright },
+  jaapBtnText: { fontSize: 11, color: palette.night },
   reviewNote: { fontSize: 11.5, lineHeight: 17, marginTop: 12 },
 
   // Bulleted list (offerings)

@@ -4,359 +4,443 @@ import {
   type AppStateStatus,
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from 'react-native-svg';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { MotionPressable } from '@/components/common/MotionPressable';
-import { computeVimshottariDashaFromBirth, type DashaLord } from 'panchang-ts';
-import { computeSadeSatiCached } from '@/services/astrology/kundliService';
 
 import { useTranslation } from 'react-i18next';
 
-import { useStore } from '@/store/useStore';
+import { useStore, type IntentKey } from '@/store/useStore';
 import {
   darkColors,
   lightColors,
-  MONO_FONT,
-  palette,
   spacing,
   borderRadius,
-  type ColorPalette,
+  palette,
 } from '@/config/theme';
 import {
-  computeJanmaRashiIndex,
   deriveJanmaIndicesFromStore,
   fetchPanchangForToday,
+  FALLBACK_COORDS,
+  panchangTimezoneMinutes,
 } from '@/services/astrology/panchangService';
-import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
+import { timezoneLabel } from '@/utils/timezoneLabel';
 import { resolveLanguage } from '@/i18n';
-import { DeityAvatar } from '@/components/common/DeityAvatar';
-import { NightCard, usePlinthColors, type PlinthColors } from '@/components/common/NightCard';
 import { ScreenMount } from '@/components/common/ScreenMount';
-import { Kicker } from '@/components/common/Kicker';
-import { SectionLabel } from '@/components/common/SectionLabel';
-import { Ornament } from '@/components/common/Ornament';
-import { TodaysDeityCard } from '@/components/common/TodaysDeityCard';
-import { SadhanaStreakBadge } from '@/components/common/SadhanaStreakBadge';
 import { HomePanchangSkeleton, SkeletonCrossfade } from '@/components/common/SkeletonLoader';
 import { AdBanner } from '@/components/common/AdBanner';
 import { WalkthroughSpotlight, type SpotlightRect } from '@/components/common/WalkthroughOverlay';
-import { DEITY_BY_ID } from '@/config/deities';
+import { buildDayVerdict, VERDICT_REVIEW_PENDING } from '@/utils/dayVerdict';
+import { getVaarDevataForDate, vaarDeityNames } from '@/config/vaarDevata';
 import type { IPanchangDay, IPanchangElement } from '@/types';
-import {
-  getAllAppAartis,
-  getAllAppChalisas,
-  aartiVerses,
-  type Recitation,
-  type Chalisa,
-} from '@/services/content';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getGreetingKey(): 'Morning' | 'Afternoon' | 'Evening' {
-  const h = new Date().getHours();
-  if (h < 12) return 'Morning';
-  if (h < 17) return 'Afternoon';
-  return 'Evening';
-}
-
-interface DateParts {
-  weekday: string;
-  day: string;
-  month: string;
-  year: string;
-}
-
-function getDateParts(lang: string): DateParts {
-  const locale = lang === 'hi' ? 'hi-IN' : 'en-IN';
-  const now = new Date();
-  return {
-    weekday: now.toLocaleDateString(locale, { weekday: 'long' }).toUpperCase(),
-    day: now.toLocaleDateString(locale, { day: 'numeric' }),
-    month: now.toLocaleDateString(locale, { month: 'long' }),
-    year: now.getFullYear().toString(),
-  };
-}
-
-function pickRandom<T>(arr: T[]): T | null {
-  if (!arr.length) return null;
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+const DEVA_RE = /[ऀ-ॿ]/;
 
 function getActiveElement(elements: IPanchangElement[]): IPanchangElement | undefined {
   if (!elements.length) return undefined;
-  const nowMs = Date.now();
-  for (const el of elements) {
-    if (!el.endTimeMs || el.endTimeMs > nowMs) return el;
-  }
-  return elements[elements.length - 1];
+  return elements[0];
 }
 
-const DEVA_RE = /[\u0900-\u097F]/;
-
-const DASHA_LORD_KEY: Record<DashaLord, string> = {
-  Sun: 'sun', Moon: 'moon', Mars: 'mars', Mercury: 'mercury', Jupiter: 'jupiter',
-  Venus: 'venus', Saturn: 'saturn', Rahu: 'rahu', Ketu: 'ketu',
-};
-
-function padTwo(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
+/**
+ * Parse one of the service's "2:07 PM" strings into the instant it names (epoch
+ * ms). The string is a wall clock in the PLACE's zone — `offsetMinutes` east of
+ * UTC, what the service rendered it in — on `day`'s civil date, the date the
+ * panchang was fetched for. Reading it as a device-local clock (`setHours`) was
+ * right only while phone and place shared an offset: a phone in New York on the
+ * Ujjain default counted down to a Rahu Kaal 9½ hours off. For a GPS fix the
+ * offset IS the device's, so that case reads exactly as it always did.
+ */
+function parseClockAtPlace(clock: string | undefined, day: Date, offsetMinutes: number): number | null {
+  if (!clock) return null;
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(clock.trim());
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const mer = m[3]?.toUpperCase();
+  if (mer === 'PM' && h < 12) h += 12;
+  if (mer === 'AM' && h === 12) h = 0;
+  return Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), h, min) - offsetMinutes * 60_000;
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
+/** "2h 14m" / "43m" — the countdown grain used by the Rahu Kaal strip. */
+function formatSpan(ms: number): string {
+  const totalMin = Math.max(1, Math.round(ms / 60_000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const isDarkMode = useStore(s => s.isDarkMode);
-  const favoriteIds = useStore(s => s.favoriteIds);
   const userLocation = useStore(s => s.userLocation);
   const locationName = useStore(s => s.locationName);
   const language = useStore(s => s.language);
   const region = useStore(s => s.region);
   const ayanamsa = useStore(s => s.ayanamsa);
+  const masaSystem = useStore(s => s.masaSystem);
   const userBirthDate = useStore(s => s.userBirthDate);
   const userBirthTime = useStore(s => s.userBirthTime);
   const userBirthPlace = useStore(s => s.userBirthPlace);
   const walkthroughStep = useStore(s => s.walkthroughStep);
   const setWalkthroughStep = useStore(s => s.setWalkthroughStep);
-  const selectedDeities = useStore(s => s.selectedDeities);
+  const primaryIntent = useStore(s => s.primaryIntent);
   const colors = isDarkMode ? darkColors : lightColors;
   const { t, i18n } = useTranslation();
-  const lang = i18n.language;
+  const lang: 'en' | 'hi' = i18n.language === 'hi' ? 'hi' : 'en';
+
+  // NativeTabs has no lazy/freeze gate (see `app/(tabs)/_layout.tsx`), so all
+  // four tab screens mount on cold start. Home is the initial route and so is
+  // normally focused on its very first render — `useIsFocused` reads the live
+  // state synchronously, so the latch is already true and the fetch below
+  // starts in the same effect pass it always did. It only bites when Home is
+  // NOT the entry (a notification deep-link lands on another route), where the
+  // panchang fetch would otherwise run behind whatever the user actually
+  // opened. One-way: once focused it stays armed for the session.
+  const isFocused = useIsFocused();
+  const [hasBeenFocused, setHasBeenFocused] = useState(isFocused);
+  if (isFocused && !hasBeenFocused) setHasBeenFocused(true);
 
   const [panchang, setPanchang] = useState<IPanchangDay | null>(null);
   const [panchangLoading, setPanchangLoading] = useState(true);
-  const [featuredAarti, setFeaturedAarti] = useState<Recitation | null>(null);
-  const [featuredAartiIndex, setFeaturedAartiIndex] = useState<number>(0);
-  const [featuredAartiFromSelected, setFeaturedAartiFromSelected] = useState(false);
-  const [featuredChalisa, setFeaturedChalisa] = useState<Chalisa | null>(null);
-  const [featuredChalisaIndex, setFeaturedChalisaIndex] = useState<number>(0);
-  const [featuredChalisaFromSelected, setFeaturedChalisaFromSelected] = useState(false);
+  // Minute tick drives the Rahu Kaal countdown. The value itself never
+  // animates — it is replaced (MOTION.md: reported times appear, not move).
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   // ── Panchang — fetch + mid-day refresh ────────────────────────────────────
   const lastFetchRef = useRef(0);
-
   const panchangLang = resolveLanguage(language);
-  const refreshPanchang = useCallback((showSpinner = false) => {
-    const now = Date.now();
-    if (!showSpinner && now - lastFetchRef.current < 3_600_000) return;
-    lastFetchRef.current = now;
-    if (showSpinner) setPanchangLoading(true);
+  // Everything the fetch reads, as one identity. `runFetch` closes over it and
+  // the skeleton adjustment below keys on the same object, so "the inputs
+  // changed" means exactly the same thing in both places.
+  const fetchInputs = useMemo(
+    () => ({ userLocation, panchangLang, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace }),
+    [userLocation, panchangLang, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace],
+  );
+  // The fetch itself. Its only state writes are in the promise callbacks, so
+  // an effect body can call it without a synchronous setState.
+  const runFetch = useCallback(() => {
+    lastFetchRef.current = Date.now();
     const { janmaNakshatra, janmaRashi } = deriveJanmaIndicesFromStore({
-      userBirthDate, userBirthTime, userBirthPlace,
+      userBirthDate: fetchInputs.userBirthDate,
+      userBirthTime: fetchInputs.userBirthTime,
+      userBirthPlace: fetchInputs.userBirthPlace,
     });
+    // No stored place means FALLBACK_COORDS, said explicitly. Handing the
+    // service `null` sent it to `getCoords()`, which takes a live GPS fix
+    // whenever permission happens to be granted — so Home could print a sunrise
+    // for wherever the phone was, on the phone's clock, under a header that
+    // says "Ujjain", while the Panchang tab, the widget and the sunrise alert
+    // all computed Ujjain on IST. It also left the zone of these times
+    // unknowable here, and the zone tag beside sunrise below has to name it.
     fetchPanchangForToday(
-      userLocation, panchangLang, region, ayanamsa, janmaNakshatra, janmaRashi,
+      fetchInputs.userLocation ?? FALLBACK_COORDS, fetchInputs.panchangLang, fetchInputs.region, fetchInputs.ayanamsa,
+      janmaNakshatra, janmaRashi,
     )
       .then(p => { if (p) setPanchang(p); })
       .finally(() => setPanchangLoading(false));
-  }, [userLocation, panchangLang, region, ayanamsa, userBirthDate, userBirthTime, userBirthPlace]);
+  }, [fetchInputs]);
+  const refreshPanchang = useCallback((showSpinner = false) => {
+    if (!showSpinner && Date.now() - lastFetchRef.current < 3_600_000) return;
+    if (showSpinner) setPanchangLoading(true);
+    runFetch();
+  }, [runFetch]);
 
-  useEffect(() => { refreshPanchang(true); }, [refreshPanchang]);
+  // First fetch, and a refetch whenever an input changes. The skeleton for
+  // that refetch is raised during render (React's "adjusting state when a
+  // prop changes"), keyed on `fetchInputs` and guarded by its previous value,
+  // so it lands in the commit that carries the new inputs instead of a second
+  // commit cascaded out of the effect. The key is `null` until the tab has
+  // been focused: input changes before then neither fetch (the effect's early
+  // return) nor spin. On mount key and previous key are equal, so cold start
+  // pays nothing here — the initial `panchangLoading` is already true.
+  const fetchKey = hasBeenFocused ? fetchInputs : null;
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    if (fetchKey) setPanchangLoading(true);
+  }
+  useEffect(() => {
+    if (!hasBeenFocused) return;
+    runFetch();
+  }, [runFetch, hasBeenFocused]);
   useFocusEffect(useCallback(() => { refreshPanchang(); }, [refreshPanchang]));
-
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active') refreshPanchang();
+      if (state === 'active') { refreshPanchang(); setNowMs(Date.now()); }
     });
     return () => sub.remove();
   }, [refreshPanchang]);
-
-  // ── Featured Aarti / Chalisa ─────────────────────────────────────────────
+  // Keyed on focus, not mounted forever: tabs never unmount here, so an unkeyed
+  // interval kept re-rendering Home from behind whatever tab the user was
+  // actually on — for the rest of the session, long after the Rahu Kaal strip
+  // had gone null for the day. The tick only feeds visible chrome (that
+  // countdown and the midnight header rollover), so it has no reason to run
+  // while the screen is not on screen.
+  //
+  // The leading edge on re-arm is load-bearing, not tidiness: without it a
+  // return to Home after midnight paints yesterday's date until the first tick
+  // lands, up to 30s later. It rides a zero-delay timer rather than running in
+  // the effect body so it stays out of the synchronous render cascade, and it
+  // is guarded on staleness so that arming at mount — where `nowMs` is
+  // milliseconds old — bails out instead of costing cold start a second render
+  // of the whole screen.
   useEffect(() => {
-    const allAartis = getAllAppAartis();
-    const selected = new Set(selectedDeities);
-    let pick: Recitation | null = null;
-    let fromSelected = false;
+    if (!isFocused) return;
+    const lead = setTimeout(
+      () => setNowMs(prev => (Date.now() - prev >= 30_000 ? Date.now() : prev)),
+      0,
+    );
+    const id = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => { clearTimeout(lead); clearInterval(id); };
+  }, [isFocused]);
 
-    const favAartiSlugs = favoriteIds
-      .filter(id => id.startsWith('aarti-'))
-      .map(id => id.slice('aarti-'.length));
-    if (favAartiSlugs.length > 0) {
-      const favPool = allAartis.filter(a => favAartiSlugs.includes(a.deity));
-      pick = pickRandom(favPool);
-    }
+  // ── Header date ───────────────────────────────────────────────────────────
+  // `nowMs` collapsed to the local midnight that opens its civil day. Everything
+  // below keys off *that*, so the day-granular work doesn't re-run on every 30s
+  // countdown tick while the header still rolls over at midnight. (Memoising on
+  // `[lang]` alone froze it at mount: after an overnight resume the largest text
+  // on the launch screen named yesterday while the panchang hero and the day's
+  // deity card below it had already advanced.)
+  const dayStartMs = new Date(nowMs).setHours(0, 0, 0, 0);
+  const dateParts = useMemo(() => {
+    const locale = lang === 'hi' ? 'hi-IN' : 'en-IN';
+    // Midnight formats to the same weekday/day/month as any other moment in
+    // its day, so this reads `dayStartMs` alone — no stale-closure suppression.
+    const day = new Date(dayStartMs);
+    return {
+      weekday: day.toLocaleDateString(locale, { weekday: 'long' }),
+      dayMonth: day.toLocaleDateString(locale, { day: 'numeric', month: 'long' }),
+    };
+  }, [lang, dayStartMs]);
 
-    if (!pick && selected.size > 0) {
-      const selectedPool = allAartis.filter(a => selected.has(a.deity));
-      pick = pickRandom(selectedPool);
-      if (pick) fromSelected = true;
-    }
-
-    if (!pick) pick = pickRandom(allAartis);
-
-    setFeaturedAarti(pick);
-    setFeaturedAartiIndex(pick ? allAartis.findIndex(a => a.deity === pick!.deity) + 1 : 0);
-    setFeaturedAartiFromSelected(fromSelected);
-  }, [favoriteIds, selectedDeities]);
-
+  // The rest of the card follows the wall clock, so the day it describes has to
+  // follow it too: `refreshPanchang` is throttled to an hour, which would
+  // otherwise leave yesterday's tithi and Rahu Kaal under today's heading.
+  const lastDayStartRef = useRef(dayStartMs);
   useEffect(() => {
-    const allChalisas = getAllAppChalisas();
-    const selected = new Set(selectedDeities);
-    let pick: Chalisa | null = null;
-    let fromSelected = false;
+    if (lastDayStartRef.current === dayStartMs) return;
+    lastDayStartRef.current = dayStartMs;
+    // Bust the one-hour throttle — a day change is exactly the case it must
+    // not suppress.
+    lastFetchRef.current = 0;
+    refreshPanchang(false);
+  }, [dayStartMs, refreshPanchang]);
 
-    if (selected.size > 0) {
-      const selectedPool = allChalisas.filter(c => selected.has(c.deity));
-      pick = pickRandom(selectedPool);
-      if (pick) fromSelected = true;
-    }
-
-    if (!pick) pick = pickRandom(allChalisas);
-
-    setFeaturedChalisa(pick);
-    setFeaturedChalisaIndex(pick ? allChalisas.findIndex(c => c.deity === pick!.deity) + 1 : 0);
-    setFeaturedChalisaFromSelected(fromSelected);
-  }, [selectedDeities]);
-
-  const greetingKey = useMemo(() => getGreetingKey(), []);
-  const dateParts = useMemo(() => getDateParts(lang), [lang]);
-
-  const selectedDeityMetas = useMemo(
-    () => selectedDeities.map((id) => DEITY_BY_ID[id]).filter(Boolean),
-    [selectedDeities]
+  // ── Zone tag beside sunrise (A14) ─────────────────────────────────────────
+  // The zone the fetch above renders in: a stored place's own (none for a GPS
+  // fix, which is the phone's clock), else FALLBACK_COORDS' IST. Printed for
+  // the fallback always, and for a chosen place whose offset is not the
+  // phone's; null otherwise (see `timezoneLabel`).
+  const zoneLabel = useMemo(
+    () => timezoneLabel(userLocation, FALLBACK_COORDS, new Date(dayStartMs)),
+    [userLocation, dayStartMs],
   );
 
-  // First verse of the featured aarti, for the card's verse-peek.
-  const aartiVersePeek = useMemo(() => {
-    if (!featuredAarti) return null;
-    const lines = aartiVerses(featuredAarti, 'hi');
-    return lines[0] ?? null;
-  }, [featuredAarti]);
-
-  const birthInstant = useMemo<Date | null>(() => {
-    if (!userBirthDate) return null;
-    const tz = userBirthPlace?.timezone ?? DEFAULT_BIRTH_TIMEZONE;
-    try {
-      return wallclockInZoneToUtc(userBirthDate, userBirthTime ?? '12:00', tz);
-    } catch {
-      return null;
+  // ── Rahu Kaal countdown ───────────────────────────────────────────────────
+  // The window's strings are wall clocks in the zone the panchang was rendered
+  // in, on the day it was fetched for, so they are turned into instants with
+  // that zone's offset — the service's own resolution for the same coords and
+  // day — before being compared with the phone's clock. Memoised apart from
+  // the countdown so the offset (an Intl round-trip for a non-IST place) is
+  // resolved once per fetch, not on every 30s tick.
+  const rahuWindow = useMemo(() => {
+    if (!panchang) return null;
+    const offset = panchangTimezoneMinutes(userLocation ?? FALLBACK_COORDS, panchang.date);
+    const start = parseClockAtPlace(panchang.rahuKalamStart, panchang.date, offset);
+    const end = parseClockAtPlace(panchang.rahuKalamEnd, panchang.date, offset);
+    if (start === null || end === null) return null;
+    return { start, end };
+  }, [panchang, userLocation]);
+  const rahu = useMemo(() => {
+    if (!rahuWindow) return null;
+    if (nowMs < rahuWindow.start) {
+      return { text: t('home.rahuBeginsIn', { time: formatSpan(rahuWindow.start - nowMs) }) };
     }
-  }, [userBirthDate, userBirthTime, userBirthPlace]);
-
-  // ── Dasha (Vimshottari) — current mahādaśā lord, if birth date set ────────
-  const dashaLord = useMemo<DashaLord | null>(() => {
-    if (!birthInstant) return null;
-    try {
-      return computeVimshottariDashaFromBirth(birthInstant, 'lahiri').currentMahaDashaLord;
-    } catch {
-      return null;
+    if (nowMs < rahuWindow.end) {
+      return { text: t('home.rahuEndsIn', { time: formatSpan(rahuWindow.end - nowMs) }) };
     }
-  }, [birthInstant]);
+    return null; // over for today — the strip earns its place only while live
+  }, [rahuWindow, nowMs, t]);
 
-  // ── Sade Sati — surface a small banner when Saturn is in the 7.5y arc ────
-  const sadeSatiPhase = useMemo<1 | 2 | 3 | null>(() => {
-    if (!birthInstant) return null;
-    try {
-      const moonRashi = computeJanmaRashiIndex(birthInstant);
-      const info = computeSadeSatiCached(moonRashi, new Date(), 'lahiri');
-      return info?.active ? info.phase : null;
-    } catch {
-      return null;
-    }
-  }, [birthInstant]);
+  // Plain verdict — shared with the Panchang tab (P16.3).
+  const verdict = useMemo(
+    () => buildDayVerdict(panchang, !!panchang?.eclipse, t),
+    [panchang, t],
+  );
 
-  // ── Walkthrough refs & measurement ────────────────────────────────────────
+  // ── Day's deity (vaar devata) ─────────────────────────────────────────────
+  // Keyed on `dayStartMs`, not a bare `new Date()`: only the weekday is read,
+  // so midnight gives the same deity as any other moment of its day — and it
+  // gives the compiler a reactive input, where a clock read in render is
+  // cached at mount and the card would stop rolling over at midnight.
+  const vaar = getVaarDevataForDate(new Date(dayStartMs));
+  const deityNames = vaarDeityNames(vaar, lang);
+
+  // ── Quick actions — intent decides which tile leads (P16.6 + Diya 01).
+  // Built inline each render: four tiny objects, cheaper than memo bookkeeping.
+  const abhijit = panchang?.abhijitMuhurtaStart;
+  const jaapTile = {
+    key: 'jaap', icon: 'flower' as IconName,
+    title: t('home.quickJaap'), caption: t('home.quickJaapCaption'),
+    go: () => router.push('/jaap'),
+  };
+  const muhuratTile = {
+    key: 'muhurat', icon: 'clock' as IconName,
+    title: t('home.quickMuhurat'),
+    caption: abhijit ? t('home.abhijitAt', { time: abhijit }) : t('home.quickMuhuratCaption'),
+    go: () => router.push('/muhurat'),
+  };
+  const aartiTile = {
+    key: 'aarti', icon: 'flame' as IconName,
+    title: t('home.quickAarti'), caption: deityNames.split(/[,·]/)[0].trim(),
+    go: () => router.push('/aarti'),
+  };
+  const kundliTile = {
+    key: 'kundli', icon: 'compass' as IconName,
+    title: t('home.quickKundli'), caption: t('home.quickKundliCaption'),
+    go: () => router.push('/(tabs)/astrology'),
+  };
+  const primaryKey: IntentKey = primaryIntent[0] ?? 'worship';
+  const quickActions =
+    primaryKey === 'kundli' ? [kundliTile, jaapTile, muhuratTile]
+    : primaryKey === 'panchang' ? [muhuratTile, jaapTile, aartiTile]
+    : [jaapTile, muhuratTile, aartiTile];
+
+  const locationLabel = locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'));
+
+  // ── Walkthrough — Step 1 spotlights the Panchang hero ─────────────────────
   const panchangCardRef = useRef<View>(null);
   const [panchangRect, setPanchangRect] = useState<SpotlightRect | null>(null);
-
   const measurePanchang = useCallback(() => {
     panchangCardRef.current?.measureInWindow((x, y, width, height) => {
       if (width > 0) setPanchangRect({ x, y, width, height });
     });
   }, []);
-
   useFocusEffect(
     useCallback(() => {
-      // Step 4 used to spotlight the gear in the Home header; Settings is
-      // now a bottom-tab so the gear was removed — auto-finish the walk-
-      // through when step 4 fires.
-      if (walkthroughStep === 4) {
-        setWalkthroughStep(0);
-        return;
-      }
       if (walkthroughStep === 1) {
         const timer = setTimeout(measurePanchang, 300);
         return () => clearTimeout(timer);
       }
-    }, [walkthroughStep, measurePanchang, setWalkthroughStep])
+    }, [walkthroughStep, measurePanchang]),
   );
-
   const skipWalkthrough = useCallback(() => setWalkthroughStep(0), [setWalkthroughStep]);
 
-  const plinth = usePlinthColors();
+  const tithi = panchang ? getActiveElement(panchang.tithis) : undefined;
+  // The lunar month in the user's own reckoning — the same string the Panchang
+  // tab's Chandra Masa row prints, read the same way, so the two screens cannot
+  // disagree. Neither of the other two fields can stand in here: `masa` is the
+  // SOLAR month (the rashi the Sun occupies), and `hinduMonth` is always the
+  // purnimanta name regardless of the setting — on 2026-09-03 that is
+  // Bhadrapada where an Amanta user is owed Shravana. The line is unlabelled
+  // and sits directly under a paksha-prefixed tithi, so it reads as *the*
+  // Hindu month.
+  const masaLine = masaSystem === 'purnimanta'
+    ? panchang?.hinduMonthPurnimanta
+    : panchang?.hinduMonthAmanta;
 
   return (
     <ScreenMount>
     <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top']}>
+      {/* One warm light in a dark room — a faint turmeric wash from the top.
+          Bounded to the top 42% rather than absoluteFill: on Android every
+          <Svg> root is drawn into a retained ARGB_8888 bitmap the size of the
+          view (9.2 MiB full-screen on a 1080×2220 panel, never recycled because
+          the tab never unmounts) and software-filled pixel by pixel. The glow
+          only ever reached y = 42% — the ellipse's own vertical radius — so the
+          rest of that bitmap was fully transparent. Shrinking the box and
+          taking `ry` to 100% of it leaves the identical ellipse: `ry` is in
+          objectBoundingBox units, so 100% × 42%H is the same 42%H it was. */}
+      {isDarkMode && (
+        <Svg style={styles.wash} pointerEvents="none">
+          <Defs>
+            <SvgRadialGradient id="heroGlow" cx="50%" cy="0%" rx="80%" ry="100%">
+              <Stop offset="0" stopColor={palette.turmeric} stopOpacity={0.14} />
+              <Stop offset="1" stopColor={palette.turmeric} stopOpacity={0} />
+            </SvgRadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroGlow)" />
+        </Svg>
+      )}
+
       <ScrollView
+        // iOS: react-native-screens only applies the tab-bar content inset to the
+        // first ScrollView in the tab screen's first-descendant chain, and here the
+        // dark-mode wash comes first, so React Native's iOS default (Never) stuck.
+        // Without this the end of the scroll content sits permanently under
+        // the floating tab bar and cannot be tapped (Android ignores the prop).
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
         showsVerticalScrollIndicator={false}>
 
-        {/* ── Header ───────────────────────────────────────────────────── */}
-        {/* Settings now lives in the bottom tab bar; the header keeps just the
-            date stack and breathes wider into the space the gear used to fill. */}
+        {/* ── Header: weekday kicker, date, location + gear ─────────────── */}
         <View style={styles.header}>
           <View style={styles.dateStack}>
-            <Text variant="mono-caps" style={[styles.weekday, { color: colors.textMuted }]}>
+            <Text variant="kicker" style={[styles.weekday, { color: colors.accentText }]}>
               {dateParts.weekday}
             </Text>
-            <View style={styles.dateMainRow}>
-              <Text style={[styles.dateNum, { color: colors.emphasis }]}>
-                {dateParts.day}
+            <Text variant="display" style={[styles.dateBig, { color: colors.textPrimary }]}>
+              {dateParts.dayMonth}
+            </Text>
+            {/* Tappable: on the fallback this is a guess, and the user is
+                looking at the sunrise it produced. One tap to the city picker
+                is worth more than any choice of default city. */}
+            <MotionPressable
+              onPress={() => router.push('/location-permission')}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              style={styles.locRow}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.changeLocation', { location: locationLabel })}>
+              <Icon name="location" size={13} color={colors.textMuted} />
+              <Text variant="body" style={[styles.locText, { color: colors.textTertiary }]} numberOfLines={1}>
+                {locationLabel}
               </Text>
-              <Text variant="display-italic" style={[styles.dateMonth, { color: colors.textPrimary }]}>
-                {' '}{dateParts.month}{' '}
-              </Text>
-              <Text style={[styles.dateNum, { color: colors.emphasis }]}>
-                {dateParts.year}
-              </Text>
-            </View>
+              <Icon name="chevron-right" size={11} color={colors.textMuted} />
+            </MotionPressable>
           </View>
+          <MotionPressable
+            onPress={() => router.push('/settings')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.gear, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.openSettings')}>
+            <Icon name="gear" size={19} color={colors.textSecondary} />
+          </MotionPressable>
         </View>
 
-        {/* ── Sadhana streak (P14.4) — top placement, non-interactive ─── */}
-        {/* Anchors the daily-engagement loop. Renders at the top of Home so
-            it's the first thing the user reads on opening the app. Pure
-            indicator — not a button — so it never traps a tap. */}
-        <View style={styles.streakRow}>
-          <SadhanaStreakBadge colors={colors} large />
-        </View>
-
-        {/* ── Greeting ─────────────────────────────────────────────────── */}
-        <View style={styles.greetingBlock}>
-          <Text variant="display-italic" style={[styles.greeting, { color: colors.textPrimary }]}>
-            {t(`home.greeting${greetingKey}`)}
-          </Text>
-        </View>
-
-        {/* ── Panchang Hero ────────────────────────────────────────────── */}
+        {/* ── Hero: the panchang glance ─────────────────────────────────── */}
         <MotionPressable
           ref={panchangCardRef}
+          pressedScale={0.98}
           onPress={() => router.push('/(tabs)/panchang')}
-          style={styles.panchangWrap}
           accessibilityRole="button"
           accessibilityLabel={t('a11y.openPanchang')}>
-          <NightCard padding={20} mandalaSize={220} mandalaOpacity={0.09}>
-            <View style={styles.phHead}>
-              <View>
-                <Kicker color={plinth.accent} size={9.5}>
-                  {t('home.panchangKicker')}
-                </Kicker>
-                <Text variant="deva-bold" style={[styles.phTitle, { color: plinth.text }]}>
-                  {t('home.panchangTitleDeva')}
-                </Text>
-              </View>
-              <View style={[styles.locBadge, { backgroundColor: plinth.badgeBg, borderColor: plinth.badgeBorder }]}>
-                <Icon name="location" size={10} color={plinth.badgeText} />
-                <Text variant="mono-caps" style={[styles.locText, { color: plinth.badgeText }]} numberOfLines={1}>
-                  {locationName ?? (userLocation ? t('common.gpsLabel') : t('common.locationDefault'))}
-                </Text>
-              </View>
+          <LinearGradient
+            colors={
+              isDarkMode
+                ? ['rgba(216,163,26,0.14)', 'rgba(255,255,255,0.035)']
+                : [colors.accentSurface, colors.surface]
+            }
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.7, y: 1 }}
+            style={[styles.hero, { borderColor: colors.borderAccent }]}>
+            <View style={styles.heroHead}>
+              <Text variant="kicker" style={[styles.heroKicker, { color: colors.textTertiary }]}>
+                {t('home.panchangHeroKicker')}
+              </Text>
+              <Text variant="body" style={[styles.heroFull, { color: colors.accentText }]}>
+                {t('home.fullLink')} →
+              </Text>
             </View>
 
             <SkeletonCrossfade
@@ -366,248 +450,181 @@ export default function HomeScreen() {
                   colors={colors}
                   baseColor={isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}
                   shimmerColor={isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.45)'}
-                  dividerColor={plinth.divider}
+                  dividerColor={colors.divider}
                 />
               }>
               {panchang ? (
                 <>
-                  <View style={styles.phRows}>
-                    <PanchangRow label={t('home.tithi')}     el={getActiveElement(panchang.tithis)} plinth={plinth} />
-                    <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} plinth={plinth} />
-                    <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} plinth={plinth} />
-                    <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} plinth={plinth} last />
+                  <View style={styles.tithiRow}>
+                    <View style={[styles.tithiDot, { backgroundColor: colors.accent, shadowColor: colors.accent }]} />
+                    <Text
+                      variant={tithi && DEVA_RE.test(tithi.name) ? 'deva-bold' : 'title'}
+                      style={[styles.tithiName, { color: colors.textPrimary }]}
+                      numberOfLines={1}>
+                      {tithi?.name ?? '—'}
+                    </Text>
+                    {!!tithi?.endTime && (
+                      <Text variant="mono" style={[styles.tithiEnd, { color: colors.textTertiary }]}>
+                        {t('home.untilTime', { time: tithi.endTime })}
+                      </Text>
+                    )}
                   </View>
+                  {!!masaLine && (
+                    <Text variant="body" style={[styles.masaLine, { color: colors.textTertiary }]} numberOfLines={1}>
+                      {masaLine}
+                    </Text>
+                  )}
+                  {verdict && (
+                    <Text variant="body" style={[styles.heroVerdict, { color: colors.accentText }]}>
+                      {verdict.text}
+                    </Text>
+                  )}
+                  {/* Home is the launch screen, so this is the first verdict a
+                      user ever sees — it carries the same provisional caption
+                      as the Panchang tab. Tertiary rather than muted: the hero
+                      sits on a turmeric-tinted gradient, where textMuted washes
+                      out. */}
+                  {verdict && VERDICT_REVIEW_PENDING && (
+                    <Text
+                      variant="body-italic"
+                      style={[styles.heroVerdictProvisional, { color: colors.textSecondary }]}>
+                      {t('panchang.verdictProvisional')}
+                    </Text>
+                  )}
 
-                  <Ornament variant="diamond" tone={isDarkMode ? 'dark' : 'light'} style={styles.phDivider} />
+                  <View style={[styles.heroDivider, { backgroundColor: colors.divider }]} />
 
-                  <View style={styles.phSun}>
-                    <SunItem
-                      icon="sun"
-                      label={t('home.sunrise')}
-                      value={panchang.sunrise}
-                      plinth={plinth}
-                    />
-                    <View style={[styles.phSunSep, { backgroundColor: plinth.divider }]} />
-                    <SunItem
-                      icon="moon"
-                      label={t('home.sunset')}
-                      value={panchang.sunset}
-                      plinth={plinth}
-                    />
+                  <View style={styles.phRows}>
+                    <PanchangRow label={t('home.nakshatra')} el={getActiveElement(panchang.nakshatras)} colors={colors} />
+                    <PanchangRow label={t('home.yoga')}      el={getActiveElement(panchang.yogas)} colors={colors} />
+                    <PanchangRow label={t('home.karana')}    el={getActiveElement(panchang.karanas)} colors={colors} />
+                    {/* Two label/value pairs that wrap as whole pairs: on a
+                        narrow phone, at a large text size or with the zone tag
+                        present, sunset drops to its own line instead of the
+                        row running past the card edge. */}
+                    <View style={styles.sunRow}>
+                      <View style={styles.sunPair}>
+                        <Text variant="kicker" style={[styles.phLbl, { color: colors.textMuted }]}>
+                          {t('home.sunrise')}
+                        </Text>
+                        <Text variant="mono" style={[styles.sunVal, { color: colors.textSecondary }]}>
+                          {panchang.sunrise}
+                        </Text>
+                        {!!zoneLabel && (
+                          <Text
+                            variant="kicker"
+                            style={[styles.zoneTag, styles.zoneTagTight, { color: colors.textSecondary }]}
+                            numberOfLines={1}
+                            accessibilityLabel={t('a11y.timesInZone', { zone: zoneLabel })}>
+                            {zoneLabel}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.sunPair}>
+                        <Text variant="kicker" style={[styles.phLbl, styles.sunsetLbl, { color: colors.textMuted }]}>
+                          {t('home.sunset')}
+                        </Text>
+                        <Text variant="mono" style={[styles.sunVal, { color: colors.textSecondary }]}>
+                          {panchang.sunset}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </>
               ) : (
-                <Text variant="body-italic" style={[styles.errorText, { color: plinth.textMuted }]}>
+                <Text variant="body" style={[styles.errorText, { color: colors.textMuted }]}>
                   {t('home.couldNotLoadPanchang')}
                 </Text>
               )}
             </SkeletonCrossfade>
-          </NightCard>
+          </LinearGradient>
         </MotionPressable>
 
-        {/* ── Today's Deity (Vaar Devata) ───────────────────────────────── */}
-        <TodaysDeityCard colors={colors} />
-
-        {/* ── Your Deities strip ────────────────────────────────────────── */}
-        {selectedDeityMetas.length > 0 && (
-          <View style={styles.block}>
-            <View style={styles.sectionHeader}>
-              <SectionLabel settle>{t('home.yourDeities')}</SectionLabel>
-              <TouchableOpacity
-                onPress={() => router.push('/settings/deities')}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('home.yourDeitiesManage')}>
-                <Text variant="body-italic" style={[styles.sectionAction, { color: colors.emphasis }]}>
-                  {t('home.yourDeitiesManage')}  →
-                </Text>
-              </TouchableOpacity>
+        {/* ── Rahu Kaal — only while it still matters today ─────────────── */}
+        {rahu && panchang && (
+          <View style={[styles.rahuCard, { backgroundColor: colors.dangerSurface, borderColor: isDarkMode ? 'rgba(210,64,92,0.30)' : 'rgba(179,38,30,0.25)' }]}>
+            <View style={[styles.rahuIcon, { backgroundColor: isDarkMode ? 'rgba(210,64,92,0.18)' : 'rgba(179,38,30,0.10)' }]}>
+              <Icon name="warning" size={18} color={colors.dangerText} />
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.deitiesScroll}>
-              {selectedDeityMetas.map((deity) => (
-                <TouchableOpacity
-                  key={deity.id}
-                  activeOpacity={0.85}
-                  onPress={() => router.push(`/god/${deity.id}`)}
-                  style={styles.deityChip}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('a11y.openDeity', { name: t(`deities.${deity.id}.displayName`) })}>
-                  <DeityAvatar deity={deity.id} size={54} />
-                  <Text
-                    variant="body-italic"
-                    style={[styles.deityName, { color: colors.textSecondary }]}
-                    numberOfLines={1}>
-                    {t(`deities.${deity.id}.displayName`)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* ── Featured Aarti ────────────────────────────────────────────── */}
-        {featuredAarti && (
-          <View style={styles.block}>
-            <View style={styles.sectionHeader}>
-              <SectionLabel settle>
-                {favoriteIds.some((id) => id.startsWith('aarti-'))
-                  ? t('home.fromYourFavourites')
-                  : featuredAartiFromSelected
-                    ? t('home.forYourDeities')
-                    : t('home.featuredKicker')}
-              </SectionLabel>
-            </View>
-
-            <MotionPressable
-              onPress={() => router.push(`/aarti/${featuredAarti.deity}`)}
-              style={[styles.featCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${lang === 'hi' ? featuredAarti.titleHindi : featuredAarti.titleEnglish} — ${t('a11y.openAarti')}`}>
-              <View style={styles.cornerMark}>
-                <Kicker color={palette.gold} size={8.5}>
-                  {t('home.aartiNumber', { num: padTwo(featuredAartiIndex) })}
-                </Kicker>
-              </View>
-              <View style={styles.featRow}>
-                <DeityAvatar deity={featuredAarti.deity} size={58} />
-                <View style={styles.featBody}>
-                  <Text variant="deva-bold" style={[styles.featHiTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {featuredAarti.titleHindi}
-                  </Text>
-                  <Text variant="body-italic" style={[styles.featEnTitle, { color: colors.textTertiary }]} numberOfLines={1}>
-                    {featuredAarti.titleEnglish}
-                  </Text>
-                  <Text variant="mono-caps" style={[styles.featMeta, { color: colors.accent }]} numberOfLines={1}>
-                    {t(`deities.${featuredAarti.deity}.displayName`)}
-                  </Text>
-                </View>
-                <Icon name="chevron-right" size={18} color={colors.textMuted} />
-              </View>
-              {aartiVersePeek && (
-                <>
-                  <Ornament variant="double-rule" style={styles.versePeekRule} />
-                  <Text variant="deva" style={[styles.versePeek, { color: colors.textSecondary }]} numberOfLines={2}>
-                    {aartiVersePeek}
-                  </Text>
-                </>
-              )}
-            </MotionPressable>
-          </View>
-        )}
-
-        {/* ── Featured Chalisa ─────────────────────────────────────────── */}
-        {featuredChalisa && (
-          <TouchableOpacity
-            activeOpacity={0.88}
-            onPress={() => router.push(`/chalisa/${featuredChalisa.deity}`)}
-            style={[styles.featCard, styles.featCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            accessibilityRole="button"
-            accessibilityLabel={`${lang === 'hi' ? featuredChalisa.titleHindi : featuredChalisa.titleEnglish} — ${t('a11y.openChalisa')}`}>
-            <View style={styles.cornerMark}>
-              <Kicker color={palette.gold} size={8.5}>
-                {t('home.chalisaNumber', { num: padTwo(featuredChalisaIndex) })}
-              </Kicker>
-            </View>
-            <View style={styles.featRow}>
-              <DeityAvatar deity={featuredChalisa.deity} size={58} />
-              <View style={styles.featBody}>
-                <Text variant="deva-bold" style={[styles.featHiTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {featuredChalisa.titleHindi}
-                </Text>
-                <Text variant="body-italic" style={[styles.featEnTitle, { color: colors.textTertiary }]} numberOfLines={1}>
-                  {featuredChalisa.titleEnglish}
-                </Text>
-                <Text variant="mono-caps" style={[styles.featMeta, { color: colors.accent }]}>
-                  {featuredChalisaFromSelected ? t('home.forYourDeities') : t('home.featuredChalisa')}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={18} color={colors.textMuted} />
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* ── Dasha Callout ─────────────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={() => router.push('/(tabs)/astrology')}
-          style={styles.calloutWrap}
-          accessibilityRole="button"
-          accessibilityLabel={t('a11y.openDasha')}>
-          <LinearGradient
-            colors={['rgba(165,48,28,0.10)', 'rgba(156,118,35,0.10)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.callout}>
-            <View style={[styles.calloutIcon, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
-              <Icon name="clock" size={18} color={colors.accent} />
-            </View>
-            <View style={styles.calloutStack}>
-              <Text variant="mono-caps" style={[styles.calloutKicker, { color: colors.accent }]}>
-                {t('dasha.title')}
+            <View style={styles.rahuBody}>
+              <Text variant="title" style={[styles.rahuTitle, { color: colors.textPrimary }]}>
+                {rahu.text}
               </Text>
-              {dashaLord ? (
-                <Text variant="body-italic" style={[styles.calloutBody, { color: colors.textPrimary }]}>
-                  {t('home.dashaCurrentBody', { planet: t(`dasha.planet.${DASHA_LORD_KEY[dashaLord]}`) })}
+              {/* The countdown above runs on the phone's clock; the window's
+                  times are the place's, so when the sunrise tag names a zone
+                  it is named here too. A sibling, not a nested span: a nested
+                  Text's own scaled lineHeight can squeeze the line on Android. */}
+              <View style={styles.rahuTimesRow}>
+                <Text variant="mono" style={[styles.rahuTimes, { color: colors.textTertiary }]}>
+                  {panchang.rahuKalamStart} – {panchang.rahuKalamEnd}
                 </Text>
-              ) : (
-                <Text variant="body-italic" style={[styles.calloutBody, { color: colors.textSecondary }]} numberOfLines={2}>
-                  {t('home.setDashaPrompt')}
-                </Text>
-              )}
+                {!!zoneLabel && (
+                  <Text
+                    variant="kicker"
+                    style={[styles.zoneTag, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                    accessibilityLabel={t('a11y.timesInZone', { zone: zoneLabel })}>
+                    {zoneLabel}
+                  </Text>
+                )}
+              </View>
             </View>
-            <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* ── Sade Sati banner (only when active) ──────────────────────── */}
-        {sadeSatiPhase !== null && (
-          <TouchableOpacity
-            activeOpacity={0.88}
-            onPress={() => router.push('/(tabs)/astrology')}
-            style={[styles.sadeSatiBanner, { backgroundColor: 'rgba(165,48,28,0.12)', borderColor: 'rgba(165,48,28,0.40)' }]}
-            accessibilityRole="button"
-            accessibilityLabel={t('home.sadeSatiBanner', { phase: sadeSatiPhase })}>
-            <Icon name="alert-circle" size={16} color={palette.sindoor} />
-            <Text variant="body" style={[styles.sadeSatiText, { color: colors.textPrimary }]}>
-              {t('home.sadeSatiBanner', { phase: sadeSatiPhase })}
-            </Text>
-            <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-          </TouchableOpacity>
+          </View>
         )}
 
-        {/* ── Quick Row ─────────────────────────────────────────────────── */}
+        {/* ── Quick actions ─────────────────────────────────────────────── */}
         <View style={styles.quickRow}>
-          <QuickCard icon="heart-outline" label={t('home.favorites')}  onPress={() => router.push('/favorites')} colors={colors} />
-          <QuickCard icon="flame" label={t('home.festivals')} onPress={() => router.push('/festivals')} colors={colors} />
-          <QuickCard icon="flower" label={t('home.jaap')} onPress={() => router.push('/jaap')} colors={colors} />
+          {quickActions.map(a => (
+            <MotionPressable
+              key={a.key}
+              pressedScale={0.97}
+              onPress={a.go}
+              style={[styles.quickTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={a.title}>
+              <Icon name={a.icon} size={21} color={colors.accent} />
+              <View>
+                <Text variant="title" style={[styles.quickTitle, { color: colors.textPrimary }]}>{a.title}</Text>
+                <Text variant="body-small" style={[styles.quickCaption, { color: colors.textMuted }]} numberOfLines={1}>
+                  {a.caption}
+                </Text>
+              </View>
+            </MotionPressable>
+          ))}
         </View>
 
-        {/* ── Find Auspicious Date ──────────────────────────────────────── */}
+        {/* ── Day's deity ───────────────────────────────────────────────── */}
         <MotionPressable
-          onPress={() => router.push('/muhurat')}
-          style={[styles.muhuratCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          pressedScale={0.98}
+          onPress={() => router.push(`/vaar/${vaar.dayKey}`)}
+          style={[styles.deityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           accessibilityRole="button"
-          accessibilityLabel={t('a11y.openMuhuratFinder')}>
-          <View style={[styles.muhuratIc, { backgroundColor: colors.surfaceRecessed, borderColor: colors.borderAccent }]}>
-            <Icon name="calendar" size={18} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="mono-caps" style={[styles.muhuratKicker, { color: colors.accent }]}>
-              {t('home.findMuhuratTitle')}
+          accessibilityLabel={t('vaar.a11yTodaysDeities', { names: deityNames, graha: vaar.grahaName[lang] })}>
+          <LinearGradient
+            colors={['rgba(216,163,26,0.30)', 'rgba(216,163,26,0.05)']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={[styles.omBadge, { borderColor: colors.borderAccent }]}>
+            <Text variant="deva" style={[styles.omGlyph, { color: colors.accent }]}>ॐ</Text>
+          </LinearGradient>
+          <View style={styles.deityBody}>
+            <Text variant="kicker" style={[styles.deityKicker, { color: colors.textMuted }]}>
+              {t('vaar.todaysDeityKicker')}
             </Text>
-            <Text variant="body-italic" style={[styles.muhuratDesc, { color: colors.textTertiary }]} numberOfLines={2}>
-              {t('home.findMuhuratDesc')}
+            <Text variant="deva-bold" style={[styles.deityName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {deityNames}
             </Text>
           </View>
-          <Icon name="chevron-right" size={16} color={colors.textMuted} />
+          <Icon name="chevron-right" size={17} color={colors.textMuted} />
         </MotionPressable>
 
       </ScrollView>
 
-      <AdBanner colors={colors} placement="home" />
+      {/* ── Ad banner (pinned bottom — placement unchanged). aboveTabBar lifts
+          it clear of the iOS tab bar (the per-tab bottom inset) only while a
+          banner renders, so an empty slot leaves the scroll content free to
+          run under the glass bar with its automatic content inset. */}
+      <AdBanner colors={colors} placement="home" aboveTabBar />
 
       {walkthroughStep === 1 && panchangRect && (
         <WalkthroughSpotlight
@@ -616,7 +633,7 @@ export default function HomeScreen() {
           description={t('walkthrough.step1Desc')}
           tooltipPosition="below"
           stepIndex={0}
-          totalSteps={4}
+          totalSteps={3}
           onSpotlightTap={() => {
             setWalkthroughStep(2);
             router.push('/(tabs)/panchang');
@@ -625,331 +642,189 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Walkthrough step 4 (settings spotlight) was removed when Settings
-          became a bottom-tab — the focus effect auto-finishes the walkthrough
-          when this step fires (see useFocusEffect above). */}
-
     </SafeAreaView>
     </ScreenMount>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Panchang hero sub-components ──────────────────────────────────────────────
 
 interface PanchangRowProps {
   label: string;
   el: IPanchangElement | undefined;
-  plinth: PlinthColors;
-  last?: boolean;
+  colors: typeof darkColors | typeof lightColors;
 }
 
-const PanchangRow = memo(function PanchangRow({ label, el, plinth, last }: PanchangRowProps) {
-  const { t } = useTranslation();
+const PanchangRow = memo(function PanchangRow({ label, el, colors }: PanchangRowProps) {
   if (!el) return null;
   const isDeva = DEVA_RE.test(el.name);
   return (
-    <View style={[styles.phRow, { borderBottomColor: plinth.divider }, last && styles.phRowLast]}>
-      <Text variant="mono-caps" style={[styles.phLbl, { color: plinth.textMuted }]}>{label}</Text>
+    <View style={styles.phRow}>
+      <Text variant="kicker" style={[styles.phLbl, { color: colors.textMuted }]}>{label}</Text>
       <Text
-        variant={isDeva ? 'deva' : 'body-italic'}
-        style={[styles.phVal, { color: plinth.text }]}
+        variant={isDeva ? 'deva' : 'body'}
+        style={[styles.phVal, { color: colors.textSecondary }]}
         numberOfLines={1}>
         {el.name}
       </Text>
-      {el.endTime ? (
-        <Text variant="mono" style={[styles.phTime, { color: plinth.accent }]}>
-          {t('home.untilTime', { time: el.endTime })}
+      {!!el.endTime && (
+        <Text variant="mono" style={[styles.phTime, { color: colors.textTertiary }]}>
+          {el.endTime}
         </Text>
-      ) : (
-        <View />
       )}
     </View>
   );
 });
 
-interface SunItemProps {
-  icon: IconName;
-  label: string;
-  value: string;
-  plinth: PlinthColors;
-}
-
-const SunItem = memo(function SunItem({ icon, label, value, plinth }: SunItemProps) {
-  return (
-    <View style={styles.phSunItem}>
-      <View style={[styles.phSunIc, { backgroundColor: plinth.iconBg }]}>
-        <Icon name={icon} size={13} color={plinth.accent} />
-      </View>
-      <View>
-        <Text variant="mono-caps" style={[styles.phSunK, { color: plinth.textMuted }]}>{label}</Text>
-        <Text variant="mono" style={[styles.phSunV, { color: plinth.text }]}>{value}</Text>
-      </View>
-    </View>
-  );
-});
-
-interface QuickCardProps {
-  icon: IconName;
-  label: string;
-  onPress: () => void;
-  colors: ColorPalette;
-}
-
-const QuickCard = memo(function QuickCard({ icon, label, onPress, colors }: QuickCardProps) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.85}
-      style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      accessibilityRole="button"
-      accessibilityLabel={label}>
-      <Icon name={icon} size={20} color={colors.accent} />
-      <Text
-        variant="body-italic"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        style={[styles.quickLabel, { color: colors.textSecondary }]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-});
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { paddingBottom: 32, paddingTop: 10 },
+  scroll: { paddingTop: 10, paddingBottom: 24 },
+
+  // Height is the glow's own reach — see the note at the call site.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: '42%' },
 
   // Header
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 14,
-  },
-  dateStack: { flex: 1 },
-  weekday: { fontSize: 10 },
-  dateMainRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 4,
-  },
-  dateNum: {
-    fontFamily: MONO_FONT,
-    fontWeight: '500',
-    fontSize: 22,
-    letterSpacing: 0.2,
-  },
-  dateMonth: {
-    fontSize: 22,
-  },
-  gear: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Greeting
-  greetingBlock: { marginTop: 8, marginBottom: 20 },
-  // 1.5× ratio so the Devanagari greeting ("शुभ दोपहर") renders without the
-  // shirorekha or top matras getting clipped at this size; safe headroom for
-  // Latin too.
-  greeting: { fontSize: 34, lineHeight: 50 },
-
-  // Panchang hero
-  panchangWrap: { marginBottom: 18 },
-  phHead: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  phTitle: {
-    fontSize: 18,
-    marginTop: 4,
-  },
-  locBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    maxWidth: 140,
-  },
-  locText: {
-    fontSize: 10,
-  },
-  phRows: { marginTop: 2 },
-  phRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  phRowLast: { borderBottomWidth: 0 },
-  phLbl: {
-    width: 78,
-    fontSize: 9.5,
-  },
-  phVal: {
-    flex: 1,
-    fontSize: 15,
-  },
-  phTime: {
-    fontSize: 11,
-    marginLeft: 8,
-  },
-  phDivider: { marginVertical: 10 },
-  phSun: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  phSunItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  phSunIc: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  phSunK: { fontSize: 9 },
-  phSunV: { fontSize: 13, marginTop: 2 },
-  phSunSep: {
-    width: StyleSheet.hairlineWidth,
-    height: 28,
-    marginHorizontal: 12,
-  },
-  errorText: {
-    fontSize: 13,
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
-
-  // Generic block + section header
-  block: { marginBottom: 18 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionAction: { fontSize: 12 },
-
-  // Deities strip
-  deitiesScroll: { gap: 14, paddingRight: 4, paddingBottom: 4 },
-  deityChip: { alignItems: 'center', width: 64, gap: 7 },
-  deityName: { fontSize: 11, textAlign: 'center' },
-
-  // Featured card
-  featCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 16,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  featCardSecondary: {
     marginBottom: 18,
   },
-  cornerMark: {
-    position: 'absolute',
-    top: 10,
-    right: 14,
-    zIndex: 2,
-  },
-  featRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  featBody: { flex: 1, minWidth: 0 },
-  featHiTitle: { fontSize: 18 },
-  featEnTitle: { fontSize: 12.5, marginTop: 2 },
-  featMeta: { fontSize: 9, marginTop: 6 },
-  versePeekRule: { marginTop: 14, marginBottom: 10 },
-  versePeek: {
-    fontSize: 13.5,
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-
-  // Callout
-  calloutWrap: { marginBottom: 16 },
-
-  // Sade Sati chip — sits between the dasha callout and the quick row.
-  sadeSatiBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: borderRadius.cardInner,
+  dateStack: { flex: 1 },
+  weekday: { fontSize: 10.5 },
+  dateBig: { fontSize: 36, lineHeight: 40, marginTop: 6 },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 7 },
+  locText: { fontSize: 13, flexShrink: 1 },
+  gear: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 16,
-  },
-  sadeSatiText: { flex: 1, fontSize: 13, lineHeight: 19 },
-
-  callout: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(165,48,28,0.22)',
-  },
-  calloutIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    alignItems: 'center',
+    marginLeft: 12,
   },
-  calloutStack: { flex: 1 },
-  calloutKicker: { fontSize: 9.5, marginBottom: 3 },
-  calloutBody: { fontSize: 14 },
 
-  // Quick row
-  quickRow: { flexDirection: 'row', gap: spacing.gridGap, marginBottom: 16 },
-  // Top streak row — sits between header and greeting; right-aligned so it
-  // visually balances the gear above and reads as a private metric, not a CTA.
-  streakRow: { alignItems: 'flex-end', marginTop: 6, marginBottom: 4 },
-  quickCard: {
-    flex: 1,
-    borderRadius: 14,
+  // Hero
+  hero: {
+    borderRadius: borderRadius.hero,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
+  },
+  heroHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  heroKicker: { fontSize: 10.5 },
+  heroFull: { fontSize: 12 },
+  tithiRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  tithiDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  tithiName: { flex: 1, fontSize: 22, lineHeight: 30 },
+  tithiEnd: { fontSize: 13.5, marginLeft: 8 },
+  masaLine: { fontSize: 13, marginTop: 2, marginLeft: 16 },
+  heroVerdict: { fontSize: 13, lineHeight: 19, marginTop: 8 },
+  heroVerdictProvisional: { fontSize: 11, lineHeight: 15, marginTop: 3 },
+  heroDivider: { height: StyleSheet.hairlineWidth, marginVertical: 14 },
+  phRows: { gap: 9 },
+  phRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  phLbl: { minWidth: 74, fontSize: 10 },
+  phVal: { flex: 1, fontSize: 15 },
+  phTime: { fontSize: 13 },
+  // 26 between the pairs is the old sunrise-value → SUNSET spacing (10 value
+  // margin + 10 gap + 6 label margin), so the unwrapped row is unchanged; the
+  // 9 row gap matches `phRows` when sunset wraps.
+  sunRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    columnGap: 26,
+    rowGap: 9,
+    marginTop: 2,
+  },
+  sunPair: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  sunVal: { fontSize: 13 },
+  sunsetLbl: { minWidth: 0 },
+  // Zone tag ("IST") — small, secondary ink, never accent. Beside sunrise the
+  // negative margin pulls it to 5 from the time it qualifies, inside the
+  // pair's 10 gap; beside the Rahu window the row's own gap is 5.
+  zoneTag: { fontSize: 9.5, letterSpacing: 0.8 },
+  zoneTagTight: { marginLeft: -5 },
+  errorText: { fontSize: 13, textAlign: 'center', paddingVertical: 8 },
+
+  // Rahu Kaal
+  rahuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    borderRadius: borderRadius.list,
     borderWidth: 1,
     paddingVertical: 14,
-    alignItems: 'center',
-    gap: 6,
+    paddingHorizontal: 18,
+    marginTop: 12,
   },
-  quickLabel: { fontSize: 12 },
+  rahuIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rahuBody: { flex: 1 },
+  rahuTitle: { fontSize: 14.5 },
+  rahuTimesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    columnGap: 5,
+    marginTop: 2,
+  },
+  rahuTimes: { fontSize: 12.5 },
 
-  // Muhurat card
-  muhuratCard: {
+  // Quick actions
+  quickRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  quickTile: {
+    flex: 1,
+    borderRadius: borderRadius.tile,
+    borderWidth: 1,
+    paddingVertical: 15,
+    paddingHorizontal: 14,
+    gap: 9,
+  },
+  quickTitle: { fontSize: 14 },
+  quickCaption: { fontSize: 11.5, marginTop: 1 },
+
+  // Day's deity
+  deityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 15,
     borderRadius: borderRadius.card,
     borderWidth: 1,
-    padding: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginTop: 12,
   },
-  muhuratIc: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  omBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  muhuratKicker: { fontSize: 9.5, marginBottom: 3 },
-  muhuratDesc: { fontSize: 12.5, lineHeight: 17 },
+  omGlyph: { fontSize: 21, lineHeight: 30 },
+  deityBody: { flex: 1 },
+  deityKicker: { fontSize: 10.5 },
+  deityName: { fontSize: 19, lineHeight: 26, marginTop: 2 },
 });

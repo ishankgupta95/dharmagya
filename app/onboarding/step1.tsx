@@ -1,137 +1,126 @@
-import { Image, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { AppText as Text } from '@/components/common/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { borderRadius, palette, spacing } from '@/config/theme';
-import { Ornament } from '@/components/common/Ornament';
-import { MandalaWatermark } from '@/components/common/MandalaWatermark';
+import { palette, spacing } from '@/config/theme';
+import { onb, PrimaryCta } from '@/components/onboarding/OnboardingChrome';
 
+// Onboarding 1/5 · Welcome (Diya) — one glow, one mark, one promise. The
+// offline and no-account lines land here because they're the two objections
+// people arrive with.
 export default function OnboardingStep1() {
   const { t } = useTranslation();
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      {/* Onboarding always renders on the night ground */}
+      <StatusBar style="light" />
+      {/* Bounded rather than absoluteFill: on Android an <Svg> root is drawn
+          into a retained full-size ARGB_8888 bitmap (~9 MiB on a 1080×2220
+          panel) and software-filled pixel by pixel, and this is the very first
+          content frame of a fresh install. The glow is centred at 38% with a
+          vertical radius of 40%, so it never reaches past y = 78% — below that
+          the bitmap was transparent. The box is cut to exactly that reach and
+          cx/cy/ry re-expressed as fractions OF THAT BOX (38/78, 40/78), which
+          leaves the ellipse pixel-identical. */}
+      <Svg style={styles.wash} pointerEvents="none">
+        <Defs>
+          <SvgRadialGradient id="welcomeGlow" cx="50%" cy="48.72%" rx="80%" ry="51.28%">
+            <Stop offset="0" stopColor={palette.turmeric} stopOpacity={0.22} />
+            <Stop offset="1" stopColor={palette.turmeric} stopOpacity={0} />
+          </SvgRadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#welcomeGlow)" />
+      </Svg>
 
-      {/* Subtle watermark mandala behind the hero — editorial tone */}
-      <View style={styles.watermarkWrap} pointerEvents="none">
-        <MandalaWatermark
-          size={460}
-          color={palette.goldLeaf}
-          opacity={0.07}
-          position="center"
-        />
-      </View>
-
-      {/* ── Center content ──────────────────────────────────────────── */}
+      {/* ── Center: the mark ──────────────────────────────────────────── */}
       <View style={styles.content}>
-
-        <Image
-          source={require('../../assets/images/dharmagya_logo.webp')}
-          style={styles.appIcon}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-
-        <Text variant="display-italic" style={styles.appName}>
-          {t('common.appName')}
-        </Text>
+        <View style={styles.omRing}>
+          <Text variant="deva" style={styles.omGlyph}>ॐ</Text>
+        </View>
         <Text variant="deva-bold" style={styles.appNameHindi}>
           {t('common.appNameHindi')}
         </Text>
-
-        <Ornament variant="lotus" style={styles.ornament} />
-
-        <Text variant="body-italic" style={styles.tagline}>
-          {t('onboarding.tagline')}
+        <Text variant="display" style={styles.appName}>
+          {t('common.appName').toUpperCase()}
         </Text>
-
+        <Text variant="body" style={styles.body}>
+          {t('onboarding.welcomeBody')}
+        </Text>
       </View>
 
-      {/* ── Bottom ──────────────────────────────────────────────────── */}
+      {/* ── Bottom: Begin + the promise ───────────────────────────────── */}
       <View style={styles.bottom}>
-        <TouchableOpacity
-          onPress={() => router.push('/onboarding/step2')}
-          activeOpacity={0.85}
-          style={styles.cta}
-          accessibilityRole="button"
-          accessibilityLabel={t('onboarding.beginJourney')}>
-          <Text variant="mono-caps" style={styles.ctaText}>
-            {t('onboarding.beginJourney')}
-          </Text>
-        </TouchableOpacity>
+        <PrimaryCta label={t('onboarding.begin')} onPress={() => router.push('/onboarding/intent')} />
+        <Text variant="body-small" style={styles.promise}>
+          {t('onboarding.welcomePromise')}
+        </Text>
       </View>
-
     </SafeAreaView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: palette.parchment },
-  watermarkWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  root: { flex: 1, backgroundColor: onb.base },
+
+  // Height is the glow's own reach (cy 38% + ry 40%) — see the call site.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: '78%' },
 
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: spacing.screenH,
+    paddingHorizontal: 40,
+    marginTop: -30,
   },
-
-  appIcon: {
-    width: 180,
-    height: 180,
-    marginBottom: 8,
+  omRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(216,163,26,0.35)',
+    backgroundColor: 'rgba(216,163,26,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  // English on top, Devanagari directly below. Hindi gets a generous
-  // lineHeight (~1.6×) so the shirorekha (top bar of letters like ध / र्म /
-  // ज्ञ) clears the line box — Noto Serif Devanagari clips above the cap line
-  // when lineHeight is tight.
-  appName: {
-    fontSize: 42,
-    lineHeight: 50,
-    color: palette.ink,
-    marginTop: 4,
-    textAlign: 'center',
-  },
+  omGlyph: { fontSize: 44, lineHeight: 64, color: onb.accent },
   appNameHindi: {
-    fontSize: 28,
-    lineHeight: 46,
-    color: palette.inkSoft,
+    fontSize: 46,
+    lineHeight: 66,
+    color: onb.text,
+    marginTop: 26,
     textAlign: 'center',
   },
-  ornament: {
-    width: 140,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  tagline: {
-    fontSize: 15,
-    color: palette.inkQuiet,
+  appName: {
+    fontSize: 21,
+    lineHeight: 28,
+    letterSpacing: 3,
+    color: onb.textSoft,
+    marginTop: 8,
     textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 12,
+  },
+  body: {
+    fontSize: 16,
+    lineHeight: 27,
+    color: onb.textSoft,
+    textAlign: 'center',
+    marginTop: 26,
+    maxWidth: 300,
   },
 
   bottom: {
     paddingHorizontal: spacing.screenH,
-    paddingBottom: 8,
+    paddingBottom: 10,
     gap: 16,
-    alignItems: 'center',
   },
-  cta: {
-    width: '100%',
-    backgroundColor: palette.sindoor,
-    paddingVertical: 16,
-    borderRadius: borderRadius.button,
-    alignItems: 'center',
-  },
-  ctaText: {
-    fontSize: 12,
-    color: palette.parchmentBright,
+  promise: {
+    fontSize: 12.5,
+    lineHeight: 20,
+    color: onb.textGhost,
+    textAlign: 'center',
   },
 });

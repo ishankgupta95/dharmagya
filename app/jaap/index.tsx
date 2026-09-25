@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
-  TouchableOpacity,
   TextInput,
   StyleSheet,
   Alert,
@@ -17,14 +16,12 @@ import { useStore } from '@/store/useStore';
 import { darkColors, lightColors, MONO_FONT, spacing, borderRadius, type ColorPalette } from '@/config/theme';
 import { AdBanner } from '@/components/common/AdBanner';
 import { Icon } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
-import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SectionLabel } from '@/components/common/SectionLabel';
 import { DeityAvatar } from '@/components/common/DeityAvatar';
 import { MotionPressable } from '@/components/common/MotionPressable';
-import { SadhanaStreakBadge } from '@/components/common/SadhanaStreakBadge';
 import { resolveLanguage } from '@/i18n';
+import { useLocaleFormatters } from '@/utils/format';
 import {
   getAllAppMantras,
   titleFor,
@@ -49,6 +46,7 @@ export default function JaapPickerScreen() {
 
   // Stats + saved customs refresh on focus — re-reads after the user
   // completes a session or saves a new custom mantra on the counter screen.
+  const { formatCount, digits } = useLocaleFormatters();
   const [stats, setStats] = useState<JaapStats>(() => getJaapStats(db));
   const [savedCustoms, setSavedCustoms] = useState<CustomMantra[]>(() => listCustomMantras(db));
   useFocusEffect(
@@ -114,54 +112,42 @@ export default function JaapPickerScreen() {
     <ScreenMount>
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         <View style={[styles.navRow, { borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-          <Text variant="body-italic" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          </MotionPressable>
+          <Text variant="display" style={[styles.navTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('jaap.title')}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.push('/jaap/history')}
             style={[styles.navPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.openJaapHistory')}>
             <Icon name="clock" size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingHorizontal: spacing.screenH }]}
           keyboardShouldPersistTaps="handled"
+          // iOS only (Android resizes the window for the keyboard): the custom
+          // mantra input below auto-focuses inside this ScrollView, and without
+          // this the keyboard slides over it and its Save button. The native
+          // scroll view grows its bottom inset by the keyboard height and
+          // scrolls the focused caret above the keyboard.
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}>
-
-          {/* ── Editorial masthead ─────────────────────────────────────────── */}
-          <View style={styles.heroBlock}>
-            <Kicker color={colors.accent} size={11} style={styles.heroEyebrow}>
-              {t('jaap.titleEyebrow')}
-            </Kicker>
-            <Kicker color={colors.accent} size={22} style={styles.heroTitle}>
-              {t('jaap.title')}
-            </Kicker>
-            <Ornament
-              variant="lotus"
-              tone={isDarkMode ? 'dark' : 'light'}
-              style={styles.heroRule}
-            />
-            <Text variant="body-italic" style={[styles.heroIntro, { color: colors.textTertiary }]}>
-              {t('jaap.pickerIntro')}
-            </Text>
-          </View>
 
           {/* ── Stats card (only when there's history) ─────────────────────── */}
           {stats.sessionCount > 0 && (
-            <TouchableOpacity
-              activeOpacity={0.85}
+            <MotionPressable
+              pressedScale={0.97}
               onPress={() => router.push('/jaap/history')}
               style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
@@ -172,7 +158,7 @@ export default function JaapPickerScreen() {
                     {t('jaap.countLabel')}
                   </Text>
                   <Text style={[styles.statsValue, { color: colors.textPrimary }]}>
-                    {stats.totalCount.toLocaleString()}
+                    {formatCount(stats.totalCount)}
                   </Text>
                 </View>
                 <View style={[styles.statsDivider, { backgroundColor: colors.divider }]} />
@@ -181,18 +167,14 @@ export default function JaapPickerScreen() {
                     {t('jaap.malaLabel', { count: stats.totalMalas })}
                   </Text>
                   <Text style={[styles.statsValue, { color: colors.textPrimary }]}>
-                    {stats.totalMalas}
+                    {digits(String(stats.totalMalas))}
                   </Text>
                 </View>
               </View>
               <Text variant="body-italic" style={[styles.statsHint, { color: colors.textTertiary }]}>
                 {t('jaap.statsSessionCount', { count: stats.sessionCount })}  →
               </Text>
-              {/* Sadhana streak (P14.4) — sits inside the stats card so the
-                  three private metrics (total reps / malas / streak) read
-                  together as "your practice today." */}
-              <SadhanaStreakBadge colors={colors} large style={styles.statsStreakBadge} />
-            </TouchableOpacity>
+            </MotionPressable>
           )}
 
           {/* ── Saved custom mantras ───────────────────────────────────────── */}
@@ -217,8 +199,8 @@ export default function JaapPickerScreen() {
             <SectionLabel settle>
               {savedCustoms.length > 0 ? t('jaap.addCustomMantra') : t('jaap.customMantra')}
             </SectionLabel>
-            <TouchableOpacity
-              activeOpacity={customExpanded ? 1 : 0.85}
+            <MotionPressable
+              pressedScale={customExpanded ? 1 : 0.97}
               onPress={() => setCustomExpanded(true)}
               style={[styles.customCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
@@ -252,7 +234,7 @@ export default function JaapPickerScreen() {
                     style={[styles.customInput, { color: colors.textPrimary, borderColor: colors.border }]}
                     autoFocus
                   />
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={openCustom}
                     disabled={customDraft.trim().length === 0}
                     style={[
@@ -267,10 +249,10 @@ export default function JaapPickerScreen() {
                     <Text variant="mono-caps" style={[styles.customSubmitText, { color: colors.accent }]}>
                       {t('jaap.customMantraSave')}  →
                     </Text>
-                  </TouchableOpacity>
+                  </MotionPressable>
                 </View>
               )}
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
 
           {/* ── Universal mantras ──────────────────────────────────────────── */}
@@ -327,6 +309,7 @@ interface MantraCardProps {
 }
 
 function MantraCard({ mantra, lang, onPress, colors, t }: MantraCardProps) {
+  const { digits: cardDigits } = useLocaleFormatters();
   const titleEn = mantra.titleEnglish;
   const titleHi = mantra.titleHindi;
   const titleLocal = titleFor(mantra, lang);
@@ -364,7 +347,7 @@ function MantraCard({ mantra, lang, onPress, colors, t }: MantraCardProps) {
               ? t('jaap.deityChip', { name: t(`deities.${deityKey}.displayName`) })
               : t('jaap.universalMantra')}
             {'  ·  '}
-            {recommendedCount}
+            {cardDigits(String(recommendedCount))}
           </Text>
         </View>
         <Icon name="chevron-right" size={16} color={colors.textMuted} />
@@ -406,14 +389,14 @@ function SavedCustomCard({ mantra, onPress, onDelete, colors, t }: SavedCustomCa
             {t('jaap.customMantra')}
           </Text>
         </View>
-        <TouchableOpacity
+        <MotionPressable
           onPress={onDelete}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel={t('jaap.customDeleteConfirm')}
           style={styles.savedCustomDelete}>
           <Icon name="close" size={14} color={colors.textMuted} />
-        </TouchableOpacity>
+        </MotionPressable>
       </View>
     </MotionPressable>
   );
@@ -454,7 +437,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  navTitle: { flex: 1, textAlign: 'center', fontSize: 15 },
+  navTitle: { flex: 1, fontSize: 24, lineHeight: 30, marginLeft: 2 },
 
   scroll: { paddingTop: 16, paddingBottom: 24 },
 
@@ -483,7 +466,6 @@ const styles = StyleSheet.create({
   },
   statsDivider: { width: StyleSheet.hairlineWidth, height: 38 },
   statsHint: { fontSize: 12.5, marginTop: 12 },
-  statsStreakBadge: { marginTop: 12, alignSelf: 'flex-start' },
 
   customCard: {
     borderRadius: borderRadius.card,

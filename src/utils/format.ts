@@ -1,4 +1,40 @@
+import { useMemo } from 'react';
+
 import { useStore, type TimeFormat } from '@/store/useStore';
+
+/**
+ * Cached `Intl.DateTimeFormat` instances, keyed by locale + options.
+ *
+ * Constructing a DateTimeFormat bridges to android.icu across JSI on Hermes,
+ * so it is far more expensive than the format call itself — the same reason
+ * `CalGridDense.makeCellDateFormatter` exists (measured 1.72 ms per 42-cell
+ * pass constructing each time vs 0.08 ms reusing one). Screens that format a
+ * date per row — the muhurat scan, the festivals browser — route through here
+ * so a list pass constructs one formatter instead of one per row.
+ */
+const DATE_FORMAT_CACHE = new Map<string, Intl.DateTimeFormat>();
+
+export function getDateFormatter(
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let formatter = DATE_FORMAT_CACHE.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, options);
+    DATE_FORMAT_CACHE.set(key, formatter);
+  }
+  return formatter;
+}
+
+/** `date.toLocaleDateString(locale, options)` through the formatter cache. */
+export function formatDateCached(
+  date: Date,
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  return getDateFormatter(locale, options).format(date);
+}
 
 const ASCII_TO_DEVANAGARI: Record<string, string> = {
   '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
@@ -13,6 +49,16 @@ export function toDevanagariDigits(str: string): string {
 export function formatNumber(value: number | string, useDevanagari: boolean): string {
   const s = typeof value === 'number' ? String(value) : value;
   return useDevanagari ? toDevanagariDigits(s) : s;
+}
+
+/**
+ * Format a count with Indian digit grouping (1,00,000 not 100,000) and
+ * optional Devanagari conversion. Use for jaap totals, milestone counts,
+ * session totals — anywhere a large integer might reach lakhs.
+ */
+export function formatCount(value: number, useDevanagari: boolean): string {
+  const grouped = value.toLocaleString('en-IN');
+  return useDevanagari ? toDevanagariDigits(grouped) : grouped;
 }
 
 /** Format an HH:mm string per the user's time-format preference + numerals flag. */
@@ -81,16 +127,28 @@ export function applyQuietHoursShift(
   return shifted;
 }
 
-/** React hook returning formatters bound to the user's current preferences. */
+/**
+ * React hook returning formatters bound to the user's current preferences.
+ *
+ * Memoised on the two preferences it closes over: the returned object and its
+ * closures are passed as props into `memo`'d components (`CalGridDense` takes
+ * `digits`), and a fresh identity on every render defeats their shallow prop
+ * compare — the 42-cell calendar rebuilt in full on every accordion toggle and
+ * every 5-minute tick despite the memo that exists to prevent exactly that.
+ */
 export function useLocaleFormatters() {
   const useDevanagari = useStore((s) => s.useDevanagariNumerals);
   const timeFormat = useStore((s) => s.timeFormat);
-  return {
-    useDevanagari,
-    timeFormat,
-    formatNumber: (v: number | string) => formatNumber(v, useDevanagari),
-    formatTime: (hhmm: string) => formatTime(hhmm, { timeFormat, useDevanagari }),
-    formatDateTime: (d: Date) => formatDateTime(d, { timeFormat, useDevanagari }),
-    digits: (s: string) => (useDevanagari ? toDevanagariDigits(s) : s),
-  };
+  return useMemo(
+    () => ({
+      useDevanagari,
+      timeFormat,
+      formatNumber: (v: number | string) => formatNumber(v, useDevanagari),
+      formatCount: (n: number) => formatCount(n, useDevanagari),
+      formatTime: (hhmm: string) => formatTime(hhmm, { timeFormat, useDevanagari }),
+      formatDateTime: (d: Date) => formatDateTime(d, { timeFormat, useDevanagari }),
+      digits: (s: string) => (useDevanagari ? toDevanagariDigits(s) : s),
+    }),
+    [useDevanagari, timeFormat],
+  );
 }

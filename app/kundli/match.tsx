@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MotionPressable } from '@/components/common/MotionPressable';
 import {
   View,
   ScrollView,
-  TouchableOpacity,
   StyleSheet,
   Modal,
   TextInput,
   FlatList,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type {
@@ -20,11 +22,12 @@ import type {
   PoruthamName,
 } from 'panchang-ts';
 
+import Svg, { Circle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { AppText as Text } from '@/components/common/AppText';
 import { Icon } from '@/components/common/Icon';
-import { Kicker } from '@/components/common/Kicker';
 import { SectionLabel } from '@/components/common/SectionLabel';
-import { NightCard, usePlinthColors } from '@/components/common/NightCard';
 import { ScreenMount } from '@/components/common/ScreenMount';
 import { SegmentedChip } from '@/components/common/SegmentedChip';
 import { DatePickerModal } from '@/components/common/DatePickerModal';
@@ -42,7 +45,8 @@ import {
 } from '@/services/astrology/kundliService';
 import { INDIAN_CITIES, cityTimezone, type City } from '@/config/cities';
 import { ymd } from '@/utils/calendar';
-import { DEFAULT_BIRTH_TIMEZONE, wallclockInZoneToUtc } from '@/utils/time';
+import { wallclockInZoneToUtc } from '@/utils/time';
+import { localizeRashi } from '@/i18n/panchangNames';
 
 const RASHI_NAMES_EN = [
   'Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya',
@@ -65,7 +69,6 @@ export default function KundliMatchScreen() {
   const ayanamsa = useStore((s) => s.ayanamsa);
   const houseSystem = useStore((s) => s.houseSystem);
   const colors = isDarkMode ? darkColors : lightColors;
-  const plinth = usePlinthColors();
 
   const charts = useBirthStore((s) => s.charts);
   const upsertChart = useBirthStore((s) => s.upsertChart);
@@ -84,6 +87,26 @@ export default function KundliMatchScreen() {
   // Which slot a freshly-added person should attach to. Set when the user
   // taps an "Add person" button inside a particular slot.
   const [addTargetSlot, setAddTargetSlot] = useState<'A' | 'B'>('B');
+
+  // `useBirthStore` persists through an async kv store, and on the first Match
+  // open of an app launch its hydration starts inside this push — so the
+  // initializers above run against `charts: []` and both slots seed to null.
+  // Nothing reconciled afterwards, leaving saved partners rendered unselected
+  // with no score until the user tapped one. Seed the slots once, when the
+  // hydrated charts first arrive, mirroring the initializers' asymmetry
+  // (B = charts[0], A = charts[1], so `excludeId` never hides A's only pick).
+  // The `seededFromHydration` latch keeps this to that one fill: `handleDelete` deliberately clears a
+  // slot, and re-seeding it behind the user would undo the deletion's intent.
+  // Adjusted during render rather than in an effect, matching the
+  // `hasBeenFocused` latch the tab screens use: seeding from an effect costs a
+  // second commit and trips react-hooks/set-state-in-effect, and React
+  // explicitly sanctions this shape for "adjust state when the inputs change".
+  const [seededFromHydration, setSeededFromHydration] = useState(charts.length > 0);
+  if (!seededFromHydration && charts.length > 0) {
+    setSeededFromHydration(true);
+    setPartnerBId((prev) => prev ?? charts[0]?.id ?? null);
+    if (isOthersMode) setPartnerAId((prev) => prev ?? charts[1]?.id ?? null);
+  }
 
   const lang = resolveLanguage(language);
 
@@ -127,8 +150,9 @@ export default function KundliMatchScreen() {
       moonNakshatra: partnerACompute.moon.nakshatra,
       lagnaRashi: partnerACompute.lagnaRashi,
       navamsaRashi: partnerACompute.moon.navamsaRashi,
+      ayanamsa,
     });
-  }, [partnerA, partnerACompute, setDerived]);
+  }, [partnerA, partnerACompute, setDerived, ayanamsa]);
   useEffect(() => {
     if (!partnerB || !partnerBCompute || partnerBCompute.fromCache) return;
     setDerived(partnerB.id, {
@@ -136,8 +160,9 @@ export default function KundliMatchScreen() {
       moonNakshatra: partnerBCompute.moon.nakshatra,
       lagnaRashi: partnerBCompute.lagnaRashi,
       navamsaRashi: partnerBCompute.moon.navamsaRashi,
+      ayanamsa,
     });
-  }, [partnerB, partnerBCompute, setDerived]);
+  }, [partnerB, partnerBCompute, setDerived, ayanamsa]);
 
   // Slot A's effective moon + sex: user in "you" mode, partnerA otherwise.
   const slotAMoon = isOthersMode ? partnerACompute?.moon ?? null : yourMoon;
@@ -192,6 +217,12 @@ export default function KundliMatchScreen() {
   }
 
   function handlePartnerSaved(entry: BirthChartEntry) {
+    // Close the hydration-seeding window here too. A user with no saved charts
+    // hydrates to `charts: []`, which leaves the render-time seeding latch
+    // open; this first save then both attaches the entry to its target slot AND
+    // lets the latch fill the *other* slot with the same and only chart — matching
+    // a person against themselves.
+    setSeededFromHydration(true);
     upsertChart(entry);
     // If the user was editing an existing entry, leave selection alone.
     // For a new entry, attach to the slot the Add button came from.
@@ -223,14 +254,14 @@ export default function KundliMatchScreen() {
       <SafeAreaView style={[styles.root, { backgroundColor: colors.base }]} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={[styles.header, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             hitSlop={12}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.title, { color: colors.textPrimary }]}>
             {isOthersMode ? t('match.titleOthers') : t('match.title')}
           </Text>
@@ -251,7 +282,7 @@ export default function KundliMatchScreen() {
                   <Icon name="person" size={18} color={colors.accent} />
                   <View style={{ flex: 1 }}>
                     <Text variant="body" style={[styles.cardTitle, { color: colors.textPrimary }]}>
-                      {RASHI_NAMES_EN[yourMoon.rashi]} · {t('match.nakshatraN', { n: yourMoon.nakshatra + 1 })}
+                      {localizeRashi(RASHI_NAMES_EN[yourMoon.rashi], lang)} · {t('match.nakshatraN', { n: yourMoon.nakshatra + 1 })}
                     </Text>
                     <Text variant="mono" style={[styles.cardMeta, { color: colors.textMuted }]}>
                       {userBirthDate ?? ''}
@@ -259,13 +290,13 @@ export default function KundliMatchScreen() {
                       {userBirthPlace ? ` · ${userBirthPlace.name}` : ''}
                     </Text>
                   </View>
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => router.push('/settings')}
                     hitSlop={10}
                     accessibilityRole="button"
                     accessibilityLabel={t('match.editYourDetails')}>
                     <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                  </TouchableOpacity>
+                  </MotionPressable>
                 </View>
               ) : (
                 <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -273,31 +304,31 @@ export default function KundliMatchScreen() {
                   <Text variant="body-italic" style={[styles.cardTitle, { color: colors.textSecondary, flex: 1 }]}>
                     {t('match.yourDetailsMissing')}
                   </Text>
-                  <TouchableOpacity
+                  <MotionPressable
                     onPress={() => router.push('/settings')}
                     hitSlop={10}
                     accessibilityRole="button"
                     accessibilityLabel={t('kundli.openSettings')}>
                     <Icon name="chevron-right" size={16} color={colors.accent} />
-                  </TouchableOpacity>
+                  </MotionPressable>
                 </View>
               )}
 
               {/* User's sex CTA — Ashtakoot's Varna scoring is asymmetric
                   (boy ≥ girl), so we need to know who is boy and who is girl. */}
               {yourMoon && !userSex && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
+                <MotionPressable
+                  pressedScale={0.97}
                   onPress={() => router.push('/settings')}
-                  style={[styles.sexMissingCard, { backgroundColor: 'rgba(165,48,28,0.12)', borderColor: 'rgba(165,48,28,0.40)' }]}
+                  style={[styles.sexMissingCard, { backgroundColor: colors.dangerSurface, borderColor: colors.danger + '66' }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('match.userSexMissing')}>
-                  <Icon name="alert-circle" size={18} color={palette.sindoor} />
+                  <Icon name="alert-circle" size={18} color={colors.danger} />
                   <Text variant="body" style={[styles.sexMissingText, { color: colors.textPrimary }]}>
                     {t('match.userSexMissing')}
                   </Text>
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                </TouchableOpacity>
+                </MotionPressable>
               )}
 
               {/* Partner — picker / list */}
@@ -325,8 +356,8 @@ export default function KundliMatchScreen() {
               )}
 
               {charts.length < MAX_SECONDARY_CHARTS && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
+                <MotionPressable
+                  pressedScale={0.97}
                   onPress={() => handleAddPartner('B')}
                   style={[styles.addBtn, { borderColor: colors.borderAccent }]}
                   accessibilityRole="button"
@@ -335,7 +366,7 @@ export default function KundliMatchScreen() {
                   <Text variant="mono-caps" style={[styles.addBtnText, { color: colors.accent }]}>
                     {t('match.addPartner')}
                   </Text>
-                </TouchableOpacity>
+                </MotionPressable>
               )}
             </>
           ) : (
@@ -388,7 +419,7 @@ export default function KundliMatchScreen() {
                   active={matchSystem === 'ashtakoot'}
                   onPress={() => setMatchSystem('ashtakoot')}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.systemChip}
@@ -400,7 +431,7 @@ export default function KundliMatchScreen() {
                       {
                         color:
                           matchSystem === 'ashtakoot'
-                            ? palette.parchmentBright
+                            ? palette.night
                             : colors.textSecondary,
                       },
                     ]}>
@@ -411,7 +442,7 @@ export default function KundliMatchScreen() {
                   active={matchSystem === 'porutham'}
                   onPress={() => setMatchSystem('porutham')}
                   inactiveBg="transparent"
-                  activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                  activeBg={colors.accent}
                   inactiveBorder={colors.border}
                   activeBorder="transparent"
                   style={styles.systemChip}
@@ -423,7 +454,7 @@ export default function KundliMatchScreen() {
                       {
                         color:
                           matchSystem === 'porutham'
-                            ? palette.parchmentBright
+                            ? palette.night
                             : colors.textSecondary,
                       },
                     ]}>
@@ -434,32 +465,28 @@ export default function KundliMatchScreen() {
 
               {matchSystem === 'ashtakoot' ? (
                 <>
-                  <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
-                    <Kicker color={plinth.accent} size={10}>
-                      {t('match.totalScoreLabel')}
-                    </Kicker>
-                    <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
-                      {result.totalScore} <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 36</Text>
-                    </Text>
-                    <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
-                      {verdictKey(result.totalScore, t)}
-                    </Text>
-                  </NightCard>
+                  <TotalHero
+                    score={result.totalScore}
+                    max={36}
+                    verdict={verdictKey(result.totalScore, t)}
+                    colors={colors}
+                    isDark={isDarkMode}
+                  />
 
-                  <View style={styles.kootList}>
-                    {result.koots.map((k) => (
-                      <KootRow key={k.name} koot={k} colors={colors} t={t} />
+                  <View style={[styles.kootList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {result.koots.map((k, i) => (
+                      <KootRow key={k.name} koot={k} first={i === 0} colors={colors} isDark={isDarkMode} lang={lang} t={t} />
                     ))}
                   </View>
 
                   {result.cancellations.length > 0 && (
                     <View style={[styles.cancelCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Kicker color={colors.accent} size={9}>
+                      <Text variant="kicker-small" style={{ color: colors.accentText, fontSize: 9 }}>
                         {t('match.cancellationsLabel')}
-                      </Kicker>
+                      </Text>
                       {result.cancellations.map((c, i) => (
                         <Text key={i} variant="body" style={[styles.cancelLine, { color: colors.textSecondary }]}>
-                          • {c}
+                          • {localizeCancellation(c, t)}
                         </Text>
                       ))}
                     </View>
@@ -467,26 +494,21 @@ export default function KundliMatchScreen() {
                 </>
               ) : (
                 <>
-                  <NightCard padding={20} mandalaSize={180} mandalaOpacity={0.08}>
-                    <Kicker color={plinth.accent} size={10}>
-                      {t('match.pathuPorutham.totalScoreLabel')}
-                    </Kicker>
-                    <Text variant="display-italic" style={[styles.totalScore, { color: plinth.text }]}>
-                      {poruthamResult.totalPasses}{' '}
-                      <Text variant="display-italic" style={[styles.totalOf, { color: plinth.textSubdued }]}>/ 10</Text>
-                    </Text>
-                    <Text variant="body-italic" style={[styles.verdict, { color: plinth.textMuted }]}>
-                      {t(
-                        poruthamResult.recommended
-                          ? 'match.pathuPorutham.recommended'
-                          : 'match.pathuPorutham.notRecommended',
-                      )}
-                    </Text>
-                  </NightCard>
+                  <TotalHero
+                    score={poruthamResult.totalPasses}
+                    max={10}
+                    verdict={t(
+                      poruthamResult.recommended
+                        ? 'match.pathuPorutham.recommended'
+                        : 'match.pathuPorutham.notRecommended',
+                    )}
+                    colors={colors}
+                    isDark={isDarkMode}
+                  />
 
-                  <View style={styles.kootList}>
-                    {poruthamResult.poruthams.map((p) => (
-                      <PoruthamRow key={p.name} porutham={p} colors={colors} t={t} />
+                  <View style={[styles.kootList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {poruthamResult.poruthams.map((p, i) => (
+                      <PoruthamRow key={p.name} porutham={p} first={i === 0} colors={colors} isDark={isDarkMode} lang={lang} t={t} />
                     ))}
                   </View>
                 </>
@@ -531,6 +553,10 @@ export default function KundliMatchScreen() {
 // after the first compute. A cached entry that pre-dates the 4.1 navamsa-
 // rashi enrichment (no `navamsaRashi` field) is treated as a partial hit
 // and triggers a fresh compute so the opt-in Bhakoot cancellation can fire.
+// The same applies when the block was computed under a different ayanamsa:
+// nothing invalidates `derived` on a settings change, so without this the
+// user's side recomputed while the partner's stayed frozen and the 36-point
+// total mixed two zodiacs.
 function usePartnerCompute(
   partner: BirthChartEntry | null,
   ayanamsa: Ayanamsa,
@@ -539,7 +565,11 @@ function usePartnerCompute(
 ): { moon: NatalMoon; lagnaRashi: number; fromCache: boolean } | null {
   return useMemo(() => {
     if (!partner) return null;
-    if (partner.derived && partner.derived.navamsaRashi !== undefined) {
+    if (
+      partner.derived &&
+      partner.derived.navamsaRashi !== undefined &&
+      partner.derived.ayanamsa === ayanamsa
+    ) {
       return {
         moon: {
           rashi: partner.derived.moonRashi,
@@ -630,8 +660,8 @@ function PersonSlot({
       )}
 
       {charts.length < MAX_SECONDARY_CHARTS && (
-        <TouchableOpacity
-          activeOpacity={0.85}
+        <MotionPressable
+          pressedScale={0.97}
           onPress={onAdd}
           style={[styles.addBtn, { borderColor: colors.borderAccent }]}
           accessibilityRole="button"
@@ -640,7 +670,7 @@ function PersonSlot({
           <Text variant="mono-caps" style={[styles.addBtnText, { color: colors.accent }]}>
             {t('match.addPerson')}
           </Text>
-        </TouchableOpacity>
+        </MotionPressable>
       )}
     </>
   );
@@ -658,8 +688,8 @@ interface PartnerRowProps {
 
 function PartnerRow({ entry, selected, onSelect, onEdit, onDelete, colors, t }: PartnerRowProps) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
+    <MotionPressable
+      pressedScale={0.97}
       onPress={onSelect}
       style={[
         styles.partnerRow,
@@ -691,41 +721,157 @@ function PartnerRow({ entry, selected, onSelect, onEdit, onDelete, colors, t }: 
           {entry.dateTimeIso.replace('T', ' · ')} · {entry.place.name}
         </Text>
       </View>
-      <TouchableOpacity onPress={onEdit} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.edit')}>
+      <MotionPressable onPress={onEdit} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.edit')}>
         <Icon name="text" size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onDelete} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.delete')}>
+      </MotionPressable>
+      <MotionPressable onPress={onDelete} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('match.delete')}>
         <Icon name="close" size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+      </MotionPressable>
+    </MotionPressable>
   );
+}
+
+// ── Total hero (frame 27) — the score is the headline. The ring is a static
+// SVG arc: guna scores never animate (MOTION.md).
+function TotalHero({
+  score,
+  max,
+  verdict,
+  colors,
+  isDark,
+}: {
+  score: number;
+  max: number;
+  verdict: string;
+  colors: ColorPalette;
+  isDark: boolean;
+}) {
+  const R = 49;
+  const C = 2 * Math.PI * R;
+  const frac = Math.max(0, Math.min(1, score / max));
+  const track = isDark ? 'rgba(237,232,240,0.10)' : 'rgba(34,27,36,0.10)';
+  return (
+    <View style={[styles.totalHero, { backgroundColor: colors.surface, borderColor: colors.borderAccent }]}>
+      <LinearGradient
+        colors={
+          isDark
+            ? (['rgba(216,163,26,0.13)', 'rgba(255,255,255,0.03)'] as const)
+            : ([colors.surfaceAccent, '#FFFFFF'] as const)
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.totalRing}>
+        <Svg width={110} height={110} style={StyleSheet.absoluteFill}>
+          <Circle cx={55} cy={55} r={R} stroke={track} strokeWidth={5} fill="none" />
+          <Circle
+            cx={55}
+            cy={55}
+            r={R}
+            stroke={colors.accent}
+            strokeWidth={5}
+            fill="none"
+            strokeDasharray={`${C}`}
+            strokeDashoffset={C * (1 - frac)}
+            strokeLinecap="round"
+            transform="rotate(-90 55 55)"
+          />
+        </Svg>
+        <Text variant="display" style={[styles.totalScore, { color: colors.textPrimary }]}>
+          {score}
+        </Text>
+        <Text variant="body-small" style={[styles.totalOf, { color: colors.textTertiary }]}>
+          / {max}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text variant="title" style={[styles.verdict, { color: colors.textPrimary }]}>
+          {verdict}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Whether to print the library's own free-form explanation strings.
+ *
+ * `computeAshtakoot` / `computePathuPorutham` take no language option, so
+ * `KootScore.description` and `PoruthamScore.description` are English
+ * regardless — "buffalo ↔ mongoose", "Boy's varna (vaishya) vs girl's
+ * (brahmin)". They also carry no structured operands, so they cannot be
+ * re-templated from `score` alone. Under a Devanagari heading an English
+ * caption is worse than none: the koota name, the score, the bar and the
+ * verdict all still read in Hindi.
+ *
+ * `AshtakootResult.cancellations` is deliberately NOT gated on this — the
+ * koota totals visibly include those cancellations, so hiding the card leaves
+ * an inflated score unexplained. See `localizeCancellation`.
+ */
+function showsLibraryProse(language: string): boolean {
+  return language !== 'hi';
+}
+
+// Unlike the free-form descriptions, `AshtakootResult.cancellations` entries
+// come from a closed set of nine `"<Koot>: <reason>"` strings emitted by
+// panchang-ts (scoreGana / scoreBhakoot / scoreNadi), so they map key-for-key.
+const CANCELLATION_KEYS: Record<string, string> = {
+  'Gana: same rashi-lord': 'match.cancellations.ganaSameRashiLord',
+  'Gana: mutual friendship of rashi-lords': 'match.cancellations.ganaMutualFriendship',
+  'Bhakoot: same rashi-lord': 'match.cancellations.bhakootSameRashiLord',
+  'Bhakoot: mutual friendship of rashi-lords': 'match.cancellations.bhakootMutualFriendship',
+  'Bhakoot: same lagna-lord': 'match.cancellations.bhakootSameLagnaLord',
+  'Bhakoot: same 7th-house lord': 'match.cancellations.bhakootSameSeventhLord',
+  'Bhakoot: same Navamsa lord': 'match.cancellations.bhakootSameNavamsaLord',
+  'Nadi: same nakshatra': 'match.cancellations.nadiSameNakshatra',
+  'Nadi: same rashi': 'match.cancellations.nadiSameRashi',
+};
+
+/**
+ * Translate one cancellation line. An entry a future panchang-ts adds falls
+ * through to the library's own English rather than blanking the row out.
+ */
+function localizeCancellation(
+  line: string,
+  t: (k: string, o?: Record<string, unknown>) => string,
+): string {
+  const key = CANCELLATION_KEYS[line];
+  return key ? t(key, { defaultValue: line }) : line;
 }
 
 interface KootRowProps {
   koot: AshtakootResult['koots'][number];
+  first: boolean;
   colors: ColorPalette;
+  isDark: boolean;
+  lang: string;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function KootRow({ koot, colors, t }: KootRowProps) {
+function KootRow({ koot, first, colors, isDark, lang, t }: KootRowProps) {
   const ratio = koot.score / koot.maxScore;
-  const tone = ratio >= 0.66 ? '#3FA37D' : ratio >= 0.33 ? '#BA7E2A' : palette.sindoor;
+  // Red is reserved for a koota scoring under half (frame 27).
+  const tone = ratio < 0.5 ? colors.danger : colors.accent;
+  const track = isDark ? 'rgba(237,232,240,0.12)' : 'rgba(34,27,36,0.10)';
   return (
-    <View style={[styles.kootRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.kootRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
       <View style={styles.kootHead}>
-        <Text variant="body" style={[styles.kootName, { color: colors.textPrimary }]}>
+        <Text variant="title" style={[styles.kootName, { color: colors.textPrimary }]}>
           {t(`match.koots.${kootKey(koot.name)}`)}
         </Text>
-        <Text variant="mono-caps" style={[styles.kootScore, { color: tone }]}>
-          {koot.score} / {koot.maxScore}
+        <Text variant="mono" style={[styles.kootScore, { color: colors.textSecondary }]}>
+          {koot.score}/{koot.maxScore}
         </Text>
       </View>
-      <View style={[styles.kootBarTrack, { backgroundColor: colors.border }]}>
+      <View style={[styles.kootBarTrack, { backgroundColor: track }]}>
         <View style={[styles.kootBarFill, { width: `${Math.max(0, ratio * 100)}%`, backgroundColor: tone }]} />
       </View>
-      <Text variant="mono" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
-        {koot.description}
-      </Text>
+      {showsLibraryProse(lang) && (
+        <Text variant="body-small" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
+          {koot.description}
+        </Text>
+      )}
     </View>
   );
 }
@@ -745,46 +891,43 @@ function kootKey(name: KootName): string {
 
 interface PoruthamRowProps {
   porutham: PathuPoruthamResult['poruthams'][number];
+  first: boolean;
   colors: ColorPalette;
+  isDark: boolean;
+  lang: string;
   t: (k: string, o?: Record<string, unknown>) => string;
 }
 
-function PoruthamRow({ porutham, colors, t }: PoruthamRowProps) {
-  // Pathu Porutham is binary per koot; pass = green tone, fail = sindoor.
-  // Veto-failed koots get a stronger sindoor outline so the user reads
-  // "this is the one that flipped the recommendation" at a glance.
+function PoruthamRow({ porutham, first, colors, isDark, lang, t }: PoruthamRowProps) {
+  // Pathu Porutham is binary per koot: pass fills the bar in the accent, fail
+  // leaves it empty with the label in the danger tone. Veto-failed koots carry
+  // a tag so the user reads "this one flipped the recommendation" at a glance.
   const passes = porutham.passes;
   const veto = porutham.veto === true;
-  const tone = passes ? '#3FA37D' : palette.sindoor;
+  const track = isDark ? 'rgba(237,232,240,0.12)' : 'rgba(34,27,36,0.10)';
   return (
-    <View
-      style={[
-        styles.kootRow,
-        {
-          backgroundColor: colors.surface,
-          borderColor: veto ? palette.sindoor : colors.border,
-          borderWidth: veto ? 1.5 : 1,
-        },
-      ]}>
+    <View style={[styles.kootRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
       <View style={styles.kootHead}>
-        <Text variant="body" style={[styles.kootName, { color: colors.textPrimary }]}>
+        <Text variant="title" style={[styles.kootName, { color: colors.textPrimary }]}>
           {t(`match.pathuPorutham.poruthams.${poruthamKey(porutham.name)}`)}
           {veto && (
-            <Text variant="mono-caps" style={[styles.poruthamVetoTag, { color: palette.sindoor }]}>
+            <Text variant="kicker-small" style={[styles.poruthamVetoTag, { color: colors.dangerText }]}>
               {'  '}· {t('match.pathuPorutham.vetoTag')}
             </Text>
           )}
         </Text>
-        <Text variant="mono-caps" style={[styles.kootScore, { color: tone }]}>
+        <Text variant="mono" style={[styles.kootScore, { color: passes ? colors.textSecondary : colors.dangerText }]}>
           {t(passes ? 'match.pathuPorutham.pass' : 'match.pathuPorutham.fail')}
         </Text>
       </View>
-      <View style={[styles.kootBarTrack, { backgroundColor: colors.border }]}>
-        <View style={[styles.kootBarFill, { width: passes ? '100%' : '0%', backgroundColor: tone }]} />
+      <View style={[styles.kootBarTrack, { backgroundColor: track }]}>
+        <View style={[styles.kootBarFill, { width: passes ? '100%' : '0%', backgroundColor: passes ? colors.accent : colors.danger }]} />
       </View>
-      <Text variant="mono" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
-        {porutham.description}
-      </Text>
+      {showsLibraryProse(lang) && (
+        <Text variant="body-small" style={[styles.kootDesc, { color: colors.textMuted }]} numberOfLines={2}>
+          {porutham.description}
+        </Text>
+      )}
     </View>
   );
 }
@@ -813,12 +956,35 @@ interface PartnerEditorProps {
   onSave: (entry: BirthChartEntry) => void;
 }
 
+// Both sheets below run to the physical screen bottom, so on a home-indicator
+// iPhone the form's Save button (24pt of end padding) and the city list's last
+// row (none) could be scrolled no further than into the 34pt indicator area.
+// This is the window's bottom inset on iOS — match is a root-stack screen, so
+// the nearest SafeAreaProvider is the window's — and 0 on Android, which keeps
+// both sheets' padding exactly as it was there.
+function useIosBottomInset(): number {
+  const { bottom } = useSafeAreaInsets();
+  return Platform.OS === 'ios' ? bottom : 0;
+}
+
+const MODAL_SCROLL_PAD_BOTTOM = 24;
+
+/** The inputs the partner form was last seeded from; see `PartnerEditor`. */
+interface PartnerFormSeed {
+  visible: boolean;
+  existing: BirthChartEntry | null;
+  userBirthPlace: BirthChartEntry['place'] | null;
+}
+
 function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorProps) {
   const { t } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
   const userBirthPlace = useStore((s) => s.userBirthPlace);
-  const userLocation = useStore((s) => s.userLocation);
   const colors = isDarkMode ? darkColors : lightColors;
+  // The original 24, or the iOS home-indicator inset + 12 where that is larger
+  // (the settings / picker sheets' rule); home-button iPhones and Android keep 24.
+  const iosBottomInset = useIosBottomInset();
+  const scrollBottomPad = Math.max(MODAL_SCROLL_PAD_BOTTOM, iosBottomInset + 12);
 
   const existing = useBirthStore((s) => s.charts.find((c) => c.id === editingId)) ?? null;
 
@@ -832,35 +998,51 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
-  // Sync form state to the entry being edited (or reset on add). Runs once
-  // when the modal becomes visible; later edits stay local until Save.
-  useEffect(() => {
-    if (!visible) return;
-    if (existing) {
-      setName(existing.name);
-      setSex(existing.sex);
-      const [d, hhmm] = existing.dateTimeIso.split('T');
-      setDate(new Date(`${d}T12:00:00`));
-      setTime(hhmm ?? '12:00');
-      setPlace(existing.place);
-    } else {
-      setName('');
-      setSex(null);
-      setDate(null);
-      setTime('12:00');
-      // Default partner place to user's birthplace (most common case for
-      // marriage matching) → fall back to current location.
-      const fallback = userBirthPlace ?? (userLocation
-        ? {
-            lat: userLocation.lat,
-            lon: userLocation.lon,
-            name: t('match.currentLocation'),
-            timezone: DEFAULT_BIRTH_TIMEZONE,
-          }
-        : null);
-      setPlace(fallback);
+  // Sync form state to the entry being edited (or reset on add) when the modal
+  // becomes visible; later edits stay local until Save. Same trigger set the
+  // old effect had — any change of (visible, existing, userBirthPlace) while
+  // visible — but done as a render-time "adjust state when inputs change"
+  // (React docs: storing information from previous renders) rather than a
+  // setState-in-effect, which trips react-hooks/set-state-in-effect and makes
+  // the compiler bail out of this component. React re-runs this function
+  // before committing, so the sheet commits once with the seeded values
+  // instead of first painting the previous session's form. The lazy `null`
+  // keeps a mount-while-visible seeding, as the effect's mount run did.
+  const [seededFrom, setSeededFrom] = useState<PartnerFormSeed | null>(() =>
+    visible ? null : { visible, existing, userBirthPlace },
+  );
+  if (
+    seededFrom === null ||
+    seededFrom.visible !== visible ||
+    seededFrom.existing !== existing ||
+    seededFrom.userBirthPlace !== userBirthPlace
+  ) {
+    setSeededFrom({ visible, existing, userBirthPlace });
+    if (visible) {
+      if (existing) {
+        setName(existing.name);
+        setSex(existing.sex);
+        const [d, hhmm] = existing.dateTimeIso.split('T');
+        setDate(new Date(`${d}T12:00:00`));
+        setTime(hhmm ?? '12:00');
+        setPlace(existing.place);
+      } else {
+        setName('');
+        setSex(null);
+        setDate(null);
+        setTime('12:00');
+        // Default partner place to the user's birthplace (most common case for
+        // marriage matching), which always carries a real timezone. There is
+        // deliberately no "current location" fallback: that stamped
+        // Asia/Kolkata onto whatever GPS coordinates the device happened to
+        // hold, so a partner's birth wall clock was read in IST while the chart
+        // was cast at the device's own latitude/longitude — 12.5 h of error and
+        // the Moon a whole rashi out. Leaving `place` null blocks Save and makes
+        // the user pick a real, timezone-bearing place.
+        setPlace(userBirthPlace);
+      }
     }
-  }, [visible, existing, userBirthPlace, userLocation, t]);
+  }
 
   const canSave = name.trim().length > 0 && !!sex && !!date && !!place;
 
@@ -879,20 +1061,28 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
     onSave(entry);
   }
 
+  // The backdrop is the KeyboardAvoidingView (the settings NameSheet pattern):
+  // on iOS its keyboard padding lifts the flex-end sheet above the keyboard
+  // and the `maxHeight: '90%'` resolves against what is left, so the inner
+  // ScrollView shrinks and scrolls instead of the keyboard sliding over the
+  // name field and Save. Android's adjustResize already does this; there
+  // behavior is undefined, which renders a bare View with the same style.
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+      <KeyboardAvoidingView
+        style={styles.modalBackdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalSheet, { backgroundColor: colors.base, borderColor: colors.border }]}>
           <View style={styles.modalHeader}>
             <Text variant="display-italic" style={[styles.modalTitle, { color: colors.textPrimary }]}>
               {existing ? t('match.editPartner') : t('match.addPartner')}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+            <MotionPressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Icon name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalScroll}>
+          <ScrollView contentContainerStyle={[styles.modalScroll, { paddingBottom: scrollBottomPad }]}>
             {/* Name */}
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldName')}
@@ -915,7 +1105,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 active={sex === 'male'}
                 onPress={() => setSex('male')}
                 inactiveBg="transparent"
-                activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                activeBg={colors.accent}
                 inactiveBorder={colors.border}
                 activeBorder="transparent"
                 style={styles.sexChip}
@@ -924,7 +1114,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                   variant="mono-caps"
                   style={[
                     styles.sexChipText,
-                    { color: sex === 'male' ? palette.parchmentBright : colors.textSecondary },
+                    { color: sex === 'male' ? palette.night : colors.textSecondary },
                   ]}>
                   {t('settings.sex.male')}
                 </Text>
@@ -933,7 +1123,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 active={sex === 'female'}
                 onPress={() => setSex('female')}
                 inactiveBg="transparent"
-                activeBg={isDarkMode ? palette.goldLeaf : palette.sindoor}
+                activeBg={colors.accent}
                 inactiveBorder={colors.border}
                 activeBorder="transparent"
                 style={styles.sexChip}
@@ -942,7 +1132,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                   variant="mono-caps"
                   style={[
                     styles.sexChipText,
-                    { color: sex === 'female' ? palette.parchmentBright : colors.textSecondary },
+                    { color: sex === 'female' ? palette.night : colors.textSecondary },
                   ]}>
                   {t('settings.sex.female')}
                 </Text>
@@ -953,9 +1143,9 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldBirthDate')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setDatePickerOpen(true)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.input, styles.inputPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('match.fieldBirthDate')}>
@@ -963,15 +1153,15 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 {date ? ymd(date) : t('match.pickDate')}
               </Text>
               <Icon name="calendar" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </MotionPressable>
 
             {/* Time */}
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldBirthTime')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setTimePickerOpen(true)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.input, styles.inputPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('match.fieldBirthTime')}>
@@ -979,15 +1169,15 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 {time}
               </Text>
               <Icon name="clock" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </MotionPressable>
 
             {/* Place */}
             <Text variant="mono-caps" style={[styles.fieldLabel, { color: colors.textTertiary }]}>
               {t('match.fieldBirthPlace')}
             </Text>
-            <TouchableOpacity
+            <MotionPressable
               onPress={() => setCityPickerOpen(true)}
-              activeOpacity={0.85}
+              pressedScale={0.97}
               style={[styles.input, styles.inputPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('match.fieldBirthPlace')}>
@@ -995,18 +1185,18 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
                 {place?.name ?? t('match.pickPlace')}
               </Text>
               <Icon name="map" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </MotionPressable>
 
-            <TouchableOpacity
+            <MotionPressable
               onPress={handleSave}
-              activeOpacity={0.88}
+              pressedScale={0.97}
               disabled={!canSave}
-              style={[styles.saveBtn, { backgroundColor: canSave ? palette.sindoor : colors.border, opacity: canSave ? 1 : 0.6 }]}
+              style={[styles.saveBtn, { backgroundColor: canSave ? palette.turmeric : colors.border, opacity: canSave ? 1 : 0.6 }]}
               accessibilityRole="button">
               <Text variant="mono-caps" style={styles.saveBtnText}>
                 {existing ? t('common.save') : t('match.addPartner')}
               </Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </ScrollView>
 
           <DatePickerModal
@@ -1039,7 +1229,7 @@ function PartnerEditor({ visible, editingId, onClose, onSave }: PartnerEditorPro
             }}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1054,6 +1244,7 @@ function CityPickerModal({ visible, onClose, onPick }: CityPickerModalProps) {
   const { t } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
+  const listBottomPad = useIosBottomInset();
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -1064,17 +1255,23 @@ function CityPickerModal({ visible, onClose, onPick }: CityPickerModalProps) {
     ).slice(0, 100);
   }, [query]);
 
+  // Same keyboard handling as the partner form: on iOS the padded backdrop
+  // lifts the sheet and its `height: '80%'` resolves against the space above
+  // the keyboard, so the search field and the list stay visible. Android is
+  // a bare View with the same style, as before.
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+      <KeyboardAvoidingView
+        style={styles.modalBackdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalSheet, { backgroundColor: colors.base, borderColor: colors.border, height: '80%' }]}>
           <View style={styles.modalHeader}>
             <Text variant="display-italic" style={[styles.modalTitle, { color: colors.textPrimary }]}>
               {t('match.fieldBirthPlace')}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10}>
+            <MotionPressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Icon name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
           <View style={{ paddingHorizontal: 18 }}>
             <TextInput
@@ -1091,6 +1288,7 @@ function CityPickerModal({ visible, onClose, onPick }: CityPickerModalProps) {
             data={filtered}
             keyExtractor={(c) => `${c.name}-${c.state}`}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: listBottomPad }}
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => onPick(item)}
@@ -1105,7 +1303,7 @@ function CityPickerModal({ visible, onClose, onPick }: CityPickerModalProps) {
             )}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1217,25 +1415,40 @@ const styles = StyleSheet.create({
   },
   systemChipText: { fontSize: 9 },
 
-  totalScore: { fontSize: 56, lineHeight: 60, marginTop: 6 },
-  totalOf: { fontSize: 24, lineHeight: 28 },
-  verdict: { fontSize: 14, lineHeight: 20, marginTop: 6 },
-
-  poruthamVetoTag: { fontSize: 9, letterSpacing: 1.4 },
-
-  kootList: { marginTop: 16, gap: 10 },
-  kootRow: {
-    padding: 14,
+  totalHero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
     borderRadius: borderRadius.card,
     borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    overflow: 'hidden',
+  },
+  totalRing: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
+  totalScore: { fontSize: 40, lineHeight: 44 },
+  totalOf: { fontSize: 12, marginTop: 1 },
+  verdict: { fontSize: 20, lineHeight: 27 },
+
+  poruthamVetoTag: { fontSize: 9 },
+
+  kootList: {
+    marginTop: 12,
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  kootRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     gap: 8,
   },
   kootHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  kootName: { fontSize: 14, lineHeight: 20 },
-  kootScore: { fontSize: 11, letterSpacing: 1.4 },
-  kootBarTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  kootBarFill: { height: '100%', borderRadius: 2 },
-  kootDesc: { fontSize: 11, lineHeight: 16, letterSpacing: 0.2 },
+  kootName: { fontSize: 14.5, lineHeight: 20 },
+  kootScore: { fontSize: 12.5 },
+  kootBarTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  kootBarFill: { height: '100%', borderRadius: 3 },
+  kootDesc: { fontSize: 11.5, lineHeight: 16 },
 
   cancelCard: {
     marginTop: 16,
@@ -1274,7 +1487,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   modalTitle: { fontSize: 22 },
-  modalScroll: { paddingHorizontal: 18, paddingBottom: 24 },
+  modalScroll: { paddingHorizontal: 18, paddingBottom: MODAL_SCROLL_PAD_BOTTOM },
 
   fieldLabel: { fontSize: 9, marginTop: 16, marginBottom: 8 },
   input: {
@@ -1296,7 +1509,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.button,
     alignItems: 'center',
   },
-  saveBtnText: { color: palette.parchmentBright, fontSize: 11 },
+  saveBtnText: { color: palette.night, fontSize: 11 },
 
   cityRow: {
     paddingVertical: 14,

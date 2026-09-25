@@ -25,6 +25,16 @@ export const stagger = {
   loose: 80,
 } as const;
 
+// Diya springs (MOTION.md) — three, no more. Pass to `withSpring`.
+//   snap:   segmented thumb, chip selection, tab switch, checkbox
+//   settle: sheet present/dismiss, card expand, step slide, FAB in/out
+//   drift:  collapsing header, ring progress
+export const springs = {
+  snap:   { damping: 26, stiffness: 340, mass: 1 },
+  settle: { damping: 22, stiffness: 190, mass: 1 },
+  drift:  { damping: 30, stiffness: 90,  mass: 1.2 },
+} as const;
+
 export const loop = {
   breath: 2200,
   drift: 90000,

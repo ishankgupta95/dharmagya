@@ -14,10 +14,17 @@ export default {
     close: 'बंद करें',
     pickDate: 'दिनांक चुनें',
     pickTime: 'समय चुनें',
-    year: 'वर्ष',
     gpsLabel: 'GPS',
-    locationDefault: 'वाराणसी',
-    locationDefaultLong: 'वाराणसी (डिफ़ॉल्ट)',
+    locationDefault: 'उज्जैन',
+    locationDefaultLong: 'उज्जैन (डिफ़ॉल्ट)',
+  },
+
+  // ── Root crash screen (the ErrorBoundary export in app/_layout.tsx) ─────
+  // Read through a tSafe() wrapper that falls back to English, so the screen
+  // still renders if the bundle never loaded. Retry reuses `common.retry`.
+  appError: {
+    title: 'कुछ गड़बड़ हो गई',
+    body: 'ऐप पूरी तरह खुल नहीं पाया। फिर से कोशिश करें, या इसे बंद करके दोबारा खोलें।',
   },
 
   // ── Accessibility labels for icon-only buttons and screen-reader hints ──
@@ -25,6 +32,7 @@ export default {
     back: 'वापस जाएँ',
     close: 'बंद करें',
     clearSearch: 'खोज हटाएँ',
+    changeLocation: '{{location}} का पंचांग। स्थान बदलें',
     addFavorite: 'पसंदीदा में जोड़ें',
     removeFavorite: 'पसंदीदा से हटाएँ',
     previousMonth: 'पिछला महीना',
@@ -32,41 +40,42 @@ export default {
     today: 'आज पर जाएँ',
     openDatePicker: 'तिथि चयन खोलें',
     openSettings: 'सेटिंग्स खोलें',
-    openDasha: 'विंशोत्तरी दशा खोलें',
     openPanchang: 'पंचांग खोलें',
     openMuhuratFinder: 'शुभ मुहूर्त खोजें',
     openDeity: '{{name}} खोलें',
-    openAarti: 'आरती खोलें',
-    openChalisa: 'चालीसा खोलें',
     openJaap: 'मंत्र जप खोलें',
     openJaapHistory: 'जप इतिहास खोलें',
     tapToCount: 'एक जप गिनने के लिए स्पर्श करें',
     decrement: 'एक घटाएँ',
     resetCount: 'गिनती रीसेट करें',
+    timesInZone: 'समय {{zone}} के अनुसार',
   },
 
   // ── Tabs ────────────────────────────────────────────────────────────────
   tabs: {
-    home: 'होम',
+    home: 'आज',
     panchang: 'पंचांग',
     gods: 'भगवान',
-    astrology: 'ज्योतिष',
-    pujas: 'पूजा',
-    settings: 'सेटिंग्स',
+    astrology: 'कुंडली',
+    library: 'संग्रह',
   },
 
   // ── Home Screen ─────────────────────────────────────────────────────────
   home: {
-    greetingMorning: 'शुभ प्रभात',
-    greetingAfternoon: 'शुभ दोपहर',
-    greetingEvening: 'शुभ संध्या',
-    panchangKicker: 'पंच अंग',
-    panchangTitleDeva: 'आज का पंचांग',
-    featuredKicker: 'आपके इष्ट देवों के लिए · आज',
-    dashaCurrentBody: 'आप {{planet}} महादशा में हैं',
-    setDashaPrompt: 'अपनी जन्म तिथि सेट करें और 120-वर्षीय समय-सारणी देखें',
-    sadeSatiBanner: 'साढ़े साती · चरण {{phase}} सक्रिय — ज्योतिष देखें',
-    tithi: 'तिथि',
+    // P16.4 — Home panchang hero
+    panchangHeroKicker: 'आज का पंचांग',
+    // Diya — Today screen
+    fullLink: 'पूरा',
+    rahuBeginsIn: 'राहु काल {{time}} में शुरू होगा',
+    rahuEndsIn: 'राहु काल {{time}} में समाप्त होगा',
+    quickJaap: 'जाप',
+    quickMuhurat: 'मुहूर्त',
+    quickAarti: 'आरती',
+    quickKundli: 'कुंडली',
+    quickJaapCaption: 'माला जपें',
+    quickMuhuratCaption: 'आज के शुभ समय',
+    quickKundliCaption: 'कुंडली और दशा',
+    abhijitAt: 'अभिजीत {{time}}',
     nakshatra: 'नक्षत्र',
     yoga: 'योग',
     karana: 'करण',
@@ -74,20 +83,6 @@ export default {
     sunset: 'सूर्यास्त',
     untilTime: '{{time}} तक',
     couldNotLoadPanchang: 'पंचांग लोड नहीं हो सका',
-    fromYourFavourites: 'आपके पसंदीदा से',
-    featuredChalisa: 'विशेष चालीसा',
-    aartiNumber: 'आरती № {{num}}',
-    chalisaNumber: 'चालीसा № {{num}}',
-    forYourDeities: 'आपके इष्ट देवताओं के लिए',
-    yourDeities: 'आपके इष्ट देव',
-    yourDeitiesManage: 'प्रबंधित करें',
-    favorites: 'पसंदीदा',
-    festivals: 'त्योहार',
-    jaap: 'मंत्र जप',
-    findMuhuratTitle: 'शुभ मुहूर्त खोजें',
-    findMuhuratDesc: 'विवाह, गृह प्रवेश, नामकरण — शास्त्रीय मुहूर्त नियम',
-    dashaLink: {
-    },
   },
 
   // ── Panchang Screen ─────────────────────────────────────────────────────
@@ -101,7 +96,6 @@ export default {
     calculationFailed: 'गणना विफल',
     calculationFailedDesc:
       'इस तिथि के लिए पंचांग की गणना नहीं हो सकी। यह अमान्य तिथि या स्थान के कारण हो सकता है।',
-    fallbackNote: 'डिफ़ॉल्ट: वाराणसी (25.32°N)',
     // पंच अंग के लेबल — पुनर्डिज़ाइन में छोटे italic kicker के रूप में।
     tithiLunarDay: 'तिथि',
     nakshatraLunarMansion: 'नक्षत्र',
@@ -150,10 +144,11 @@ export default {
     eclipseSubtype: { partial: 'आंशिक', total: 'पूर्ण', annular: 'वलयाकार', penumbral: 'उपछाया' },
     eclipseVisible: 'आपके स्थान से दृश्य',
     eclipseNotVisible: 'आपके स्थान से अदृश्य',
-    eclipseMagnitude: 'तीव्रता: {{value}}',
+    eclipseObscuration: 'आच्छादन: {{value}}%',
     eclipsePeak: 'चरम {{time}}',
     eclipseWindow: '{{start}} – {{end}}',
     eclipseSutak: 'सूतक: {{start}} – {{end}}',
+    eclipseNoSutak: 'इस ग्रहण पर सूतक लागू नहीं।',
     rahuKalam: 'राहु काल',
     yamaganda: 'यमगंड',
     gulikaKalam: 'गुलिक काल',
@@ -172,7 +167,7 @@ export default {
     tapToChangeDate: 'तिथि बदलने के लिए टैप करें',
     activeNow: 'अभी',
     hora: 'होरा',
-    findAuspiciousDate: 'किसी अवसर के लिए शुभ दिन खोजें',
+    findAuspiciousDate: 'मुहूर्त — शुभ समय खोजें',
     dayHeaders: ['र', 'सो', 'मं', 'बु', 'गु', 'शु', 'श'],
     monthNames: [
       'जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून',
@@ -186,7 +181,18 @@ export default {
     layoutCompact: 'सामान्य',
     layoutDense: 'विस्तृत',
     layoutSettingLabel: 'पंचांग लेआउट',
+    festivalDataRange: 'त्योहारों की तिथियाँ {{from}}–{{to}} के लिए उपलब्ध हैं।',
     glanceTitle: 'मुख्य',
+    // P16.3 — plain "today's verdict" + Full-almanac reveal.
+    verdictBestAvoid: 'शुभ समय {{best}} के आस-पास · {{avoid}} से बचें',
+    verdictAvoidOnly: '{{avoid}} से बचें',
+    verdictBestOnly: 'शुभ समय {{best}} के आस-पास',
+    verdictEclipse: 'आज ग्रहण — परंपरागत रूप से संयम का समय, नए कार्यों के लिए नहीं।',
+    verdictProvisional: 'एक सामान्य मार्गदर्शन, भविष्यवाणी नहीं।',
+    fullAlmanac: 'पूर्ण पंचांग',
+    goodAvoidTimes: 'शुभ व अशुभ समय',
+    showAllSystems: 'सभी पद्धतियाँ देखें',
+    hideOtherSystems: 'अन्य पद्धतियाँ छिपाएँ',
     panchaAngaSection: 'पंच अंग',
     sunMoonSection: 'सूर्य व चंद्र',
     forYouSection: 'आपके लिए',
@@ -195,7 +201,6 @@ export default {
 
   // ── Library Screen ──────────────────────────────────────────────────────
   library: {
-    godsTitle: 'भगवान',
     searchPlaceholder: 'देवता, आरती, चालीसा खोजें…',
     countAartis_one: '{{count}} आरती',
     countAartis_other: '{{count}} आरतियाँ',
@@ -203,17 +208,42 @@ export default {
     countChalisas_other: '{{count}} चालीसा',
     countNone: 'जल्द आ रहा है',
     emptyForQuery: '"{{query}}" के लिए कुछ नहीं मिला।',
+    // P16.5 — एकीकृत संग्रह टैब
+    title: 'संग्रह',
+    bucketDeities: 'देवता',
+    bucketRead: 'पाठ',
+    bucketRituals: 'अनुष्ठान एवं पर्व',
+    bucketPractice: 'आपकी साधना',
+    // Diya — संग्रह टैब (frame 06)
+    continueKicker: 'जारी रखें',
+    continueVerse: 'पद {{num}} / {{total}}',
+    allCount: 'सभी {{count}}',
+    allGodsTitle: 'सभी देवता',
+    allAartis: {
+      title: 'आरती',
+      count: '{{count}} आरतियाँ',
+      verseCount: '{{count}} पद',
+      a11yOpen: '{{name}} आरती खोलें',
+    },
+    allChalisas: {
+      title: 'चालीसा',
+      count: '{{count}} चालीसा',
+      a11yOpen: '{{name}} चालीसा खोलें',
+    },
   },
 
   // ── God Detail ──────────────────────────────────────────────────────────
   god: {
-    aartiBadge: 'आरती',
-    chalisaBadge: 'चालीसा',
     kathaBadge: 'व्रत कथा',
     scriptureBadge: 'ग्रंथ',
+    sahasranamaBadge: '१००० नाम',
+    stotraBadge: 'स्तोत्र',
+    suktaBadge: 'वैदिक सूक्त',
     chaupaiCount: '{{count}} चौपाई',
     noContent: 'अभी कोई सामग्री उपलब्ध नहीं',
     deityNotFound: 'देवता नहीं मिले',
+    moolMantra: 'मूल मंत्र',
+    jaapRecommended: '{{count}} अनुशंसित',
   },
 
   // ── Aarti / Chalisa Detail ──────────────────────────────────────────────
@@ -224,14 +254,42 @@ export default {
     notFound: 'इस देवता की चालीसा उपलब्ध नहीं है।',
   },
   reader: {
-    aartiLabel: 'आरती',
-    chalisaLabel: 'चालीसा',
     verseLabel: 'पद {{num}}',
     refrainTag: 'टेक',
     dohaLabel: 'दोहा',
     sorathaLabel: 'सोरठा',
     chaupaiLabel: 'चौपाई',
     verifyNote: 'पाठ एवं उच्चारण परंपरा अनुसार भिन्न होते हैं — किसी भी अनुष्ठान से पूर्व पंडित जी से पुष्टि करें।',
+    reviewNote: 'लिप्यंतरण विद्वत्-समीक्षाधीन है — इसे अनंतिम मानें।',
+    prevVerse: 'पिछला पद',
+    nextVerse: 'अगला पद',
+    a11yFocusVerseHint: 'इस पद को केंद्र में लाता है',
+    copyAction: 'कॉपी करें',
+    copied: 'कॉपी हो गया',
+    copiedSelectHint: 'कॉपी हो गया। टेक्स्ट चुनने के लिए फिर से देर तक दबाएँ।',
+    copyFailed: 'कॉपी नहीं हो सका। कृपया पुनः प्रयास करें।',
+  },
+  ashtottara: {
+    badge: 'अष्टोत्तर · १०८ नाम',
+    nameCount: '{{count}} नाम',
+    openingShloka: 'आरंभिक श्लोक',
+    closingShloka: 'समापन श्लोक',
+    notFound: 'यह नामावली उपलब्ध नहीं है।',
+  },
+  prayers: {
+    title: 'नित्य प्रार्थनाएँ',
+    eyebrow: 'नित्य कर्म',
+    intro: 'गृह-पूजा की दैनिक प्रार्थनाएँ — प्रातः जागरण, स्नान से पूर्व, भोजन से पूर्व एवं संध्या के समय।',
+    notFound: 'कोई प्रार्थना उपलब्ध नहीं।',
+    occasion: {
+      morning: 'प्रातः जागरण',
+      bath: 'स्नान से पूर्व',
+      meal: 'भोजन से पूर्व',
+      evening: 'संध्या',
+      night: 'रात्रि',
+      invocation: 'आवाहन',
+      closing: 'समापन',
+    },
   },
   langToggle: {
     english: 'English',
@@ -240,20 +298,32 @@ export default {
 
   // ── Search Screen ───────────────────────────────────────────────────────
   search: {
-    placeholder: 'आरती, चालीसा खोजें…',
+    placeholder: 'पाठ, देवता, तीर्थ खोजें…',
     emptyTitle: 'खोज करें',
-    emptyDesc: 'शीर्षक, लिप्यंतरण, या देवता नाम से खोजें',
+    emptyDesc: 'शीर्षक, देवता या स्थान से खोजें — हिन्दी या अंग्रेज़ी में',
     noResults: 'कोई परिणाम नहीं',
     noResultsFor: '"{{query}}" के लिए कुछ नहीं मिला',
-    aartisSection: 'आरती  ·  {{count}}',
-    chalisasSection: 'चालीसा  ·  {{count}}',
+    textsSection: 'पाठ · {{count}}',
+    deitiesSection: 'देवता · {{count}}',
+    tirthaSection: 'तीर्थ · {{count}}',
+    deityTexts: '{{count}} पाठ',
+    kind: {
+      aarti: 'आरती',
+      chalisa: 'चालीसा',
+      stotra: 'स्तोत्र',
+      sukta: 'वैदिक सूक्त',
+      sahasranama: 'सहस्रनाम',
+      katha: 'व्रत कथा',
+      scripture: 'ग्रंथ',
+    },
   },
 
   // ── Favorites Screen ────────────────────────────────────────────────────
   favorites: {
-    title: 'पसंदीदा',
-    emptyTitle: 'अभी कोई पसंदीदा नहीं',
-    emptyDesc: 'किसी भी आरती या चालीसा पर ♡ दबाकर यहाँ सहेजें',
+    title: 'सहेजे गए',
+    textsSection: 'पाठ · {{count}}',
+    emptyTitle: 'अभी कुछ सहेजा नहीं',
+    emptyDesc: 'किसी भी पाठ पर ♡ दबाकर यहाँ सहेजें',
     browseLibrary: 'लाइब्रेरी देखें',
     aartiBadge: 'आरती',
     chalisaBadge: 'चालीसा',
@@ -265,6 +335,8 @@ export default {
     noFestivals: '{{year}} के लिए कोई त्योहार नहीं मिला',
     searchPlaceholder: 'त्यौहार खोजें…',
     noSearchResults: '{{year}} में "{{query}}" के लिए कोई परिणाम नहीं',
+    loadingYear: '{{year}} के त्योहार लोड हो रहे हैं…',
+    computeFailed: '{{year}} के त्योहारों की गणना नहीं हो सकी। कृपया पुनः प्रयास करें।',
     soonBadge: 'शीघ्र',
     upcomingEclipses: 'आगामी ग्रहण',
     solarEclipse: 'सूर्य ग्रहण',
@@ -274,14 +346,15 @@ export default {
     eclipseNotVisible: 'आपके स्थान से अदृश्य',
     smartaFast: 'स्मार्त व्रत',
     vaishnavaFast: 'वैष्णव व्रत',
-    deferredTo: '{{label}} · {{date}} पर स्थगित',
     alsoObservedAs: 'इन रूपों में भी: {{names}}',
+    footer: 'यहाँ दिए विवरण विद्वत्-समीक्षाधीन हैं — इन्हें अनंतिम मानें। तिथियाँ एवं रीति-रिवाज क्षेत्र एवं परंपरा के अनुसार भिन्न होते हैं।',
   },
 
   // ── Settings Screen ─────────────────────────────────────────────────────
   settings: {
     title: 'सेटिंग्स',
     appearance: 'दिखावट',
+    intentSection: 'आप यहाँ क्यों आए हैं?',
     display: 'प्रदर्शन',
     timeFormat: 'समय प्रारूप',
     timeFormatAuto: 'स्वचालित',
@@ -392,8 +465,7 @@ export default {
     location: 'स्थान',
     gpsLocation: 'GPS स्थान',
     myLocation: 'मेरा स्थान',
-    usingDefault: 'डिफ़ॉल्ट (वाराणसी)',
-    deities: 'इष्ट देव',
+    usingDefault: 'डिफ़ॉल्ट (उज्जैन)',
     manageDeities: 'अपने इष्ट देव प्रबंधित करें',
     manageDeitiesCount: '{{count}} चयनित',
     manageDeitiesNone: 'कोई नहीं — चुनने के लिए टैप करें',
@@ -430,14 +502,15 @@ export default {
     sunriseOffsetPickerTitle: 'सूर्योदय अलर्ट समय',
     permissionRequired: 'अनुमति आवश्यक',
     permissionRequiredDesc: 'कृपया सेटिंग्स में सूचनाओं की अनुमति दें।',
+    permissionOpenSettings: 'सेटिंग्स खोलें',
     sunriseUnavailable: 'सूर्योदय अनुपलब्ध',
     sunriseUnavailableDesc: 'आज के सूर्योदय का समय निर्धारित नहीं हो सका।',
     about: 'जानकारी',
     appVersion: 'ऐप संस्करण',
     replayWalkthrough: 'ऐप परिचय',
     replayWalkthroughDesc: 'ऐप का उपयोग कैसे करें जानें',
-    festivalTithiReminders: 'साधना, तिथि एवं त्योहार अनुस्मारक',
-    festivalTithiRemindersDesc: 'दैनिक साधना याद + एकादशी, प्रदोष, त्योहार',
+    festivalTithiReminders: 'तिथि एवं त्योहार अनुस्मारक',
+    festivalTithiRemindersDesc: 'एकादशी, प्रदोष, पूर्णिमा एवं त्योहार याद',
     sendFeedback: 'प्रतिक्रिया भेजें',
     sendFeedbackDesc: 'त्रुटि बताएँ या नई सुविधा माँगें',
     rateApp: 'धर्मज्ञ को रेट करें',
@@ -447,6 +520,8 @@ export default {
     shareAppMessage: 'धर्मज्ञ आज़माएँ — दैनिक पंचांग, आरती और चालीसा का साथी।',
     privacyPolicy: 'गोपनीयता नीति',
     privacyPolicyDesc: 'हम आपके डेटा का प्रयोग कैसे करते हैं',
+    adPrivacyOptions: 'विज्ञापन गोपनीयता विकल्प',
+    adPrivacyOptionsDesc: 'विज्ञापन सहमति के अपने विकल्प देखें या बदलें',
     widgetSection: 'होम स्क्रीन विजेट',
     widgetCustomize: 'विजेट अनुकूलित करें',
     widgetCustomizeDesc: 'चुनें कि होम-स्क्रीन विजेट पर कौन-से पंचांग क्षेत्र दिखें',
@@ -467,6 +542,26 @@ export default {
     slot4Label: 'फूटर दायाँ',
     slot4Desc: 'संक्षिप्त मान, नीचे दायीं ओर',
     footerHint: 'अगली बार विजेट रिफ्रेश होने पर बदलाव लागू होंगे (या विजेट पर ↻ टैप करने पर तुरंत)।',
+    footerHintIos: 'बदलाव कुछ ही मिनटों में लागू हो जाते हैं; ऐप खोलने पर भी विजेट रिफ्रेश हो जाता है।',
+    sizesNote: 'बड़े आकार के विजेट में आज के नीचे कल का पंचांग भी दिखता है।',
+    refreshing: 'रिफ्रेश हो रहा है',
+    refreshed: 'रिफ्रेश हो गया',
+    refreshTarget: 'आज का पंचांग',
+  },
+
+  // ── Notification permission pre-prompt ──────────────────────────────────
+  permissionPrompt: {
+    tithi: {
+      title: 'हर तिथि का सम्मान',
+      body: 'आपकी चुनी हुई एकादशी, प्रदोष, पूर्णिमा, अमावस्या आदि तिथियों के एक दिन पहले संध्या को एक सूचना — ताकि कोई तिथि छूट न जाए।',
+    },
+    festival: {
+      title: 'पर्व अब आपके हाथ में',
+      body: 'चुने हुए हर पर्व के एक दिन पहले संध्या को एक सूचना। नवरात्रि अपनी नौ-दिवसीय अनुक्रम पहले दिन शुरू करता है।',
+    },
+    systemHint: 'अगली स्क्रीन आपके फ़ोन की अनुमति-पटी है। आप इसे कभी भी सेटिंग्स में बदल सकते हैं।',
+    continueBtn: 'जारी रखें',
+    cancelBtn: 'अभी नहीं',
   },
 
   // ── Reminders Screen ────────────────────────────────────────────────────
@@ -514,19 +609,23 @@ export default {
       sankashti: '🕉️ कल संकष्टी है',
       shivaratri: '🔱 कल शिवरात्रि है',
     },
+    tithiTitleToday: {
+      ekadashi: '🌙 आज एकादशी है',
+      pradosha: '🌒 आज प्रदोष है',
+      purnima: '🌕 आज पूर्णिमा है',
+      amavasya: '🌑 आज अमावस्या है',
+      sankashti: '🕉️ आज संकष्टी है',
+      shivaratri: '🔱 आज शिवरात्रि है',
+    },
     tithiBody: 'कल {{name}} है — अपनी तैयारी करें।',
+    tithiBodyToday: 'आज {{name}} है — अपना व्रत रखें।',
     festivalTitle: '🪔 {{name}}',
     festivalBody: 'कल {{name}} है।',
+    festivalBodyToday: 'आज {{name}} है।',
     tithiTimeLabel: 'अनुस्मारक समय (एक दिन पहले संध्या)',
     festivalTimeLabel: 'अनुस्मारक समय (एक दिन पहले संध्या)',
     tithiTimePickerTitle: 'तिथि अनुस्मारक समय',
     festivalTimePickerTitle: 'त्योहार अनुस्मारक समय',
-    // P14.4 — साधना अभ्यास अनुस्मारक (वैकल्पिक, शांत भाव में)
-    sadhanaSection: 'साधना अभ्यास',
-    sadhanaLabel: 'संध्या साधना अनुस्मारक',
-    sadhanaSublabel: 'यदि आज अभी साधना शुरू नहीं की हो — एक कोमल याद',
-    sadhanaTimeLabel: 'अनुस्मारक समय',
-    sadhanaTimePickerTitle: 'साधना अनुस्मारक समय',
   },
 
   // ── Walkthrough ──────────────────────────────────────────────────────────
@@ -540,14 +639,11 @@ export default {
     step2Title: 'विस्तृत पंचांग',
     step2Desc: 'पंचांग के पाँचों अंग, सूर्योदय/सूर्यास्त, शुभ-अशुभ समय और ग्रह स्थिति — सब एक जगह।',
     step3Title: 'देवता, आरती और बहुत कुछ',
-    step3Desc: 'देवताओं को जानें, आरती व चालीसा पढ़ें। पसंदीदा को बुकमार्क करें।',
-    step4Title: 'अपना अनुभव बदलें',
-    step4Desc: 'भाषा, थीम, फ़ॉन्ट आकार, स्थान और सूचना प्राथमिकताएँ यहाँ से बदलें।',
+    step3Desc: 'देवताओं को जानें, आरती व चालीसा पढ़ें। जो पसंद आए उसे सहेजें — “आपकी साधना” में “सहेजे गए” के अंतर्गत मिलेगा।',
   },
 
   // ── Vimshottari Dasha ───────────────────────────────────────────────────
   dasha: {
-    title: 'विंशोत्तरी दशा',
     birthDateLabel: 'आपकी जन्म तिथि',
     setBirthDate: 'जन्म तिथि सेट करें',
     changeBirthDate: 'बदलें',
@@ -576,6 +672,7 @@ export default {
       rahu: 'राहु',
       ketu: 'केतु',
     },
+    otherSystems: 'अन्य पद्धतियाँ',
     system: {
       vimshottari: 'विंशोत्तरी',
       ashtottari: 'अष्टोत्तरी',
@@ -612,29 +709,41 @@ export default {
     noCitiesFound: '"{{query}}" के लिए कोई शहर नहीं मिला',
     gpsDenied: 'स्थान अनुमति अस्वीकृत',
     gpsDeniedDesc: 'अपना स्थान स्वयं सेट करने हेतु नीचे अपना शहर खोजें।',
+    // gpsDenied से भिन्न — अनुमति मिलने पर भी स्थान न मिल पाने की स्थिति।
+    gpsFailed: 'आपका स्थान प्राप्त नहीं हो सका',
+    gpsFailedDesc: 'फिर से प्रयास करें, या नीचे अपना शहर चुनें।',
   },
 
   // ── Onboarding ──────────────────────────────────────────────────────────
   onboarding: {
-    // Step 1
-    tagline: 'आपका दैनिक ईश्वरीय सेतु',
-    beginJourney: 'यात्रा शुरू करें',
-    // Step 2
-    step2of3: 'चरण 2 / 3',
-    chooseDeities: 'अपने देवता चुनें',
-    chooseDeitiesDesc:
-      'हम आपके प्रिय देवताओं की आरती और चालीसा दिखाएँगे। आप इसे कभी भी बदल सकते हैं।',
+    // Step — Intent (keystone, P16.6)
+    intentTitle: 'आप यहाँ क्यों आए हैं?',
+    intentSubtitle: 'जो सबसे महत्वपूर्ण हो चुनें — इसे सेटिंग्स में कभी भी बदल सकते हैं।',
+    intent_worship: 'दैनिक पूजा व त्योहार',
+    intent_panchang: 'पंचांग व शुभ समय',
+    intent_kundli: 'ज्योतिष व कुंडली',
+    // Step — Birth details (skippable & soft, P16.6)
+    birthTitle: 'आपके जन्म विवरण',
+    birthSubtitle: 'ताकि आपकी कुंडली व समय सटीक हों। इन्हें बाद में कुंडली में जोड़ सकते हैं।',
+    birthAddLater: 'बाद में कुंडली में जोड़ें',
+    // देवता चयन — सेटिंग्स की देवता स्क्रीन में भी प्रयुक्त।
     selectedCount: '{{count}} चयनित',
-    // Step 3
-    step3of3: 'चरण 3 / 3',
-    preferences: 'प्राथमिकताएँ सेट करें',
-    dark: 'डार्क',
-    light: 'लाइट',
-    useGpsLocation: 'GPS स्थान उपयोग करें',
-    gpsDesc: 'सटीक सूर्योदय और पंचांग समय',
-    usePuneDefault: 'वाराणसी (डिफ़ॉल्ट)',
-    puneDesc: 'स्थान अनुमति की आवश्यकता नहीं',
     startExploring: 'अन्वेषण शुरू करें  🙏',
+    // Diya onboarding (frames 1–5)
+    welcomeBody: 'हर दिन का पंचांग, मुहूर्त और पूजा — गणना आपके फ़ोन पर, ऑफ़लाइन भी।',
+    welcomePromise: 'कोई खाता नहीं। कुछ भी फ़ोन से बाहर नहीं जाता।',
+    begin: 'शुरू करें',
+    langTitle: 'भाषा और परंपरा',
+    showTextIn: 'पाठ की भाषा',
+    calendarSystem: 'पंचांग पद्धति',
+    purnimantaDesc: 'उत्तर भारत — मास पूर्णिमा को समाप्त होता है',
+    amantaDesc: 'दक्षिण व पश्चिम — मास अमावस्या को समाप्त होता है',
+    masaNote: 'इससे त्योहारों की तिथियाँ और मास के नाम बदलते हैं, पंचांग की गणना नहीं।',
+    locTitle: 'आपका स्थान',
+    locBody: 'सूर्योदय, सूर्यास्त और हर मुहूर्त शहर-दर-शहर बदलते हैं। पंचांग एक समय में एक ही स्थान के लिए सही होता है।',
+    useMyLocation: 'मेरा स्थान उपयोग करें',
+    chooseCity: 'शहर चुनें',
+    locationSetTo: 'स्थान: {{name}}',
   },
 
   // ── Deity Names & Descriptions ──────────────────────────────────────────
@@ -662,11 +771,8 @@ export default {
 
   // ── Muhurat Screen ──────────────────────────────────────────────────────
   muhurat: {
-    title: 'शुभ मुहूर्त',
-    intro: 'शास्त्रीय मुहूर्त नियमों के अनुसार जीवन के महत्वपूर्ण कार्यों के लिए शुभ दिन ढूंढें — तिथि, नक्षत्र, योग, वार का संयोग।',
+    title: 'मुहूर्त खोजें',
     footer: 'ये नियम-आधारित संभावित दिन हैं। महत्वपूर्ण कार्यों के लिए अंतिम निर्णय हेतु किसी पंडित से परामर्श करें।',
-    notFound: 'अवसर नहीं मिला',
-    scanRange: 'अगले {{days}} दिनों के शुभ दिन दिखाए जा रहे हैं',
     progressCalculating: 'दिन {{current}} / {{total}} की गणना हो रही है…',
     cancelScan: 'रद्द करें',
     scanPaused: 'गणना {{current}} / {{total}} दिन पर रुकी',
@@ -674,16 +780,21 @@ export default {
     retryScan: 'पुनः प्रयास करें',
     scanFailed: 'मुहूर्त की गणना नहीं हो सकी। कृपया पुनः प्रयास करें।',
     noMatches: 'कोई शुभ दिन नहीं मिला',
-    noMatchesDesc: 'अगले 365 दिनों में इस अवसर के लिए सभी शास्त्रीय नियम पूरे नहीं होते।',
-    resultsCount: '{{count}} शुभ दिन',
+    noMatchesDesc: 'चुनी अवधि में इस अवसर के लिए सभी शास्त्रीय नियम पूरे नहीं होते।',
+    resultsCount: '{{count}} तिथियाँ मिलीं',
     upcomingBadge: 'शीघ्र',
+    bestBadge: 'सर्वोत्तम',
+    changeRange: 'बदलें',
+    window3: '3 महीने',
+    window6: '6 महीने',
+    window12: '1 वर्ष',
+    durationHM: '{{h}}घं {{m}}मि',
     bestSlots: 'दिन के सर्वोत्तम क्षण',
     noSlots: 'विशेष क्षण की जानकारी उपलब्ध नहीं',
     avoidRahu: 'राहु काल से बचें: {{start}} – {{end}}',
-    disclaimer: 'नियम-आधारित; योग्य पंडित का विकल्प नहीं।',
-    scoreKicker: 'अंक',
     scoreOutOf: '/ १००',
     scoreAccessibility: '१०० में से {{score}} अंक',
+    a11yDayHint: 'इस दिन के सर्वोत्तम समय और अंक के कारण दिखाता है',
     whyThisDay: 'इस दिन के कारण',
     scoreBand: {
       excellent: 'अत्यन्त शुभ',
@@ -691,23 +802,44 @@ export default {
       mild: 'मध्यम शुभ',
       marginal: 'सामान्य',
     },
+    // "इस दिन के कारण" की पंक्तियाँ — इंजन के factor.code से (en.ts देखें)।
+    factor: {
+      auspicious_tithi: 'शुभ तिथि — {{name}}',
+      inauspicious_tithi: 'अशुभ तिथि — {{name}}',
+      auspicious_nakshatra: 'शुभ नक्षत्र — {{name}}',
+      inauspicious_nakshatra: 'अशुभ नक्षत्र — {{name}}',
+      auspicious_vara: 'शुभ वार — {{name}}',
+      inauspicious_vara: 'अशुभ वार — {{name}}',
+      auspicious_yoga: 'शुभ योग — {{name}}',
+      inauspicious_yoga: 'अशुभ योग — {{name}}',
+      vara_tithi_siddha: 'सिद्ध योग — वार और तिथि का शुभ संयोग',
+      vara_tithi_amrita: 'अमृत योग — वार और तिथि का शुभ संयोग',
+      vara_tithi_dagdha: 'दग्ध योग — वार और तिथि का अशुभ संयोग',
+      vara_tithi_visha: 'विष योग — वार और तिथि का अशुभ संयोग',
+      vara_tithi_hutasana: 'हुताशन योग — वार और तिथि का अशुभ संयोग',
+      vara_tithi_krakacha: 'क्रकच योग — वार और तिथि का अशुभ संयोग',
+      vara_tithi_samvartaka: 'संवर्तक योग — वार और तिथि का अशुभ संयोग',
+      bhadra: 'दिन के कुछ भाग में भद्रा काल रहता है',
+      amrit_siddhi: 'अमृत सिद्धि योग',
+      sarvartha_siddhi: 'सर्वार्थ सिद्धि योग — सभी कार्यों के लिए शुभ',
+      ravi_pushya: 'रवि पुष्य योग',
+      guru_pushya: 'गुरु पुष्य योग',
+      jwalamukhi: 'ज्वालामुखी योग — अशुभ',
+    },
     occasion: {
-      vivah: { name: 'विवाह', desc: 'विवाह संस्कार का मुहूर्त' },
-      'griha-pravesh': { name: 'गृह प्रवेश', desc: 'नए घर में प्रवेश का मुहूर्त' },
-      namkaran: { name: 'नामकरण', desc: 'बालक के नामकरण का संस्कार' },
-      vahan: { name: 'वाहन खरीदी', desc: 'वाहन क्रय का मुहूर्त' },
-      mundan: { name: 'मुंडन', desc: 'बालक का प्रथम केश-कर्तन संस्कार' },
-      annaprashan: { name: 'अन्नप्राशन', desc: 'प्रथम अन्न ग्रहण संस्कार (लगभग 6 माह)' },
-      vidyarambh: { name: 'विद्यारंभ', desc: 'औपचारिक शिक्षा का आरंभ' },
+      vivah: { name: 'विवाह', chip: 'विवाह', desc: 'विवाह संस्कार का मुहूर्त' },
+      'griha-pravesh': { name: 'गृह प्रवेश', chip: 'गृह प्रवेश', desc: 'नए घर में प्रवेश का मुहूर्त' },
+      namkaran: { name: 'नामकरण', chip: 'नामकरण', desc: 'बालक के नामकरण का संस्कार' },
+      vahan: { name: 'वाहन खरीदी', chip: 'वाहन', desc: 'वाहन क्रय का मुहूर्त' },
+      mundan: { name: 'मुंडन', chip: 'मुंडन', desc: 'बालक का प्रथम केश-कर्तन संस्कार' },
+      annaprashan: { name: 'अन्नप्राशन', chip: 'अन्नप्राशन', desc: 'प्रथम अन्न ग्रहण संस्कार (लगभग 6 माह)' },
+      vidyarambh: { name: 'विद्यारंभ', chip: 'विद्यारंभ', desc: 'औपचारिक शिक्षा का आरंभ' },
     },
   },
 
-  // ── Astrology tab (Kundli / Dasha / Sade Sati) ──────────────────────────
+  // ── Astrology tab ───────────────────────────────────────────────────────
   astrology: {
-    title: 'ज्योतिष',
     kundli: 'कुंडली',
-    dasha: 'दशा',
-    sadeSati: 'साढ़े साती',
   },
 
   kundli: {
@@ -716,6 +848,42 @@ export default {
     padaShort: 'पाद {{pada}}',
     chartNorth: 'उत्तर',
     chartSouth: 'दक्षिण',
+    // Divisional (varga) chart short meanings (P16.1).
+    divisional: {
+      D1: 'मुख्य',
+      D2: 'धन',
+      D3: 'भाई-बहन',
+      D7: 'संतान',
+      D9: 'विवाह',
+      D10: 'करियर',
+      D12: 'माता-पिता',
+      D30: 'कष्ट',
+    },
+    // P16.2 — Basics layer + "Advanced chart" switch.
+    setupTitle: 'अपनी कुंडली बनाएं',
+    moonSignLabel: 'चंद्र राशि',
+    sunSignLabel: 'सूर्य राशि',
+    currentPeriodLabel: 'वर्तमान काल',
+    currentPeriodBody: 'आप {{planet}} महादशा में हैं — {{year}} तक',
+    reading: {
+      label: 'आपकी कुंडली का सार',
+      intro: 'आपकी कुंडली का सरल भाषा में सारांश — आपका स्वभाव, आपके मज़बूत पक्ष, और ध्यान देने योग्य बातें।',
+      natureLabel: 'आपका स्वभाव',
+      strengthsLabel: 'मज़बूत पक्ष',
+      cautionsLabel: 'ध्यान देने योग्य',
+      provisional: 'यह आपकी कुंडली पर आधारित एक सामान्य मार्गदर्शन है, भविष्यवाणी नहीं।',
+    },
+    highlightsLabel: 'मुख्य बातें',
+    noFlags: 'आपकी कुंडली में कोई बड़ा दोष नहीं।',
+    flagMangal: 'मंगल दोष',
+    flagKaalSarp: 'काल सर्प',
+    flagPitru: 'पितृ दोष',
+    toolsLabel: 'उपकरण',
+    toolMatch: 'मिलान',
+    toolVarshaphala: 'वर्षफल',
+    toolPrashna: 'प्रश्न',
+    advancedChart: 'विस्तृत कुंडली',
+    dashaTimelineLabel: 'दशा समयरेखा',
     openSettings: 'सेटिंग्स खोलें',
     computeFailed: 'इन विवरणों के लिए कुंडली नहीं बनाई जा सकी।',
     doshasSection: 'दोष',
@@ -742,7 +910,6 @@ export default {
     fromLagna: 'लग्न से',
     fromMoon: 'चंद्र से',
     fromVenus: 'शुक्र से',
-    cancellation: 'परिहार',
     dignitySection: 'ग्रह बल',
     shadbalaSection: 'षड्बल · छह-गुना बल',
     dignity: {
@@ -754,14 +921,8 @@ export default {
       enemy: 'शत्रु',
       debilitated: 'नीच',
     },
-    matchKicker: 'अनुकूलता',
-    matchCardTitle: 'दो कुंडलियों का मिलान (अष्टकूट गुण मिलान)',
     matchOthersKicker: 'अन्य अनुकूलता',
     matchOthersTitle: 'दो अन्य व्यक्तियों की कुंडली मिलाएँ',
-    openVarshaphalaKicker: 'वार्षिक चक्र',
-    openVarshaphala: 'वर्षफल — वार्षिक प्रत्यागमन चक्र',
-    openPrashnaKicker: 'प्रश्न · प्रश्नकुण्डली',
-    openPrashna: 'प्रश्न कुंडली बनाएँ',
     formIntro: 'कुंडली बनाने के लिए अपने जन्म विवरण जोड़ें। यहाँ सुरक्षित, हर जगह उपयोगी।',
     fieldName: 'आपका नाम',
     fieldNamePlaceholder: 'आपका नाम',
@@ -811,7 +972,7 @@ export default {
       sectionTitle: 'अष्टकवर्ग',
       sarvaShort: 'सर्व',
       sarvaFootnote: 'सर्वाष्टक — सभी राशियों का योग: {{sum}} (शास्त्रीय 337)।',
-      bhinnaFootnote: '{{graha}} का भिन्नाष्टक — योग {{sum}} (बीपीएचएस अध्याय 66 अनुसार चार्ट-अपरिवर्तनीय)।',
+      bhinnaFootnote: '{{graha}} का भिन्नाष्टक — योग {{sum}} (प्रत्येक कुंडली में यही रहता है)।',
     },
     varshaphala: {
       headerTitle: 'वार्षिक चक्र',
@@ -844,14 +1005,14 @@ export default {
       natalTithiLabel: 'जन्म तिथि',
       shuklaTithi: 'शुक्ल {{n}}',
       krishnaTithi: 'कृष्ण {{n}}',
-      tithiBasis: 'प्रवेश तिथि निर्माण से जन्म तिथि के समान है।',
+      tithiBasis: 'प्रवेश कुंडली तब बनती है जब सूर्य–चन्द्र का अंतर पुनः जन्म के मान पर आता है।',
       praveshAt: 'तिथि प्रवेश · {{date}} · {{time}}',
       bhavaCuspsSection: 'भाव संधि',
       cuspsHint: '{{system}} पद्धति में संधियाँ।',
       planetsSection: 'प्रवेश पर ग्रह',
       computeFailed: 'इन विवरणों के लिए तिथि प्रवेश नहीं बनाई जा सकी।',
       disclaimer:
-        'तिथि प्रवेश दक्षिण-भारतीय वार्षिक प्रत्यागमन चक्र है जो उस सौर-चन्द्र क्षण पर बनती है, जब सूर्य व चन्द्र पुनः जन्मांश पर आते हैं। जन्म तिथि निर्माण से सुरक्षित रहती है।',
+        'तिथि प्रवेश दक्षिण-भारतीय वार्षिक प्रत्यागमन चक्र है जो उस सौर-चन्द्र क्षण पर बनती है, जब सूर्य व चन्द्र पुनः जन्मांश पर आते हैं।',
     },
     advancedPoints: {
       sectionTitle: 'विशिष्ट बिंदु',
@@ -929,7 +1090,7 @@ export default {
     nextArc: 'अगला चक्र लगभग {{date}} से शुरू होगा।',
     aboutLabel: 'साढ़े साती के बारे में',
     aboutDesc:
-      'साढ़े साती शनि का 7.5 वर्षों का संक्रमण है, जो आपके जन्म चंद्र से 12वीं, 1ली और 2री राशियों में होता है। शास्त्रीय स्रोत (पाराशर, BPHS) इसे दुर्भाग्य नहीं बल्कि अनुशासन और पुनरावलोकन का काल मानते हैं।',
+      'साढ़े साती शनि का 7.5 वर्षों का संक्रमण है, जो आपके जन्म चंद्र से 12वीं, 1ली और 2री राशियों में होता है। परंपरा में इसे दुर्भाग्य नहीं, बल्कि अनुशासन और पुनरावलोकन का काल माना जाता है।',
   },
 
   match: {
@@ -958,14 +1119,32 @@ export default {
     fieldBirthPlace: 'जन्म स्थान',
     pickDate: 'तिथि चुनें',
     pickPlace: 'शहर चुनें',
-    currentLocation: 'वर्तमान स्थान',
     resultTitle: 'अनुकूलता',
-    totalScoreLabel: 'अष्टकूट कुल',
     verdictExcellent: 'उत्तम अनुकूलता',
     verdictGood: 'अच्छी अनुकूलता',
     verdictAcceptable: 'स्वीकार्य अनुकूलता',
     verdictPoor: 'न्यून अनुकूलता',
     cancellationsLabel: 'लागू परिहार',
+    cancellations: {
+      ganaSameRashiLord:
+        'गण: दोनों का राशि स्वामी एक ही ग्रह है, इसलिए स्वभाव के बेमेल का दोष नहीं लगता।',
+      ganaMutualFriendship:
+        'गण: दोनों के राशि स्वामी परस्पर मित्र ग्रह हैं, इसलिए स्वभाव के बेमेल का दोष नहीं लगता।',
+      bhakootSameRashiLord:
+        'भकूट: दोनों का राशि स्वामी एक ही ग्रह है, इसलिए राशियों के बीच की प्रतिकूल दूरी का दोष नहीं लगता।',
+      bhakootMutualFriendship:
+        'भकूट: दोनों के राशि स्वामी परस्पर मित्र ग्रह हैं, इसलिए राशियों के बीच की प्रतिकूल दूरी का दोष नहीं लगता।',
+      bhakootSameLagnaLord:
+        'भकूट: दोनों का लग्न स्वामी एक ही ग्रह है, इसलिए राशियों के बीच की प्रतिकूल दूरी का दोष नहीं लगता।',
+      bhakootSameSeventhLord:
+        'भकूट: दोनों कुंडलियों में सप्तम भाव स्वामी (विवाह भाव का स्वामी) एक ही ग्रह है, इसलिए राशियों के बीच की प्रतिकूल दूरी का दोष नहीं लगता।',
+      bhakootSameNavamsaLord:
+        'भकूट: दोनों की नवांश (विवाह) कुंडली में चंद्रमा की राशि का स्वामी एक ही ग्रह है, इसलिए राशियों के बीच की प्रतिकूल दूरी का दोष नहीं लगता।',
+      nadiSameNakshatra:
+        'नाड़ी: दोनों का जन्म नक्षत्र एक ही है, इसलिए एक ही नाड़ी होने का दोष नहीं लगता।',
+      nadiSameRashi:
+        'नाड़ी: दोनों की चंद्र राशि एक ही है, इसलिए एक ही नाड़ी होने का दोष नहीं लगता।',
+    },
     disclaimer:
       'अष्टकूट कई शास्त्रीय अनुकूलता परीक्षणों में से एक है। इसे मार्गदर्शन मानें, अंतिम निर्णय नहीं — पूर्ण कुंडली विश्लेषण में दोष, दशा-संगति और ग्रह दृष्टि भी देखी जाती हैं।',
     systemAshtakoot: '36-अंक · अष्टकूट',
@@ -981,7 +1160,6 @@ export default {
       nadi: 'नाड़ी · आरोग्य · अनुवांशिकता',
     },
     pathuPorutham: {
-      totalScoreLabel: 'पाठु पोरुथम',
       recommended: 'अनुशंसित — तमिल परम्परा अनुसार अनुकूल',
       notRecommended: 'तमिल परम्परा में अनुशंसित नहीं',
       pass: 'उत्तीर्ण',
@@ -1008,16 +1186,14 @@ export default {
   notifications: {
     dailyReminderTitle: '🙏 प्रातः स्मरण',
     dailyReminderBody: 'आरती से दिन की शुरुआत करें। आपकी सुबह मंगलमय हो।',
+    dailyReminderBodyWithVrat: '🪔 कल {{vrat}} है। अपनी प्रार्थना की तैयारी करें।',
     sunriseAlertTitle: '🌅 सूर्योदय',
     sunriseAlertBody: '{{time}} पर सूर्योदय। प्रार्थना का पवित्र समय।',
-    dailyReminderBodyWithVrat: '🪔 कल {{vrat}} है। अपनी प्रार्थना की तैयारी करें।',
   },
 
   // ── Mantra Jaap ─────────────────────────────────────────────────────────
   jaap: {
     title: 'मंत्र जप',
-    titleEyebrow: 'जप',
-    pickerIntro: 'गिनती शुरू करने के लिए एक मंत्र चुनें। केन्द्रीय मणि पर प्रत्येक स्पर्श एक जप जोड़ता है।',
     chooseMantra: 'मंत्र चुनें',
     customMantra: 'स्वयं का मंत्र',
     customMantraDesc: 'गिनने के लिए अपना मंत्र लिखें।',
@@ -1048,7 +1224,11 @@ export default {
     saveBeforeExitDesc: 'आपने {{count}} जप गिने हैं। इतिहास में सहेजें?',
     saveYes: 'सहेजें',
     saveNo: 'त्यागें',
-    historyTitle: 'जप इतिहास',
+    historyTitle: 'आपकी साधना',
+    statMalas: 'कुल मालाएँ',
+    statTime: 'साधना समय',
+    statSessions: 'सत्र',
+    last12Weeks: 'पिछले 12 सप्ताह',
     historyEmptyTitle: 'अभी कोई सत्र नहीं',
     historyEmptyDesc: 'जप सत्र पूरा करें ताकि वह यहाँ दिखे। पिछले 30 सहेजे जाते हैं।',
     historyBeginCta: 'जप आरंभ करें',
@@ -1060,7 +1240,6 @@ export default {
     historyDurationShort: '{{seconds}} से',
     universalMantra: 'सर्वसामान्य',
     deityChip: '{{name}} के लिए',
-    homeBody: 'मंत्र जप आरंभ करें',
   },
 
   vaar: {
@@ -1068,7 +1247,6 @@ export default {
     todaysDeityKicker: 'आज के देवता',
     rulingGraha: '{{graha}} ग्रह का वार',
     dayColorLabel: 'दिन का रंग',
-    ishtDevataInFocus: 'आज आपके इष्ट देव का दिन है',
     startJaap: 'जप आरंभ करें',
     // विवरण स्क्रीन
     detailTitle: '{{day}} के देवता',
@@ -1096,9 +1274,9 @@ export default {
   // ── Navratri / Navadurga 9-day guide (P14.3) ────────────────────────────
   navratri: {
     title: 'नवरात्रि',
-    sharadName: 'शारदीय नवरात्रि',
     dayShortLabel: 'दिन',
     dayKicker: 'दिन {{day}} · {{name}}',
+    dayOfBadge: '9 में से दिन {{day}}',
     colorLabel: 'आज का रंग',
     colorComputedNote: '{{weekday}} पर आधारित — रंग वार-अनुसार होते हैं, देवी-अनुसार नहीं।',
     iconographyLabel: 'स्वरूप-वर्णन',
@@ -1110,7 +1288,8 @@ export default {
     bhogLabel: 'भोग / प्रसाद',
     ghatasthapanaLabel: 'घटस्थापना मुहूर्त',
     ghatasthapanaWindowNote: 'आपके स्थान हेतु गणित — दिन के प्रथम तृतीयांश में, जब प्रतिपदा सक्रिय हो।',
-    ghatasthapanaAbhijitFallback: 'सूर्योदय से पूर्व ही प्रतिपदा समाप्त हो जाती है — अभिजित मुहूर्त का प्रयोग करें।',
+    ghatasthapanaAbhijitFallback: 'प्रतिपदा दिन के प्रथम तृतीयांश में नहीं पड़ती — अभिजित मुहूर्त का प्रयोग करें।',
+    ghatasthapanaNoWindow: 'इस दिन और स्थान के लिए घटस्थापना का मुहूर्त निर्धारित नहीं हो सका — स्थानीय पंडित जी के परामर्श का अनुसरण करें।',
     warnChitra: 'चित्रा नक्षत्र सक्रिय है — शास्त्रोक्त रूप से वर्जित नहीं, परंतु अनुशंसित नहीं।',
     warnVaidhriti: 'वैधृति योग सक्रिय है — शास्त्रोक्त रूप से वर्जित नहीं, परंतु अनुशंसित नहीं।',
     kanyaPujanKicker: 'कन्या पूजन',
@@ -1118,6 +1297,7 @@ export default {
     day9HavanText: 'नवमी हवन एवं पूर्णाहुति के साथ नवरात्रि का समापन। अनेक गृहस्थ नवमी पर ही कन्या पूजन रखते हैं — २-१० वर्ष की नौ बालिकाएँ, हलवा-पूरी-चना, उपहार।',
     vijayadashamiLabel: 'विजयदशमी / दशहरा',
     vijayadashamiText: 'दिन १० — {{date}} — विजयदशमी / दशहरा। दुर्गा विसर्जन तथा अनेक परंपराओं में रावण दहन एवं शमी पूजन।',
+    vijayadashamiToday: 'आज ही विजयदशमी / दशहरा है।',
     saptashatiTodayLabel: 'आज का सप्तशती पाठ',
     saptashatiChapters_one: 'अध्याय {{list}}',
     saptashatiChapters_other: 'अध्याय {{list}}',
@@ -1132,21 +1312,21 @@ export default {
     allowedLabel: 'अनुमत',
     forbiddenLabel: 'वर्जित',
     sourcesLabel: 'इसके विषय में',
-    headerKickerUpcoming: 'आगामी · नौ-दिवसीय मार्गदर्शिका',
-    headerKickerActive: 'नौ में से दिन {{day}} · चल रहा है',
-    headerGhatasthapanaLine: 'घटस्थापना · {{range}}',
-    headerAbhijitLine: 'अभिजित मुहूर्त · {{range}}',
     notif: {
       dayTitle: 'दिन {{day}} · {{form}}',
       day1Body: 'प्रातः का मुख्य अनुष्ठान घटस्थापना — शुभ मुहूर्त {{muhurat}}। आज {{form}} का दिन है।',
+      day1BodyNoMuhurat: 'प्रातः का मुख्य अनुष्ठान घटस्थापना है। आज {{form}} का दिन है।',
       dayBody: 'आज का रंग {{color}}; {{form}} को {{bhog}} का भोग अर्पित करें।',
       dayKanyaBody: 'आज {{form}} का दिन — रंग {{color}}, भोग {{bhog}}। अष्टमी या नवमी कन्या पूजन का दिन है।',
+      day9And10Body: 'आज {{form}} का दिन — रंग {{color}}, भोग {{bhog}}। आज ही विजयदशमी / दशहरा है: दुर्गा विसर्जन तथा अनेक परंपराओं में रावण दहन एवं शमी पूजन।',
       day10Title: 'विजयदशमी · दशहरा',
       day10Body: 'आज दुर्गा विसर्जन। अनेक परंपराओं में रावण दहन एवं शमी पूजन।',
-      day1MuhuratTitle: 'घटस्थापना मुहूर्त निकट है',
+      // दोनों body के लिए एक ही title — यह सूचना मुहूर्त आरंभ से पहले भी और
+      // बाद में भी पहुँच सकती है, अतः समय की बात body में ही रहती है।
+      day1MuhuratTitle: 'घटस्थापना मुहूर्त',
       day1MuhuratBody: 'कलश-स्थापना का शुभ मुहूर्त लगभग 30 मिनट में आरंभ होगा — {{range}}।',
+      day1MuhuratBodyOpen: 'कलश-स्थापना का शुभ मुहूर्त अभी चल रहा है — {{end}} तक।',
     },
-    a11yOpenGuide: 'नवरात्रि की नौ-दिवसीय मार्गदर्शिका खोलें',
     a11ySwitchKind: '{{name}} पर जाएँ',
     a11yPickDay: 'दिन {{day}}',
     a11yStartJaap: 'इस मंत्र का जप आरंभ करें',
@@ -1168,15 +1348,122 @@ export default {
     a11yOpenKanyaPujan: 'कन्या पूजन मार्गदर्शिका खोलें',
   },
 
+  // ── Sacred Texts hub ────────────────────────────────────────────────────
+  texts: {
+    title: 'पवित्र ग्रंथ',
+    eyebrow: 'पाठ · स्वाध्याय',
+    intro: 'समस्त पठन-सामग्री एक स्थान पर — पूर्ण ग्रंथ, स्तोत्र एवं नामावलियाँ, वैदिक सूक्त, तथा व्रत कथाएँ।',
+    scriptures: { title: 'ग्रंथ', subtitle: 'गीता, रामचरितमानस, सुन्दरकाण्ड एवं उपनिषद्।' },
+    stotras: { title: 'स्तोत्र एवं अष्टक', subtitle: 'शिव ताण्डव, महिषासुरमर्दिनी, बजरंग बाण आदि।' },
+    sahasranama: { title: 'सहस्रनाम', subtitle: 'सहस्र नाम — विष्णु एवं ललिता।' },
+    suktas: { title: 'वैदिक सूक्त', subtitle: 'श्री सूक्त, पुरुष सूक्त, श्री रुद्रम् आदि।' },
+    kathas: { title: 'व्रत कथाएँ', subtitle: 'व्रत रखते समय पठित कथाएँ।' },
+  },
+
+  // ── Stotras / Ashtakams ─────────────────────────────────────────────────
+  stotra: {
+    indexTitle: 'स्तोत्र एवं अष्टक',
+    indexEyebrow: 'स्तुति-गान',
+    indexIntro: 'देवताओं के शास्त्रीय स्तोत्र एवं अष्टक — स्तुत देवता अनुसार वर्गीकृत। श्लोक-दर-श्लोक पढ़ने हेतु किसी पर स्पर्श करें।',
+    notFound: 'यह स्तोत्र उपलब्ध नहीं है।',
+    a11yOpen: '{{name}} खोलें',
+    form: {
+      stotra: 'स्तोत्र',
+      ashtakam: 'अष्टक',
+      stuti: 'स्तुति',
+    },
+    language: {
+      sanskrit: 'संस्कृत',
+      awadhi: 'अवधी',
+    },
+  },
+
+  // ── Vedic Suktas ────────────────────────────────────────────────────────
+  sukta: {
+    indexTitle: 'वैदिक सूक्त',
+    indexEyebrow: 'वेदों से',
+    indexIntro: 'वेद-संहिताओं से चयनित सूक्त — पूजा, हवन एवं अभिषेक में पठित। पूर्ण पाठ हेतु किसी पर स्पर्श करें।',
+    notFound: 'यह सूक्त उपलब्ध नहीं है।',
+    a11yOpen: '{{name}} खोलें',
+  },
+
+  // ── Sahasranama (1000 names) ────────────────────────────────────────────
+  sahasranama: {
+    indexTitle: 'सहस्रनाम',
+    indexEyebrow: 'सहस्र नाम',
+    indexIntro: 'सहस्र-नाम नामावलियाँ — स्तोत्र रूप में सम्पूर्ण पाठ, अथवा अर्चना रूप में नाम-दर-नाम। आरंभ हेतु किसी पर स्पर्श करें।',
+    notFound: 'यह सहस्रनाम उपलब्ध नहीं है।',
+    a11yOpen: '{{name}} खोलें',
+    nameCount: '{{count}} नाम',
+    tabStotram: 'स्तोत्रम्',
+    tabNamavali: '१००० नाम',
+  },
+
+  // ── Tirtha (sacred geography) ───────────────────────────────────────────
+  tirtha: {
+    title: 'तीर्थ',
+    notFound: 'यह स्थल उपलब्ध नहीं है।',
+    sourcesLabel: 'इसके विषय में',
+    siteCount: '{{count}} स्थल',
+    a11yOpenSite: '{{name}} खोलें',
+    jyotirlingaNumber: '१२ में से {{num}}वाँ ज्योतिर्लिंग',
+    numOf: '{{total}} में से {{num}}',
+    openMaps: 'मानचित्र में खोलें',
+    presidingDeity: 'अधिष्ठाता देवता',
+    openDeity: '{{name}} खोलें',
+    openPuja: 'पूजा-विधि खोलें',
+    startJaap: 'मंत्र जप आरंभ करें',
+    category: {
+      jyotirlinga: 'द्वादश ज्योतिर्लिंग',
+      'char-dham': 'चार धाम',
+      'chota-char-dham': 'छोटा चार धाम',
+      'shakti-peetha': 'शक्तिपीठ',
+      'sapta-puri': 'सप्त पुरी',
+      'sacred-river': 'पवित्र नदियाँ',
+    },
+    field: {
+      shakti: 'शक्ति',
+      bodyPart: 'अंग (जो गिरा)',
+      bhairava: 'भैरव',
+      direction: 'दिशा',
+    },
+  },
+
+  // ── Festival detail ─────────────────────────────────────────────────────
+  festival: {
+    notFound: 'यह व्रत-पर्व उपलब्ध नहीं है।',
+    story: 'कथा',
+    presidingDeity: 'अधिष्ठाता देवता',
+    openDeity: '{{name}} खोलें',
+    observeLabel: 'इसका पालन कैसे करें',
+    sourcesLabel: 'इसके विषय में',
+    today: 'आज',
+    tomorrow: 'कल',
+    inDays: '{{count}} दिन में',
+    onTheDay: 'उस दिन',
+    link: {
+      katha: 'व्रत कथा',
+      puja: 'पूजा-विधि',
+      scripture: 'ग्रंथ',
+      mantra: 'मंत्र · जप',
+      sukta: 'वैदिक सूक्त',
+      stotra: 'स्तोत्र',
+    },
+  },
+
   // ── Scripture reader (P14.3 outline + library scriptures) ──────────────
   scripture: {
     notFound: 'यह ग्रंथ उपलब्ध नहीं है।',
     // Index screen
     indexTitle: 'ग्रंथ',
     indexEyebrow: 'पवित्र ग्रंथ',
-    indexIntro: 'भगवद्गीता एवं तुलसी-सुन्दरकाण्ड के पूर्ण मूल पाठ, तथा नवरात्रि पाठ हेतु प्रयुक्त दुर्गा सप्तशती की रूपरेखा। पढ़ने हेतु किसी ग्रंथ पर स्पर्श करें।',
+    indexIntro: 'भगवद्गीता, रामचरितमानस, सुन्दरकाण्ड एवं प्रमुख उपनिषदों के पूर्ण मूल पाठ, तथा नवरात्रि पाठ हेतु प्रयुक्त दुर्गा सप्तशती की रूपरेखा। पढ़ने हेतु किसी ग्रंथ पर स्पर्श करें।',
     sourcesLabel: 'इसके विषय में',
     a11yOpenScripture: '{{name}} खोलें',
+    group: {
+      core: 'महाकाव्य एवं गीता',
+      upanishad: 'उपनिषद्',
+    },
     // Saptashati branch
     kickerSaptashati: 'दुर्गा माहात्म्य',
     aboutLabel: 'इस ग्रंथ के विषय में',
@@ -1191,6 +1478,9 @@ export default {
     subtitleVersesOnly_other: '{{count}} श्लोक',
     subtitleChaptersVerses: '{{chapters}} अध्याय · {{verses}} श्लोक',
     chapterListLabel: 'अध्याय',
+    continueChapter: 'जारी रखें — अध्याय {{num}}',
+    verseOf: 'श्लोक {{x}} / {{y}}',
+    chapterComplete: 'पूर्ण',
     versesNCount_one: '{{count}} श्लोक',
     versesNCount_other: '{{count}} श्लोक',
     readCtaKicker: 'पाठ आरम्भ',
@@ -1199,6 +1489,12 @@ export default {
     a11yOpenChapter: 'अध्याय {{num}} खोलें',
     // Verse reader
     verseKicker: 'श्लोक {{num}}',
+    meaningLabel: 'अर्थ',
+    // Chapter footer navigation
+    prevChapter: 'पिछला',
+    nextChapter: 'अगला',
+    prevChapterA11y: 'पिछला अध्याय — अध्याय {{num}}',
+    nextChapterA11y: 'अगला अध्याय — अध्याय {{num}}',
   },
 
   // ── Vrat Kathas (hindu-devotional-texts kathas/ module) ─────────────────
@@ -1218,10 +1514,28 @@ export default {
 
   // ── Practice tab (P14.3 — sadhana / pujas / vrats hub) ──────────────────
   practice: {
-    title: 'पूजा',
-    eyebrow: 'पूजा · साधना',
-    intro: 'पूजा-विधि एवं वार-उपासना — नवरात्रि नौ-दिवसीय मार्गदर्शिका, वार देवता, सामग्री-सूची एवं क्रमिक उपचार सहित सात विशेष पूजाएँ, तथा छह व्रत कथाएँ। पर्व-तिथियाँ (एकादशी, महाशिवरात्रि आदि) पर्व-तालिका (Festivals) टैब में सूचीबद्ध हैं।',
+    title: 'भक्ति',
+    eyebrow: 'साधना',
+    intro: 'समस्त साधना एक स्थान पर — नवरात्रि मार्गदर्शिका एवं वार देवता, विशेष पूजाएँ, पवित्र-ग्रंथ संग्रह, तीर्थ-संग्रह, तथा पर्व-तालिका।',
     comingSoon: 'शीघ्र आ रही',
+    section: {
+      daily: 'नित्य साधना',
+      texts: 'पवित्र ग्रंथ',
+      places: 'तीर्थ-स्थल',
+      festivals: 'पर्व',
+    },
+    texts: {
+      title: 'पवित्र ग्रंथ',
+      subtitle: 'ग्रंथ, स्तोत्र एवं अष्टक, सहस्रनाम, वैदिक सूक्त एवं व्रत कथाएँ।',
+    },
+    tirtha: {
+      title: 'तीर्थ · पवित्र स्थल',
+      subtitle: 'ज्योतिर्लिंग, शक्तिपीठ, चार धाम, सप्त पुरी एवं पवित्र नदियाँ।',
+    },
+    festivals: {
+      title: 'पर्व-तालिका',
+      subtitle: 'प्रत्येक व्रत एवं पर्व की तिथि, महत्त्व एवं कथा।',
+    },
     navratri: {
       title: 'नवरात्रि नौ-दिवसीय मार्गदर्शिका',
       defaultSubtitle: 'शारदीय नवरात्रि · दिन-वार रूप, मंत्र, भोग, व्रत-नियम एवं दुर्गा सप्तशती',
@@ -1235,21 +1549,15 @@ export default {
       title: 'पूजा-विधि',
       subtitle: 'गृहस्थ पूजाओं की क्रमिक विधि — सत्यनारायण, लक्ष्मी/दीपावली, गणेश, रुद्राभिषेक, हनुमान, नवग्रह, घटस्थापना।',
     },
-    kathas: {
-      title: 'व्रत कथाएँ',
-      subtitle: 'व्रत रखते समय पठित कथाएँ — सत्यनारायण, करवा चौथ, वैभव लक्ष्मी, संतोषी माता, सोलह सोमवार, अहोई अष्टमी।',
-    },
-    scriptures: {
-      title: 'ग्रंथ',
-      subtitle: 'भगवद्गीता, सुन्दरकाण्ड एवं दुर्गा सप्तशती की रूपरेखा।',
+    prayers: {
+      title: 'नित्य प्रार्थनाएँ',
+      subtitle: 'दिन भर की नित्य-कर्म प्रार्थनाएँ — प्रातः जागरण, स्नान से पूर्व, भोजन से पूर्व एवं संध्या।',
     },
   },
 
   // ── Puja Vidhi (P14.2) ──────────────────────────────────────────────────
   puja: {
     indexTitle: 'पूजा-विधि',
-    indexEyebrow: 'विशेष पूजाएँ',
-    indexIntro: 'सबसे प्रचलित गृहस्थ पूजाओं में से सात, प्रत्येक शास्त्रीय षोडशोपचार-क्रम पर — कब एवं क्यों, अंतर्क्रियात्मक सामग्री-सूची, क्रमांकित उपचार, तथा आरती, चालीसा, जाप एवं सम्बद्ध पर्व अथवा मुहूर्त के सीधे लिंक।',
     notFound: 'यह पूजा उपलब्ध नहीं है।',
     // Detail-screen section labels
     whenWhyLabel: 'कब एवं क्यों',
@@ -1257,62 +1565,39 @@ export default {
     samagriHint: 'सामग्री एकत्रित करते समय एक-एक करके टिक करें — पृष्ठ छोड़ने पर ये टिक रीसेट हो जाती हैं।',
     sankalpaLabel: 'संकल्प · समर्पण',
     sankalpaHint: 'मन-ही-मन उच्चारित करें; कोष्ठक में दिए स्थानों पर अपना गोत्र, नाम, स्थान एवं अभिप्राय प्रतिस्थापित करें।',
-    preArcLabel: 'पूर्व-क्रम',
-    shodashopacharaLabel: 'षोडशोपचार',
-    shodashopacharaHint: 'शास्त्रीय षोडशोपचार-क्रम, इस पूजा हेतु अनुकूलित।',
-    postArcLabel: 'समापन-क्रम',
     afterTheLabel: 'पूजा के पश्चात्',
     variantsLabel: 'क्षेत्रीय एवं पारंपरिक भेद',
     sourcesLabel: 'इसके विषय में',
+    // Step-at-a-time flow (frame 04)
+    todayBadge: 'आज',
+    stepKicker: 'चरण {{n}}',
+    stepCount: '{{count}} चरण',
+    samagriCount: '{{count}} सामग्री',
+    beginCta: 'पूजा आरंभ करें',
+    doneNext: 'हो गया — अगला चरण',
+    finish: 'समाप्त करें',
+    neededNow: 'अभी आवश्यक',
+    completeTitle: 'पूजा सम्पन्न',
+    completeSubtitle: 'सभी चरण पूर्ण हुए। आरती के साथ समापन करें एवं नैवेद्य प्रसाद रूप में बाँटें।',
+    a11yExitSteps: 'चरण-दर-चरण दृश्य से बाहर निकलें',
     // Banners + buttons
     reviewBanner: 'मंत्र विद्वत्-समीक्षाधीन हैं — अस्थायी मानें। क्षेत्रीय एवं पारिवारिक भेद विद्यमान हैं; किसी भी बड़े अनुष्ठान के लिए पंडित जी के परामर्श का अनुसरण करें।',
     startJaap: 'जप आरंभ करें',
     openAarti: 'आरती खोलें',
     openChalisa: 'चालीसा खोलें',
     // Cross-link CTAs
-    openPujaCta: 'पूजा-विधि खोलें',
     openNamedPuja: '{{name}} खोलें',
-    openDeityPuja: '{{name}} खोलें',
     // Accessibility
     a11yStartJaap: 'इस मंत्र का जप आरंभ करें',
   },
-  share: {
-    // Sheet chrome
-    title: 'कार्ड साझा करें',
-    shareBtn: 'साझा करें',
-    shapeStory: 'स्टोरी · 9:16',
-    shapeSquare: 'वर्ग · 1:1',
-    statusHint: 'व्हाट्सऐप स्टेटस के लिए — शेयर शीट खोलें, व्हाट्सऐप चुनें, फिर "My status" पर टैप करें।',
-    error: 'कार्ड नहीं बन सका। कृपया फिर से प्रयास करें।',
-    // Card kickers
-    kickerDeityBlessing: 'देव आशीर्वाद',
-    kickerFestival: 'पर्व की शुभकामनाएँ',
-    kickerVerse: 'पावन पंक्ति',
-    kickerJaap: 'जाप पूर्ण',
-    jaapCountLine: 'आज {{count}} बार जप',
-    kickerMilestone: 'साधना मील-पत्थर',
-    milestoneSubline: {
-      sessions: 'पूर्ण किए गए सत्र',
-      repetitions: 'पावन जप',
-      streak: 'दिनों की साधना',
-    },
-    from: 'स्रोत — {{name}}',
-    // Entry-point buttons
-    ctaGreeting: 'शुभकामना साझा करें',
-    ctaDeity: 'साझा करें',
-    ctaVerse: 'पंक्ति साझा करें',
-    ctaJaap: 'साझा करें',
-    shareFullText: 'पूरा पाठ साझा करें',
-    viaDharmagya: 'dharmagya ऐप से साझा',
-    a11yShare: 'साझा करने योग्य चित्र बनाएँ',
-    a11yShareFullText: 'पूरा पाठ व्हाट्सऐप या किसी अन्य ऐप पर साझा करें',
-  },
 
-  // ── साधना श्रृंखला + मील-पत्थर (P14.4) ─────────────────────────────────
+  // ── साधना श्रृंखला + मील-पत्थर (P14.4) — DORMANT ─────────────────────────
+  // धारा हटा दी गई थी, पर कोड जान-बूझकर रखा गया है (rebuild reference)।
+  // आज कोई स्क्रीन इन्हें माउंट नहीं करती, अतः ये कहीं नहीं दिखतीं — किंतु
+  // वे फ़ाइलें अब भी इन पथों पर t() बुलाती हैं, इसलिए कुंजियाँ साथ रहती हैं।
+  // 7ddf8c5^ से यथावत् पुनर्स्थापित; बिना call site वाली दो कुंजियाँ
+  // (streakLabel, streakDays_*) वापस नहीं लाई गईं।
   sadhana: {
-    streakLabel: 'साधना',
-    streakDays_one: 'दिन',
-    streakDays_other: 'दिन',
     dayStreakLabel_one: 'दिन साधना',
     dayStreakLabel_other: 'दिन साधना',
     a11yStreakBadge_one: 'आपकी वर्तमान साधना श्रृंखला: {{count}} दिन',
@@ -1334,7 +1619,6 @@ export default {
     },
     milestoneBlessing: 'आपकी साधना गहरी हो।',
     continueBtn: 'आगे बढ़ें',
-    shareBtn: 'साझा करें',
 
     reminderTitle: '🪔 एक शांत क्षण',
     reminderBody: 'जब समय मिले, आज की साधना आरंभ करें।',

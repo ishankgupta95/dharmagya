@@ -1,4 +1,4 @@
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -13,14 +13,15 @@ import { Ornament } from '@/components/common/Ornament';
 import { ScreenMount } from '@/components/common/ScreenMount';
 
 import { ALL_KATHAS, KATHA_DISCLAIMER } from '@/config/kathas';
+import { MotionPressable } from '@/components/common/MotionPressable';
 
 /**
  * Vrat Kathas — listing screen.
  *
  * Lists the six library kathas (Satyanarayan + five vrat kathas) as editorial
- * rows. Unlike the aarti/chalisa readers, there is no in-screen language
- * toggle — the katha narrative prose is English-primary (see `@/config/kathas`)
- * so each row shows the Devanagari title with the English title beneath it.
+ * rows. Unlike the aarti/chalisa readers there is no in-screen language toggle:
+ * both this screen and the reader it pushes to follow the app language, so each
+ * row shows a single title in that language.
  * The Practice tab routes here; tapping a row pushes `/katha/[slug]`.
  */
 export default function KathaIndexScreen() {
@@ -28,8 +29,8 @@ export default function KathaIndexScreen() {
   const isDarkMode = useStore((s) => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
   const ornamentTone = isDarkMode ? 'dark' : 'light';
-  // Katha narrative prose is English-only, but the disclaimer is bilingual —
-  // surface it in the app language so meta-text matches the chrome labels.
+  // Row titles and the bilingual disclaimer both follow the app language, the
+  // same selection the reader makes for the narrative itself.
   const lang = i18n.language === 'hi' ? 'hi' : 'en';
 
   return (
@@ -38,14 +39,14 @@ export default function KathaIndexScreen() {
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={[styles.headerRow, { paddingHorizontal: spacing.screenH, borderBottomColor: colors.divider }]}>
-          <TouchableOpacity
+          <MotionPressable
             onPress={() => router.back()}
             style={[styles.backPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={t('a11y.back')}>
             <Icon name="chevron-left" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </MotionPressable>
           <Text variant="display-italic" style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
             {t('katha.indexTitle')}
           </Text>
@@ -69,10 +70,10 @@ export default function KathaIndexScreen() {
 
           {/* ── Katha rows ──────────────────────────────────────────────── */}
           {ALL_KATHAS.map((k) => (
-            <TouchableOpacity
+            <MotionPressable
               key={k.slug}
               onPress={() => router.push({ pathname: '/katha/[slug]', params: { slug: k.slug } })}
-              activeOpacity={0.88}
+              pressedScale={0.97}
               style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
               accessibilityRole="button"
               accessibilityLabel={t('katha.a11yOpenKatha', { name: k.titleEnglish })}>
@@ -88,7 +89,7 @@ export default function KathaIndexScreen() {
                 </Text>
               </View>
               <Icon name="chevron-right" size={14} color={colors.textMuted} />
-            </TouchableOpacity>
+            </MotionPressable>
           ))}
 
           {/* ── Disclaimer footer ───────────────────────────────────────── */}

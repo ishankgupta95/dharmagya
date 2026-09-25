@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { AppText as Text } from '@/components/common/AppText';
 import { useStore } from '@/store/useStore';
-import { darkColors, lightColors, typeScale } from '@/config/theme';
+import { borderRadius, darkColors, lightColors, typeScale } from '@/config/theme';
 import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
 
 /**
@@ -14,6 +15,7 @@ import { refreshTodayWidget } from '@/services/widgets/widgetRefresh';
  * exits cleanly instead of looping back to this transient screen.
  */
 export default function RefreshWidgetScreen() {
+  const { t } = useTranslation();
   const isDarkMode = useStore((s) => s.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
   const [done, setDone] = useState(false);
@@ -26,7 +28,10 @@ export default function RefreshWidgetScreen() {
       setDone(true);
       setTimeout(() => {
         if (cancelled) return;
-        router.replace('/panchang');
+        // `dismissTo`, not `replace`: on a warm launch the widget's deep link
+        // is pushed onto the live stack, so replacing the focused route mints
+        // a second `(tabs)` navigator instead of returning to the existing one.
+        router.dismissTo('/panchang');
       }, 900);
     })();
     return () => {
@@ -46,14 +51,16 @@ export default function RefreshWidgetScreen() {
       <View
         style={[
           styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.borderAccent },
+          // Floating card over its own scrim — needs the OPAQUE raised surface,
+          // not the translucent in-page card tint (which all but vanishes here).
+          { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
         ]}
       >
-        <Text style={[typeScale.monoCaps, styles.kicker, { color: colors.accent }]}>
-          {done ? 'REFRESHED' : 'REFRESHING'}
+        <Text style={[typeScale.monoCaps, styles.kicker, { color: colors.accentText }]}>
+          {done ? t('widgetSettings.refreshed') : t('widgetSettings.refreshing')}
         </Text>
         <Text style={[typeScale.bodySerif, styles.line, { color: colors.textPrimary }]}>
-          Today’s Panchang
+          {t('widgetSettings.refreshTarget')}
         </Text>
       </View>
     </View>
@@ -70,7 +77,7 @@ const styles = StyleSheet.create({
   card: {
     paddingHorizontal: 28,
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: borderRadius.card,
     borderWidth: 1,
     minWidth: 220,
     alignItems: 'center',
